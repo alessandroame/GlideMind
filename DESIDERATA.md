@@ -7,8 +7,8 @@ Questo documento traccia lo stato di avanzamento delle funzionalità e dei modul
 | **Workspace Foundation & Governance** | Fase 0 | 🟢 Completato | Regole, skill, server di dev locale, test runner, triade di continuità cognitiva |
 | **Migrazione Core Headless: `flyability.js`** | Fase 1 | 🟢 Completato | Algoritmo waterfall a cascata, priorità aeronautica, EDR, Deardorff, protezione sottovento |
 | **Migrazione Core Headless: `geoSpatialMath.js`** | Fase 1 | 🟢 Completato | Formule WGS84, Haversine, bearing, scomposizione vento, Chaikin, Web Mercator, ENU, DEM |
-| **Migrazione Core Headless: `soundingsMath.js`** | Fase 1 | ⚪ Pianificato | Termodinamica atmosferica, LCL Cloud Base, lapse rate adiabatico |
-| **Migrazione Core Headless: `igcParser.js`** | Fase 1 | ⚪ Pianificato | Parser per record GPS B-record conformi FAI IGC |
+| **Migrazione Core Headless: `soundingsMath.js`** | Fase 1 | 🟢 Completato | Termodinamica atmosferica, LCL Cloud Base, lapse rate adiabatico, stima thermal top, barometria ICAO |
+| **Migrazione Core Headless: `igcParser.js`** | Fase 1 | 🟢 Completato | Parser per record GPS B-record conformi FAI IGC, anti-spike filter, trimming suolo, matching spot |
 | **Migrazione Core Headless: `flightTelemetry.js`** | Fase 1 | ⚪ Pianificato | Decimazione LTTB e cinematica di volo (ground speed, vario, glide ratio) |
 | **Migrazione Core Headless: `flightManeuvers.js`** | Fase 1 | ⚪ Pianificato | Rilevamento termiche, spirali, wingover e 360° |
 | **Migrazione Core Headless: `openMeteoApi.js`** | Fase 1 | ⚪ Pianificato | Client Open-Meteo con caching e supporto mock disconnesso |
