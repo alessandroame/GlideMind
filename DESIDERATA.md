@@ -5,8 +5,8 @@ Questo documento traccia lo stato di avanzamento delle funzionalità e dei modul
 | Modulo / Funzionalità | Fase | Stato | Note di Avanzamento |
 | :--- | :---: | :---: | :--- |
 | **Workspace Foundation & Governance** | Fase 0 | 🟢 Completato | Regole, skill, server di dev locale, test runner, triade di continuità cognitiva |
-| **Migrazione Core Headless: `flyability.js`** | Fase 1 | 🟡 In Lavorazione | Algoritmo waterfall di volabilità da estrarre da ParaMeteo |
-| **Migrazione Core Headless: `geoSpatialMath.js`** | Fase 1 | ⚪ Pianificato | Formule geodetiche WGS84, distanze, cuspidi, wind vector decomposition |
+| **Migrazione Core Headless: `flyability.js`** | Fase 1 | 🟢 Completato | Algoritmo waterfall a cascata, priorità aeronautica, EDR, Deardorff, protezione sottovento |
+| **Migrazione Core Headless: `geoSpatialMath.js`** | Fase 1 | 🟢 Completato | Formule WGS84, Haversine, bearing, scomposizione vento, Chaikin, Web Mercator, ENU, DEM |
 | **Migrazione Core Headless: `soundingsMath.js`** | Fase 1 | ⚪ Pianificato | Termodinamica atmosferica, LCL Cloud Base, lapse rate adiabatico |
 | **Migrazione Core Headless: `igcParser.js`** | Fase 1 | ⚪ Pianificato | Parser per record GPS B-record conformi FAI IGC |
 | **Migrazione Core Headless: `flightTelemetry.js`** | Fase 1 | ⚪ Pianificato | Decimazione LTTB e cinematica di volo (ground speed, vario, glide ratio) |
