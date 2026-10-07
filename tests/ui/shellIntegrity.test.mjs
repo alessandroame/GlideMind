@@ -1,0 +1,47 @@
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const projectRoot = path.resolve(__dirname, '../../');
+
+describe('GlideMind Phase 2 - Shell & Design System Integrity', () => {
+  it('should have index.html under 200 lines with required semantic landmarks', () => {
+    const indexPath = path.join(projectRoot, 'index.html');
+    assert.ok(fs.existsSync(indexPath), 'index.html must exist');
+
+    const htmlContent = fs.readFileSync(indexPath, 'utf-8');
+    const lines = htmlContent.split('\n');
+    assert.ok(lines.length < 200, `index.html must be < 200 lines, found ${lines.length}`);
+
+    // Verify key landmark IDs
+    assert.ok(htmlContent.includes('id="app-root"'), 'Must have #app-root');
+    assert.ok(htmlContent.includes('id="desktop-nav-bar"'), 'Must have #desktop-nav-bar');
+    assert.ok(htmlContent.includes('id="main-view"'), 'Must have #main-view');
+    assert.ok(htmlContent.includes('id="bottom-nav-bar"'), 'Must have #bottom-nav-bar');
+    assert.ok(htmlContent.includes('id="sheet-container"'), 'Must have #sheet-container');
+    assert.ok(htmlContent.includes('viewport-fit=cover'), 'Must specify viewport-fit=cover');
+  });
+
+  it('should have css/theme.css defining aeronautical design tokens and Fitts touch floor', () => {
+    const cssPath = path.join(projectRoot, 'css/theme.css');
+    assert.ok(fs.existsSync(cssPath), 'css/theme.css must exist');
+
+    const cssContent = fs.readFileSync(cssPath, 'utf-8');
+
+    // Token definitions
+    assert.ok(cssContent.includes('--gm-bg-base'), 'Must define --gm-bg-base');
+    assert.ok(cssContent.includes('--gm-bg-card'), 'Must define --gm-bg-card');
+    assert.ok(cssContent.includes('--gm-accent'), 'Must define --gm-accent');
+    assert.ok(cssContent.includes('--gm-status-flyable'), 'Must define --gm-status-flyable');
+    assert.ok(cssContent.includes('--gm-status-caution'), 'Must define --gm-status-caution');
+    assert.ok(cssContent.includes('--gm-status-unflyable'), 'Must define --gm-status-unflyable');
+    assert.ok(cssContent.includes('--gm-touch-min: 44px;'), 'Must enforce 44px Fitts touch floor');
+    assert.ok(cssContent.includes('100dvh'), 'Must use 100dvh for mobile viewport consistency');
+    assert.ok(cssContent.includes('.gm-carousel'), 'Must define .gm-carousel class');
+    assert.ok(cssContent.includes('scroll-snap-type: x mandatory'), 'Carousel must use snap scrolling');
+  });
+});

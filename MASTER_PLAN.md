@@ -120,14 +120,15 @@ The new application will deliver:
 - [x] **Quality Gate 1**: 100% tests passing in Node.js with zero DOM mocks (149/149 pass).
 
 ### Phase 2: Design System & Shell Architecture
-- [ ] Build minimal `index.html` shell (<200 lines).
-- [ ] Implement CSS design tokens in `css/theme.css`:
+- [x] Build minimal `index.html` shell (<200 lines, implemented at 108 lines).
+- [x] Implement CSS design tokens in `css/theme.css`:
   - High-Contrast Dark palette (`--gm-bg-base: #070d18`, `--gm-bg-card: #0f1c30`, etc.).
   - Fitts's law touch minimums ($44\text{px}$).
   - Single-row horizontal scroll snap carousels (`.gm-carousel`).
-- [ ] Implement `core/store.js` (Reactive State Engine).
-- [ ] Implement `ui/router.js` (5-tab navigation manager: Home, Forecast, Map, Logbook, Settings).
-- [ ] Implement `ui/sheetManager.js` (Full-height drawers and sheets, zero trapped modals).
+- [x] Implement `core/store.js` (Reactive State Engine with Pub/Sub and injectable storage adapter).
+- [x] Implement `ui/router.js` (5-tab navigation manager: Home, Forecast, Map, Logbook, Settings).
+- [x] Implement `ui/sheetManager.js` (Full-height drawers and sheets, zero trapped modals).
+- [x] **Quality Gate 2**: 100% tests passing in Node.js (173/173 pass across 18 test suites).
 
 ### Phase 3: Home Dashboard View
 - [ ] Implement `ui/views/HomeDashboardView.js`:

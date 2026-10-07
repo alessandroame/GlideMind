@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>GlideMind - Paragliding Intelligence & Telemetry</title>
+  <meta name="description" content="Piattaforma avanzata di intelligenza meteorologica e analisi telemetrica per il volo libero in parapendio e deltaplano.">
+  <meta name="theme-color" content="#070d18">
+  <link rel="stylesheet" href="css/theme.css">
+</head>
+<body>
+  <a href="#main-view" class="gm-skip-link">Salta al contenuto principale</a>
+
+  <div id="app-root">
+    <!-- Desktop Persistent Header (>= 768px) -->
+    <header id="desktop-nav-bar" role="banner">
+      <div class="gm-brand-group">
+        <div class="gm-brand-logo">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--gm-accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 2L2 19h20L12 2z"></path>
+            <path d="M12 9v4"></path>
+            <path d="M12 17h.01"></path>
+          </svg>
+          Glide<span>Mind</span>
+        </div>
+        <span class="gm-badge gm-badge-flyable" style="font-size: 0.7rem; padding: 2px 8px;">Aero V2</span>
+      </div>
+
+      <nav role="navigation" aria-label="Navigazione principale">
+        <ul class="gm-nav-links">
+          <li>
+            <a href="#home" class="gm-nav-link" data-route="home">
+              Home <span class="gm-kbd-badge">H</span>
+            </a>
+          </li>
+          <li>
+            <a href="#forecast" class="gm-nav-link" data-route="forecast">
+              Previsioni <span class="gm-kbd-badge">F</span>
+            </a>
+          </li>
+          <li>
+            <a href="#map" class="gm-nav-link" data-route="map">
+              Mappa <span class="gm-kbd-badge">M</span>
+            </a>
+          </li>
+          <li>
+            <a href="#logbook" class="gm-nav-link" data-route="logbook">
+              Logbook <span class="gm-kbd-badge">L</span>
+            </a>
+          </li>
+          <li>
+            <a href="#settings" class="gm-nav-link" data-route="settings">
+              Impostazioni <span class="gm-kbd-badge">S</span>
+            </a>
+          </li>
+        </ul>
+      </nav>
+    </header>
+
+    <!-- Main Dynamic View Container -->
+    <main id="main-view" class="gm-view-container" role="main" tabindex="-1">
+      <!-- Mount target managed by ui/router.js -->
+    </main>
+
+    <!-- Mobile Persistent Bottom Navigation (< 768px) -->
+    <nav id="bottom-nav-bar" role="navigation" aria-label="Navigazione principale mobile">
+      <button type="button" class="gm-tab-btn" data-route="home" aria-label="Home">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+          <polyline points="9 22 9 12 15 12 15 22"></polyline>
+        </svg>
+        <span>Home</span>
+      </button>
+
+      <button type="button" class="gm-tab-btn" data-route="forecast" aria-label="Previsioni">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path>
+        </svg>
+        <span>Meteo</span>
+      </button>
+
+      <button type="button" class="gm-tab-btn" data-route="map" aria-label="Mappa Decolli">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>
+          <line x1="8" y1="2" x2="8" y2="18"></line>
+          <line x1="16" y1="6" x2="16" y2="22"></line>
+        </svg>
+        <span>Mappa</span>
+      </button>
+
+      <button type="button" class="gm-tab-btn" data-route="logbook" aria-label="Libretto di Volo">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+        </svg>
+        <span>Logbook</span>
+      </button>
+
+      <button type="button" class="gm-tab-btn" data-route="settings" aria-label="Impostazioni">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+        <span>Assetto</span>
+      </button>
+    </nav>
+
+    <!-- Centralized Single-Sheet Overlay Container (Zero Nested Modals) -->
+    <div id="sheet-container" role="dialog" aria-modal="true" aria-hidden="true">
+      <div id="sheet-backdrop"></div>
+      <section class="gm-sheet" aria-labelledby="sheet-title-text">
+        <div class="gm-sheet-handle-bar">
+          <div class="gm-sheet-handle"></div>
+        </div>
+        <header class="gm-sheet-header">
+          <h3 id="sheet-title-text" class="gm-sheet-title"></h3>
+          <button type="button" class="gm-sheet-close-btn" aria-label="Chiudi pannello">&times;</button>
+        </header>
+        <div class="gm-sheet-content"></div>
+      </section>
+    </div>
+  </div>
+
+  <script type="module" src="ui/app.js"></script>
+</body>
+</html>
