@@ -9,8 +9,8 @@ Questo documento traccia lo stato di avanzamento delle funzionalità e dei modul
 | **Migrazione Core Headless: `geoSpatialMath.js`** | Fase 1 | 🟢 Completato | Formule WGS84, Haversine, bearing, scomposizione vento, Chaikin, Web Mercator, ENU, DEM |
 | **Migrazione Core Headless: `soundingsMath.js`** | Fase 1 | 🟢 Completato | Termodinamica atmosferica, LCL Cloud Base, lapse rate adiabatico, stima thermal top, barometria ICAO |
 | **Migrazione Core Headless: `igcParser.js`** | Fase 1 | 🟢 Completato | Parser per record GPS B-record conformi FAI IGC, anti-spike filter, trimming suolo, matching spot |
-| **Migrazione Core Headless: `flightTelemetry.js`** | Fase 1 | ⚪ Pianificato | Decimazione LTTB e cinematica di volo (ground speed, vario, glide ratio) |
-| **Migrazione Core Headless: `flightManeuvers.js`** | Fase 1 | ⚪ Pianificato | Rilevamento termiche, spirali, wingover e 360° |
+| **Migrazione Core Headless: `flightTelemetry.js`** | Fase 1 | 🟢 Completato | Decimazione LTTB, cinematica di volo, fasce FAI e gradienti CSS |
+| **Migrazione Core Headless: `flightManeuvers.js`** | Fase 1 | 🟢 Completato | Rilevamento termiche, spirali, wingover, 360°, circuito a 8 e merge manovre |
 | **Migrazione Core Headless: `openMeteoApi.js`** | Fase 1 | ⚪ Pianificato | Client Open-Meteo con caching e supporto mock disconnesso |
 | **Design System & Shell Architetturale** | Fase 2 | ⚪ Pianificato | Shell HTML minima, CSS custom properties, Fitts 44px, router 5-tab, store reattivo |
 | **Vista Home Dashboard (`HomeDashboardView.js`)** | Fase 3 | ⚪ Pianificato | Selettore date, carosello decolli salvati, card sintesi volabilità |

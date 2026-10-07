@@ -6,6 +6,7 @@
  */
 
 import { igcDmmToDecimal, computeDistanceKm } from './geoSpatialMath.js';
+import { analyzeFlightTelemetry } from './flightTelemetry.js';
 
 /**
  * Calculates Great-Circle distance between two points in kilometers.
@@ -355,7 +356,7 @@ export function parseIgc(igcText, knownSpots = [], options = {}) {
     let telemetry;
     if (typeof options.telemetryAnalyzer === 'function') {
         telemetry = options.telemetryAnalyzer(flightPoints);
-    } else {
+    } else if (options.skipTelemetry) {
         telemetry = {
             pointsCount: flightPoints.length,
             thermals: [],
@@ -369,6 +370,8 @@ export function parseIgc(igcText, knownSpots = [], options = {}) {
             dominantWindDrift: null,
             detectedManeuverKeys: []
         };
+    } else {
+        telemetry = analyzeFlightTelemetry(flightPoints);
     }
 
     // Auto-detect takeoff and landing site names from known spots catalog within 500m
