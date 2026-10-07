@@ -1,0 +1,16 @@
+node_modules/
+.DS_Store
+Thumbs.db
+*.log
+*-debug.log*
+.system_generated/
+scratch/
+dist/
+coverage/
+.cache/
+.env
+.env.*
+.vscode/
+.idea/
+.gemini/
+.agents/plugins/

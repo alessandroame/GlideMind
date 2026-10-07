@@ -1,0 +1,24 @@
+{
+  "name": "glidemind",
+  "version": "1.0.0",
+  "description": "Free Flight Weather & Flight Logbook PWA",
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "dev": "node scripts/serve.js"
+  },
+  "keywords": [
+    "paragliding",
+    "weather",
+    "hang-gliding",
+    "flight-logbook",
+    "open-meteo",
+    "igc",
+    "pwa"
+  ],
+  "author": "Alessandro Amè",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
