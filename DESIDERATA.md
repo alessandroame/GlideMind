@@ -11,7 +11,7 @@ Questo documento traccia lo stato di avanzamento delle funzionalità e dei modul
 | **Migrazione Core Headless: `igcParser.js`** | Fase 1 | 🟢 Completato | Parser per record GPS B-record conformi FAI IGC, anti-spike filter, trimming suolo, matching spot |
 | **Migrazione Core Headless: `flightTelemetry.js`** | Fase 1 | 🟢 Completato | Decimazione LTTB, cinematica di volo, fasce FAI e gradienti CSS |
 | **Migrazione Core Headless: `flightManeuvers.js`** | Fase 1 | 🟢 Completato | Rilevamento termiche, spirali, wingover, 360°, circuito a 8 e merge manovre |
-| **Migrazione Core Headless: `openMeteoApi.js`** | Fase 1 | ⚪ Pianificato | Client Open-Meteo con caching e supporto mock disconnesso |
+| **Migrazione Core Headless: `openMeteoApi.js`** | Fase 1 | 🟢 Completato | Client Open-Meteo con cache LRU in memoria, retry 429, fallback modelli, dati sintetici e arricchimento EDR |
 | **Design System & Shell Architetturale** | Fase 2 | ⚪ Pianificato | Shell HTML minima, CSS custom properties, Fitts 44px, router 5-tab, store reattivo |
 | **Vista Home Dashboard (`HomeDashboardView.js`)** | Fase 3 | ⚪ Pianificato | Selettore date, carosello decolli salvati, card sintesi volabilità |
 | **Vista Previsioni Meteo (`ForecastView.js`)** | Fase 4 | ⚪ Pianificato | Timeline oraria a cascata, indicatore vento 360°, radiosondaggi, briefing AI Guido |

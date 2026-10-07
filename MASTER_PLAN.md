@@ -101,7 +101,7 @@ The new application will deliver:
 - [x] Initialize `package.json`, `.gitignore`, dev server harness (`scripts/serve.js`), and smoke test runner (`node --test`).
 
 ### Phase 1: Core Engine Migration & Automated Test Harness
-- [ ] Extract pure logic modules from `C:\github\ParaMeteo\js\` into `C:\github\GlideMind\core\`:
+- [x] Extract pure logic modules from `C:\github\ParaMeteo\js\` into `C:\github\GlideMind\core\`:
   - `core/flyability.js` (waterfall algorithm)
   - `core/geoSpatialMath.js` (geodesic formulas)
   - `core/soundingsMath.js` (thermodynamic soundings, LCL cloud base)
@@ -109,13 +109,15 @@ The new application will deliver:
   - `core/flightTelemetry.js` (LTTB decimation & flight kinematics)
   - `core/flightManeuvers.js` (thermals, spirals, wingovers detector)
   - `core/openMeteoApi.js` (weather client with mock support)
-  - `core/data/sites.json` (canonical takeoffs & landings registry)
-- [ ] Implement automated unit test suite in `tests/core/`:
+- [x] Implement automated unit test suite in `tests/core/`:
   - `tests/core/flyability.test.mjs`
-  - `tests/core/igcParser.test.mjs`
+  - `tests/core/geoSpatialMath.test.mjs`
   - `tests/core/soundingsMath.test.mjs`
+  - `tests/core/igcParser.test.mjs`
+  - `tests/core/flightTelemetry.test.mjs`
   - `tests/core/flightManeuvers.test.mjs`
-- [ ] **Quality Gate 1**: 100% tests passing in Node.js with zero DOM mocks.
+  - `tests/core/openMeteoApi.test.mjs`
+- [x] **Quality Gate 1**: 100% tests passing in Node.js with zero DOM mocks (149/149 pass).
 
 ### Phase 2: Design System & Shell Architecture
 - [ ] Build minimal `index.html` shell (<200 lines).
