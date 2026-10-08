@@ -62,7 +62,16 @@ export interface FlyingSite {
 
 ---
 
-## 2. Algoritmo di Sintesi della Volabilità del Comprensorio
+## 2. Regola dell'Unico Binomio (1 Decollo + 1 Atterraggio per Comprensorio)
+
+Per garantire la massima leggibilità a colpo d'occhio outdoor ed eliminare il sovraccarico cognitivo del pilota (*Miller's Law* e *Hick's Law*):
+- Ciascun comprensorio sintetizza **esclusivamente un singolo decollo** e **un singolo atterraggio**.
+- Nel modello dati, ogni decollo e atterraggio possiede la proprietà `isPrimary: boolean`, dove il decollo e atterraggio principale o ufficiale del sito sono contrassegnati con `isPrimary: true`.
+- L'oggetto di valutazione finale espone esplicitamente il binomio selezionato (`takeoff` e `landing`, con i rispettivi flag `isTakeoffPrimary` e `isLandingPrimary`).
+
+---
+
+## 3. Algoritmo di Sintesi della Volabilità del Comprensorio
 
 Per un pilota che non pratica cross-country, una località è fruibile se e solo se sussiste contemporaneamente la praticabilità di almeno un decollo e la sicurezza dell'atterraggio:
 

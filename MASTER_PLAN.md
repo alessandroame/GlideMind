@@ -130,12 +130,12 @@ The new application will deliver:
 - [x] Implement `ui/sheetManager.js` (Full-height drawers and sheets, zero trapped modals).
 - [x] **Quality Gate 2**: 100% tests passing in Node.js (173/173 pass across 18 test suites).
 
-### Phase 3: Home Dashboard View
-- [ ] Implement `ui/views/HomeDashboardView.js`:
-  - **Date Scrubber**: Quick pills (Today, Tomorrow, Weekend, Calendar).
-  - **Pinned Takeoffs Carousel**: Horizontal swipeable cards with live flyability status badge, takeoff heading, and wind vector arrow.
-  - **Quick Search & Spot Selector**: Instant filtering by name, region, or GPS distance.
-  - **Nowcast Summary**: High-contrast summary card with primary launch safety verdict.
+### Phase 3: Home Dashboard View (Completata)
+- [x] Implement `core/comprensorio.js` (Comprensorio normalization, glide cone to landing $E_{\text{richiesta}}$, dual launch/landing flyability evaluation, and dynamic sorting).
+- [x] Implement `ui/views/HomeDashboardView.js`:
+  - **Block 1**: Volabilità Comprensori dynamically sorted by flyability descending (Flyable -> Caution -> Unflyable) with $T_{\text{best}}$, $L_{\text{safe}}$, and Explainability reasoning (Zero PIN/favorites clutter, instant search filter).
+  - **Block 2**: Pilot Activity & Currency summary with high-contrast primary CTA `+ Carica Traccia IGC` ($\ge 48\text{px}$).
+- [x] **Quality Gate 3**: 100% tests passing in Node.js (191/191 pass across 25 test suites).
 
 ### Phase 4: Weather & Flyability Dashboard
 - [ ] Implement `ui/views/ForecastView.js`:

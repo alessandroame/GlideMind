@@ -39,9 +39,37 @@ describe('GlideMind Phase 2 - Shell & Design System Integrity', () => {
     assert.ok(cssContent.includes('--gm-status-flyable'), 'Must define --gm-status-flyable');
     assert.ok(cssContent.includes('--gm-status-caution'), 'Must define --gm-status-caution');
     assert.ok(cssContent.includes('--gm-status-unflyable'), 'Must define --gm-status-unflyable');
-    assert.ok(cssContent.includes('--gm-touch-min: 44px;'), 'Must enforce 44px Fitts touch floor');
+    assert.ok(cssContent.includes('--gm-touch-min: 48px;'), 'Must enforce 48px Fitts touch floor');
     assert.ok(cssContent.includes('100dvh'), 'Must use 100dvh for mobile viewport consistency');
     assert.ok(cssContent.includes('.gm-carousel'), 'Must define .gm-carousel class');
     assert.ok(cssContent.includes('scroll-snap-type: x mandatory'), 'Carousel must use snap scrolling');
+  });
+
+  it('should enforce CSS layout safeguards against card duplication and invisible heading displacement', () => {
+    const cssPath = path.join(projectRoot, 'css/theme.css');
+    const cssContent = fs.readFileSync(cssPath, 'utf-8');
+
+    // Safeguard 1: .gm-spot-card must be declared exactly once as a standalone block
+    const standaloneMatches = cssContent.match(/^\.gm-spot-card\s*\{/gm);
+    assert.equal(
+      standaloneMatches ? standaloneMatches.length : 0,
+      1,
+      'Must have exactly ONE standalone .gm-spot-card declaration in css/theme.css'
+    );
+
+    // Safeguard 2: .gm-spot-card must be 100% responsive width (never fixed width on mobile)
+    assert.ok(
+      cssContent.includes('.gm-spot-card {\n  width: 100%;') ||
+      cssContent.includes('.gm-spot-card {\r\n  width: 100%;') ||
+      /\.gm-spot-card\s*\{[^}]*width:\s*100%/.test(cssContent),
+      '.gm-spot-card must declare width: 100% for mobile responsiveness'
+    );
+
+    // Safeguard 3: .sr-only must be defined with position: absolute to prevent visual layout shifts
+    assert.ok(cssContent.includes('.sr-only {'), 'Must define .sr-only utility class');
+    assert.ok(
+      /\.sr-only\s*\{[^}]*position:\s*absolute/.test(cssContent),
+      '.sr-only must have position: absolute'
+    );
   });
 });
