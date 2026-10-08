@@ -13,9 +13,9 @@ Questo documento traccia lo stato di avanzamento delle funzionalità e dei modul
 | **Migrazione Core Headless: `flightManeuvers.js`** | Fase 1 | 🟢 Completato | Rilevamento termiche, spirali, wingover, 360°, circuito a 8 e merge manovre |
 | **Migrazione Core Headless: `openMeteoApi.js`** | Fase 1 | 🟢 Completato | Client Open-Meteo con cache LRU in memoria, retry 429, fallback modelli, dati sintetici e arricchimento EDR |
 | **Design System & Shell Architetturale** | Fase 2 | 🟢 Completato | Shell HTML minima (108 righe), CSS custom properties, Fitts 44px, router 5-tab, store reattivo SSOT, sheetManager |
-| **Vista Home Dashboard (`HomeDashboardView.js`)** | Fase 3 | ⚪ Pianificato | Selettore date, carosello decolli salvati, card sintesi volabilità |
-| **Vista Previsioni Meteo (`ForecastView.js`)** | Fase 4 | ⚪ Pianificato | Timeline oraria a cascata, indicatore vento 360°, radiosondaggi, briefing AI Guido |
-| **Vista Mappa Decolli (`SpotMapView.js`)** | Fase 5 | ⚪ Pianificato | Cartografia interattiva, coni di decollo orientati al vento, filtro raggio "Dove volare oggi" |
+| **Vista Home Dashboard (`HomeDashboardView.js`)** | Fase 3 | 🟡 In Lavorazione | Selettore date, carosello località preferite, card sintesi volabilità comprensorio (miglior decollo + atterraggio) |
+| **Vista Previsioni Meteo (`ForecastView.js`)** | Fase 4 | ⚪ Pianificato | Panoramica comprensorio (decolli e atterraggi), timeline oraria a cascata, indicatore vento 360°, radiosondaggi, briefing AI |
+| **Vista Mappa Comprensori (`SpotMapView.js`)** | Fase 5 | ⚪ Pianificato | Cartografia comprensori, coni decollo orientati al vento, planata verso atterraggi, filtro raggio "Dove volare oggi" |
 | **Modulo Logbook di Volo (`LogbookView.js`)** | Fase 6 | ⚪ Pianificato | Inserimento IGC, IndexedDB `logbookDb.js`, KPI di carriera, matrice Peter Pan |
 | **Visualizzatore 3D Traiettoria (`FlightReplayView.js`)**| Fase 7 | ⚪ Pianificato | Replay WebGL 3D su terreno DEM Terrarium, telemetry strip 2D a 60 FPS |
 | **PWA, Internazionalizzazione & Offline Hardening** | Fase 8 | ⚪ Pianificato | Service Worker passthrough, Web App Manifest, supporto i18n a 4 lingue, WCAG AA |
