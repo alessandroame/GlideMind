@@ -4,23 +4,23 @@
  */
 
 :root {
-  /* High-Contrast Glare-Resistant Dark Palette */
-  --gm-bg-base: #070d18;
-  --gm-bg-card: #0f1c30;
-  --gm-bg-elevated: #16263e;
-  --gm-bg-surface: #1e3352;
-  --gm-bg-hover: #27436b;
+  /* High-Contrast Glare-Resistant Dark Palette (Neutral Carbon & Deep Slate) */
+  --gm-bg-base: #0b0d12;
+  --gm-bg-card: #13161f;
+  --gm-bg-elevated: #1b202c;
+  --gm-bg-surface: #242a3a;
+  --gm-bg-hover: #2e3549;
 
   /* Typography Colors */
-  --gm-text-primary: #f0f4f8;
-  --gm-text-secondary: #94a3b8;
+  --gm-text-primary: #f3f5f8;
+  --gm-text-secondary: #9aa2b1;
   --gm-text-muted: #64748b;
-  --gm-text-inverse: #070d18;
+  --gm-text-inverse: #0b0d12;
 
-  /* Accent & Aeronautical Palette */
-  --gm-accent: #38bdf8;
-  --gm-accent-glow: rgba(56, 189, 248, 0.25);
-  --gm-accent-strong: #0284c7;
+  /* Accent & Aeronautical Palette (Aviation Cockpit Amber & Gold - Zero Blue) */
+  --gm-accent: #f59e0b;
+  --gm-accent-glow: rgba(245, 158, 11, 0.25);
+  --gm-accent-strong: #d97706;
 
   /* Flyability Status Codes */
   --gm-status-flyable: #22c55e;
@@ -33,9 +33,9 @@
   --gm-status-alert-bg: rgba(249, 115, 22, 0.15);
 
   /* Borders & Dividers */
-  --gm-border: rgba(255, 255, 255, 0.09);
-  --gm-border-strong: rgba(255, 255, 255, 0.18);
-  --gm-border-focus: #38bdf8;
+  --gm-border: rgba(255, 255, 255, 0.08);
+  --gm-border-strong: rgba(255, 255, 255, 0.16);
+  --gm-border-focus: #f59e0b;
 
   /* Ergonomic Spacing & Fitts's Law Dimensions */
   --gm-touch-min: 44px;
@@ -327,7 +327,7 @@ button, input, select, textarea {
 }
 
 .gm-btn-primary:hover {
-  background-color: #7dd3fc;
+  background-color: #fbbf24;
 }
 
 .gm-btn-secondary {
@@ -561,8 +561,350 @@ button, input, select, textarea {
     opacity: 0;
     transition: transform var(--gm-transition-fast), opacity var(--gm-transition-fast);
   }
-  #sheet-container.active .gm-sheet {
-    transform: scale(1);
-    opacity: 1;
+}
+
+/* -------------------------------------------------------------
+ * 8. Aeronautical UI Components (Pills, Stats, Spot Cards, Timeline)
+ * ------------------------------------------------------------- */
+
+/* Pill Filters & Date Scrubber */
+.gm-pill-group {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: 4px 0;
+}
+.gm-pill-group::-webkit-scrollbar {
+  display: none;
+}
+
+.gm-pill {
+  min-height: var(--gm-touch-min);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 16px;
+  border-radius: var(--gm-radius-full);
+  background-color: var(--gm-bg-elevated);
+  border: 1px solid var(--gm-border-strong);
+  color: var(--gm-text-secondary);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  scroll-snap-align: start;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--gm-transition-fast), color var(--gm-transition-fast), border-color var(--gm-transition-fast);
+}
+
+.gm-pill:hover {
+  background-color: var(--gm-bg-hover);
+  color: var(--gm-text-primary);
+}
+
+.gm-pill.active {
+  background-color: var(--gm-accent);
+  color: var(--gm-text-inverse);
+  border-color: var(--gm-accent);
+  font-weight: 700;
+  box-shadow: 0 0 12px var(--gm-accent-glow);
+}
+
+/* Stat Metrics Grid */
+.gm-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin: 12px 0;
+}
+
+@media (min-width: 768px) {
+  .gm-stat-grid {
+    grid-template-columns: repeat(4, 1fr);
   }
 }
+
+.gm-stat-box {
+  background-color: var(--gm-bg-card);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-sm);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gm-stat-lbl {
+  font-size: 0.72rem;
+  color: var(--gm-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.gm-stat-val {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--gm-text-primary);
+  font-family: var(--gm-font-mono);
+  letter-spacing: -0.02em;
+}
+
+.gm-stat-sub {
+  font-size: 0.76rem;
+  color: var(--gm-text-secondary);
+}
+
+/* Search Box */
+.gm-search-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background-color: var(--gm-bg-card);
+  border: 1px solid var(--gm-border-strong);
+  border-radius: var(--gm-radius-sm);
+  padding: 0 14px;
+  min-height: var(--gm-touch-min);
+  margin-bottom: 12px;
+  transition: border-color var(--gm-transition-fast), box-shadow var(--gm-transition-fast);
+}
+
+.gm-search-box:focus-within {
+  border-color: var(--gm-accent);
+  box-shadow: 0 0 0 2px var(--gm-accent-glow);
+}
+
+.gm-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 0.92rem;
+  color: var(--gm-text-primary);
+}
+
+.gm-search-input::placeholder {
+  color: var(--gm-text-muted);
+}
+
+/* Spot Carousel Cards */
+.gm-spot-card {
+  width: 270px;
+  background-color: var(--gm-bg-card);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-md);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  cursor: pointer;
+  transition: border-color var(--gm-transition-fast), transform var(--gm-transition-fast);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.gm-spot-card:hover {
+  border-color: var(--gm-border-strong);
+  transform: translateY(-2px);
+}
+
+.gm-spot-card.selected {
+  border-color: var(--gm-accent);
+  box-shadow: 0 0 16px var(--gm-accent-glow);
+}
+
+.gm-spot-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.gm-spot-name {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--gm-text-primary);
+  margin: 0;
+  line-height: 1.3;
+}
+
+.gm-spot-subtext {
+  font-size: 0.78rem;
+  color: var(--gm-text-muted);
+  margin-top: 2px;
+}
+
+.gm-spot-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: var(--gm-text-secondary);
+}
+
+.gm-spot-wind-val {
+  font-family: var(--gm-font-mono);
+  font-weight: 700;
+  color: var(--gm-text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Hourly Timeline Strip */
+.gm-timeline-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: 8px 2px;
+}
+.gm-timeline-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.gm-timeline-col {
+  flex: 0 0 68px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 4px;
+  background-color: var(--gm-bg-card);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-sm);
+  cursor: pointer;
+  scroll-snap-align: start;
+  transition: border-color var(--gm-transition-fast), background-color var(--gm-transition-fast);
+}
+
+.gm-timeline-col:hover {
+  background-color: var(--gm-bg-hover);
+}
+
+.gm-timeline-col.active {
+  border-color: var(--gm-accent);
+  background-color: var(--gm-bg-elevated);
+  box-shadow: 0 0 10px var(--gm-accent-glow);
+}
+
+.gm-timeline-col .time {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--gm-text-secondary);
+}
+
+.gm-timeline-col .bar {
+  width: 12px;
+  height: 48px;
+  border-radius: var(--gm-radius-full);
+  background-color: var(--gm-bg-surface);
+  position: relative;
+  overflow: hidden;
+}
+
+.gm-timeline-col .bar-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  border-radius: var(--gm-radius-full);
+}
+
+.gm-timeline-col .wind-speed {
+  font-size: 0.75rem;
+  font-family: var(--gm-font-mono);
+  font-weight: 700;
+  color: var(--gm-text-primary);
+}
+
+/* Flight Log Card */
+.gm-flight-card {
+  background-color: var(--gm-bg-card);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-md);
+  padding: 16px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color var(--gm-transition-fast);
+}
+
+.gm-flight-card:hover {
+  border-color: var(--gm-border-strong);
+}
+
+/* Toggle Group for Settings */
+.gm-toggle-group {
+  display: inline-flex;
+  background-color: var(--gm-bg-base);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-sm);
+  padding: 3px;
+  gap: 2px;
+}
+
+.gm-toggle-btn {
+  min-height: var(--gm-touch-min);
+  padding: 6px 14px;
+  border: none;
+  background: transparent;
+  color: var(--gm-text-secondary);
+  font-weight: 600;
+  font-size: 0.84rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color var(--gm-transition-fast), color var(--gm-transition-fast);
+}
+
+.gm-toggle-btn.active {
+  background-color: var(--gm-accent);
+  color: var(--gm-text-inverse);
+  font-weight: 700;
+}
+
+/* Inline Text Button with Fitts Floor (>= 44px hit target) */
+.gm-text-btn {
+  background: transparent;
+  border: none;
+  color: var(--gm-accent);
+  font-weight: 600;
+  font-size: 0.82rem;
+  min-height: var(--gm-touch-min);
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color var(--gm-transition-fast), opacity var(--gm-transition-fast);
+}
+
+.gm-text-btn:hover {
+  color: #fbbf24;
+}
+
+.gm-text-btn:active {
+  opacity: 0.8;
+}
+
+/* Large Icon Button for Outdoor Touch (>= 48px) */
+.gm-btn-icon-lg {
+  min-width: 48px;
+  min-height: 48px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
