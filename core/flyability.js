@@ -15,10 +15,52 @@
 export const NO_FLY_BG = 'fly-seg-nofly';
 export const NO_DATA_BG = 'fly-seg-nd';
 
+/**
+ * @deprecated Aerodynamic limits derive directly from glider class and specifications (vTrim, AR, glideRatio),
+ * avoiding arbitrary pilot self-declaration in the UI.
+ */
 export const PilotExperienceLevel = Object.freeze({
     BEGINNER: 'beginner',
     INTERMEDIATE: 'intermediate',
     EXPERT: 'expert'
+});
+
+/**
+ * Standard FAI/EN Paraglider Certification Classes & Aerodynamic Baselines.
+ */
+export const GLIDER_CLASSES = Object.freeze({
+    EN_A: Object.freeze({
+        name: 'Scuola / Principiante (EN-A)',
+        category: 'EN-A',
+        vTrim: 36,
+        vMax: 46,
+        ar: 4.8,
+        glideRatio: 7.8
+    }),
+    EN_B: Object.freeze({
+        name: 'Standard / Intermedio (EN-B)',
+        category: 'EN-B',
+        vTrim: 38,
+        vMax: 50,
+        ar: 5.3,
+        glideRatio: 8.6
+    }),
+    EN_C: Object.freeze({
+        name: 'Sport / Avanzato (EN-C)',
+        category: 'EN-C',
+        vTrim: 40,
+        vMax: 55,
+        ar: 6.2,
+        glideRatio: 9.8
+    }),
+    EN_D: Object.freeze({
+        name: 'Competizione (EN-D / CCC)',
+        category: 'EN-D',
+        vTrim: 42,
+        vMax: 60,
+        ar: 7.0,
+        glideRatio: 10.5
+    })
 });
 
 export const PriorityWeights = Object.freeze({
@@ -31,6 +73,7 @@ export const PriorityWeights = Object.freeze({
 
 export const DEFAULT_GLIDER = Object.freeze({
     name: 'Standard EN-A/B',
+    category: 'EN-A',
     vTrim: 37,
     vMax: 50,
     ar: 5.1,
