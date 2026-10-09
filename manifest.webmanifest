@@ -1,7 +1,7 @@
 {
-  "name": "GlideMind - Paragliding Intelligence & Telemetry",
+  "name": "GlideMind - Free Flight Aerology & Logbook",
   "short_name": "GlideMind",
-  "description": "Piattaforma avanzata di intelligenza meteorologica e analisi telemetrica per il volo libero in parapendio e deltaplano.",
+  "description": "Piattaforma di aerologia, pianificazione comprensori e logbook telemetrico per il volo libero in parapendio e deltaplano.",
   "start_url": "./index.html",
   "display": "standalone",
   "orientation": "portrait",

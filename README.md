@@ -1,4 +1,4 @@
-# 🦅 GlideMind - Free Flight Intelligence
+# 🦅 GlideMind - Free Flight Aerology & Logbook
 
 **GlideMind** is a weather assessment and flight logbook PWA designed for paragliding and hang gliding pilots.
 

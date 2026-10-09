@@ -16,7 +16,7 @@ Il punto di riferimento approvato è il mockup dello splash screen verticale (9:
   - *Gradiente Ambra*: Da `#fbbf24` (luce zenitale) a `#f59e0b` (ambra aeronautica primaria) e `#d97706` (ambra profonda).
   - *Bagliore Perimetrale*: `rgba(245, 158, 11, 0.25)` controllato.
   - *Tipografia Brand*: `GLIDEMIND` in `#f3f5f8` (sans-serif geometrico maiuscolo, `letter-spacing: 0.15em`).
-  - *Payoff*: `FREE FLIGHT INTELLIGENCE` in `#9aa2b1` / tonalità ambrata desaturata.
+  - *Payoff*: `FREE FLIGHT AEROLOGY & LOGBOOK` in `#9aa2b1` / tonalità ambrata desaturata.
   - *Trama di Sfondo*: Micro-trama geometrica a fibra di carbonio opaca.
 
 ---
@@ -56,7 +56,7 @@ Il punto di riferimento approvato è il mockup dello splash screen verticale (9:
    - Markup critico inserito a livello radice prima di `#app-root`:
      - Container `#gm-splash-screen` a tutta altezza (`100dvh`, background `#0b0d12`, `z-index: 99999`).
      - Emblema alare in SVG inline centrato verticalmente (42-45% dall'alto).
-     - Tipografia `GLIDEMIND` e payoff `FREE FLIGHT INTELLIGENCE`.
+     - Tipografia `GLIDEMIND` e payoff `FREE FLIGHT AEROLOGY & LOGBOOK`.
 3. **Dismiss Sincronizzato con l'Idratazione dello Store**:
    - All'aggancio del router o completamento del boot:
      - Aggiunta classe `.gm-splash-hidden` (`opacity: 0; pointer-events: none; transition: opacity 300ms ease;`).
