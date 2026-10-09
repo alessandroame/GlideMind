@@ -6064,5 +6064,33 @@
         "reliability": 48
       }
     ]
+  },
+  {
+    "id": "campetto-scuola-peter-pan-torino",
+    "location": "Campetto Scuola Peter Pan (Torino - TO)",
+    "description": "Area didattica e campo scuola per addestramento a terra (ground handling) ed esercitazioni di gonfiaggio vele della Scuola Parapendio Peter Pan, situata a Torino Sud lungo l'area verde del Parco Sangone / Mirafiori.",
+    "club": {
+      "name": "Scuola Parapendio Peter Pan A.S.D."
+    },
+    "reliability": 95,
+    "takeoffs": [
+      {
+        "name": "Campetto Peter Pan (Pratica a terra / Decollo scuola)",
+        "coordinates": "45.009697, 7.626743",
+        "altitude": 240,
+        "heading": 180,
+        "description": "Prato pianeggiante dedicato a esercitazioni di gonfiaggio fronte/rovescio e controllo vela al suolo.",
+        "reliability": 95
+      }
+    ],
+    "landings": [
+      {
+        "name": "Area Atterraggio Campetto Peter Pan",
+        "coordinates": "45.009697, 7.626743",
+        "altitude": 240,
+        "description": "Superficie erbosa per rientro da brevi stacchi didattici e ripiegamento vele.",
+        "reliability": 95
+      }
+    ]
   }
 ]

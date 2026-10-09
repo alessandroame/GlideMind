@@ -2785,6 +2785,42 @@
           }
         ],
         "reliability": 90
+      },
+      {
+        "location": "Campetto Scuola Peter Pan (Torino - TO)",
+        "description": "Area didattica e campo scuola per addestramento a terra (ground handling) ed esercitazioni di gonfiaggio vele della Scuola Parapendio Peter Pan, situata a Torino Sud lungo l'area verde del Parco Sangone / Mirafiori.",
+        "club": {
+          "name": "Scuola Parapendio Peter Pan A.S.D.",
+          "phone": "+39 347 2575423",
+          "email": "info@scuolapeterpan.it",
+          "contactName": "Guido Teppa (Istruttore AeCI / FIVL)",
+          "website": "https://www.scuolapeterpan.it",
+          "radioFreq": "144.300 MHz / RRM 8-16 (446.09375 MHz CTCSS 16)"
+        },
+        "takeoffs": [
+          {
+            "name": "Campetto Peter Pan (Pratica a terra / Decollo scuola)",
+            "coordinates": "45.009697, 7.626743",
+            "altitude": 240,
+            "heading": 180,
+            "description": "Prato pianeggiante dedicato a esercitazioni di gonfiaggio fronte/rovescio e controllo vela al suolo.",
+            "hazards": "Attenzione agli alberi perimetrali, recinzioni del parco e frequentatori dell'area verde pubblica.",
+            "access": "Accesso immediato da Strada Castello di Mirafiori a Torino Sud con parcheggio nelle immediate vicinanze.",
+            "reliability": 95
+          }
+        ],
+        "landings": [
+          {
+            "name": "Area Atterraggio Campetto Peter Pan",
+            "coordinates": "45.009697, 7.626743",
+            "altitude": 240,
+            "description": "Superficie erbosa per rientro da brevi stacchi didattici e ripiegamento vele.",
+            "hazards": "Mantenere distanza di sicurezza da passanti e strutture del parco urbano.",
+            "rules": "Utilizzo per fini didattici ed addestrativi. Rispettare la fruizione pubblica del parco.",
+            "reliability": 95
+          }
+        ],
+        "reliability": 95
       }
     ],
     "Puglia": [

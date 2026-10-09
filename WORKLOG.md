@@ -253,6 +253,20 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Definita la collocazione dell'interfaccia utente nel tab `#settings` ([ui/views/SettingsView.js](file:///ui/views/SettingsView.js)) con selettore tema a 3 vie (`Scuro`, `Chiaro`, `Auto`), gestione profilo ala attiva/hangar (proxy EN-A..EN-D), unità aeronautiche e backup/restore.
   - Sincronizzati [DESIDERATA.md](file:///DESIDERATA.md), [MASTER_PLAN.md](file:///MASTER_PLAN.md), [.agents/rules/constraints.md](file:///.agents/rules/constraints.md) e registrata la Lezione #32 in [MEMORY.md](file:///MEMORY.md).
 
+---
+
+## 2026-10-09 - Integrazione Campetto Scuola Peter Pan (Torino) nel Catalogo Dati
+- **Tipo**: Data Integration / Domain Modeling / Test Automation
+- **Dettagli**: [.agents/worklog.d/2026-10-09_campetto-peter-pan-torino-spot-integration.md](file:///.agents/worklog.d/2026-10-09_campetto-peter-pan-torino-spot-integration.md)
+- **Sintesi**:
+  - Censito e integrato nel catalogo ufficiale [data/locations.json](file:///data/locations.json) (Piemonte) il campo scuola e area di addestramento a terra (ground handling) della Scuola Parapendio Peter Pan (A.S.D. diretta da Guido Teppa).
+  - Coordinate WGS84: `45.009697, 7.626743` (quota 240 m s.l.m., Parco Sangone / Colonnetti, Torino Sud).
+  - Modellato secondo l'architettura dell'Unico Binomio (decollo didattico + atterraggio coincidente su superficie erbosa, efficienza richiesta $E = 0$).
+  - Inserito il record verificato anche in [data/staging-locations.json](file:///data/staging-locations.json).
+  - Implementato unit test di integrazione in [tests/core/comprensorio.test.mjs](file:///tests/core/comprensorio.test.mjs) (270/270 test passati nel test runner nativo).
+  - Registrata la Lezione #33 in [MEMORY.md](file:///MEMORY.md).
+
+
 
 
 

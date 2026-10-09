@@ -1,5 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import {
   parseCoordinates,
   slugifyComprensorio,
@@ -468,6 +470,41 @@ describe('GlideMind Comprensorio Locality & Dual Launch/Landing Evaluator', () =
       assert.equal(site.reliability, 93);
       assert.equal(site.takeoffs[0].reliability, 95);
       assert.equal(site.landings[0].reliability, 96);
+    });
+  });
+
+  describe('Verified Ground Handling / Campetto Integration', () => {
+    it('should include Campetto Scuola Peter Pan (Torino) in locations.json and evaluate correctly', () => {
+      const locationsPath = path.resolve(process.cwd(), 'data/locations.json');
+      const rawCatalog = JSON.parse(fs.readFileSync(locationsPath, 'utf-8'));
+      assert.ok(rawCatalog.IT?.Piemonte, 'Piemonte region must exist');
+
+      const piemonteSpots = rawCatalog.IT.Piemonte;
+      const peterPanSpot = piemonteSpots.find(s => s.location.includes('Campetto Scuola Peter Pan'));
+      assert.ok(peterPanSpot, 'Campetto Scuola Peter Pan must be present in Piemonte spots');
+      assert.equal(peterPanSpot.location, 'Campetto Scuola Peter Pan (Torino - TO)');
+      assert.ok(peterPanSpot.club?.name?.includes('Peter Pan'));
+      assert.equal(peterPanSpot.takeoffs[0].coordinates, '45.009697, 7.626743');
+      assert.equal(peterPanSpot.takeoffs[0].altitude, 240);
+      assert.equal(peterPanSpot.landings[0].coordinates, '45.009697, 7.626743');
+
+      // Test catalog normalization
+      const normalizedCatalog = normalizeLocationsCatalog(rawCatalog);
+      const normalizedSpot = normalizedCatalog.find(c => c.location.includes('Campetto Scuola Peter Pan'));
+      assert.ok(normalizedSpot, 'Normalized catalog must contain Campetto Scuola Peter Pan');
+      assert.equal(normalizedSpot.province, 'TO');
+      assert.equal(normalizedSpot.region, 'Piemonte');
+
+      // Test flyability evaluation for ground handling / school hops
+      const evalResult = evaluateComprensorio({
+        comprensorio: normalizedSpot,
+        glider: GLIDER_CLASSES.EN_A
+      });
+      assert.ok(evalResult);
+      assert.equal(evalResult.status, 'flyable');
+      assert.equal(evalResult.badge, 'Aperto');
+      assert.equal(evalResult.glideMetrics.isSafe, true);
+      assert.equal(evalResult.glideMetrics.requiredGlideRatio, 0);
     });
   });
 });
