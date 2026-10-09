@@ -114,6 +114,17 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Ottimizzata la geometria del viewport su risoluzione mobile di riferimento (390 x 844 px): tutti i 4 comprensori e la barra attività rientrano interamente nella prima schermata con 31px di spazio libero sopra la barra di navigazione fissa (#bottom-nav-bar).
   - Aggiunte salvaguardie automatizzate permanenti in [tests/ui/shellIntegrity.test.mjs](file:///tests/ui/shellIntegrity.test.mjs) e [tests/ui/homeDashboardView.test.mjs](file:///tests/ui/homeDashboardView.test.mjs) (199/199 test superati).
 
+---
 
-
-
+## 2026-10-09 - Fase 4: Implementazione Vista Previsioni Meteo (ForecastView)
+- **Tipo**: Feature / UI View / Aerologia / Radiosondaggi
+- **Dettagli**: [.agents/worklog.d/2026-10-09_phase-4-forecast-view-implementation.md](file:///.agents/worklog.d/2026-10-09_phase-4-forecast-view-implementation.md)
+- **Sintesi**:
+  - Implementazione della vista [ui/views/ForecastView.js](file:///ui/views/ForecastView.js) aderente ai vincoli Laws of UX 2026 (touch floor $\ge 48\text{px}$, zero overflow-x).
+  - Panoramica comprensorio basata sull'Unico Binomio ($T_{\text{best}}$ e $L_{\text{safe}}$), selettore spot accessibile e selettore data a 3 tab (Oggi, Domani, +2 Giorni).
+  - Timeline oraria a cascata (08:00 - 20:00) con waterfall bars color-coded (Flyable / Caution / Unflyable), freccia vento e scrubbing interattivo ultra-rapido (< 50ms).
+  - Bussola 360° SVG vettoriale con cono decollo orientato sull'azimut ($\pm 35^\circ$), vettore freccia vento, indicatori allineamento e readout grandezze anemometriche.
+  - Griglia radiosondaggio a 4 tile anti-gergo: Base Cumulo LCL (MSL/AGL), Ceiling Termico stimato, Gradiente termico verticale e Rischio Temporali (con dettaglio accessorio CAPE).
+  - Briefing AI di volo persona Guido deterministico euristico offline (finestra ottimale, allerte, raccomandazione vela/pilota).
+  - Registrazione nel bootstrap in [ui/app.js](file:///ui/app.js) e stili dedicati in [css/theme.css](file:///css/theme.css).
+  - Creazione della suite di test [tests/ui/forecastView.test.mjs](file:///tests/ui/forecastView.test.mjs) (12 nuovi test, totale 221/221 passanti).

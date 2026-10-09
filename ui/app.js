@@ -7,6 +7,7 @@ import { store } from '../core/store.js';
 import { router } from './router.js';
 import { initSheetManager } from './sheetManager.js';
 import { homeDashboardView } from './views/HomeDashboardView.js';
+import { forecastView } from './views/ForecastView.js';
 
 /**
  * Initializes the GlideMind client application shell.
@@ -17,6 +18,7 @@ export function bootstrapApp() {
 
   // Register view controllers
   router.registerView('home', homeDashboardView);
+  router.registerView('forecast', forecastView);
 
   // Initialize sheet manager
   initSheetManager();

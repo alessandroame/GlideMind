@@ -14,7 +14,7 @@ Questo documento traccia lo stato di avanzamento delle funzionalità e dei modul
 | **Migrazione Core Headless: `openMeteoApi.js`** | Fase 1 | 🟢 Completato | Client Open-Meteo con cache LRU in memoria, retry 429, fallback modelli, dati sintetici e arricchimento EDR |
 | **Design System & Shell Architetturale** | Fase 2 | 🟢 Completato | Shell HTML minima (108 righe), CSS custom properties, Fitts >= 48px, router 5-tab, store reattivo SSOT, sheetManager |
 | **Vista Home Dashboard (`HomeDashboardView.js`)** | Fase 3 | 🟢 Completato | Architettura minimale a 2 blocchi: comprensori ordinati per volabilità ($T_{\text{best}}$ e $L_{\text{safe}}$ con Explainability e ricerca istantanea, zero PIN/preferiti) e blocco currency pilota |
-| **Vista Previsioni Meteo (`ForecastView.js`)** | Fase 4 | ⚪ Pianificato | Panoramica comprensorio (decolli e atterraggi), timeline oraria a cascata, indicatore vento 360°, radiosondaggi, briefing AI |
+| **Vista Previsioni Meteo (`ForecastView.js`)** | Fase 4 | 🟢 Completato | Panoramica comprensorio (Unico Binomio $T_{\text{best}}$/$L_{\text{safe}}$), timeline oraria a cascata con scrubbing touch, indicatore vento 360°, radiosondaggi LCL e briefing AI Guido |
 | **Vista Mappa Comprensori (`SpotMapView.js`)** | Fase 5 | ⚪ Pianificato | Cartografia comprensori, coni decollo orientati al vento, planata verso atterraggi, filtro raggio "Dove volare oggi" |
 | **Modulo Logbook di Volo (`LogbookView.js`)** | Fase 6 | ⚪ Pianificato | Inserimento IGC, IndexedDB `logbookDb.js`, KPI di carriera, matrice Peter Pan |
 | **Visualizzatore 3D Traiettoria (`FlightReplayView.js`)**| Fase 7 | ⚪ Pianificato | Replay WebGL 3D su terreno DEM Terrarium, telemetry strip 2D a 60 FPS |

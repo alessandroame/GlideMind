@@ -347,9 +347,12 @@ export function evaluateComprensorio({
   if (weatherData && weatherData.hourly) {
     const h = weatherData.hourly;
     const idx = Math.min(Math.max(0, hourIndex), (h.time?.length || 1) - 1);
-    if (h.wind_speed_10m && h.wind_speed_10m[idx] != null) windSpeed = Number(h.wind_speed_10m[idx]);
-    if (h.wind_gusts_10m && h.wind_gusts_10m[idx] != null) windGust = Number(h.wind_gusts_10m[idx]);
-    if (h.wind_direction_10m && h.wind_direction_10m[idx] != null) windDir = Number(h.wind_direction_10m[idx]);
+    const rawSpeed = h.windspeed_10m ?? h.wind_speed_10m;
+    if (rawSpeed && rawSpeed[idx] != null) windSpeed = Number(rawSpeed[idx]);
+    const rawGust = h.windgusts_10m ?? h.wind_gusts_10m;
+    if (rawGust && rawGust[idx] != null) windGust = Number(rawGust[idx]);
+    const rawDir = h.winddirection_10m ?? h.wind_direction_10m;
+    if (rawDir && rawDir[idx] != null) windDir = Number(rawDir[idx]);
     if (h.cape && h.cape[idx] != null) cape = Number(h.cape[idx]);
     if (h.turbulence_edr && h.turbulence_edr[idx] != null) turbulence = Number(h.turbulence_edr[idx]);
     if (h.precipitation && h.precipitation[idx] != null) rain = Number(h.precipitation[idx]);
