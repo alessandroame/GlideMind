@@ -26,7 +26,7 @@
 ---
 
 ## 3. UI & Ergonomic Constraints (Outdoor Mobile Interface)
-- **High-Contrast Dark Theme**: High-contrast, glare-resistant dark theme with CSS custom properties (`var(--gm-bg-base)`, `var(--gm-bg-card)`, etc.).
+- **Dual High-Contrast Theme Engine (Outdoor Sunlight Resilient)**: Default glare-resistant dark cockpit theme and high-luminance sunlight light mode (`data-theme="light"`), strictly governed via CSS custom properties (`var(--gm-bg-base)`, `var(--gm-bg-card)`, etc.) with verified WCAG 2.1 AA contrast ratios ($\ge 4.5:1$).
 - **Zero Horizontal Scrollbar**: The application must never trigger horizontal scrolling.
 - **Controlled Viewport & Scrolling**: Document/dashboard views adopt natural vertical scrolling; full-viewport map and 3D replay views manage their own canvas containers (`height: 100dvh`, `touch-action: none` / cooperative gesture handling).
 - **Touch Target Floor**: Every clickable/tappable element must strictly provide $\ge 44 \times 44\text{ px}$ effective touch area (with $\ge 48\text{px}$ preferred where layout permits).

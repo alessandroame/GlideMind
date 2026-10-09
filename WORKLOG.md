@@ -241,5 +241,18 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Creata la suite [tests/ui/brandAndSplash.test.mjs](file:///tests/ui/brandAndSplash.test.mjs) con 269/269 test passanti.
   - Registrata la Lezione #31 in [MEMORY.md](file:///MEMORY.md) e aggiornato [DESIDERATA.md](file:///DESIDERATA.md) con Fase 2-bis completata.
 
+---
+
+## 2026-10-09 - Fase 8-bis: Pianificazione Architetturale Gestione Temi & Sunlight Light Mode
+- **Tipo**: Architettura / Planning / Design System / Outdoor Ergonomics
+- **Dettagli**: [.agents/worklog.d/2026-10-09_theme-management-and-settings-planning.md](file:///.agents/worklog.d/2026-10-09_theme-management-and-settings-planning.md)
+- **Sintesi**:
+  - Formalizzato il piano di sviluppo per il **Dual High-Contrast Theme Engine** per risolvere l'effetto riverbero a specchio sotto luce solare zenitale diretta sui decolli.
+  - Definite le specifiche tecniche per **Sunlight Light Mode**: bianco ottico/slate chiaro (`#f8fafc` / `#ffffff`), testo ad altissima densità (`#0a0c10`), bordi strutturati e contrasto $\ge 12:1$.
+  - Prescritta la ricalibrazione conforme a WCAG 2.1 AA ($\ge 4.5:1$) per i 4 colori discreti di volabilità (verde scuro `#15803d`, ambra `#b45309`, rosso `#b91c1c`, nero `#09090b`).
+  - Definita la collocazione dell'interfaccia utente nel tab `#settings` ([ui/views/SettingsView.js](file:///ui/views/SettingsView.js)) con selettore tema a 3 vie (`Scuro`, `Chiaro`, `Auto`), gestione profilo ala attiva/hangar (proxy EN-A..EN-D), unità aeronautiche e backup/restore.
+  - Sincronizzati [DESIDERATA.md](file:///DESIDERATA.md), [MASTER_PLAN.md](file:///MASTER_PLAN.md), [.agents/rules/constraints.md](file:///.agents/rules/constraints.md) e registrata la Lezione #32 in [MEMORY.md](file:///MEMORY.md).
+
+
 
 

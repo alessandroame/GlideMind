@@ -214,7 +214,24 @@ The new application will deliver:
   - `Network-Only` (pass-through trasparente non intercettato) per le tile cartografiche esterne (OpenTopoMap, DEM raster RGB) per prevenire categoricamente errori di quota storage esaurita (`QuotaExceededError`).
 - [ ] Web App Manifest (`manifest.json`) con icone ad alto contrasto per installazione standalone.
 - [ ] Supporto i18n per 4 lingue (Italiano, Inglese, Francese, Tedesco) con dizionari iniettati come dipendenze pure.
-- [ ] Audit di accessibilità WCAG 2.1 AA e verifica leggibilità outdoor sotto luce solare diretta con palette ad alto contrasto.
+- [ ] Audit di accessibilità WCAG 2.1 AA e verifica leggibilità outdoor sotto luce solare diretta con palette ad alto contrasto su entrambi i temi.
+
+### Phase 8-bis: Settings View, Glider Hangar & Dual Theme Engine (Sunlight Light Mode)
+- [ ] Implement `ui/views/SettingsView.js`:
+  - **Selettore Tema Visivo**: Selezione a 3 vie (`Scuro (Cockpit)`, `Chiaro (Luce Solare / Sunlight)`, `Automatico (OS)`) con commutazione dinamica istantanea senza ricaricamento di pagina (<50ms).
+  - **Gestore Profilo Pilota & Hangar Vele**: Selezione dell'ala attiva (classe EN-A, EN-B, EN-C, EN-D) e parametri aerodinamici ($v_{\text{trim}}$, $AR$, efficienza max $E_{\text{glider}}$) come SSOT per le formule fisiche di volabilità e coni di planata verso l'atterraggio sicuro (zero selettori soggettivi di "livello pilota", conforme a `MEMORY.md` #13).
+  - **Preferenze Unità di Misura**: Configurazione reattiva delle unità aeronautiche nello store (Velocità: km/h vs nodi; Quota: metri vs piedi; Variometro: m/s vs ft/min).
+  - **Pannello Backup & Ripristino Dati**: Interfaccia grafica di esportazione/importazione JSON guidata da `core/backupManager.js` (Fase 6-bis) con supporto a Snapshot Globale o archivio modulare del Logbook.
+- [ ] Dual-Theme Architecture in `css/theme.css`:
+  - **Specifiche Sunlight Light Mode**: Progettato per eliminare i riflessi a specchio su display OLED/LCD sotto irraggiamento solare diretto zenitale sui decolli. Fondo primario bianco ottico/slate chiaro (`--gm-bg-base: #f8fafc`, `--gm-bg-card: #ffffff`, `--gm-bg-elevated: #f1f5f9`), testi ad altissimo contrasto (`--gm-text-primary: #0a0c10`, `--gm-text-secondary: #334155`), bordi definiti (`--gm-border: rgba(15, 23, 42, 0.12)`).
+  - **Ricalibrazione WCAG 2.1 AA dei Codici di Volabilità**: Adattamento dei 4 colori di stato (🟢 Volabile, 🟡 Cautela, 🔴 Chiuso, ⚫ Severo) per garantire contrasto $\ge 4.5:1$ rispetto al fondo chiaro (verde aeronautico `#15803d`, ambra `#b45309`, rosso `#b91c1c`, nero profondo `#09090b`).
+  - **Adattamento Elementi Grafici & Mappe**: Sincronizzazione dell'inversione di colore per i tracciati telemetrici Canvas 2D (variometro, radiosondaggi Skew-T / LCL) e commutazione automatica del layer cartografico in `SpotMapView.js` (tile chiare per la modalità luce solare).
+- [ ] Runtime Theme Controller in `core/store.js` & `ui/app.js`:
+  - Metodo `store.setTheme(mode)` con persistenza in `localStorage`.
+  - Mutazione immediata dell'attributo radice `document.documentElement.dataset.theme = effectiveTheme`.
+  - Aggiornamento dinamico del meta tag `<meta name="theme-color" content="...">` per le barre di stato mobile di iOS e Android.
+  - Listener reattivo su `window.matchMedia('(prefers-color-scheme: dark)')` per la modalità `system`.
+
 
 ---
 
