@@ -68,9 +68,38 @@ export class HomeDashboardViewController {
     this.boundSearchInputHandler = this.handleSearchInput.bind(this);
     
     this.searchQuery = '';
-    this.comprensoriCatalog = options.comprensoriCatalog || [...DEFAULT_COMPRENSORI];
+    this.comprensoriCatalog = options.comprensoriCatalog || (this.store && typeof this.store.getState === 'function' ? this.store.getState().locationsCatalog : null) || [...DEFAULT_COMPRENSORI];
     this.isLoading = false;
     this.pilotPeriod = 'month';
+  }
+
+  /**
+   * Updates the active comprensori catalog (e.g. when master catalog is loaded).
+   * @param {Array<object>} catalog
+   */
+  setComprensoriCatalog(catalog) {
+    if (!Array.isArray(catalog) || catalog.length === 0) return;
+    this.comprensoriCatalog = catalog;
+
+    // If search input is currently focused by the user, update only the list to avoid losing focus
+    const searchInput = this.containerEl ? this.containerEl.querySelector('#home-spot-search') : null;
+    const isSearchFocused = Boolean(searchInput && typeof document !== 'undefined' && document.activeElement === searchInput);
+
+    if (isSearchFocused) {
+      const listContainer = this.containerEl.querySelector('section[aria-labelledby="heading-comprensori"]');
+      if (listContainer) {
+        const evaluatedList = this.getEvaluatedComprensori();
+        const countBadge = listContainer.querySelector('.flex.items-center.justify-between.text-xs span:last-child');
+        if (countBadge) countBadge.textContent = `${evaluatedList.length} siti`;
+        const existingList = listContainer.querySelector('#home-spots-list') || listContainer.querySelector('.flex.flex-col.gap-2');
+        if (existingList) {
+          existingList.outerHTML = this.renderComprensoriList(evaluatedList);
+        }
+        return;
+      }
+    }
+
+    this.render();
   }
 
   /**
@@ -81,15 +110,20 @@ export class HomeDashboardViewController {
   mount(containerEl, params = {}) {
     this.containerEl = containerEl;
 
-    // Subscribe to reactive store changes (weatherData, activeDate, selectedSpot)
+    // Subscribe to reactive store changes (weatherData, activeDate, selectedSpot, locationsCatalog)
     if (this.store && typeof this.store.subscribe === 'function') {
       this.storeUnsubscribe = this.store.subscribe((state, prev) => {
         if (
           !prev ||
           state.weatherData !== prev.weatherData ||
-          state.activeDate !== prev.activeDate
+          state.activeDate !== prev.activeDate ||
+          state.locationsCatalog !== prev.locationsCatalog
         ) {
-          this.render();
+          if (state.locationsCatalog && state.locationsCatalog !== this.comprensoriCatalog) {
+            this.setComprensoriCatalog(state.locationsCatalog);
+          } else {
+            this.render();
+          }
         }
       });
     }

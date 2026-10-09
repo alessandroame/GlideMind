@@ -266,6 +266,19 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Implementato unit test di integrazione in [tests/core/comprensorio.test.mjs](file:///tests/core/comprensorio.test.mjs) (270/270 test passati nel test runner nativo).
   - Registrata la Lezione #33 in [MEMORY.md](file:///MEMORY.md).
 
+---
+
+## 2026-10-09 - Idratazione Asincrona del Catalogo Comprensori Reale a Runtime
+- **Tipo**: Architettura UI / State Management / Reattività / Test Automation
+- **Dettagli**: [.agents/worklog.d/2026-10-09_master-locations-catalog-runtime-hydration.md](file:///.agents/worklog.d/2026-10-09_master-locations-catalog-runtime-hydration.md)
+- **Sintesi**:
+  - Implementata l'idratazione asincrona in background del catalogo reale [data/locations.json](file:///data/locations.json) (135 comprensori) in [ui/app.js](file:///ui/app.js) tramite `loadLocationsCatalog()`.
+  - Salvaguardato il rendering immediato a 0ms con `DEFAULT_COMPRENSORI` per conformità offline e soglia di Doherty (<400ms).
+  - Aggiunto `locationsCatalog: null` nello store reattivo [core/store.js](file:///core/store.js) ed estesi i controller [ui/views/HomeDashboardView.js](file:///ui/views/HomeDashboardView.js) e [ui/views/ForecastView.js](file:///ui/views/ForecastView.js) con `setComprensoriCatalog(catalog)`.
+  - Implementata la salvaguardia del focus dell'utente sul campo di ricerca durante l'idratazione in HomeDashboardView.
+  - Creata la suite [tests/ui/locationsCatalogHydration.test.mjs](file:///tests/ui/locationsCatalogHydration.test.mjs) (274/274 test passati).
+
+
 
 
 

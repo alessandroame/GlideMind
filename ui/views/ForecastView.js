@@ -252,7 +252,7 @@ export class ForecastViewController {
   constructor(options = {}) {
     this.store = options.store || store;
     this.router = options.router || router;
-    this.comprensoriCatalog = options.comprensoriCatalog || DEFAULT_COMPRENSORI;
+    this.comprensoriCatalog = options.comprensoriCatalog || (this.store && typeof this.store.getState === 'function' ? this.store.getState().locationsCatalog : null) || DEFAULT_COMPRENSORI;
 
     this.containerEl = null;
     this.unsubscribeStore = null;
@@ -275,6 +275,16 @@ export class ForecastViewController {
   }
 
   /**
+   * Updates the active comprensori catalog (e.g. when master catalog is loaded).
+   * @param {Array<object>} catalog
+   */
+  setComprensoriCatalog(catalog) {
+    if (!Array.isArray(catalog) || catalog.length === 0) return;
+    this.comprensoriCatalog = catalog;
+    this.render();
+  }
+
+  /**
    * Returns formatted YYYY-MM-DD string offset by dayOffset days from today.
    * @param {number} dayOffset
    * @returns {string}
@@ -292,7 +302,10 @@ export class ForecastViewController {
   getCurrentSpot() {
     const state = this.store ? this.store.getState() : {};
     if (state.selectedSpot && state.selectedSpot.id) {
-      const found = this.comprensoriCatalog.find(c => c.id === state.selectedSpot.id);
+      const found = this.comprensoriCatalog.find(c => 
+        c.id === state.selectedSpot.id || 
+        (state.selectedSpot.name && c.name && c.name.toLowerCase() === state.selectedSpot.name.toLowerCase())
+      );
       if (found) return found;
       return state.selectedSpot;
     }
@@ -412,7 +425,11 @@ export class ForecastViewController {
 
     if (this.store) {
       this.unsubscribeStore = this.store.subscribe((nextState) => {
-        this.render();
+        if (nextState.locationsCatalog && nextState.locationsCatalog !== this.comprensoriCatalog) {
+          this.setComprensoriCatalog(nextState.locationsCatalog);
+        } else {
+          this.render();
+        }
       });
     }
 

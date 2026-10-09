@@ -8,6 +8,37 @@ import { router } from './router.js';
 import { initSheetManager } from './sheetManager.js';
 import { homeDashboardView } from './views/HomeDashboardView.js';
 import { forecastView } from './views/ForecastView.js';
+import { normalizeLocationsCatalog, DEFAULT_COMPRENSORI } from '../core/comprensorio.js';
+
+/**
+ * Loads the master real locations catalog from /data/locations.json.
+ * Falls back safely to DEFAULT_COMPRENSORI in offline or test environments.
+ * @returns {Promise<Array<object>>}
+ */
+export async function loadLocationsCatalog() {
+  if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+    try {
+      const response = await window.fetch('/data/locations.json');
+      if (response.ok) {
+        const rawJson = await response.json();
+        const normalized = normalizeLocationsCatalog(rawJson);
+        if (Array.isArray(normalized) && normalized.length > 0) {
+          store.setState({ locationsCatalog: normalized });
+          if (typeof homeDashboardView.setComprensoriCatalog === 'function') {
+            homeDashboardView.setComprensoriCatalog(normalized);
+          }
+          if (typeof forecastView.setComprensoriCatalog === 'function') {
+            forecastView.setComprensoriCatalog(normalized);
+          }
+          return normalized;
+        }
+      }
+    } catch (err) {
+      console.warn('[GlideMind] Impossibile caricare /data/locations.json, fallback a DEFAULT_COMPRENSORI:', err);
+    }
+  }
+  return DEFAULT_COMPRENSORI;
+}
 
 /**
  * Initializes the GlideMind client application shell.
@@ -26,6 +57,9 @@ export function bootstrapApp() {
   // Initialize router
   router.init();
 
+  // Asynchronously load real master locations catalog in background
+  loadLocationsCatalog();
+
   // Dismiss splash screen within Doherty threshold (<400ms)
   dismissSplashScreen();
 
@@ -34,6 +68,7 @@ export function bootstrapApp() {
     window.__GLIDEMIND__ = {
       store,
       router,
+      loadLocationsCatalog,
       version: '2.0.0'
     };
   }

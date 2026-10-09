@@ -81,4 +81,12 @@ describe('GlideMind Static Dev Server Integration', () => {
     assert.equal(res.status, 200);
     assert.ok(res.headers.get('content-type').includes('javascript'));
   });
+
+  it('should serve data/locations.json with application/json containing valid catalog', async () => {
+    const res = await fetch(`http://127.0.0.1:${serverPort}/data/locations.json`);
+    assert.equal(res.status, 200);
+    assert.ok(res.headers.get('content-type').includes('application/json'));
+    const data = await res.json();
+    assert.ok(data.IT, 'Catalog should contain IT country data');
+  });
 });

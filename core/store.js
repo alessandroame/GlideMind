@@ -83,6 +83,7 @@ export const DEFAULT_INITIAL_STATE = Object.freeze({
   selectedSpot: null,
   activeDate: new Date().toISOString().split('T')[0],
   weatherData: null,
+  locationsCatalog: null,
   pinnedSpots: Object.freeze([]),
   pinnedSpotIds: Object.freeze(['monte-cornizzolo-lc']),
   recentSpotIds: Object.freeze([]),
