@@ -116,7 +116,7 @@ export function openSheet({ id = 'default', title, content, onOpen = null, onClo
   }
 
   // Set focus to close button or title for accessibility
-  if (closeBtnEl) {
+  if (closeBtnEl && typeof closeBtnEl.focus === 'function') {
     closeBtnEl.focus();
   }
 

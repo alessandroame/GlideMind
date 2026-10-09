@@ -809,16 +809,18 @@ export class HomeDashboardViewController {
       title: 'Seleziona Data Volabilità Siti',
       content: renderContent(),
       onOpen: () => {
-        const input = document.getElementById('custom-date-native-input');
-        if (input) {
-          input.addEventListener('change', (e) => {
-            const val = e.target.value;
-            if (val && this.store) {
-              this.store.setState({ activeDate: val });
-              closeSheet();
-              this.render();
-            }
-          });
+        if (typeof document !== 'undefined') {
+          const input = document.getElementById('custom-date-native-input');
+          if (input) {
+            input.addEventListener('change', (e) => {
+              const val = e.target.value;
+              if (val && this.store) {
+                this.store.setState({ activeDate: val });
+                closeSheet();
+                this.render();
+              }
+            });
+          }
         }
       }
     });

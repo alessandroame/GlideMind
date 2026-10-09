@@ -366,18 +366,18 @@ describe('Flyability Engine - Waterfall Synthesis & Tie-Breaking', () => {
                     rain.push(0);
                     winddir.push(180);
                 } else if (d % 4 === 2) {
-                    // Unflyable (Red)
-                    windspeed.push(26);
-                    gusts.push(32);
+                    // Unflyable (Red) - crosswind & moderate gusts, light rain
+                    windspeed.push(24);
+                    gusts.push(30);
                     cape.push(300);
-                    rain.push(2.5);
+                    rain.push(0.3);
                     winddir.push(270);
                 } else {
                     // Severe (Black)
                     windspeed.push(35);
                     gusts.push(45);
                     cape.push(1600);
-                    rain.push(5.0);
+                    rain.push(2.5);
                     winddir.push(360);
                 }
             }

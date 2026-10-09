@@ -1577,19 +1577,21 @@ export class ForecastViewController {
       title: 'Seleziona Data di Volo',
       content: renderContent(),
       onOpen: () => {
-        const input = document.getElementById('custom-date-native-input');
-        if (input) {
-          input.addEventListener('change', (e) => {
-            const val = e.target.value;
-            if (val) {
-              this.activeDate = val;
-              if (this.store) {
-                this.store.setState({ activeDate: val });
+        if (typeof document !== 'undefined') {
+          const input = document.getElementById('custom-date-native-input');
+          if (input) {
+            input.addEventListener('change', (e) => {
+              const val = e.target.value;
+              if (val) {
+                this.activeDate = val;
+                if (this.store) {
+                  this.store.setState({ activeDate: val });
+                }
+                closeSheet();
+                this.render();
               }
-              closeSheet();
-              this.render();
-            }
-          });
+            });
+          }
         }
       }
     });

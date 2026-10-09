@@ -323,7 +323,7 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
           set innerHTML(val) { capturedHtml = val; },
           appendChild() {}
         };
-        if (sel === '.gm-sheet-close-btn') return { addEventListener() {} };
+        if (sel === '.gm-sheet-close-btn') return { addEventListener() {}, focus() {} };
         return null;
       },
       classList: { add() {}, remove() {}, contains() { return false; } },

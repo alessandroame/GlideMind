@@ -154,3 +154,16 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Progettata l'architettura 3D Replay ad Adapter Unificato (`IReplay3dEngine`): primario MapLibre GL 3D + Three.js DEM Terrarium con fallback solido e collaudato a CesiumJS (coordinate cartesiane WGS84 native), azzerando il rischio di blocco implementativo e proteggendo i controlli UI e la telemetria 2D su Canvas.
   - Riformulata la mappa (Fase 5) per adottare un batch statico sul catalogo (`data/locations.json`) con aggiornamento in RAM istantaneo (eliminazione rischio HTTP 429) e Headless Map Adapter per test in Node.js.
   - Aggiornati [MASTER_PLAN.md](file:///MASTER_PLAN.md), [DESIDERATA.md](file:///DESIDERATA.md) e [MEMORY.md](file:///MEMORY.md) (Lezioni 21-24).
+
+---
+
+## 2026-10-09 - Fase 4: Indicatore Volabilità Semantico a 4 Colori nel Calendario 14 Giorni
+- **Tipo**: Feature / Core Engine / UI Layer / Outdoor HMI / Accessibilità
+- **Dettagli**: [.agents/worklog.d/2026-10-09_4-color-flyability-calendar-grid.md](file:///.agents/worklog.d/2026-10-09_4-color-flyability-calendar-grid.md)
+- **Sintesi**:
+  - Esteso `calculateDailyFlyabilitySummary` in [core/flyability.js](file:///core/flyability.js) e il meteo sintetico in [core/openMeteoApi.js](file:///core/openMeteoApi.js) fino a 14/16 giorni.
+  - Implementata classificazione semantica della volabilità a 4 stati discreti: 🟢 **Volabile** (`flyable`, `●`), 🟡 **Cautela** (`caution`, `▲`), 🔴 **Chiuso** (`unflyable`, `✕`), ⚫ **Severo** (`severe`, `⚡`).
+  - Arricchito il calendario dei prossimi 14 giorni in [core/datePresets.js](file:///core/datePresets.js) con volabilità normalizzata, badge semantici e dot nei preset rapidi.
+  - Progettata l'interfaccia outdoor HMI in [css/theme.css](file:///css/theme.css) e nei fogli modali di [ui/views/ForecastView.js](file:///ui/views/ForecastView.js) e [ui/views/HomeDashboardView.js](file:///ui/views/HomeDashboardView.js): bordo inferiore 3px colorato, pillola status con icona e microcopy multimodale, indicatore sinottico (>7gg) e legenda aeronautica esplicita.
+  - Aggiornate le suite di test [tests/core/flyability.test.mjs](file:///tests/core/flyability.test.mjs), [tests/core/datePresets.test.mjs](file:///tests/core/datePresets.test.mjs), [tests/ui/forecastView.test.mjs](file:///tests/ui/forecastView.test.mjs) e [tests/ui/homeDashboardView.test.mjs](file:///tests/ui/homeDashboardView.test.mjs) (241/241 test passanti).
+
