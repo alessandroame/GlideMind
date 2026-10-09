@@ -12,7 +12,7 @@ GlideMind uses a persistent 5-tab navigation architecture:
    - Site identity & elevation badge.
    - Hourly flyability timeline (color-coded waterfall, click-to-inspect).
    - 360° wind and cross-wind indicator.
-   - Atmospheric sounding (CAPE, LCL Cloud Base, thermal lapse rate).
+   - Atmospheric sounding (Rischio temporali / Instabilità, Base Nubi, Gradiente termico).
    - AI Briefing summary drawer.
 3. **Spot Map (`#view-map`)**:
    - Interactive full-viewport map (MapLibre GL).
@@ -68,4 +68,8 @@ Prima di redigere markup, stili CSS o implementare viste e componenti UI, l'arch
    - `SheetManager` (bottom sheet swipeabili) per filtri, picker e drill-down contestuali, evitando dialoghi modali popup bloccanti e annidati.
 5. **Doherty Threshold (<400ms)**:
    - Tutte le interazioni di selezione (ora, data, spot, tab) devono aggiornare lo stato e la vista istantaneamente (<50ms).
+6. **Audit Terminologico & Anti-Gergo (Novice Pilot Spec & WCAG Understandable)**:
+   - Censimento preventivo di tutti i testi, etichette e unità di misura prima di definire il markup o il design della vista.
+   - Traduzione obbligatoria di ogni grandezza aerologica nell'effetto pratico di sicurezza per il pilota (es. *Rischio Temporali* anziché *Energia CAPE*, *Base Nubi* anziché *LCL*, *Turbolenza* anziché *EDR*).
+   - Gerarchia visiva: stato qualitativo semantico in primo piano con color-coding chiaro, metrica numerica specialistica subordinata come informazione secondaria/tooltip per piloti esperti.
 

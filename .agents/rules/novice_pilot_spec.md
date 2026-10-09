@@ -52,11 +52,12 @@ Questo documento formalizza i requisiti operativi, i vincoli di sicurezza e la d
 
 La skill `novice-pilot-auditor` deve essere invocata sistematicamente nei seguenti checkpoint operativi del ciclo di sviluppo:
 
-### Checkpoint 1: Rilascio o Refactoring di Viste UI (Design Review)
-- **Quando**: Durante lo sviluppo o modifica di `HomeDashboardView`, `ForecastView`, `SpotMapView`, `LogbookView`.
+### Checkpoint 1: Fase Progettuale Preventiva & Rilascio Viste UI (Design Review)
+- **Quando**: In fase progettuale preventiva (PRIMA di scrivere codice, template o mockup) e durante lo sviluppo o modifica di `HomeDashboardView`, `ForecastView`, `SpotMapView`, `LogbookView`.
 - **Cosa verificare**:
+  - **Audit Terminologico & Anti-Gergo Preventivo**: Censimento di tutte le etichette, unità di misura e grandezze meteo. Divieto assoluto di acronimi isolati o grandezze fisiche grezze come etichette primarie (`CAPE`, `LCL`, `EDR`, `J/kg`). Mappatura obbligatoria sull'effetto di sicurezza pratico per il pilota (es. *Rischio Temporali*, *Base Nubi*, *Turbolenza in Termica*).
   - Regola dei 3 secondi: il verdetto è immediatamente visibile senza scrollare o aprire modal?
-  - Fitts's Law: touch target rigorosamente $\ge 44 \times 44\text{ px}$ (ottimale $48\text{ px}$) per l'uso con guanti da volo.
+  - Fitts's Law: touch target rigorosamente $\ge 48 \times 48\text{ px}$ per l'uso con guanti da volo.
   - Zero Icon Clutter e contrasto elevato conforme WCAG AAA.
 
 ### Checkpoint 2: Aggiornamento Algoritmi di Volabilità (`flyability.js`, `soundingsMath.js`)

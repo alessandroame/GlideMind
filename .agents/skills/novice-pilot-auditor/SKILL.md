@@ -18,9 +18,9 @@ Questa skill guida l'agente o il subagente nell'eseguire un audit rigoroso del s
 ## Quando Invocare Questa Skill (Momenti Opportuni)
 Invocare questa skill sistematicamente nei seguenti checkpoint del flusso di lavoro:
 
-1. **Checkpoint 1: Design & Sviluppo Viste UI**:
-   - Durante il rilascio o refactoring di `HomeDashboardView`, `ForecastView`, `SpotMapView`, `LogbookView`.
-   - Verifica: regola dei 3 secondi sul decollo (*glanceability*), touch target $\ge 48\text{ px}$ con guanti da volo, contrasto per luce solare diretta.
+1. **Checkpoint 1: Design & Sviluppo Viste UI (Audit Progettuale Preventivo)**:
+   - Da eseguire PRIMA della scrittura del codice durante la definizione dei componenti di `HomeDashboardView`, `ForecastView`, `SpotMapView`, `LogbookView`.
+   - Verifica: censimento terminologico preventivo (zero gergo specialistico o acronimi isolati come CAPE, LCL, EDR come label primarie), regola dei 3 secondi sul decollo (*glanceability*), touch target $\ge 48\text{ px}$ con guanti da volo, contrasto per luce solare diretta.
 2. **Checkpoint 2: Aggiornamenti Algoritmi di Volabilità e Aerologia**:
    - Modifiche a `core/flyability.js`, `core/soundingsMath.js` o `core/openMeteoApi.js`.
    - Verifica: calcolo conservativo con vela EN-A ($v_{\text{trim}} \approx 36\text{ km/h}$), protezione contro raffiche con delta $> 8\text{ km/h}$, inseparabilità decollo-atterraggio.
