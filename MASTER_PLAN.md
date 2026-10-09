@@ -137,19 +137,32 @@ The new application will deliver:
   - **Block 2**: Pilot Activity & Currency summary with high-contrast primary CTA `+ Carica Traccia IGC` ($\ge 48\text{px}$).
 - [x] **Quality Gate 3**: 100% tests passing in Node.js (191/191 pass across 25 test suites).
 
-### Phase 4: Weather & Flyability Dashboard
-- [ ] Implement `ui/views/ForecastView.js`:
+### Phase 4: Weather & Flyability Dashboard (Completata)
+- [x] Implement `ui/views/ForecastView.js`:
   - **Hourly Flyability Timeline**: Interactive waterfall bars (color-coded, tap to scrub).
   - **360° Windsock & Wind Direction Indicator**: Takeoff azimuth vs hourly wind vector with cross-wind warning cone.
   - **Sounding & Lapse Rate Panel**: Atmospheric temperature vs dew point curves, LCL cloud base, and inversion altitudes.
   - **AI Flight Briefing (Guido)**: 1-click voice/text briefing with concise safety persona.
 
-### Phase 5: Spot Map & "Dove Volare Oggi" Finder
+### Phase 5: Spot Map & Mappa della Volabilità ("Dove Volare Oggi")
 - [ ] Implement `ui/views/SpotMapView.js`:
-  - Full-viewport map with toggleable satellite / terrain base layers.
-  - Takeoff cones colored dynamically by wind alignment.
-  - Official and emergency landings with glide ratio cones.
-  - "Dove Volare Oggi" radius filter: finds top flyable spots within $X\text{ km}$.
+  - **Cartografia & Base Layers**: Mappa interattiva a pieno schermo (Leaflet) con toggle satellite/topo ad alto contrasto per outdoor.
+  - **Vista Macro a Bacini di Volabilità (Stile Paraglidable Sostenibile)**:
+    - Aureole semitrasparenti di comprensorio (raggio 8-12 km) con codifica colore semantica reattiva (🟢 Aperto, 🟡 Cautela, 🔴 Chiuso) calcolata tramite `evaluateComprensorio`.
+    - Colpo d'occhio immediato a livello regionale sull'arco alpino e appenninico senza interpolazioni continue orograficamente ingannevoli.
+  - **Vista Micro Aeronautica (Zoom Progressivo >= 10)**:
+    - Decollo primario ($T_{\text{best}}$): cono azimutale di decollo e freccia del vento reale calcolata a quota decollo.
+    - Atterraggio di rientro ($L_{\text{safe}}$): linea di collegamento e cono di planata aerodinamica ($E_{\text{richiesta}} \le E_{\text{glider}}$) parametrato sull'ala attiva del pilota (EN-A/B/C/D).
+  - **Timeline di Scrubbing Orario Integrata**:
+    - Slider/stepper orario compatto (09:00 - 18:00) sincronizzato con `store.activeDate` e `store.activeHourIndex`.
+    - Ricalcolo istantaneo in RAM di tutti i comprensori visibili in $<50\text{ms}$ a costo di rete zero.
+  - **Ingestione Meteo a Finestra Geografica (Bounding Box Batch)**:
+    - Query batch su Open-Meteo limitata ai comprensori visibili nel viewport corrente (15-30 coordinate per sessione, $< 2\%$ della quota gratuita giornaliera).
+    - Cache in-memory LRU (TTL 30 min) in `openMeteoApi.js` per azzerare chiamate ripetute su pan e zoom.
+  - **Filtro di Raggio "Dove Volare Oggi"**:
+    - Selettore rapido (50 km / 100 km / 150 km dalla posizione GPS o dal punto focale) con attenuazione dei siti fuori raggio o chiusi.
+  - **Scheda Rapida Comprensorio (Bottom Sheet)**:
+    - Tap sull'aureola o marker: apertura drawer non bloccante (`SheetManager.js`) con metriche essenziali di sicurezza e CTA diretto a `ForecastView.js`.
 
 ### Phase 6: Flight Logbook & Telemetry Module
 - [ ] Implement `core/logbookDb.js` (IndexedDB storage for tracks and metadata).
