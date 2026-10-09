@@ -280,15 +280,27 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
 
 ---
 
+## 2026-10-09 - Correzione Ricerca Reattiva e Preferiti Reali nel Drawer Comprensori (ForecastView)
+- **Tipo**: Bug Fix / State Management / DOM Ergonomics / Test Automation
+- **Dettagli**: [.agents/worklog.d/2026-10-09_picker-search-and-favorites-real-data-fix.md](file:///.agents/worklog.d/2026-10-09_picker-search-and-favorites-real-data-fix.md)
+- **Sintesi**:
+  - Risolto il freeze della ricerca nel drawer comprensori causato dalla distruzione del campo `<input>` al primo evento di digitazione: separata la barra di ricerca in una testata statica persistente e delegato il rendering reattivo al solo contenitore `#picker-sections-container`.
+  - Allineati i preferiti di default in [core/store.js](file:///core/store.js) con gli ID normalizzati del catalogo master (`monte-cornizzolo-suello-lc-lc`, `monte-grappa-borso-del-grappa-tv-tv`, `calascio-rocca-calascio-calascio-aq-aq`, `meduno-monte-valinis-toppo-pn-pn`) e introdotta la funzione `isSpotPinned` con migrazione trasparente per vecchi ID.
+  - Aggiunti test di regressione in [tests/ui/locationsCatalogHydration.test.mjs](file:///tests/ui/locationsCatalogHydration.test.mjs).
+
+---
+
 ## 2026-10-09 - Integrazione Icona Brand, Versione e Build Stamp nell'Header Mobile (HomeDashboardView)
-- **Tipo**: UI Enhancement / HMI Ergonomics / Brand Alignment / Metadata
+- **Tipo**: UI Enhancement / HMI Ergonomics / Brand Alignment / Visual Verification
 - **Dettagli**: [.agents/worklog.d/2026-10-09_mobile-header-brand-icon-integration.md](file:///.agents/worklog.d/2026-10-09_mobile-header-brand-icon-integration.md)
 - **Sintesi**:
   - Valutate le opzioni di collocazione icona: respinta la sostituzione dell'icona standard della casa nella bottom bar (violazione di Jakob's Law e Law of Similarity); approvata l'integrazione a fianco del titolo nell'header mobile.
   - Integrato l'asset reale `assets/icons/icon-192.png` con classi `.gm-brand-icon .gm-brand-icon-sm` (22×22 px) subito a sinistra del tag `<h1>GlideMind</h1>` in [ui/views/HomeDashboardView.js](file:///ui/views/HomeDashboardView.js).
-  - Aggiunta a fianco del titolo la versione corrente (`v2.0.0`) in font ridotto monospace.
-  - Rimossa la data ridondante dall'header e sostituita con l'indicatore `build 5bf6d1c` sempre visibile sulla destra per la tracciabilità delle build di test.
+  - Diagnosticato e risolto il difetto visivo emerso in browser mobile (versione fluttuante come apice sopra il titolo): causa radice imputabile a margini default browser su `<h1>` e uso di classi Tailwind inesistenti nel runtime CSS vanilla.
+  - Introdotte in [css/theme.css](file:///css/theme.css) le classi dedicate `.gm-home-header`, `.gm-header-brand`, `.gm-header-title`, `.gm-header-version` e `.gm-header-build`, azzerando i margini e vincolando la versione alla medesima baseline tipografica del titolo.
+  - Rimossa la data ridondante dall'header e sostituita con l'indicatore `build 5bf6d1c` centrato verticalmente per la tracciabilità delle build di test.
   - Creato il modulo centralizzato [core/version.js](file:///core/version.js) (SSOT per versione, commit build e data rilascio), collegato a [ui/app.js](file:///ui/app.js) in `window.__GLIDEMIND__`.
-  - Aggiunte regole CSS in [css/theme.css](file:///css/theme.css) per allineamento inline flessibile (`vertical-align: middle; flex-shrink: 0;`) e variante dimensionale compatta.
-  - Aggiunta suite di test [tests/core/version.test.mjs](file:///tests/core/version.test.mjs) ed estesa [tests/ui/homeDashboardView.test.mjs](file:///tests/ui/homeDashboardView.test.mjs) (278/278 test superati nel test runner nativo).
+  - Attivato il ciclo di verifica visiva tramite Chrome DevTools MCP con screenshot e analisi geometrica DOM su viewport 375×667 e 412×924.
+  - Aggiunta suite di test [tests/core/version.test.mjs](file:///tests/core/version.test.mjs) ed estesa [tests/ui/homeDashboardView.test.mjs](file:///tests/ui/homeDashboardView.test.mjs) (279/279 test superati nel test runner nativo).
+  - Registrata la Lezione #34 in [MEMORY.md](file:///MEMORY.md).
 

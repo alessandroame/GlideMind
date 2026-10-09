@@ -36,8 +36,11 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     // Header check: Brand icon next to GlideMind title, version badge and build stamp
     assert.ok(html.includes('assets/icons/icon-192.png'), 'Must render real brand icon in header');
     assert.ok(html.includes('gm-brand-icon'), 'Must include gm-brand-icon class');
-    assert.ok(html.includes('GlideMind</h1>'), 'Must render GlideMind title');
+    assert.ok(html.includes('gm-header-title'), 'Must include gm-header-title class');
+    assert.ok(html.includes('GlideMind'), 'Must render GlideMind title');
+    assert.ok(html.includes('gm-header-version'), 'Must include gm-header-version class');
     assert.ok(html.includes('v2.0.0'), 'Must render current app version near title');
+    assert.ok(html.includes('gm-header-build'), 'Must include gm-header-build class');
     assert.ok(html.includes('build'), 'Must render build tag in header');
 
     // Header must NOT contain redundant date string in title bar

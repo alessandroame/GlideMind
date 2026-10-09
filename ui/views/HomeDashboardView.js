@@ -213,15 +213,15 @@ export class HomeDashboardViewController {
     return `
       <div class="gm-home-view max-w-4xl mx-auto flex flex-col gap-2">
         <!-- Ultra-Clean Header (Glanceable, Version & Build Info) -->
-        <header class="flex items-center justify-between pb-2 border-b border-[var(--gm-border)]">
-          <div class="flex items-center gap-2">
+        <header class="gm-home-header">
+          <div class="gm-header-brand">
             <img src="assets/icons/icon-192.png" alt="" width="22" height="22" class="gm-brand-icon gm-brand-icon-sm">
-            <div class="flex items-baseline gap-1.5">
-              <h1 class="text-base font-bold tracking-tight text-[var(--gm-text-primary)]">GlideMind</h1>
-              <span class="text-xs font-mono text-[var(--gm-text-muted)] font-normal">${escapeHtml(getFormattedVersion())}</span>
-            </div>
+            <h1 class="gm-header-title">
+              GlideMind
+              <span class="gm-header-version">${escapeHtml(getFormattedVersion())}</span>
+            </h1>
           </div>
-          <span class="text-xs font-mono text-[var(--gm-text-muted)] tracking-tight">${escapeHtml(getFormattedBuild())}</span>
+          <span class="gm-header-build">${escapeHtml(getFormattedBuild())}</span>
         </header>
 
         <!-- SEZIONE 1: Stato Attività Pilota (Prima Sezione) -->

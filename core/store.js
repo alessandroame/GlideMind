@@ -85,7 +85,12 @@ export const DEFAULT_INITIAL_STATE = Object.freeze({
   weatherData: null,
   locationsCatalog: null,
   pinnedSpots: Object.freeze([]),
-  pinnedSpotIds: Object.freeze(['monte-cornizzolo-lc']),
+  pinnedSpotIds: Object.freeze([
+    'monte-cornizzolo-suello-lc-lc',
+    'monte-grappa-borso-del-grappa-tv-tv',
+    'calascio-rocca-calascio-calascio-aq-aq',
+    'meduno-monte-valinis-toppo-pn-pn'
+  ]),
   recentSpotIds: Object.freeze([]),
   flights: DEFAULT_SEED_FLIGHTS,
   pilotPeriod: 'month',

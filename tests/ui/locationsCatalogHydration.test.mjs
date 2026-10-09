@@ -137,4 +137,29 @@ describe('Master Locations Catalog Hydration & Runtime Integration', () => {
     assert.equal(current.province, 'LC');
     assert.ok(current.takeoffs.length >= 1);
   });
+
+  it('should accurately filter comprensori when searching in Forecast picker without frozen input bug', () => {
+    const rawLocations = JSON.parse(fs.readFileSync(path.join(ROOT_DIR, 'data/locations.json'), 'utf8'));
+    const fullCatalog = normalizeLocationsCatalog(rawLocations);
+
+    const forecastController = new ForecastViewController({
+      store,
+      comprensoriCatalog: fullCatalog
+    });
+
+    // Test search for "cornizzo"
+    const cornizzoHtml = forecastController.renderPickerSections('cornizzo');
+    assert.ok(cornizzoHtml.includes('Risultati Ricerca (1)'), 'Must return exactly 1 match for cornizzo');
+    assert.ok(cornizzoHtml.includes('Monte Cornizzolo'), 'Must include Monte Cornizzolo');
+    assert.ok(!cornizzoHtml.includes('Calascio / Rocca Calascio'), 'Must NOT include Calascio in cornizzo search');
+
+    // Test empty search returns Preferiti and Altri Comprensori
+    const defaultHtml = forecastController.renderPickerSections('');
+    assert.ok(defaultHtml.includes('Preferiti (4)'), 'Must render 4 real default preferiti');
+    assert.ok(defaultHtml.includes('Monte Cornizzolo'));
+    assert.ok(defaultHtml.includes('Monte Grappa'));
+    assert.ok(defaultHtml.includes('Calascio / Rocca Calascio'));
+    assert.ok(defaultHtml.includes('Meduno / Monte Valinis'));
+    assert.ok(defaultHtml.includes('Altri Comprensori (131)'), 'Must render 131 non-pinned spots');
+  });
 });

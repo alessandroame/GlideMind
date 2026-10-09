@@ -3,33 +3,81 @@
 - **Data**: 2026-10-09
 - **Autore**: Alessandro Amè & Pair Programmer
 - **Contesto**: Collocazione del marchio applicativo GlideMind nella UI mobile dell'applicazione, rimozione della data duplicata dall'header e visualizzazione di versione e build stamp per ambienti di test.
-- **Tipo**: UI Enhancement / HMI Ergonomics / Brand Alignment / Metadata
+- **Tipo**: UI Enhancement / HMI Ergonomics / Brand Alignment / Visual Verification
 
 ---
 
-## 1. Decisione di Progettazione ed Ergonomia (Laws of UX)
+## 1. Diagnosi del Difetto Visivo e Causa Radice (DevTools Inspection)
 
-1. **Rifiuto Sostituzione Icona Home nella Bottom Bar (Jakob's Law)**:
-   - Preservata l'icona canonica della casa (`M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z`) nella barra di navigazione inferiore.
-   - Sostituire un controllo universale con un marchio proprietario avrebbe causato ambiguità semantica e rottura dei principi Gestalt di somiglianza rispetto agli altri glifi SVG lineari da 24×24 px.
-2. **Integrazione Brand Icon e Versione nell'Header Mobile (HomeDashboardView)**:
-   - Inserita l'icona reale `assets/icons/icon-192.png` con classi `.gm-brand-icon .gm-brand-icon-sm` (22×22 px, raggio curvatura 5 px, box-shadow ambrato discreto) subito a sinistra del tag `<h1>GlideMind</h1>` nell'header mobile.
-   - A fianco del titolo è visualizzata la versione corrente (`v2.0.0`) con font ridotto monospace (`text-xs font-mono text-[var(--gm-text-muted)] font-normal`).
-3. **Rimozione Data Ridondante e Inserimento Build Stamp**:
-   - Rimossa la stringa della data statica (`2026-10-09`) dalla testata, in quanto la data attiva è già selezionabile ed evidente nel selettore orizzontale della sezione Volabilità.
-   - Sulla destra dell'header è visualizzato il tag di build (`build 5bf6d1c`), garantendo tracciabilità immediata della versione in fase di test sia su mobile sia su desktop.
-4. **Modulo Centralizzato `core/version.js`**:
-   - Creata la SSOT `core/version.js` che espone `APP_VERSION`, `APP_BUILD`, `APP_BUILD_DATE`, `getFormattedVersion()` e `getFormattedBuild()`.
-   - Aggiornato `ui/app.js` per esporre sia `version` sia `build` in `window.__GLIDEMIND__`.
+Dall'ispezione empirica del layout via Chrome DevTools su viewport mobile (375×667 e 412×924) è emersa un'anomalia di allineamento in cui il tag `v2.0.0` appariva sollevato come un esponente/apice sopra `GlideMind`:
+
+1. **Margini Default dello User-Agent**: Il tag `<h1>` ereditava dal foglio di stile del browser `margin: 10.05px 0`, spingendo la baseline di `GlideMind` verso il basso di ~10px rispetto allo `<span>` adiacente.
+2. **Assenza Utility Tailwind in Vanilla CSS**: Le classi `items-baseline` e `gap-1.5` non erano definite nel motore CSS custom [css/theme.css](file:///css/theme.css). Flexbox applicava quindi `align-items: stretch`, lasciando la versione ancorata al bordo superiore (`y: 16px`) mentre il testo del titolo partiva da `y: 26px`.
 
 ---
 
-## 2. File Modificati e Test
+## 2. Risoluzione Architetturale e Classi Dedicate
 
-- `core/version.js`: SSOT per metadati di versione e build.
-- `ui/views/HomeDashboardView.js`: rimossa data dall'header, integrata icona brand, versione e build stamp.
-- `ui/app.js`: integrati metadati versione e build nel bootstrap e debug object globale.
-- `css/theme.css`: definita variante `.gm-brand-icon-sm` (22×22 px) e reso `.gm-brand-icon` `inline-block` e `flex-shrink: 0`.
-- `tests/core/version.test.mjs`: test di unità per costanti e funzioni di formattazione versione/build.
-- `tests/ui/homeDashboardView.test.mjs`: test di regressione per assenza data in testata, presenza icona brand, versione e build.
-- **Suite di Test**: 278/278 test superati (`node --test`).
+Nel foglio di stile [css/theme.css](file:///css/theme.css) sono state introdotte classi semantiche dedicate che azzerano i margini ereditati e vincolano l'allineamento tipografico:
+
+```css
+.gm-home-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--gm-border);
+}
+
+.gm-header-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gm-header-title {
+  margin: 0;
+  padding: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--gm-text-primary);
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.gm-header-version {
+  font-family: var(--gm-font-mono, monospace);
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--gm-text-muted);
+  line-height: 1;
+}
+
+.gm-header-build {
+  font-family: var(--gm-font-mono, monospace);
+  font-size: 0.7rem;
+  color: var(--gm-text-muted);
+  background: var(--gm-bg-card);
+  border: 1px solid var(--gm-border);
+  padding: 2px 6px;
+  border-radius: var(--gm-radius-sm, 4px);
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+}
+```
+
+In [ui/views/HomeDashboardView.js](file:///ui/views/HomeDashboardView.js), `<span class="gm-header-version">` è stato incapsulato direttamente all'interno del tag `<h1 class="gm-header-title">`, condividendo in modo matematico la medesima baseline tipografica.
+
+---
+
+## 3. Ciclo di Verifica e Risultati
+
+1. **Ispezione DOM e Geometria**:
+   - `h1`: `top: 18px`, `height: 18px`
+   - `version`: `top: 23.6px`, `height: 10.8px` (allineato alla baseline inferiore di `h1` a `y: 34.4px / 36px`)
+   - `build`: centrato verticalmente a `top: 18.8px` sul lato opposto dell'header.
+2. **Verifica Visiva Headless**: Acquisiti screenshot su viewport 375×667 e 412×924 via Chrome DevTools MCP, confermando l'azzeramento dell'anomalia.
+3. **Suite di Test Automatizzata**: 279/279 test passati (`node --test`).

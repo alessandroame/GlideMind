@@ -2474,6 +2474,54 @@ input.gm-input:focus {
   border-radius: 5px;
 }
 
+/* Home Header, Brand & Version Metadata */
+.gm-home-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--gm-border);
+}
+
+.gm-header-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gm-header-title {
+  margin: 0;
+  padding: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--gm-text-primary);
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.gm-header-version {
+  font-family: var(--gm-font-mono, monospace);
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--gm-text-muted);
+  line-height: 1;
+}
+
+.gm-header-build {
+  font-family: var(--gm-font-mono, monospace);
+  font-size: 0.7rem;
+  color: var(--gm-text-muted);
+  background: var(--gm-bg-card);
+  border: 1px solid var(--gm-border);
+  padding: 2px 6px;
+  border-radius: var(--gm-radius-sm, 4px);
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+}
+
 /* ==========================================================================
    Mobile Landscape Guard (Outdoor HMI Ergonomics)
    ========================================================================== */

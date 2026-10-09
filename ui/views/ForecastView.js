@@ -1380,127 +1380,164 @@ export class ForecastViewController {
   }
 
   /**
-   * Opens the Comprensorio Picker Sheet with Preferiti, Recenti, and All spots with instant search.
+   * Checks if a spot is pinned in user favorites, including legacy seed IDs migration.
+   * @param {object} spot
+   * @param {Set<string>|Array<string>} pinnedIds
+   * @returns {boolean}
    */
-  openPickerSheet() {
+  isSpotPinned(spot, pinnedIds) {
+    if (!spot || !spot.id) return false;
+    const set = pinnedIds instanceof Set ? pinnedIds : new Set(pinnedIds || []);
+    if (set.has(spot.id)) return true;
+    const nameLower = (spot.name || '').toLowerCase();
+    const idLower = (spot.id || '').toLowerCase();
+    if (set.has('monte-cornizzolo-lc') && (idLower.includes('cornizzolo') || nameLower.includes('cornizzolo'))) return true;
+    if (set.has('bassano-del-grappa-vi') && (idLower.includes('grappa') || nameLower.includes('grappa'))) return true;
+    if (set.has('meduno-pn') && (idLower.includes('meduno') || nameLower.includes('meduno'))) return true;
+    if (set.has('rocca-calascio-aq') && (idLower.includes('calascio') || nameLower.includes('calascio'))) return true;
+    return false;
+  }
+
+  /**
+   * Evaluates if a comprensorio matches a search query across name, province, region, location and takeoff/landing names.
+   * @param {object} spot
+   * @param {string} query
+   * @returns {boolean}
+   */
+  matchComprensorioSearch(spot, query) {
+    if (!query) return true;
+    const q = query.toLowerCase().trim();
+    if ((spot.name || '').toLowerCase().includes(q)) return true;
+    if ((spot.province || '').toLowerCase().includes(q)) return true;
+    if ((spot.region || '').toLowerCase().includes(q)) return true;
+    if ((spot.location || '').toLowerCase().includes(q)) return true;
+    if (Array.isArray(spot.takeoffs) && spot.takeoffs.some(t => (t.name || '').toLowerCase().includes(q))) return true;
+    if (Array.isArray(spot.landings) && spot.landings.some(l => (l.name || '').toLowerCase().includes(q))) return true;
+    return false;
+  }
+
+  /**
+   * Renders the sections HTML for the Comprensorio Picker (Preferiti, Recenti, Altri, o Risultati Ricerca).
+   * @param {string} [searchQuery='']
+   * @returns {string}
+   */
+  renderPickerSections(searchQuery = '') {
+    const q = (searchQuery || '').toLowerCase().trim();
+    const allSpots = this.comprensoriCatalog;
     const state = this.store ? this.store.getState() : {};
     const pinnedIds = new Set(state.pinnedSpotIds || []);
     const recentIds = state.recentSpotIds || [];
     const currentSpot = this.getCurrentSpot();
 
-    const renderSheetBody = (searchQuery = '') => {
-      const q = searchQuery.toLowerCase().trim();
-      const allSpots = this.comprensoriCatalog;
-
-      const filtered = q
-        ? allSpots.filter(s => s.name.toLowerCase().includes(q) || s.province.toLowerCase().includes(q) || s.region.toLowerCase().includes(q))
-        : allSpots;
-
-      const pinnedSpots = allSpots.filter(s => pinnedIds.has(s.id));
-      const recentSpots = recentIds
-        .map(id => allSpots.find(s => s.id === id))
-        .filter(Boolean)
-        .filter(s => !pinnedIds.has(s.id));
-      const otherSpots = allSpots.filter(s => !pinnedIds.has(s.id) && !recentSpots.some(r => r.id === s.id));
-
-      const renderItem = (s) => {
-        const isPinned = pinnedIds.has(s.id);
-        const isActive = s.id === currentSpot.id;
-        return `
-          <div class="gm-picker-item ${isActive ? 'active' : ''}">
-            <div class="gm-picker-item-main" data-action="pick-spot" data-spot-id="${s.id}">
-              <div class="text-sm font-bold text-[var(--gm-text-primary)]">${escapeHtml(s.name)} (${escapeHtml(s.province)})</div>
-              <div class="text-xs text-[var(--gm-text-muted)]">${escapeHtml(s.region)}</div>
-            </div>
-            <button 
-              type="button" 
-              class="gm-star-btn ${isPinned ? 'pinned' : ''}" 
-              data-action="toggle-pin-spot" 
-              data-spot-id="${s.id}" 
-              aria-label="${isPinned ? 'Rimuovi dai' : 'Aggiungi ai'} preferiti"
-            >
-              ${isPinned ? '★' : '☆'}
-            </button>
-          </div>
-        `;
-      };
-
+    const renderItem = (s) => {
+      const isPinned = this.isSpotPinned(s, pinnedIds);
+      const isActive = s.id === currentSpot.id;
       return `
-        <div class="gm-picker-sheet flex flex-col gap-3">
-          <div class="gm-picker-header">
-            <label for="picker-search-input" class="sr-only">Cerca comprensorio</label>
-            <input 
-              id="picker-search-input" 
-              class="gm-input gm-picker-search" 
-              type="text" 
-              placeholder="Cerca comprensorio o provincia..." 
-              value="${escapeHtml(searchQuery)}"
-              autocomplete="off"
-            />
+        <div class="gm-picker-item ${isActive ? 'active' : ''}">
+          <div class="gm-picker-item-main" data-action="pick-spot" data-spot-id="${escapeHtml(s.id)}">
+            <div class="text-sm font-bold text-[var(--gm-text-primary)]">${escapeHtml(s.name)} (${escapeHtml(s.province)})</div>
+            <div class="text-xs text-[var(--gm-text-muted)]">${escapeHtml(s.region)}</div>
           </div>
-
-          ${!q ? `
-            <!-- Sezione Preferiti (Deduplicata) -->
-            ${pinnedSpots.length > 0 ? `
-              <div class="gm-picker-section">
-                <span class="gm-picker-section-title">⭐ Preferiti (${pinnedSpots.length})</span>
-                <div class="gm-picker-list">
-                  ${pinnedSpots.map(renderItem).join('')}
-                </div>
-              </div>
-            ` : ''}
-
-            <!-- Sezione Recenti (Deduplicata) -->
-            ${recentSpots.length > 0 ? `
-              <div class="gm-picker-section">
-                <span class="gm-picker-section-title">🕒 Recenti (${recentSpots.length})</span>
-                <div class="gm-picker-list">
-                  ${recentSpots.map(renderItem).join('')}
-                </div>
-              </div>
-            ` : ''}
-
-            <!-- Sezione Altri Comprensori (Zero Sovrapposizioni) -->
-            <div class="gm-picker-section">
-              <span class="gm-picker-section-title">
-                🗺️ ${(pinnedSpots.length > 0 || recentSpots.length > 0) ? 'Altri Comprensori' : 'Tutti i Comprensori'} (${(pinnedSpots.length > 0 || recentSpots.length > 0) ? otherSpots.length : allSpots.length})
-              </span>
-              <div class="gm-picker-list">
-                ${((pinnedSpots.length > 0 || recentSpots.length > 0) ? otherSpots : allSpots).map(renderItem).join('')}
-              </div>
-            </div>
-          ` : `
-            <!-- Risultati Ricerca -->
-            <div class="gm-picker-section">
-              <span class="gm-picker-section-title">🔍 Risultati Ricerca (${filtered.length})</span>
-              <div class="gm-picker-list">
-                ${filtered.length > 0 
-                  ? filtered.map(renderItem).join('') 
-                  : '<p class="text-xs text-[var(--gm-text-muted)] italic py-2">Nessun comprensorio trovato.</p>'}
-              </div>
-            </div>
-          `}
+          <button 
+            type="button" 
+            class="gm-star-btn ${isPinned ? 'pinned text-amber-400' : 'text-[var(--gm-text-muted)]'}" 
+            data-action="toggle-pin-spot" 
+            data-spot-id="${escapeHtml(s.id)}" 
+            aria-label="${isPinned ? 'Rimuovi dai' : 'Aggiungi ai'} preferiti"
+          >
+            ${isPinned ? '★' : '☆'}
+          </button>
         </div>
       `;
     };
 
+    if (q) {
+      const filtered = allSpots.filter(s => this.matchComprensorioSearch(s, q));
+      return `
+        <div class="gm-picker-section">
+          <span class="gm-picker-section-title">🔍 Risultati Ricerca (${filtered.length})</span>
+          <div class="gm-picker-list">
+            ${filtered.length > 0 
+              ? filtered.map(renderItem).join('') 
+              : '<p class="text-xs text-[var(--gm-text-muted)] italic py-2">Nessun comprensorio trovato per "' + escapeHtml(q) + '".</p>'}
+          </div>
+        </div>
+      `;
+    }
+
+    const pinnedSpots = allSpots.filter(s => this.isSpotPinned(s, pinnedIds));
+    const recentSpots = recentIds
+      .map(id => allSpots.find(s => s.id === id))
+      .filter(Boolean)
+      .filter(s => !this.isSpotPinned(s, pinnedIds));
+    const otherSpots = allSpots.filter(s => !this.isSpotPinned(s, pinnedIds) && !recentSpots.some(r => r.id === s.id));
+
+    return `
+      ${pinnedSpots.length > 0 ? `
+        <div class="gm-picker-section">
+          <span class="gm-picker-section-title">⭐ Preferiti (${pinnedSpots.length})</span>
+          <div class="gm-picker-list">
+            ${pinnedSpots.map(renderItem).join('')}
+          </div>
+        </div>
+      ` : ''}
+
+      ${recentSpots.length > 0 ? `
+        <div class="gm-picker-section">
+          <span class="gm-picker-section-title">🕒 Recenti (${recentSpots.length})</span>
+          <div class="gm-picker-list">
+            ${recentSpots.map(renderItem).join('')}
+          </div>
+        </div>
+      ` : ''}
+
+      <div class="gm-picker-section">
+        <span class="gm-picker-section-title">
+          🗺️ ${(pinnedSpots.length > 0 || recentSpots.length > 0) ? 'Altri Comprensori' : 'Tutti i Comprensori'} (${(pinnedSpots.length > 0 || recentSpots.length > 0) ? otherSpots.length : allSpots.length})
+        </span>
+        <div class="gm-picker-list">
+          ${((pinnedSpots.length > 0 || recentSpots.length > 0) ? otherSpots : allSpots).map(renderItem).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Opens the Comprensorio Picker Sheet with Preferiti, Recenti, and All spots with instant search.
+   * @param {string} [initialQuery='']
+   */
+  openPickerSheet(initialQuery = '') {
+    const sheetContent = `
+      <div class="gm-picker-sheet flex flex-col gap-3">
+        <div class="gm-picker-header">
+          <label for="picker-search-input" class="sr-only">Cerca comprensorio</label>
+          <input 
+            id="picker-search-input" 
+            class="gm-input gm-picker-search" 
+            type="text" 
+            placeholder="Cerca comprensorio, decollo, comune o provincia..." 
+            value="${escapeHtml(initialQuery)}"
+            autocomplete="off"
+          />
+        </div>
+        <div id="picker-sections-container" class="flex flex-col gap-3">
+          ${this.renderPickerSections(initialQuery)}
+        </div>
+      </div>
+    `;
+
     openSheet({
       id: 'comprensorio-picker',
       title: 'Seleziona Comprensorio',
-      content: renderSheetBody(''),
+      content: sheetContent,
       onOpen: () => {
         const input = document.getElementById('picker-search-input');
         if (input) {
-          // Zero intrusive autofocus: leave virtual keyboard closed on open so favorites are 1-tap accessible
           input.addEventListener('input', (e) => {
-            const sheetBodyEl = document.querySelector('.gm-sheet-content');
-            if (sheetBodyEl) {
-              sheetBodyEl.innerHTML = renderSheetBody(e.target.value);
-              const newInput = document.getElementById('picker-search-input');
-              if (newInput) {
-                newInput.focus();
-                newInput.setSelectionRange(newInput.value.length, newInput.value.length);
-              }
+            const query = e.target.value || '';
+            const container = document.getElementById('picker-sections-container');
+            if (container) {
+              container.innerHTML = this.renderPickerSections(query);
             }
           });
         }
@@ -1702,13 +1739,34 @@ export class ForecastViewController {
       if (this.store && spotId) {
         const state = this.store.getState();
         const pinned = new Set(state.pinnedSpotIds || []);
-        if (pinned.has(spotId)) {
+        
+        const spot = this.comprensoriCatalog.find(c => c.id === spotId);
+        const isPinned = this.isSpotPinned(spot || { id: spotId }, pinned);
+
+        if (isPinned) {
           pinned.delete(spotId);
+          if (spot) {
+            const nameLower = (spot.name || '').toLowerCase();
+            const idLower = (spot.id || '').toLowerCase();
+            if (idLower.includes('cornizzolo') || nameLower.includes('cornizzolo')) pinned.delete('monte-cornizzolo-lc');
+            if (idLower.includes('grappa') || nameLower.includes('grappa')) pinned.delete('bassano-del-grappa-vi');
+            if (idLower.includes('meduno') || nameLower.includes('meduno')) pinned.delete('meduno-pn');
+            if (idLower.includes('calascio') || nameLower.includes('calascio')) pinned.delete('rocca-calascio-aq');
+          }
         } else {
           pinned.add(spotId);
         }
+
         this.store.setState({ pinnedSpotIds: Array.from(pinned) });
-        this.openPickerSheet(); // Refresh sheet content
+
+        const searchInput = document.getElementById('picker-search-input');
+        const currentQuery = searchInput ? searchInput.value : '';
+        const container = document.getElementById('picker-sections-container');
+        if (container) {
+          container.innerHTML = this.renderPickerSections(currentQuery);
+        } else {
+          this.openPickerSheet(currentQuery);
+        }
       }
     }
   }
