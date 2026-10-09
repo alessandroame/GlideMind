@@ -143,6 +143,22 @@ The new application will deliver:
   - **Sounding & Lapse Rate Panel**: Atmospheric temperature vs dew point curves, LCL cloud base, and inversion altitudes.
   - **AI Flight Briefing (Guido)**: 1-click voice/text briefing with concise safety persona.
 
+### Phase 4-bis: Live Real Data Ingestion & Network Cache Sync (ForecastView & HomeDashboardView)
+- [ ] Implement live background data fetching in `ForecastView.js`:
+  - **Pattern Stale-While-Revalidate (0ms Latency)**: Rendering istantaneo all'apertura o cambio spot/data con dati da cache in-memory; lancio asincrono non bloccante di `fetchWeatherData(coords, { targetDate, weatherModel })` in background.
+  - **Idratazione Reattiva dello Store**: Al ricevimento del payload HTTP reale da Open-Meteo, aggiornamento di `store.weatherData`, arricchimento EDR/Deardorff/sounding e re-render trasparente senza reload o flicker.
+  - **Fallback Robusto & Offline Resilience**: In caso di assenza di rete, timeout (>5s) o HTTP 429/5xx, fallback automatico alla cache locale o al generatore sintetico con marcatore `isOfflineFallback: true`.
+- [ ] Implement live spot synchronization in `HomeDashboardView.js`:
+  - Caricamento asincrono del meteo reale per il comprensorio selezionato/primario e aggiornamento della classifica di volabilità dei comprensori in base alle condizioni effettive.
+- [ ] Indicatore di Stato Rete & Freschezza Dati (Laws of UX & Doherty Threshold):
+  - Badge discreto e accessibile nella barra superiore:
+    - 🟢 *Live Open-Meteo (DWD ICON / ECMWF)* con indicazione temporale (`aggiornato 14 min fa`).
+    - 🟡 *In aggiornamento...* (indicatore non bloccante senza spinner a schermo intero).
+    - ⚪ *Modalità Offline / Stime* (in assenza di segnale).
+- [ ] Isolamento Headless & Preservazione Test:
+  - Condizionamento del fetch di rete a `typeof window !== 'undefined' && typeof window.fetch === 'function'`. I test in Node.js puro mantengono esecuzione deterministica a 0ms senza dipendenza da internet.
+- [ ] **Quality Gate 4-bis**: 100% test passanti con `node --test` e verifica end-to-end con dati reali nel browser su `http://localhost:3000`.
+
 ### Phase 5: Spot Map & Mappa della Volabilità ("Dove Volare Oggi")
 - [ ] Implement `ui/views/SpotMapView.js`:
   - **Architettura a Due Livelli di Zoom con Idratazione Progressiva**:
