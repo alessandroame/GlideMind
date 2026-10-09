@@ -304,3 +304,44 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Aggiunta suite di test [tests/core/version.test.mjs](file:///tests/core/version.test.mjs) ed estesa [tests/ui/homeDashboardView.test.mjs](file:///tests/ui/homeDashboardView.test.mjs) (279/279 test superati nel test runner nativo).
   - Registrata la Lezione #34 in [MEMORY.md](file:///MEMORY.md).
 
+---
+
+## 2026-10-09 - De-Cluttering Visivo Scrubber, Continuous Slide Dragging e Governance Anti-Naked Data
+- **Tipo**: UI Enhancement / Mobile Ergonomics / Laws of UX / Progressive Disclosure
+- **Dettagli**: [.agents/worklog.d/2026-10-09_forecast-scrubber-progressive-disclosure.md](file:///.agents/worklog.d/2026-10-09_forecast-scrubber-progressive-disclosure.md)
+- **Sintesi**:
+  - Rimossi i numeri scalari nudi della velocità del vento (`compact-wind`) e le frecce rotanti non referenziate (`compact-arrow`) alla base delle 13 colonne dello scrubber in [ui/views/ForecastView.js](file:///ui/views/ForecastView.js), preservando l'accessibilità semantica completa tramite `aria-label`.
+  - Implementato lo scorrimento continuo col dito/puntatore (*slide/drag gesture*) tramite Pointer Events (`pointerdown`, `pointermove`, `pointerup`), pointer capture e aggiornamento reattivo in-place del DOM (`setHour`) a latenza $< 2\text{ms}$ senza ricostruzione dello scrubber.
+  - Aggiunti `touch-action: none` e `cursor: ew-resize` in [css/theme.css](file:///css/theme.css) per impedire il panning verticale accidentale durante lo scorrimento orizzontale.
+  - Allineata la visualizzazione della direzione del vento nelle card dei comprensori in [ui/views/HomeDashboardView.js](file:///ui/views/HomeDashboardView.js) (punto cardinale associato ai gradi: `da S (180°)`).
+  - Bonificata la terminologia specialistica nel grafico dei radiosondaggi in [ui/views/ForecastView.js](file:///ui/views/ForecastView.js) (`Base Nubi (LCL)`, `Quota Max`).
+  - Creata la suite automatizzata di audit statico [tests/ui/uiIntegrityAudit.test.mjs](file:///tests/ui/uiIntegrityAudit.test.mjs) e aggiunto il test di scrubbing continuo in [tests/ui/forecastView.test.mjs](file:///tests/ui/forecastView.test.mjs) (286/286 test superati).
+  - Registrate le Lezioni #36 e #38 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-09 - Correzione Spaziatura Header Previsioni, Safe-Area Top e Ergonomia Touch
+- **Tipo**: UI Bug Fix / Layout / Mobile Ergonomics / Laws of UX
+- **Dettagli**: [.agents/worklog.d/2026-10-09_forecast-header-spacing-and-safe-area-fix.md](file:///.agents/worklog.d/2026-10-09_forecast-header-spacing-and-safe-area-fix.md)
+- **Sintesi**:
+  - Diagnosticato e risolto il problema di elementi accavallati a filo (`0px` di gap) nell'header di [ui/views/ForecastView.js](file:///ui/views/ForecastView.js): causa radice imputabile all'uso della classe inesistente `.gap-2.5` nel markup CSS vanilla.
+  - Introdotta in [css/theme.css](file:///css/theme.css) la classe semantica `.gm-forecast-header` con `gap: 12px` e aggiunte le utility `.gap-1\.5` (6px) e `.gap-2\.5` (10px).
+  - Aggiunto `padding-top: calc(16px + env(safe-area-inset-top, 0px))` a `#main-view` e `padding-top: 4px` a `.gm-forecast-view` per garantire distacco continuo dalla barra di stato mobile / notch.
+  - Uniformato `.gm-subspot-select` con `min-height: 48px` (Fitts's touch floor) e `border-radius: 12px`.
+  - Verificato con analisi geometrica DOM su Chrome DevTools (`distBarToSelect: 12px`, `distSelectToTabs: 12px`, `barRect.top: 20px`).
+  - Registrata la Lezione #35 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-09 - Risoluzione Selezione Comprensorio da Picker Sheet (Event Delegation)
+- **Tipo**: Bug Fix / Event Architecture / DOM / Mobile Ergonomics
+- **Dettagli**: [.agents/worklog.d/2026-10-09_picker-sheet-event-delegation-fix.md](file:///.agents/worklog.d/2026-10-09_picker-sheet-event-delegation-fix.md)
+- **Sintesi**:
+  - Risolta la mancata reattività dei click/tap nel drawer comprensori e nel calendario modale: `#sheet-container` risiede all'apice del documento (sibling di `#main-view`) e gli eventi non transitavano per `this.containerEl`.
+  - In [ui/views/ForecastView.js](file:///ui/views/ForecastView.js) e [ui/views/HomeDashboardView.js](file:///ui/views/HomeDashboardView.js), collegato `this.boundClickHandler` contestualmente su `this.containerEl` e su `this.sheetContainerEl` (`#sheet-container`) in `mount()`, con disconnessione pulita in `unmount()`.
+  - Esteso `data-action="pick-spot"` all'intera card `.gm-picker-item` per azzerare qualsiasi dead zone di tocco (Fitts's Law).
+  - Integrato fallback di ricerca tramite slug (`slugifyComprensorio`) per massima tolleranza sui formati ID.
+  - Collaudato con Chrome DevTools su browser reale con selezione e ricerca spot reali ("Norma", "Meduno", "Grappa") e aggiunti test di regressione in [tests/ui/locationsCatalogHydration.test.mjs](file:///tests/ui/locationsCatalogHydration.test.mjs) (285/285 test superati).
+  - Registrata la Lezione #37 in [MEMORY.md](file:///MEMORY.md).
+
+

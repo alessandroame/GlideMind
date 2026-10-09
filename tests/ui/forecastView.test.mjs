@@ -117,6 +117,16 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
       /gm-timeline-col-compact\s+active[\s\S]*?data-hour="12"/.test(html),
       'Hour 12 must be marked active'
     );
+
+    // Ensure naked wind numbers and unreferenced arrows are removed from scrubber to follow Progressive Disclosure
+    assert.ok(
+      !html.includes('compact-wind'),
+      'Scrubber columns must not render naked numbers without context'
+    );
+    assert.ok(
+      !html.includes('compact-arrow'),
+      'Scrubber columns must not render ambiguous rotated arrows without compass context'
+    );
   });
 
   it('should render 360° wind compass with takeoff azimuth cone and alignment status', () => {
@@ -274,6 +284,62 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.equal(rendered, true);
   });
 
+  it('should support continuous pointer scrubbing/slide selection across timeline hours', () => {
+    const mockStore = createStore();
+    const controller = new ForecastViewController({ store: mockStore });
+
+    const mockStrip = {
+      contains() { return true; },
+      setPointerCapture() {},
+      releasePointerCapture() {},
+      getBoundingClientRect() {
+        return {
+          left: 100,
+          right: 360,
+          top: 500,
+          bottom: 550,
+          width: 260,
+          height: 50
+        };
+      }
+    };
+
+    const mockContainer = {
+      querySelector(sel) {
+        if (sel === '#forecast-timeline-strip') return mockStrip;
+        return null;
+      },
+      addEventListener() {},
+      removeEventListener() {}
+    };
+
+    controller.containerEl = mockContainer;
+
+    // 1. PointerDown at hour 10 (x = 100 + 2.5 * 20 = 150)
+    controller.handlePointerDown({
+      target: mockStrip,
+      clientX: 150,
+      pointerId: 1
+    });
+    assert.equal(controller.isScrubbing, true, 'Scrubbing must be active on pointer down');
+    assert.equal(controller.selectedHour, 10, 'Selected hour must update to 10');
+
+    // 2. Continuous pointer drag to hour 18 (x = 100 + 10.5 * 20 = 310)
+    controller.handlePointerMove({
+      target: mockStrip,
+      clientX: 310,
+      pointerId: 1
+    });
+    assert.equal(controller.selectedHour, 18, 'Selected hour must smoothly update to 18 during slide');
+
+    // 3. PointerUp finishes scrubbing
+    controller.handlePointerUp({
+      target: mockStrip,
+      pointerId: 1
+    });
+    assert.equal(controller.isScrubbing, false, 'Scrubbing must be false on pointer up');
+  });
+
   it('should toggle wind and sounding views between summary and chart mode', () => {
     const mockStore = createStore();
     const controller = new ForecastViewController({ store: mockStore });
@@ -425,5 +491,23 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.ok(capturedHtml.includes('Cautela'));
     assert.ok(capturedHtml.includes('Chiuso'));
     assert.ok(capturedHtml.includes('Severo'));
+  });
+
+  it('should enforce semantic header layout with safe-area and Fitts touch target in ForecastView', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const mockStore = createStore();
+    const controller = new ForecastViewController({ store: mockStore });
+    const html = controller.renderHtml();
+
+    // Verify semantic header in view HTML
+    assert.ok(html.includes('<header class="gm-forecast-header">'), 'Header must have gm-forecast-header class');
+    assert.ok(!html.includes('gap-2.5'), 'Header must not rely on non-existent gap-2.5 utility');
+
+    // Verify CSS design tokens and layout rules in theme.css
+    const cssContent = fs.readFileSync(path.resolve('css/theme.css'), 'utf-8');
+    assert.ok(cssContent.includes('.gm-forecast-header'), 'theme.css must declare .gm-forecast-header');
+    assert.ok(cssContent.includes('safe-area-inset-top'), 'theme.css must support safe-area-inset-top for header breathing room');
+    assert.ok(cssContent.includes('.gm-subspot-select'), 'theme.css must define .gm-subspot-select');
   });
 });

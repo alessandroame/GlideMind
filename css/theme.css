@@ -140,6 +140,7 @@ button, input, select, textarea {
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   padding: 16px;
+  padding-top: calc(16px + env(safe-area-inset-top, 0px));
   padding-bottom: calc(var(--gm-nav-height-mobile) + env(safe-area-inset-bottom, 16px) + 16px);
 }
 
@@ -1521,7 +1522,9 @@ button, input, select, textarea {
 .justify-center { justify-content: center; }
 .justify-end { justify-content: flex-end; }
 .gap-1 { gap: 4px; }
+.gap-1\.5 { gap: 6px; }
 .gap-2 { gap: 8px; }
+.gap-2\.5 { gap: 10px; }
 .gap-3 { gap: 12px; }
 .gap-4 { gap: 16px; }
 .gap-6 { gap: 24px; }
@@ -1617,6 +1620,15 @@ input.gm-input:focus {
  * ------------------------------------------------------------- */
 .gm-forecast-view {
   width: 100%;
+  padding-top: 4px;
+}
+
+.gm-forecast-header {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 2px;
 }
 
 .gm-spot-select {
@@ -2102,8 +2114,10 @@ input.gm-input:focus {
 }
 
 .gm-comprensorio-pin {
-  font-size: 1.15rem;
-  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gm-accent);
   flex-shrink: 0;
 }
 
@@ -2157,6 +2171,9 @@ input.gm-input:focus {
   padding: 8px 12px 10px;
   width: 100%;
   box-sizing: border-box;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 @media (min-width: 768px) and (min-height: 550px) {
@@ -2176,6 +2193,8 @@ input.gm-input:focus {
   gap: 2px;
   width: 100%;
   box-sizing: border-box;
+  touch-action: none;
+  cursor: ew-resize;
 }
 
 .gm-timeline-col-compact {
@@ -2183,14 +2202,15 @@ input.gm-input:focus {
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 1px;
-  min-height: 68px;
+  padding: 6px 2px 5px;
+  min-height: 50px;
   background-color: var(--gm-bg-card);
   border: 1px solid var(--gm-border);
   border-radius: 4px;
   cursor: pointer;
-  transition: all 120ms ease;
+  transition: border-color 100ms ease, background-color 100ms ease;
   user-select: none;
+  touch-action: none;
 }
 
 .gm-timeline-col-compact:hover {
@@ -2205,7 +2225,7 @@ input.gm-input:focus {
 }
 
 .gm-timeline-col-compact .compact-time {
-  font-size: 0.65rem;
+  font-size: 0.68rem;
   font-weight: 700;
   color: var(--gm-text-secondary);
   line-height: 1;
@@ -2216,7 +2236,7 @@ input.gm-input:focus {
 }
 
 .gm-timeline-col-compact .compact-bar {
-  width: 8px;
+  width: 9px;
   height: 32px;
   background: var(--gm-bg-surface);
   border-radius: 4px;
@@ -2230,26 +2250,6 @@ input.gm-input:focus {
   left: 0;
   right: 0;
   border-radius: 4px;
-}
-
-.gm-timeline-col-compact .compact-wind {
-  font-size: 0.65rem;
-  font-family: var(--gm-font-mono);
-  font-weight: 700;
-  color: var(--gm-text-primary);
-  line-height: 1;
-}
-
-.gm-timeline-col-compact .compact-arrow {
-  font-size: 0.62rem;
-  color: var(--gm-text-muted);
-  line-height: 1;
-  display: inline-block;
-  transition: transform var(--gm-transition-fast);
-}
-
-.gm-timeline-col-compact.active .compact-arrow {
-  color: var(--gm-accent);
 }
 
 /* Panel Header & Toggle Buttons (Sintetico / Grafico) */
@@ -2312,25 +2312,225 @@ input.gm-input:focus {
   user-select: none;
 }
 
-/* Level 2 Sub-Spot Dropdown */
+/* Level 2 Sub-Spot Dropdown & Custom Bounded Popover */
+.gm-subspot-dropdown-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.gm-subspot-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: var(--gm-touch-min, 48px);
+  padding: 10px 14px;
+  background-color: var(--gm-bg-surface);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-md);
+  color: var(--gm-text-primary);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--gm-transition-fast), background-color var(--gm-transition-fast);
+  box-sizing: border-box;
+  text-align: left;
+}
+
+.gm-subspot-trigger:hover {
+  background-color: var(--gm-bg-hover);
+  border-color: var(--gm-border-strong);
+}
+
+.gm-subspot-trigger:focus-visible,
+.gm-subspot-trigger.open {
+  outline: none;
+  border-color: var(--gm-accent);
+  box-shadow: 0 0 0 2px var(--gm-accent-glow);
+}
+
+.gm-subspot-trigger-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.gm-subspot-trigger-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gm-accent);
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+}
+
+.gm-subspot-trigger-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.gm-subspot-trigger-chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gm-text-muted);
+  transition: transform var(--gm-transition-fast);
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.gm-subspot-trigger-chevron.rotated {
+  transform: rotate(180deg);
+}
+
+/* Custom Popover: strictly locked to container boundaries, never bleeds outside */
+.gm-subspot-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  width: 100%;
+  max-width: 100%;
+  max-height: 320px;
+  overflow-y: auto;
+  background-color: var(--gm-bg-surface);
+  border: 1px solid var(--gm-border-strong);
+  border-radius: var(--gm-radius-md);
+  box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.65), 0 4px 12px -2px rgba(0, 0, 0, 0.4);
+  z-index: 60;
+  box-sizing: border-box;
+  padding: 6px 0;
+}
+
+.gm-subspot-group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px 4px 14px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--gm-text-muted);
+}
+
+.gm-subspot-group-header svg {
+  color: var(--gm-accent);
+}
+
+.gm-subspot-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 14px;
+  min-height: 44px;
+  background: transparent;
+  border: none;
+  color: var(--gm-text-primary);
+  font-size: 0.86rem;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color var(--gm-transition-fast);
+  box-sizing: border-box;
+}
+
+.gm-subspot-item:hover,
+.gm-subspot-item:focus-visible {
+  background-color: var(--gm-bg-hover);
+  outline: none;
+}
+
+.gm-subspot-item.active {
+  background-color: var(--gm-accent-glow);
+  color: var(--gm-accent);
+  font-weight: 700;
+}
+
+.gm-subspot-item-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.gm-subspot-item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gm-accent);
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+
+.gm-subspot-item-bullet {
+  color: var(--gm-text-muted);
+  font-size: 1rem;
+  line-height: 1;
+  width: 14px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.gm-subspot-item-text-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.gm-subspot-item-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gm-subspot-item-badge {
+  font-size: 0.75rem;
+  color: var(--gm-text-muted);
+  font-family: var(--gm-font-mono, monospace);
+}
+
+.gm-subspot-item-check {
+  color: var(--gm-accent);
+  font-weight: 700;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
 .gm-subspot-select {
   display: block;
   width: 100%;
-  min-height: 42px;
+  min-height: var(--gm-touch-min, 48px);
   background-color: var(--gm-bg-surface);
   color: var(--gm-text-primary);
   border: 1px solid var(--gm-border);
-  border-radius: var(--gm-radius-sm);
-  padding: 8px 12px;
-  font-size: 0.85rem;
+  border-radius: var(--gm-radius-md);
+  padding: 10px 14px;
+  font-size: 0.88rem;
   font-weight: 600;
   cursor: pointer;
-  transition: border-color var(--gm-transition-fast);
+  transition: border-color var(--gm-transition-fast), background-color var(--gm-transition-fast);
+  box-sizing: border-box;
 }
 
-.gm-subspot-select:focus {
+.gm-subspot-select:hover {
+  background-color: var(--gm-bg-hover);
+  border-color: var(--gm-border-strong);
+}
+
+.gm-subspot-select:focus,
+.gm-subspot-select:focus-visible {
   outline: none;
   border-color: var(--gm-accent);
+  box-shadow: 0 0 0 2px var(--gm-accent-glow);
 }
 
 /* Comprensorio Picker Sheet */

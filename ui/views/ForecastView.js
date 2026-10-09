@@ -258,12 +258,17 @@ export class ForecastViewController {
     this.unsubscribeStore = null;
     this.boundClickHandler = this.handleClick.bind(this);
     this.boundChangeHandler = this.handleChange.bind(this);
+    this.boundPointerDown = this.handlePointerDown.bind(this);
+    this.boundPointerMove = this.handlePointerMove.bind(this);
+    this.boundPointerUp = this.handlePointerUp.bind(this);
+    this.isScrubbing = false;
 
     // Initial local view state
     const now = new Date();
     const currentHour = now.getHours();
     this.selectedHour = (currentHour >= 8 && currentHour <= 20) ? currentHour : 13;
     this.selectedSubSpot = 'overview'; // 'overview' | spotId
+    this.isSubSpotMenuOpen = false;
     const storeState = this.store ? this.store.getState() : {};
     this.activeDate = storeState.activeDate || formatDateIso(now);
     this.cachedWeatherMap = new Map(); // key: spotId_date -> weatherPayload
@@ -421,6 +426,16 @@ export class ForecastViewController {
     if (this.containerEl) {
       this.containerEl.addEventListener('click', this.boundClickHandler);
       this.containerEl.addEventListener('change', this.boundChangeHandler);
+      this.containerEl.addEventListener('pointerdown', this.boundPointerDown);
+      this.containerEl.addEventListener('pointermove', this.boundPointerMove);
+      this.containerEl.addEventListener('pointerup', this.boundPointerUp);
+      this.containerEl.addEventListener('pointercancel', this.boundPointerUp);
+    }
+
+    // Attach delegated click listener to centralized modal sheet container
+    this.sheetContainerEl = typeof document !== 'undefined' ? document.getElementById('sheet-container') : null;
+    if (this.sheetContainerEl && typeof this.sheetContainerEl.addEventListener === 'function') {
+      this.sheetContainerEl.addEventListener('click', this.boundClickHandler);
     }
 
     if (this.store) {
@@ -443,7 +458,15 @@ export class ForecastViewController {
     if (this.containerEl) {
       this.containerEl.removeEventListener('click', this.boundClickHandler);
       this.containerEl.removeEventListener('change', this.boundChangeHandler);
+      this.containerEl.removeEventListener('pointerdown', this.boundPointerDown);
+      this.containerEl.removeEventListener('pointermove', this.boundPointerMove);
+      this.containerEl.removeEventListener('pointerup', this.boundPointerUp);
+      this.containerEl.removeEventListener('pointercancel', this.boundPointerUp);
       this.containerEl = null;
+    }
+    if (this.sheetContainerEl && typeof this.sheetContainerEl.removeEventListener === 'function') {
+      this.sheetContainerEl.removeEventListener('click', this.boundClickHandler);
+      this.sheetContainerEl = null;
     }
     if (this.unsubscribeStore) {
       this.unsubscribeStore();
@@ -488,15 +511,21 @@ export class ForecastViewController {
         ${this.renderHeader(spot)}
 
         <!-- 2. Spot Card: Dual Unico Binomio or Focused Sub-Spot Detail -->
-        ${this.selectedSubSpot === 'overview' 
-          ? this.renderSummaryCard(evaluated) 
-          : this.renderSpecificSpotCard(activeSubSpotObj, evaluated)}
+        <div id="forecast-spot-card-container">
+          ${this.selectedSubSpot === 'overview' 
+            ? this.renderSummaryCard(evaluated) 
+            : this.renderSpecificSpotCard(activeSubSpotObj, evaluated)}
+        </div>
 
         <!-- 3. Dual-State Wind & Orientation Panel (Sintetico / Grafico) -->
-        ${this.renderWindPanel(evaluated, weatherData, spot, activeSubSpotObj)}
+        <div id="forecast-wind-panel-container">
+          ${this.renderWindPanel(evaluated, weatherData, spot, activeSubSpotObj)}
+        </div>
 
         <!-- 4. Dual-State Sounding & Thermals Panel (Sintetico / Grafico) -->
-        ${this.renderSoundingPanel(evaluated, weatherData, spot, activeSubSpotObj)}
+        <div id="forecast-sounding-panel-container">
+          ${this.renderSoundingPanel(evaluated, weatherData, spot, activeSubSpotObj)}
+        </div>
 
         <!-- 5. AI Flight Briefing (Guido Persona) -->
         ${this.renderBriefingCard(briefing, spot)}
@@ -536,8 +565,39 @@ export class ForecastViewController {
     const takeoffs = currentSpot.takeoffs || [];
     const landings = currentSpot.landings || [];
 
+    // Resolve active sub-spot label and monochrome vector SVG icon
+    let activeSubSpotLabel = 'Panoramica (Decollo Primario + Atterraggio)';
+    let activeSubSpotIcon = `
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+        <polyline points="2 17 12 22 22 17"></polyline>
+        <polyline points="2 12 12 17 22 12"></polyline>
+      </svg>
+    `;
+
+    const activeSub = this.resolveActiveSubSpot(currentSpot);
+    if (activeSub) {
+      if (activeSub.spotType === 'takeoff') {
+        activeSubSpotLabel = `${activeSub.name} (${activeSub.altitude}m · ${activeSub.heading}° ${getCardinalDirection(activeSub.heading)})`;
+        activeSubSpotIcon = `
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="m8 3 4 8 5-5 5 15H2L8 3z"></path>
+          </svg>
+        `;
+      } else if (activeSub.spotType === 'landing') {
+        activeSubSpotLabel = `${activeSub.name} (${activeSub.altitude}m${activeSub.isOfficial ? ' · Ufficiale' : ''})`;
+        activeSubSpotIcon = `
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"></circle>
+            <circle cx="12" cy="12" r="6"></circle>
+            <circle cx="12" cy="12" r="2"></circle>
+          </svg>
+        `;
+      }
+    }
+
     return `
-      <header class="gm-forecast-header flex flex-col gap-2.5">
+      <header class="gm-forecast-header">
         <!-- Level 1: Comprensorio Bar + Picker Trigger (Full Width, Zero Duplicate Home) -->
         <div 
           class="gm-comprensorio-bar" 
@@ -547,7 +607,12 @@ export class ForecastViewController {
           aria-label="Cambia comprensorio, attualmente ${escapeHtml(currentSpot.name)}"
         >
           <div class="gm-comprensorio-bar-info">
-            <span class="gm-comprensorio-pin" aria-hidden="true">📍</span>
+            <span class="gm-comprensorio-pin" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path>
+                <circle cx="12" cy="10" r="3"></circle>
+              </svg>
+            </span>
             <div class="gm-comprensorio-text">
               <span class="gm-comprensorio-name">
                 ${escapeHtml(currentSpot.name)} (${escapeHtml(currentSpot.province)})
@@ -560,23 +625,25 @@ export class ForecastViewController {
           <span class="gm-comprensorio-chevron" aria-hidden="true">›</span>
         </div>
 
-        <!-- Level 2: Sub-Spot Dropdown (Overview vs Individual Spots) -->
-        <div>
+        <!-- Level 2: Sub-Spot Custom Dropdown (Strictly bounded, Zero Multi-color Emoji) -->
+        <div class="gm-subspot-dropdown-wrapper">
           <label for="forecast-subspot-select" class="sr-only">Seleziona Punto di Volo o Panoramica</label>
           <select 
             id="forecast-subspot-select" 
-            class="gm-subspot-select" 
+            class="gm-subspot-select sr-only" 
             data-action="change-subspot" 
             aria-label="Seleziona Punto o Panoramica del Comprensorio"
+            tabindex="-1"
+            aria-hidden="true"
           >
             <option value="overview" ${this.selectedSubSpot === 'overview' ? 'selected' : ''}>
-              🔍 Panoramica (Decollo Primario + Atterraggio)
+              Panoramica (Decollo Primario + Atterraggio)
             </option>
             ${takeoffs.length > 0 ? `
               <optgroup label="Decolli">
                 ${takeoffs.map(t => `
                   <option value="${t.id}" ${this.selectedSubSpot === t.id ? 'selected' : ''}>
-                    ↗ ${escapeHtml(t.name)} (${t.altitude}m - ${t.heading}° ${getCardinalDirection(t.heading)})
+                    ${escapeHtml(t.name)} (${t.altitude}m · ${t.heading}° ${getCardinalDirection(t.heading)})
                   </option>
                 `).join('')}
               </optgroup>
@@ -585,12 +652,133 @@ export class ForecastViewController {
               <optgroup label="Atterraggi">
                 ${landings.map(l => `
                   <option value="${l.id}" ${this.selectedSubSpot === l.id ? 'selected' : ''}>
-                    ↘ ${escapeHtml(l.name)} (${l.altitude}m${l.isOfficial ? ' - Ufficiale' : ''})
+                    ${escapeHtml(l.name)} (${l.altitude}m${l.isOfficial ? ' · Ufficiale' : ''})
                   </option>
                 `).join('')}
               </optgroup>
             ` : ''}
           </select>
+
+          <button
+            type="button"
+            class="gm-subspot-trigger ${this.isSubSpotMenuOpen ? 'open' : ''}"
+            data-action="toggle-subspot-menu"
+            aria-expanded="${this.isSubSpotMenuOpen ? 'true' : 'false'}"
+            aria-haspopup="listbox"
+            aria-label="Seleziona punto o panoramica, attualmente ${escapeHtml(activeSubSpotLabel)}"
+          >
+            <div class="gm-subspot-trigger-info">
+              <span class="gm-subspot-trigger-icon" aria-hidden="true">
+                ${activeSubSpotIcon}
+              </span>
+              <span class="gm-subspot-trigger-text">
+                ${escapeHtml(activeSubSpotLabel)}
+              </span>
+            </div>
+            <span class="gm-subspot-trigger-chevron ${this.isSubSpotMenuOpen ? 'rotated' : ''}" aria-hidden="true">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </span>
+          </button>
+
+          ${this.isSubSpotMenuOpen ? `
+            <div class="gm-subspot-popover" role="listbox" aria-label="Opzioni punto di volo">
+              <!-- Item Panoramica -->
+              <button
+                type="button"
+                class="gm-subspot-item ${this.selectedSubSpot === 'overview' ? 'active' : ''}"
+                data-action="select-subspot"
+                data-subspot-id="overview"
+                role="option"
+                aria-selected="${this.selectedSubSpot === 'overview' ? 'true' : 'false'}"
+              >
+                <div class="gm-subspot-item-left">
+                  <span class="gm-subspot-item-icon" aria-hidden="true">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                      <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                      <polyline points="2 17 12 22 22 17"></polyline>
+                      <polyline points="2 12 12 17 22 12"></polyline>
+                    </svg>
+                  </span>
+                  <span class="gm-subspot-item-name font-semibold">Panoramica (Decollo Primario + Atterraggio)</span>
+                </div>
+                ${this.selectedSubSpot === 'overview' ? `
+                  <span class="gm-subspot-item-check" aria-hidden="true">✓</span>
+                ` : ''}
+              </button>
+
+              <!-- Gruppo Decolli -->
+              ${takeoffs.length > 0 ? `
+                <div class="gm-subspot-group-header">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="m8 3 4 8 5-5 5 15H2L8 3z"></path>
+                  </svg>
+                  <span>Decolli</span>
+                </div>
+                ${takeoffs.map(t => {
+                  const isSel = this.selectedSubSpot === t.id;
+                  return `
+                    <button
+                      type="button"
+                      class="gm-subspot-item ${isSel ? 'active' : ''}"
+                      data-action="select-subspot"
+                      data-subspot-id="${escapeHtml(t.id)}"
+                      role="option"
+                      aria-selected="${isSel ? 'true' : 'false'}"
+                    >
+                      <div class="gm-subspot-item-left">
+                        <span class="gm-subspot-item-bullet" aria-hidden="true">•</span>
+                        <div class="gm-subspot-item-text-group">
+                          <span class="gm-subspot-item-name">${escapeHtml(t.name)}</span>
+                          <span class="gm-subspot-item-badge">${t.altitude}m · ${t.heading}° ${getCardinalDirection(t.heading)}</span>
+                        </div>
+                      </div>
+                      ${isSel ? `
+                        <span class="gm-subspot-item-check" aria-hidden="true">✓</span>
+                      ` : ''}
+                    </button>
+                  `;
+                }).join('')}
+              ` : ''}
+
+              <!-- Gruppo Atterraggi -->
+              ${landings.length > 0 ? `
+                <div class="gm-subspot-group-header">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <circle cx="12" cy="12" r="6"></circle>
+                    <circle cx="12" cy="12" r="2"></circle>
+                  </svg>
+                  <span>Atterraggi</span>
+                </div>
+                ${landings.map(l => {
+                  const isSel = this.selectedSubSpot === l.id;
+                  return `
+                    <button
+                      type="button"
+                      class="gm-subspot-item ${isSel ? 'active' : ''}"
+                      data-action="select-subspot"
+                      data-subspot-id="${escapeHtml(l.id)}"
+                      role="option"
+                      aria-selected="${isSel ? 'true' : 'false'}"
+                    >
+                      <div class="gm-subspot-item-left">
+                        <span class="gm-subspot-item-bullet" aria-hidden="true">•</span>
+                        <div class="gm-subspot-item-text-group">
+                          <span class="gm-subspot-item-name">${escapeHtml(l.name)}</span>
+                          <span class="gm-subspot-item-badge">${l.altitude}m${l.isOfficial ? ' · Ufficiale' : ''}</span>
+                        </div>
+                      </div>
+                      ${isSel ? `
+                        <span class="gm-subspot-item-check" aria-hidden="true">✓</span>
+                      ` : ''}
+                    </button>
+                  `;
+                }).join('')}
+              ` : ''}
+            </div>
+          ` : ''}
         </div>
 
         <!-- Smart Adaptive Date Tabs + Calendar Button -->
@@ -1228,14 +1416,14 @@ export class ForecastViewController {
           <circle cx="${activeMarkerX}" cy="${activeLclY}" r="4.5" fill="var(--gm-accent)" stroke="var(--gm-bg-base)" stroke-width="2" />
           <rect x="${activeMarkerX - 28}" y="2" width="56" height="14" rx="3" fill="var(--gm-accent)" />
           <text x="${activeMarkerX}" y="12" font-size="9" font-weight="700" fill="var(--gm-text-inverse)" text-anchor="middle">
-            LCL: ${Math.round(activeData.lclMsl)}m
+            Base: ${Math.round(activeData.lclMsl)}m
           </text>
         </svg>
 
         <div class="flex items-center justify-between text-xs px-2 pt-1 border-t border-[var(--gm-border)]">
           <div class="flex items-center gap-3">
-            <span class="flex items-center gap-1.5"><span class="w-2.5 h-0.5 bg-[var(--gm-accent)] inline-block"></span> Base LCL</span>
-            <span class="flex items-center gap-1.5"><span class="w-2.5 h-0.5 bg-[var(--gm-status-flyable)] inline-block"></span> Ceiling</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-0.5 bg-[var(--gm-accent)] inline-block"></span> Base Nubi (LCL)</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-0.5 bg-[var(--gm-status-flyable)] inline-block"></span> Quota Max</span>
           </div>
           <span class="text-xs text-[var(--gm-accent)] font-mono font-bold">
             Ore ${String(this.selectedHour).padStart(2, '0')}:00: Base ${Math.round(activeData.lclMsl)}m MSL
@@ -1332,7 +1520,7 @@ export class ForecastViewController {
           <span class="flex items-center gap-1.5">
             <span class="text-amber-400">⏱️</span> Scrubber Orario
           </span>
-          <span class="text-[var(--gm-accent)] font-mono font-bold">
+          <span id="forecast-scrubber-hour-display" class="text-[var(--gm-accent)] font-mono font-bold">
             Ore selezionate: ${String(this.selectedHour).padStart(2, '0')}:00
           </span>
         </div>
@@ -1343,7 +1531,6 @@ export class ForecastViewController {
             const evalH = slot.eval;
             const weather = evalH.weatherSnapshot || {};
             const speed = Math.round(weather.windSpeed || 0);
-            const dir = Math.round(weather.windDirection || 0);
 
             let fillPct = 30;
             let fillColor = 'var(--gm-status-unflyable)';
@@ -1369,8 +1556,6 @@ export class ForecastViewController {
                 <div class="compact-bar">
                   <div class="compact-bar-fill" style="height: ${fillPct}%; background-color: ${fillColor};"></div>
                 </div>
-                <span class="compact-arrow" style="transform: rotate(${dir}deg);">↑</span>
-                <span class="compact-wind">${speed}</span>
               </div>
             `;
           }).join('')}
@@ -1433,7 +1618,7 @@ export class ForecastViewController {
       const isPinned = this.isSpotPinned(s, pinnedIds);
       const isActive = s.id === currentSpot.id;
       return `
-        <div class="gm-picker-item ${isActive ? 'active' : ''}">
+        <div class="gm-picker-item ${isActive ? 'active' : ''}" data-action="pick-spot" data-spot-id="${escapeHtml(s.id)}">
           <div class="gm-picker-item-main" data-action="pick-spot" data-spot-id="${escapeHtml(s.id)}">
             <div class="text-sm font-bold text-[var(--gm-text-primary)]">${escapeHtml(s.name)} (${escapeHtml(s.province)})</div>
             <div class="text-xs text-[var(--gm-text-muted)]">${escapeHtml(s.region)}</div>
@@ -1652,22 +1837,189 @@ export class ForecastViewController {
   }
 
   /**
+   * Smoothly updates active hour and synchronizes UI components in-place under Doherty threshold (<50ms).
+   * @param {number} hour
+   */
+  setHour(hour) {
+    if (hour < 8 || hour > 20) return;
+    this.selectedHour = hour;
+
+    if (!this.containerEl) {
+      this.render();
+      return;
+    }
+
+    const spotCardContainer = this.containerEl.querySelector('#forecast-spot-card-container');
+    const windContainer = this.containerEl.querySelector('#forecast-wind-panel-container');
+    const soundingContainer = this.containerEl.querySelector('#forecast-sounding-panel-container');
+
+    // If sub-containers are missing from DOM, fallback to full render
+    if (!spotCardContainer || !windContainer || !soundingContainer) {
+      this.render();
+      return;
+    }
+
+    const spot = this.getCurrentSpot();
+    const glider = this.getActiveGlider();
+    const weatherData = this.getWeatherData(spot, this.activeDate);
+    const evaluated = evaluateComprensorio({
+      comprensorio: spot,
+      weatherData,
+      hourIndex: this.selectedHour,
+      glider
+    });
+    const activeSubSpotObj = this.resolveActiveSubSpot(spot);
+
+    // 1. Update Scrubber Display & Active Slot in place (zero layout thrashing)
+    const hourDisplay = this.containerEl.querySelector('#forecast-scrubber-hour-display');
+    if (hourDisplay) {
+      hourDisplay.textContent = `Ore selezionate: ${String(this.selectedHour).padStart(2, '0')}:00`;
+    }
+
+    const strip = this.containerEl.querySelector('#forecast-timeline-strip');
+    if (strip) {
+      const cols = strip.querySelectorAll('.gm-timeline-col-compact');
+      cols.forEach(col => {
+        const colHour = parseInt(col.getAttribute('data-hour'), 10);
+        const isActive = colHour === this.selectedHour;
+        col.classList.toggle('active', isActive);
+        col.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      });
+    }
+
+    // 2. Update Spot Card container
+    spotCardContainer.innerHTML = this.selectedSubSpot === 'overview'
+      ? this.renderSummaryCard(evaluated)
+      : this.renderSpecificSpotCard(activeSubSpotObj, evaluated);
+
+    // 3. Update Wind Panel container (updates 360° compass or chart cursor)
+    windContainer.innerHTML = this.renderWindPanel(evaluated, weatherData, spot, activeSubSpotObj);
+
+    // 4. Update Sounding Panel container (updates LCL or chart cursor)
+    soundingContainer.innerHTML = this.renderSoundingPanel(evaluated, weatherData, spot, activeSubSpotObj);
+  }
+
+  /**
+   * Handles pointerdown on scrubber timeline to start continuous slide selection.
+   * @param {PointerEvent} evt
+   */
+  handlePointerDown(evt) {
+    const strip = this.containerEl ? this.containerEl.querySelector('#forecast-timeline-strip') : null;
+    if (!strip) return;
+    if (!strip.contains(evt.target) && evt.target !== strip) return;
+
+    this.isScrubbing = true;
+    try {
+      if (typeof strip.setPointerCapture === 'function' && evt.pointerId != null) {
+        strip.setPointerCapture(evt.pointerId);
+      }
+    } catch (_) {}
+
+    this.updateHourFromPointer(evt, strip);
+  }
+
+  /**
+   * Handles pointermove on scrubber timeline during active slide.
+   * @param {PointerEvent} evt
+   */
+  handlePointerMove(evt) {
+    if (!this.isScrubbing) return;
+    const strip = this.containerEl ? this.containerEl.querySelector('#forecast-timeline-strip') : null;
+    if (!strip) return;
+
+    this.updateHourFromPointer(evt, strip);
+  }
+
+  /**
+   * Handles pointerup/cancel to release scrubber pointer capture.
+   * @param {PointerEvent} evt
+   */
+  handlePointerUp(evt) {
+    if (!this.isScrubbing) return;
+    this.isScrubbing = false;
+    const strip = this.containerEl ? this.containerEl.querySelector('#forecast-timeline-strip') : null;
+    if (strip) {
+      try {
+        if (typeof strip.releasePointerCapture === 'function' && evt.pointerId != null) {
+          strip.releasePointerCapture(evt.pointerId);
+        }
+      } catch (_) {}
+    }
+  }
+
+  /**
+   * Computes the target hour from horizontal pointer coordinate and updates state.
+   * @param {PointerEvent} evt
+   * @param {HTMLElement} strip
+   */
+  updateHourFromPointer(evt, strip) {
+    if (!strip) return;
+    const rect = typeof strip.getBoundingClientRect === 'function' ? strip.getBoundingClientRect() : null;
+
+    if (rect && rect.width > 0) {
+      const clientX = evt.clientX != null ? evt.clientX : 0;
+      const relX = Math.max(0, Math.min(rect.width - 1, clientX - rect.left));
+      const fraction = relX / rect.width;
+      const hourIndex = Math.min(12, Math.max(0, Math.floor(fraction * 13)));
+      const targetHour = 8 + hourIndex;
+      if (targetHour !== this.selectedHour) {
+        this.setHour(targetHour);
+        if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+          try { navigator.vibrate(8); } catch (_) {}
+        }
+      }
+    } else {
+      // Mock environment fallback without layout engine
+      const target = evt.target;
+      const col = target && typeof target.closest === 'function' ? target.closest('[data-hour]') : null;
+      if (col) {
+        const hour = parseInt(col.getAttribute('data-hour'), 10);
+        if (!isNaN(hour) && hour >= 8 && hour <= 20 && hour !== this.selectedHour) {
+          this.setHour(hour);
+        }
+      }
+    }
+  }
+
+  /**
    * Global click event dispatcher for ForecastView and Picker Sheet.
    * @param {Event} evt
    */
   handleClick(evt) {
-    const actionEl = evt.target.closest('[data-action]');
+    const actionEl = evt.target && typeof evt.target.closest === 'function'
+      ? evt.target.closest('[data-action]')
+      : null;
+
+    // Auto-close subspot popover if click is outside
+    if (this.isSubSpotMenuOpen) {
+      const isInsideSubSpot = actionEl && (
+        actionEl.getAttribute('data-action') === 'toggle-subspot-menu' ||
+        actionEl.getAttribute('data-action') === 'select-subspot'
+      );
+      if (!isInsideSubSpot) {
+        this.isSubSpotMenuOpen = false;
+        this.render();
+      }
+    }
+
     if (!actionEl) return;
 
     const action = actionEl.getAttribute('data-action');
 
-    if (action === 'select-hour') {
+    if (action === 'toggle-subspot-menu') {
+      this.isSubSpotMenuOpen = !this.isSubSpotMenuOpen;
+      this.render();
+    } else if (action === 'select-subspot') {
+      const subSpotId = actionEl.getAttribute('data-subspot-id');
+      this.selectedSubSpot = subSpotId || 'overview';
+      this.isSubSpotMenuOpen = false;
+      this.render();
+    } else if (action === 'select-hour') {
       const hourAttr = actionEl.getAttribute('data-hour');
       if (hourAttr != null) {
         const hour = parseInt(hourAttr, 10);
-        if (!isNaN(hour) && hour >= 0 && hour <= 23) {
-          this.selectedHour = hour;
-          this.render();
+        if (!isNaN(hour) && hour >= 8 && hour <= 20) {
+          this.setHour(hour);
         }
       }
     } else if (action === 'select-date') {
@@ -1723,7 +2075,10 @@ export class ForecastViewController {
       this.render();
     } else if (action === 'pick-spot') {
       const spotId = actionEl.getAttribute('data-spot-id');
-      const spot = this.comprensoriCatalog.find(c => c.id === spotId);
+      const spot = this.comprensoriCatalog.find(c => 
+        c.id === spotId || 
+        (spotId && c.name && slugifyComprensorio(c.name) === spotId)
+      );
       if (spot) {
         this.selectedSubSpot = 'overview';
         if (this.store) {

@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { store } from '../../core/store.js';
+import { store, createStore } from '../../core/store.js';
 import { DEFAULT_COMPRENSORI, normalizeLocationsCatalog } from '../../core/comprensorio.js';
 import { HomeDashboardViewController } from '../../ui/views/HomeDashboardView.js';
 import { ForecastViewController } from '../../ui/views/ForecastView.js';
@@ -161,5 +161,76 @@ describe('Master Locations Catalog Hydration & Runtime Integration', () => {
     assert.ok(defaultHtml.includes('Calascio / Rocca Calascio'));
     assert.ok(defaultHtml.includes('Meduno / Monte Valinis'));
     assert.ok(defaultHtml.includes('Altri Comprensori (131)'), 'Must render 131 non-pinned spots');
+  });
+
+  it('should select spot from picker sheet and update store when sheet click is triggered', () => {
+    const rawLocations = JSON.parse(fs.readFileSync(path.join(ROOT_DIR, 'data/locations.json'), 'utf8'));
+    const fullCatalog = normalizeLocationsCatalog(rawLocations);
+    const mockStore = createStore();
+    mockStore.setState({ locationsCatalog: fullCatalog });
+
+    const forecastController = new ForecastViewController({
+      store: mockStore,
+      comprensoriCatalog: fullCatalog
+    });
+
+    let sheetListener = null;
+    const mockSheetContainer = {
+      addEventListener(evt, fn) {
+        if (evt === 'click') sheetListener = fn;
+      },
+      removeEventListener(evt, fn) {
+        if (evt === 'click' && sheetListener === fn) sheetListener = null;
+      }
+    };
+
+    // Mount controller with mockSheetContainer injected
+    globalThis.document = {
+      getElementById(id) {
+        if (id === 'sheet-container') return mockSheetContainer;
+        return null;
+      }
+    };
+
+    const mockMainContainer = {
+      innerHTML: '',
+      addEventListener() {},
+      removeEventListener() {}
+    };
+
+    forecastController.mount(mockMainContainer);
+    assert.ok(sheetListener, 'Must register click listener on sheet-container');
+
+    // Simulate clicking Meduno in the sheet
+    const medunoSpot = fullCatalog.find(c => c.name.includes('Meduno'));
+    assert.ok(medunoSpot);
+
+    const mockEvt = {
+      target: {
+        closest(sel) {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute(attr) {
+                if (attr === 'data-action') return 'pick-spot';
+                if (attr === 'data-spot-id') return medunoSpot.id;
+                return null;
+              }
+            };
+          }
+          return null;
+        }
+      }
+    };
+
+    sheetListener(mockEvt);
+
+    assert.equal(mockStore.getState().selectedSpot.id, medunoSpot.id);
+    assert.equal(forecastController.getCurrentSpot().name, medunoSpot.name);
+    assert.ok(mockStore.getState().recentSpotIds.includes(medunoSpot.id));
+
+    // Cleanup
+    forecastController.unmount();
+    assert.equal(sheetListener, null, 'Must unbind click listener on unmount');
+    delete globalThis.document;
   });
 });

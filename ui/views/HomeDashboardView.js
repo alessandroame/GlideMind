@@ -19,7 +19,8 @@ import {
 } from '../../core/comprensorio.js';
 import {
   DEFAULT_GLIDER,
-  calculateDailyFlyabilitySummary
+  calculateDailyFlyabilitySummary,
+  getCardinalDirection
 } from '../../core/flyability.js';
 import {
   generateSyntheticWeather,
@@ -149,6 +150,12 @@ export class HomeDashboardViewController {
         searchInput.addEventListener('input', this.boundSearchInputHandler);
       }
     }
+
+    // Attach delegated click listener to centralized modal sheet container
+    this.sheetContainerEl = typeof document !== 'undefined' ? document.getElementById('sheet-container') : null;
+    if (this.sheetContainerEl && typeof this.sheetContainerEl.addEventListener === 'function') {
+      this.sheetContainerEl.addEventListener('click', this.boundClickHandler);
+    }
   }
 
   /**
@@ -162,6 +169,10 @@ export class HomeDashboardViewController {
 
     if (this.containerEl && typeof this.containerEl.removeEventListener === 'function') {
       this.containerEl.removeEventListener('click', this.boundClickHandler);
+    }
+    if (this.sheetContainerEl && typeof this.sheetContainerEl.removeEventListener === 'function') {
+      this.sheetContainerEl.removeEventListener('click', this.boundClickHandler);
+      this.sheetContainerEl = null;
     }
 
     this.containerEl = null;
@@ -420,7 +431,7 @@ export class HomeDashboardViewController {
     const takeoffAlt = takeoff.altitude ? `${takeoff.altitude}m` : '-';
     const landingAlt = landing.altitude ? `${landing.altitude}m` : '-';
     const windSpeedStr = weather.windSpeed != null ? `${weather.windSpeed} km/h` : '-';
-    const windDirStr = weather.windDir != null ? `${weather.windDir}°` : '';
+    const windDirStr = weather.windDir != null ? `${getCardinalDirection(weather.windDir)} (${weather.windDir}°)` : '';
 
     let badgeClass = 'gm-badge-flyable';
     if (item.status === 'caution') badgeClass = 'gm-badge-caution';
