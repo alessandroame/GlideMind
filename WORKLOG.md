@@ -128,3 +128,16 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Briefing AI di volo persona Guido deterministico euristico offline (finestra ottimale, allerte, raccomandazione vela/pilota).
   - Registrazione nel bootstrap in [ui/app.js](file:///ui/app.js) e stili dedicati in [css/theme.css](file:///css/theme.css).
   - Creazione della suite di test [tests/ui/forecastView.test.mjs](file:///tests/ui/forecastView.test.mjs) (12 nuovi test, totale 221/221 passanti).
+
+---
+
+## 2026-10-09 - Fase 4: Smart Date Selector & Sincronizzazione Cross-View
+- **Tipo**: Feature / Core Engine / UI Layer / Date Engine / Laws of UX
+- **Dettagli**: [.agents/worklog.d/2026-10-09_smart-date-picker-cross-view-system.md](file:///.agents/worklog.d/2026-10-09_smart-date-picker-cross-view-system.md)
+- **Sintesi**:
+  - Implementato modulo headless puro [core/datePresets.js](file:///core/datePresets.js) con calcolo adattivo delle date in base al giorno della settimana (Lunedì-Giovedì: Oggi, Domani, Sabato, Domenica; Venerdì: fusione no-duplicate di Domani e Sabato; Weekend: Oggi, Domani e Prossimo Weekend).
+  - Gestione date libere: iniezione di un chip personalizzato attivo se la data selezionata non rientra nei preset primari, con ritorno istantaneo alle date base con 1 tap.
+  - Creazione del foglio di selezione data [sheetManager.js](file:///ui/sheetManager.js) con input nativo HTML5 e griglia rapida dei prossimi 14 giorni con indicatore di attendibilità sinottica (per date > 7 giorni).
+  - Sincronizzazione reattiva tra [ui/views/ForecastView.js](file:///ui/views/ForecastView.js) e [ui/views/HomeDashboardView.js](file:///ui/views/HomeDashboardView.js) tramite `store.activeDate`: la selezione della data in Home ordina la volabilità di tutti i comprensori per quel giorno.
+  - Aggiunte scorciatoie per voli passati (`Oggi`, `Ieri`, `Domenica`, `Sabato`) nel modulo di registrazione volo (`openAddFlightSheet`).
+  - Creazione e aggiornamento delle suite [tests/core/datePresets.test.mjs](file:///tests/core/datePresets.test.mjs), [tests/ui/forecastView.test.mjs](file:///tests/ui/forecastView.test.mjs) e [tests/ui/homeDashboardView.test.mjs](file:///tests/ui/homeDashboardView.test.mjs) (235/235 test passanti con successo).
