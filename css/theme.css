@@ -29,6 +29,10 @@
   --gm-status-caution-bg: rgba(234, 179, 8, 0.15);
   --gm-status-unflyable: #ef4444;
   --gm-status-unflyable-bg: rgba(239, 68, 68, 0.15);
+  --gm-status-severe: #09090b;
+  --gm-status-severe-text: #f87171;
+  --gm-status-severe-bg: rgba(15, 23, 42, 0.95);
+  --gm-status-severe-border: #ef4444;
   --gm-status-alert: #f97316;
   --gm-status-alert-bg: rgba(249, 115, 22, 0.15);
 
@@ -436,6 +440,18 @@ button, input, select, textarea {
   background-color: var(--gm-status-alert-bg);
   color: var(--gm-status-alert);
   border: 1px solid rgba(249, 115, 22, 0.3);
+}
+
+.gm-badge-severe {
+  background-color: var(--gm-status-severe-bg);
+  color: var(--gm-status-severe-text);
+  border: 1px solid var(--gm-status-severe-border);
+}
+
+.gm-badge-nd {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--gm-text-muted);
+  border: 1px dashed var(--gm-border);
 }
 
 /* -------------------------------------------------------------
@@ -1764,10 +1780,11 @@ input.gm-input:focus {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: var(--gm-touch-min);
-  padding: 8px 4px;
+  min-height: 64px;
+  padding: 8px 4px 6px 4px;
   background-color: var(--gm-bg-surface);
   border: 1px solid var(--gm-border);
+  border-bottom: 3px solid transparent;
   border-radius: var(--gm-radius-sm);
   color: var(--gm-text-secondary);
   cursor: pointer;
@@ -1783,12 +1800,31 @@ input.gm-input:focus {
 .gm-date-grid-item.active {
   background-color: var(--gm-accent);
   border-color: var(--gm-accent-strong);
+  border-bottom-color: var(--gm-accent-strong);
   color: var(--gm-text-inverse);
   font-weight: 700;
 }
 
 .gm-date-grid-item.weekend:not(.active) {
   border-color: rgba(255, 160, 0, 0.35);
+}
+
+/* 4-Color Semantic Bottom Bars (Verde, Giallo, Rosso, Nero) */
+.gm-date-grid-item.fly-flyable:not(.active) {
+  border-bottom-color: var(--gm-status-flyable);
+}
+
+.gm-date-grid-item.fly-caution:not(.active) {
+  border-bottom-color: var(--gm-status-caution);
+}
+
+.gm-date-grid-item.fly-unflyable:not(.active) {
+  border-bottom-color: var(--gm-status-unflyable);
+}
+
+.gm-date-grid-item.fly-severe:not(.active) {
+  border-bottom-color: #09090b;
+  box-shadow: inset 0 -3px 0 0 #ef4444;
 }
 
 .gm-date-grid-item .grid-day-name {
@@ -1809,12 +1845,67 @@ input.gm-input:focus {
   opacity: 0.8;
 }
 
+.gm-date-grid-item .grid-fly-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: 0.60rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  margin-top: 4px;
+  max-width: 90%;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+
+.gm-date-grid-item.active .grid-fly-status {
+  background-color: rgba(0, 0, 0, 0.25);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.gm-date-grid-item .grid-fly-icon {
+  font-size: 0.65rem;
+  line-height: 1;
+}
+
 .gm-date-grid-item .grid-synoptic-dot {
   position: absolute;
   top: 4px;
   right: 6px;
   font-size: 0.55rem;
   color: var(--gm-status-caution);
+}
+
+/* Quick Date Tabs Flyability Dot in Header Bar */
+.gm-tab-fly-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+.gm-tab-fly-dot.fly-flyable {
+  background-color: var(--gm-status-flyable);
+}
+
+.gm-tab-fly-dot.fly-caution {
+  background-color: var(--gm-status-caution);
+}
+
+.gm-tab-fly-dot.fly-unflyable {
+  background-color: var(--gm-status-unflyable);
+}
+
+.gm-tab-fly-dot.fly-severe {
+  background-color: #09090b;
+  box-shadow: 0 0 0 1px #ef4444;
 }
 
 /* Past date presets for flight entry */

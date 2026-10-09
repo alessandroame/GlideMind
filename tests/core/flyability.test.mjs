@@ -319,13 +319,101 @@ describe('Flyability Engine - Waterfall Synthesis & Tie-Breaking', () => {
         assert.equal(summaries[0].dateStr, '2026-06-15');
         assert.ok(summaries[0].score > 70);
         assert.equal(summaries[0].bestSeverity, 0);
+        assert.equal(summaries[0].severity, 0);
+        assert.equal(summaries[0].status, 'flyable');
+        assert.equal(summaries[0].statusLabel, 'Volabile');
+        assert.equal(summaries[0].statusIcon, '●');
+        assert.equal(summaries[0].badgeClass, 'gm-badge-flyable');
         assert.equal(summaries[0].isBestDay, true);
 
         // Day 2 (June 16): Extreme storm (wind 35-40 km/h, rain > 1.5mm, tailwind) -> Score < 20
         assert.equal(summaries[1].dateStr, '2026-06-16');
         assert.ok(summaries[1].score <= 20);
         assert.equal(summaries[1].bestSeverity, 3);
+        assert.equal(summaries[1].severity, 3);
+        assert.equal(summaries[1].status, 'severe');
+        assert.equal(summaries[1].statusLabel, 'Severo');
+        assert.equal(summaries[1].statusIcon, '⚡');
+        assert.equal(summaries[1].badgeClass, 'gm-badge-severe');
         assert.equal(summaries[1].isBestDay, false);
+    });
+
+    it('should calculate 14-day multi-day flyability summary with 4-color classifications', () => {
+        // Construct 14-day mock dataset with varying regimes
+        const times = [];
+        const windspeed = [];
+        const gusts = [];
+        const cape = [];
+        const rain = [];
+        const winddir = [];
+
+        for (let d = 0; d < 14; d++) {
+            const dateStr = `2026-07-${String(d + 1).padStart(2, '0')}`;
+            for (let h = 0; h < 24; h++) {
+                times.push(`${dateStr}T${String(h).padStart(2, '0')}:00:00`);
+                if (d % 4 === 0) {
+                    // Flyable (Green)
+                    windspeed.push(12);
+                    gusts.push(16);
+                    cape.push(250);
+                    rain.push(0);
+                    winddir.push(180);
+                } else if (d % 4 === 1) {
+                    // Caution (Yellow)
+                    windspeed.push(16);
+                    gusts.push(24);
+                    cape.push(950);
+                    rain.push(0);
+                    winddir.push(180);
+                } else if (d % 4 === 2) {
+                    // Unflyable (Red)
+                    windspeed.push(26);
+                    gusts.push(32);
+                    cape.push(300);
+                    rain.push(2.5);
+                    winddir.push(270);
+                } else {
+                    // Severe (Black)
+                    windspeed.push(35);
+                    gusts.push(45);
+                    cape.push(1600);
+                    rain.push(5.0);
+                    winddir.push(360);
+                }
+            }
+        }
+
+        const payload14 = {
+            meta: { takeoff_azimuth: 180 },
+            hourly: {
+                time: times,
+                windspeed_10m: windspeed,
+                windgusts_10m: gusts,
+                cape,
+                precipitation: rain,
+                winddirection_10m: winddir
+            }
+        };
+
+        const summaries = calculateDailyFlyabilitySummary(payload14, null, null, 14);
+        assert.equal(summaries.length, 14);
+
+        // Verify that all 4 statuses are present across the 14 days
+        const statuses = summaries.map(s => s.status);
+        assert.ok(statuses.includes('flyable'), 'Should contain flyable days (Green)');
+        assert.ok(statuses.includes('caution'), 'Should contain caution days (Yellow)');
+        assert.ok(statuses.includes('unflyable'), 'Should contain unflyable days (Red)');
+        assert.ok(statuses.includes('severe'), 'Should contain severe days (Black)');
+
+        // Every summary must have valid 4-color contract properties
+        summaries.forEach(s => {
+            assert.ok(['flyable', 'caution', 'unflyable', 'severe'].includes(s.status));
+            assert.ok(['Volabile', 'Cautela', 'Chiuso', 'Severo'].includes(s.statusLabel));
+            assert.ok(['●', '▲', '✕', '⚡'].includes(s.statusIcon));
+            assert.ok(s.color.startsWith('var(--gm-status-'));
+            assert.ok(s.bg.startsWith('var(--gm-status-'));
+            assert.ok(s.badgeClass.startsWith('gm-badge-'));
+        });
     });
 
     it('should support custom translation resolver for internationalization', () => {

@@ -10,7 +10,9 @@ import {
   classifyForecastHorizon,
   getSmartDatePresets,
   getPastDatePresets,
-  getAvailableCalendarDates
+  getAvailableCalendarDates,
+  normalizeDateFlyability,
+  attachFlyabilityToCalendarDates
 } from '../../core/datePresets.js';
 
 describe('GlideMind Phase 4 - Smart Date Selector & Calendar Presets Engine', () => {
@@ -190,5 +192,92 @@ describe('GlideMind Phase 4 - Smart Date Selector & Calendar Presets Engine', ()
     assert.equal(list[13].isoDate, '2026-10-22');
     assert.equal(typeof list[0].isWeekend, 'boolean');
     assert.ok(list[0].horizon);
+    assert.ok(list[0].flyability);
+    assert.equal(list[0].flyability.status, 'unknown');
+    assert.equal(list[0].flyability.label, 'N/D');
+  });
+
+  it('should normalize flyability statuses across all 4 semantic colors (Verde, Giallo, Rosso, Nero)', () => {
+    // 0: Verde (Flyable)
+    const f0 = normalizeDateFlyability({ bestSeverity: 0, score: 85, limitingFactor: 'Vento Calmo' });
+    assert.equal(f0.status, 'flyable');
+    assert.equal(f0.label, 'Volabile');
+    assert.equal(f0.icon, '●');
+    assert.equal(f0.color, 'var(--gm-status-flyable)');
+    assert.equal(f0.badgeClass, 'gm-badge-flyable');
+
+    // 1: Giallo (Caution)
+    const f1 = normalizeDateFlyability({ bestSeverity: 1, score: 65, limitingFactor: 'Vento Forte' });
+    assert.equal(f1.status, 'caution');
+    assert.equal(f1.label, 'Cautela');
+    assert.equal(f1.icon, '▲');
+    assert.equal(f1.color, 'var(--gm-status-caution)');
+    assert.equal(f1.badgeClass, 'gm-badge-caution');
+
+    // 2: Rosso (Unflyable)
+    const f2 = normalizeDateFlyability({ bestSeverity: 2, score: 30, limitingFactor: 'Pioggia' });
+    assert.equal(f2.status, 'unflyable');
+    assert.equal(f2.label, 'Chiuso');
+    assert.equal(f2.icon, '✕');
+    assert.equal(f2.color, 'var(--gm-status-unflyable)');
+    assert.equal(f2.badgeClass, 'gm-badge-unflyable');
+
+    // 3: Nero (Severe)
+    const f3 = normalizeDateFlyability({ bestSeverity: 3, score: 10, limitingFactor: 'Raffiche Estreme' });
+    assert.equal(f3.status, 'severe');
+    assert.equal(f3.label, 'Severo');
+    assert.equal(f3.icon, '⚡');
+    assert.equal(f3.color, 'var(--gm-status-severe)');
+    assert.equal(f3.badgeClass, 'gm-badge-severe');
+
+    // Fallback: null
+    const fNull = normalizeDateFlyability(null);
+    assert.equal(fNull.status, 'unknown');
+    assert.equal(fNull.label, 'N/D');
+    assert.equal(fNull.icon, '○');
+  });
+
+  it('should enrich 14 calendar dates with flyability summaries', () => {
+    const mockSummaries = [
+      { dateStr: '2026-10-09', status: 'flyable', statusLabel: 'Volabile', bestSeverity: 0, score: 90 },
+      { dateStr: '2026-10-10', status: 'caution', statusLabel: 'Cautela', bestSeverity: 1, score: 60 },
+      { dateStr: '2026-10-11', status: 'unflyable', statusLabel: 'Chiuso', bestSeverity: 2, score: 25 },
+      { dateStr: '2026-10-12', status: 'severe', statusLabel: 'Severo', bestSeverity: 3, score: 10 }
+    ];
+
+    const enriched = getAvailableCalendarDates('2026-10-09', 14, mockSummaries);
+    assert.equal(enriched.length, 14);
+
+    assert.equal(enriched[0].flyability.status, 'flyable');
+    assert.equal(enriched[0].flyability.label, 'Volabile');
+
+    assert.equal(enriched[1].flyability.status, 'caution');
+    assert.equal(enriched[1].flyability.label, 'Cautela');
+
+    assert.equal(enriched[2].flyability.status, 'unflyable');
+    assert.equal(enriched[2].flyability.label, 'Chiuso');
+
+    assert.equal(enriched[3].flyability.status, 'severe');
+    assert.equal(enriched[3].flyability.label, 'Severo');
+
+    // Days without explicit summaries fallback to unknown (N/D)
+    assert.equal(enriched[4].flyability.status, 'unknown');
+    assert.equal(enriched[4].flyability.label, 'N/D');
+  });
+
+  it('should attach flyability to presets in getSmartDatePresets when flyabilityMap is provided', () => {
+    const mockMap = {
+      '2026-10-09': { status: 'flyable', statusLabel: 'Volabile', bestSeverity: 0 },
+      '2026-10-10': { status: 'caution', statusLabel: 'Cautela', bestSeverity: 1 }
+    };
+
+    const smart = getSmartDatePresets('2026-10-09', null, mockMap);
+    assert.ok(smart.presets[0].flyability);
+    assert.equal(smart.presets[0].flyability.status, 'flyable');
+    assert.equal(smart.presets[0].flyability.label, 'Volabile');
+
+    assert.ok(smart.presets[1].flyability);
+    assert.equal(smart.presets[1].flyability.status, 'caution');
+    assert.equal(smart.presets[1].flyability.label, 'Cautela');
   });
 });

@@ -28,7 +28,8 @@ import {
 } from '../../core/comprensorio.js';
 import {
   DEFAULT_GLIDER,
-  GLIDER_CLASSES
+  GLIDER_CLASSES,
+  calculateDailyFlyabilitySummary
 } from '../../core/flyability.js';
 import {
   calculateDewPoint,
@@ -348,6 +349,50 @@ export class ForecastViewController {
   }
 
   /**
+   * Retrieves multi-day (14-day) flyability summaries for a spot.
+   * @param {object} spot
+   * @param {number} [days=14]
+   * @returns {Array<object>}
+   */
+  getMultiDayFlyability(spot, days = 14) {
+    if (!spot) return [];
+    const today = new Date();
+    const todayIso = formatDateIso(today);
+    const key = `fly_multi_${spot.id}_${todayIso}_${days}`;
+    if (this.cachedWeatherMap.has(key)) {
+      return this.cachedWeatherMap.get(key);
+    }
+
+    const takeoff = (spot.takeoffs && spot.takeoffs[0]) ? spot.takeoffs[0] : { altitude: 1000, heading: 180 };
+    const coords = parseCoordinates(takeoff.coordinates) || { lat: 45.833, lon: 9.302 };
+
+    const state = this.store ? this.store.getState() : {};
+    let payload = null;
+
+    if (state.weatherData && state.selectedSpot && state.selectedSpot.id === spot.id && state.weatherData.hourly?.time?.length >= 24 * days) {
+      payload = state.weatherData;
+    } else {
+      const synthetic = generateSyntheticWeather(
+        coords,
+        {
+          targetDate: todayIso,
+          days,
+          elevation: takeoff.altitude || 1000,
+          takeoffAzimuth: takeoff.heading || 180,
+          weatherModel: 'best_match'
+        }
+      );
+      payload = enrichWeatherData(synthetic, todayIso, Date.now(), {
+        customHeading: takeoff.heading || 180
+      });
+    }
+
+    const summaries = calculateDailyFlyabilitySummary(payload, takeoff, null, days);
+    this.cachedWeatherMap.set(key, summaries);
+    return summaries;
+  }
+
+  /**
    * Mounts the view controller to the provided DOM container.
    * @param {HTMLElement|null} containerEl
    */
@@ -469,7 +514,8 @@ export class ForecastViewController {
    * @returns {string}
    */
   renderHeader(currentSpot) {
-    const smartData = getSmartDatePresets(new Date(), this.activeDate);
+    const flySummaries = this.getMultiDayFlyability(currentSpot, 14);
+    const smartData = getSmartDatePresets(new Date(), this.activeDate, flySummaries);
     const takeoffs = currentSpot.takeoffs || [];
     const landings = currentSpot.landings || [];
 
@@ -540,9 +586,12 @@ export class ForecastViewController {
               data-date="${p.isoDate}"
               role="tab"
               aria-selected="${p.isActive ? 'true' : 'false'}"
-              title="${p.label} - ${p.subLabel}"
+              title="${p.label} - ${p.subLabel}${p.flyability && p.flyability.status !== 'unknown' ? ` (${p.flyability.label})` : ''}"
             >
-              <span class="gm-date-tab-main">${p.label}</span>
+              <span class="gm-date-tab-main">
+                ${p.label}
+                ${p.flyability && p.flyability.status !== 'unknown' ? `<span class="gm-tab-fly-dot fly-${p.flyability.status}" title="${escapeHtml(p.flyability.label)}"></span>` : ''}
+              </span>
               <span class="gm-date-tab-sub">${p.subLabel}</span>
             </button>
           `).join('')}
@@ -1449,7 +1498,9 @@ export class ForecastViewController {
     const today = new Date();
     const minDate = formatDateIso(today);
     const maxDate = formatDateIso(new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000));
-    const availableDates = getAvailableCalendarDates(today, 14);
+    const spot = this.getCurrentSpot();
+    const flySummaries = this.getMultiDayFlyability(spot, 14);
+    const availableDates = getAvailableCalendarDates(today, 14, flySummaries);
 
     const renderContent = () => `
       <div class="gm-date-picker-sheet flex flex-col gap-4">
@@ -1481,7 +1532,7 @@ export class ForecastViewController {
         <!-- 14-Day Fast Tap Grid -->
         <div class="gm-date-sheet-section">
           <span class="text-xs font-bold uppercase tracking-wider text-[var(--gm-text-muted)] block mb-2">
-            Giorni di Volo Disponibili (Prossimi 14gg)
+            Calendario Previsioni (Prossimi 14 Giorni)
           </span>
           <div class="gm-date-grid">
             ${availableDates.map(d => {
@@ -1489,19 +1540,33 @@ export class ForecastViewController {
               return `
                 <button 
                   type="button" 
-                  class="gm-date-grid-item ${isSelected ? 'active' : ''} ${d.isWeekend ? 'weekend' : ''}"
+                  class="gm-date-grid-item ${isSelected ? 'active' : ''} ${d.isWeekend ? 'weekend' : ''} fly-${d.flyability.status}"
                   data-action="pick-calendar-date"
                   data-date="${d.isoDate}"
                   aria-selected="${isSelected ? 'true' : 'false'}"
-                  title="${d.dayName} ${d.formatted} (${d.horizon.label})"
+                  title="${d.dayName} ${d.formatted} (${d.horizon.label}) - ${d.flyability.label}: ${d.flyability.limitingFactor || ''}"
                 >
                   <span class="grid-day-name">${escapeHtml(d.dayName)}</span>
                   <span class="grid-day-number">${d.dayNumber}</span>
                   <span class="grid-month">${escapeHtml(d.formatted.split(' ')[1])}</span>
-                  ${d.horizon.isSynoptic ? `<span class="grid-synoptic-dot" title="Tendenza sinottica">●</span>` : ''}
+
+                  <span class="grid-fly-status ${d.flyability.badgeClass}" title="${escapeHtml(d.flyability.label)}">
+                    <span class="grid-fly-icon" aria-hidden="true">${d.flyability.icon}</span>
+                    <span class="grid-fly-label">${escapeHtml(d.flyability.label)}</span>
+                  </span>
+
+                  ${d.horizon.isSynoptic ? `<span class="grid-synoptic-dot" title="Tendenza sinottica (attendibilità indicativa)">●</span>` : ''}
                 </button>
               `;
             }).join('')}
+          </div>
+
+          <!-- 4-Color Semantic Legend -->
+          <div class="gm-date-sheet-legend flex items-center justify-between text-[0.68rem] px-1 pt-3 text-[var(--gm-text-muted)] border-t border-[var(--gm-border)] mt-3">
+            <span class="flex items-center gap-1"><span class="text-[var(--gm-status-flyable)]">●</span> Volabile</span>
+            <span class="flex items-center gap-1"><span class="text-[var(--gm-status-caution)]">▲</span> Cautela</span>
+            <span class="flex items-center gap-1"><span class="text-[var(--gm-status-unflyable)]">✕</span> Chiuso</span>
+            <span class="flex items-center gap-1"><span class="text-[#f87171]">⚡</span> Severo</span>
           </div>
         </div>
       </div>

@@ -544,7 +544,7 @@ function sleep(ms) {
 export function generateSyntheticWeather(coords, options = {}) {
     const { lat, lon, elev } = normalizeCoordinates(coords);
     const targetDate = options.targetDate || new Date().toISOString().split('T')[0];
-    const days = Math.min(7, Math.max(1, Number(options.days) || 3));
+    const days = Math.min(16, Math.max(1, Number(options.days) || 3));
     const effectiveElev = elev != null ? elev : 900;
 
     const times = [];
@@ -570,6 +570,7 @@ export function generateSyntheticWeather(coords, options = {}) {
         times.push(isoTime);
 
         const hourOfDay = h % 24;
+        const dayIndex = Math.floor(h / 24);
 
         let wind = 10;
         let gust = 14;
@@ -635,6 +636,47 @@ export function generateSyntheticWeather(coords, options = {}) {
             temp = 16;
             dir = 350;
             dew = 11.8;
+        }
+
+        // Apply realistic deterministic multi-day synoptic progression for dayIndex > 0
+        if (dayIndex > 0) {
+            const dayCycle = dayIndex % 6;
+            if (dayCycle === 1) {
+                // Caution day (Yellow) - slightly gusty & higher cape
+                if (hourOfDay >= 10 && hourOfDay <= 17) {
+                    wind = Math.round(wind * 1.15);
+                    gust = Math.round(gust * 1.25);
+                    cape = Math.min(1400, Math.round(cape * 1.3));
+                }
+            } else if (dayCycle === 2) {
+                // Unflyable day (Red) - rain & crosswind
+                if (hourOfDay >= 8 && hourOfDay <= 19) {
+                    rain = 2.4;
+                    wind = Math.round(wind * 1.4);
+                    gust = Math.round(gust * 1.5);
+                    dir = (dir + 90) % 360;
+                }
+            } else if (dayCycle === 3) {
+                // Severe hazard day (Black) - severe storm & violent gusts
+                if (hourOfDay >= 11 && hourOfDay <= 18) {
+                    cape = 1800;
+                    wind = 34;
+                    gust = 48;
+                    rain = 5.2;
+                }
+            } else if (dayCycle === 4) {
+                // Optimal calm soaring day (Green)
+                wind = Math.max(6, Math.round(wind * 0.75));
+                gust = Math.max(9, Math.round(gust * 0.75));
+                cape = Math.min(400, cape);
+                rain = 0;
+            } else if (dayCycle === 5) {
+                // Caution day (Yellow) - moderate wind
+                if (hourOfDay >= 11 && hourOfDay <= 17) {
+                    wind = Math.round(wind * 1.2);
+                    gust = Math.round(gust * 1.25);
+                }
+            }
         }
 
         // Diurnal solar radiation and boundary layer height

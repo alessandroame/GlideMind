@@ -1003,7 +1003,7 @@ export function calculateWeekOverview(payload, isTakeoffOverride = true, heading
  * @param {Function|null} [translator=null]
  * @returns {Array<object>}
  */
-export function calculateDailyFlyabilitySummary(weather, targetLocOverride = null, translator = null) {
+export function calculateDailyFlyabilitySummary(weather, targetLocOverride = null, translator = null, maxDays = 14) {
     if (!weather || !weather.hourly) return [];
 
     const times = weather.hourly.time || weather.hourly.rawTime;
@@ -1036,7 +1036,7 @@ export function calculateDailyFlyabilitySummary(weather, targetLocOverride = nul
         dateGroups[dateStr].push(idx);
     });
 
-    const dates = Object.keys(dateGroups).slice(0, 7);
+    const dates = Object.keys(dateGroups).slice(0, maxDays);
 
     const summaries = dates.map(dateStr => {
         const indices = dateGroups[dateStr];
@@ -1123,11 +1123,57 @@ export function calculateDailyFlyabilitySummary(weather, targetLocOverride = nul
             ? `${bestWindowStart.toString().padStart(2, '0')}:00 - ${bestWindowEnd.toString().padStart(2, '0')}:00`
             : '12:00 - 16:00';
 
+        // 4-Color Semantic Classification (Verde, Giallo, Rosso, Nero)
+        let daySeverity = bestSeverity;
+        if (bestSeverity === 0) {
+            const hasSevereHour = hourlyData.some(h => h.severity === 3);
+            if (hasSevereHour && avgScore < 60) {
+                daySeverity = 1;
+            }
+        }
+
+        let status = 'flyable';
+        let statusLabel = 'Volabile';
+        let statusIcon = '●';
+        let color = 'var(--gm-status-flyable)';
+        let bg = 'var(--gm-status-flyable-bg)';
+        let badgeClass = 'gm-badge-flyable';
+
+        if (daySeverity === 3 || (bestSeverity === 3 && avgScore < 30)) {
+            status = 'severe';
+            statusLabel = 'Severo';
+            statusIcon = '⚡';
+            color = 'var(--gm-status-severe)';
+            bg = 'var(--gm-status-severe-bg)';
+            badgeClass = 'gm-badge-severe';
+        } else if (daySeverity === 2 || avgScore < 35) {
+            status = 'unflyable';
+            statusLabel = 'Chiuso';
+            statusIcon = '✕';
+            color = 'var(--gm-status-unflyable)';
+            bg = 'var(--gm-status-unflyable-bg)';
+            badgeClass = 'gm-badge-unflyable';
+        } else if (daySeverity === 1 || avgScore < 70) {
+            status = 'caution';
+            statusLabel = 'Cautela';
+            statusIcon = '▲';
+            color = 'var(--gm-status-caution)';
+            bg = 'var(--gm-status-caution-bg)';
+            badgeClass = 'gm-badge-caution';
+        }
+
         return {
             dateStr,
             label: formattedLabel,
             score: avgScore,
             bestSeverity,
+            severity: (status === 'severe' ? 3 : status === 'unflyable' ? 2 : status === 'caution' ? 1 : 0),
+            status,
+            statusLabel,
+            statusIcon,
+            color,
+            bg,
+            badgeClass,
             bestWindow: bestWindowStr,
             limitingFactor: topLimiter,
             isBestDay: false

@@ -153,7 +153,7 @@ export function classifyForecastHorizon(dayOffset) {
  *   isCustomActive: boolean
  * }}
  */
-export function getSmartDatePresets(refDate = new Date(), activeDateIso = null) {
+export function getSmartDatePresets(refDate = new Date(), activeDateIso = null, flyabilityMap = null) {
   const ref = (typeof refDate === 'string') ? parseDateIso(refDate) : new Date(refDate.getTime());
   ref.setHours(12, 0, 0, 0);
 
@@ -308,9 +308,16 @@ export function getSmartDatePresets(refDate = new Date(), activeDateIso = null) 
     isCustomActive = true;
   }
 
+  const map = flyabilityMap
+    ? (Array.isArray(flyabilityMap)
+        ? Object.fromEntries(flyabilityMap.map(s => [s.dateStr || s.isoDate, s]))
+        : flyabilityMap)
+    : null;
+
   const finalPresets = presets.map((preset, index) => ({
     ...preset,
-    isActive: index === matchedIndex
+    isActive: index === matchedIndex,
+    flyability: map && map[preset.isoDate] ? normalizeDateFlyability(map[preset.isoDate]) : null
   }));
 
   const dayOffset = diffDaysIso(todayIso, activeIso);
@@ -382,34 +389,164 @@ export function getPastDatePresets(refDate = new Date()) {
 }
 
 /**
- * Generates an array of available calendar dates for picker sheets up to maxDays in the future.
+ * Normalizes flyability metadata for a calendar date item.
+ * @param {object|null} fly
+ * @returns {{
+ *   severity: number|null,
+ *   status: 'flyable'|'caution'|'unflyable'|'severe'|'unknown',
+ *   label: string,
+ *   color: string,
+ *   bg: string,
+ *   icon: string,
+ *   badgeClass: string,
+ *   score: number|null,
+ *   limitingFactor: string|null
+ * }}
+ */
+export function normalizeDateFlyability(fly) {
+  if (!fly) {
+    return {
+      severity: null,
+      status: 'unknown',
+      label: 'N/D',
+      color: 'var(--gm-text-muted)',
+      bg: 'transparent',
+      icon: '○',
+      badgeClass: 'gm-badge-nd',
+      score: null,
+      limitingFactor: null
+    };
+  }
+
+  const severity = (fly.severity != null) ? fly.severity : (fly.bestSeverity ?? 0);
+  let status = fly.status;
+  if (!status) {
+    if (severity === 3) status = 'severe';
+    else if (severity === 2) status = 'unflyable';
+    else if (severity === 1) status = 'caution';
+    else status = 'flyable';
+  }
+
+  let label = fly.statusLabel || fly.label;
+  if (!label || label === fly.dateStr) {
+    if (status === 'severe') label = 'Severo';
+    else if (status === 'unflyable') label = 'Chiuso';
+    else if (status === 'caution') label = 'Cautela';
+    else label = 'Volabile';
+  }
+
+  let color = fly.color;
+  if (!color) {
+    if (status === 'severe') color = 'var(--gm-status-severe)';
+    else if (status === 'unflyable') color = 'var(--gm-status-unflyable)';
+    else if (status === 'caution') color = 'var(--gm-status-caution)';
+    else color = 'var(--gm-status-flyable)';
+  }
+
+  let bg = fly.bg;
+  if (!bg) {
+    if (status === 'severe') bg = 'var(--gm-status-severe-bg)';
+    else if (status === 'unflyable') bg = 'var(--gm-status-unflyable-bg)';
+    else if (status === 'caution') bg = 'var(--gm-status-caution-bg)';
+    else bg = 'var(--gm-status-flyable-bg)';
+  }
+
+  let icon = fly.statusIcon || fly.icon;
+  if (!icon) {
+    if (status === 'severe') icon = '⚡';
+    else if (status === 'unflyable') icon = '✕';
+    else if (status === 'caution') icon = '▲';
+    else icon = '●';
+  }
+
+  let badgeClass = fly.badgeClass;
+  if (!badgeClass) {
+    if (status === 'severe') badgeClass = 'gm-badge-severe';
+    else if (status === 'unflyable') badgeClass = 'gm-badge-unflyable';
+    else if (status === 'caution') badgeClass = 'gm-badge-caution';
+    else badgeClass = 'gm-badge-flyable';
+  }
+
+  return {
+    severity,
+    status,
+    label,
+    color,
+    bg,
+    icon,
+    badgeClass,
+    score: fly.score ?? null,
+    limitingFactor: fly.limitingFactor || null
+  };
+}
+
+/**
+ * Enriches an array of calendar date items with flyability summaries.
+ * @param {Array<object>} calendarDates
+ * @param {Array<object>|object|null} flyabilityMap
+ * @returns {Array<object>}
+ */
+export function attachFlyabilityToCalendarDates(calendarDates, flyabilityMap = null) {
+  if (!Array.isArray(calendarDates)) return [];
+  const map = Array.isArray(flyabilityMap)
+    ? Object.fromEntries(flyabilityMap.map(s => [s.dateStr || s.isoDate, s]))
+    : (flyabilityMap || {});
+
+  return calendarDates.map(item => ({
+    ...item,
+    flyability: normalizeDateFlyability(map[item.isoDate] || null)
+  }));
+}
+
+/**
+ * Generates an array of available calendar dates for picker sheets up to maxDays in the future,
+ * optionally enriched with daily flyability evaluations.
  * @param {Date|string} [refDate=new Date()]
  * @param {number} [maxDays=14]
+ * @param {Array<object>|object|null} [flyabilityMap=null]
  * @returns {Array<{
  *   isoDate: string,
  *   formatted: string,
  *   dayName: string,
  *   dayNumber: number,
  *   isWeekend: boolean,
- *   horizon: { level: string, label: string, isSynoptic: boolean }
+ *   horizon: { level: string, label: string, isSynoptic: boolean },
+ *   flyability: {
+ *     severity: number|null,
+ *     status: string,
+ *     label: string,
+ *     color: string,
+ *     bg: string,
+ *     icon: string,
+ *     badgeClass: string,
+ *     score: number|null,
+ *     limitingFactor: string|null
+ *   }
  * }>}
  */
-export function getAvailableCalendarDates(refDate = new Date(), maxDays = 14) {
+export function getAvailableCalendarDates(refDate = new Date(), maxDays = 14, flyabilityMap = null) {
   const ref = (typeof refDate === 'string') ? parseDateIso(refDate) : new Date(refDate.getTime());
   ref.setHours(12, 0, 0, 0);
+
+  const map = Array.isArray(flyabilityMap)
+    ? Object.fromEntries(flyabilityMap.map(s => [s.dateStr || s.isoDate, s]))
+    : (flyabilityMap || {});
 
   const list = [];
   for (let i = 0; i < maxDays; i++) {
     const d = addDays(ref, i);
     const dayOfWeek = d.getDay();
     const iso = formatDateIso(d);
+    const fly = map[iso] || null;
+
     list.push({
       isoDate: iso,
       formatted: formatShortDate(d),
       dayName: getDayName(d, true),
       dayNumber: d.getDate(),
       isWeekend: dayOfWeek === 0 || dayOfWeek === 6,
-      horizon: classifyForecastHorizon(i)
+      horizon: classifyForecastHorizon(i),
+      flyability: normalizeDateFlyability(fly)
     });
   }
   return list;
