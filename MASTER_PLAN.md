@@ -12,7 +12,7 @@
 ## 1. Executive Summary & Vision
 
 ### 1.1 The Premise
-The core algorithms of **ParaMeteo** (flyability waterfall scoring, thermodynamic soundings, IGC parser, 3D flight replay kinematics, maneuvers detection, Peter Pan flight syllabus) represent an established, mathematically verified aeronautical logic base.
+The core algorithms of **ParaMeteo** (flyability waterfall scoring, thermodynamic soundings, IGC parser, 3D flight replay kinematics, maneuvers detection) represent an established, mathematically verified aeronautical logic base.
 
 However, the user interface suffered from architectural fatigue:
 - A single monolithic HTML file exceeding 170 KB.
@@ -71,7 +71,6 @@ The new application will deliver:
 |  | flightTelemetry.js     -> LTTB decimation, ground speed, glide ratio| |
 |  | geoSpatialMath.js      -> Great circle, bearing, wind off-axis     |  |
 |  | sitesDatabase.json     -> Italian & Alpine takeoff registry        |  |
-|  | syllabusData.js        -> Peter Pan flight school maneuver matrix  |  |
 +--------------------------------------------------------------------------+
 ```
 
@@ -146,43 +145,52 @@ The new application will deliver:
 
 ### Phase 5: Spot Map & Mappa della Volabilità ("Dove Volare Oggi")
 - [ ] Implement `ui/views/SpotMapView.js`:
-  - **Cartografia & Base Layers**: Mappa interattiva a pieno schermo (Leaflet) con toggle satellite/topo ad alto contrasto per outdoor.
+  - **Cartografia & Base Layers**: Mappa interattiva a pieno schermo con rendering condizionato/lazy (`mount`) e Headless Map Adapter per testabilità 100% in Node.js puro senza globali DOM.
   - **Vista Macro a Bacini di Volabilità (Stile Paraglidable Sostenibile)**:
-    - Aureole semitrasparenti di comprensorio (raggio 8-12 km) con codifica colore semantica reattiva (🟢 Aperto, 🟡 Cautela, 🔴 Chiuso) calcolata tramite `evaluateComprensorio`.
+    - Aureole semitrasparenti di comprensorio (raggio 8-12 km) con codifica colore semantica reattiva (🟢 Aperto, 🟡 Cautela, 🔴 Chiuso) calcolata deterministicamente con `evaluateComprensorio`.
     - Colpo d'occhio immediato a livello regionale sull'arco alpino e appenninico senza interpolazioni continue orograficamente ingannevoli.
-  - **Vista Micro Aeronautica (Zoom Progressivo >= 10)**:
+  - **Vista Micro Aeronautica (Zoom Progressivo >= 11)**:
     - Decollo primario ($T_{\text{best}}$): cono azimutale di decollo e freccia del vento reale calcolata a quota decollo.
     - Atterraggio di rientro ($L_{\text{safe}}$): linea di collegamento e cono di planata aerodinamica ($E_{\text{richiesta}} \le E_{\text{glider}}$) parametrato sull'ala attiva del pilota (EN-A/B/C/D).
   - **Timeline di Scrubbing Orario Integrata**:
     - Slider/stepper orario compatto (09:00 - 18:00) sincronizzato con `store.activeDate` e `store.activeHourIndex`.
     - Ricalcolo istantaneo in RAM di tutti i comprensori visibili in $<50\text{ms}$ a costo di rete zero.
-  - **Ingestione Meteo a Finestra Geografica (Bounding Box Batch)**:
-    - Query batch su Open-Meteo limitata ai comprensori visibili nel viewport corrente (15-30 coordinate per sessione, $< 2\%$ della quota gratuita giornaliera).
-    - Cache in-memory LRU (TTL 30 min) in `openMeteoApi.js` per azzerare chiamate ripetute su pan e zoom.
+  - **Ingestione Meteo a Catalogo Statico**:
+    - Query batch Open-Meteo limitata ai comprensori del catalogo registrato (`data/locations.json`) con cache in-memory LRU (TTL 30 min) in `openMeteoApi.js`.
+    - Zero query ridondanti o combinatorie su pan e zoom (eliminazione totale del rischio di blocco HTTP 429).
   - **Filtro di Raggio "Dove Volare Oggi"**:
     - Selettore rapido (50 km / 100 km / 150 km dalla posizione GPS o dal punto focale) con attenuazione dei siti fuori raggio o chiusi.
   - **Scheda Rapida Comprensorio (Bottom Sheet)**:
     - Tap sull'aureola o marker: apertura drawer non bloccante (`SheetManager.js`) con metriche essenziali di sicurezza e CTA diretto a `ForecastView.js`.
 
 ### Phase 6: Flight Logbook & Telemetry Module
-- [ ] Implement `core/logbookDb.js` (IndexedDB storage for tracks and metadata).
+- [ ] Implement `core/logbookDb.js`:
+  - Storage driver pattern con driver asincrono IndexedDB (`createIndexedDbAdapter`) e driver in-memory (`createMemoryDbAdapter`) per esecuzione headless e test in Node.js.
+  - Schema a due livelli anti-bloat: `flights_meta` per rendering ultraveloce delle liste e KPI, e `flights_raw` per blob IGC e tracce GPS dettagliate (caricamento on-demand per il replay).
 - [ ] Implement `ui/views/LogbookView.js`:
-  - Drag-and-drop IGC upload with instant parsing.
-  - Flight cards with altitude profile, duration, thermal count, and glider name.
-  - Career KPI counters (Total hours, flights, max altitude, longest flight).
-  - Peter Pan flight training syllabus checklist with 1-click Excel export.
+  - Inserimento traccia IGC con drag-and-drop / file picker e parsing automatico immediato.
+  - Card di volo strutturate con profilo altimetrico sintetico, durata, conteggio termiche rilevate e vela associata.
+  - Contatori KPI di carriera (ore totali, numero voli, quota massima, volo più lungo).
 
-### Phase 7: 3D Flight Replay with Synced Telemetry
+### Phase 6-bis: Backup, Auto-Sync & Restore Engine
+- [ ] Implement `core/backupManager.js` & `core/syncDirtyTracker.js`:
+  - **Full System Snapshot**: Esportazione e importazione dell'intero stato applicativo (impostazioni LocalStorage, vele, località personalizzate + voli e tracce IndexedDB) in un singolo file `.json`. Opzioni di ripristino: *Sovrascrittura Completa* (Reconstruct) o *Unione Non Distruttiva* (Smart Merge senza duplicati).
+  - **Backup & Restore Modulare del Logbook**: Esportazione e ripristino dedicati e indipendenti per il solo libretto di volo (metadati e tracce IGC), per consentire al pilota di archiviare o trasferire i propri voli separatamente dalle preferenze dell'app.
+  - **Auto-Sync & Dirty Tracking**: Rilevamento in memoria delle modifiche pendenti non archiviate (`syncDirtyTracker`), promemoria periodico discreto di backup (se trascorsi >14 giorni o $\ge 3$ nuovi voli) e predisposizione architetturale per adapter di cloud sync (Google Drive / remote folder).
+
+### Phase 7: 3D Flight Replay with Synced Telemetry (Dual-Engine Architecture)
 - [ ] Implement `ui/views/FlightReplayView.js`:
-  - WebGL 3D flight path over real elevation DEM terrain.
-  - Double-buffered 2D telemetry strip (altitude, vario, ground speed) with LTTB decimation.
-  - Playback controls (play, pause, scrub, speed 1x-20x, camera follow modes).
+  - **Interfaccia Astratta del Motore 3D (`IReplay3dEngine`)**:
+    - Disaccoppiamento totale tra controller UI, controlli playback (play, pause, scrub, velocità 1x-20x, camera follow modes) e rendering 3D.
+    - Telemetry strip 2D sincronizzata a 60 FPS su Canvas 2D (altitudine, vario con decimazione LTTB) autonoma rispetto al rendering del terreno.
+  - **Engine Primario**: MapLibre GL 3D + Three.js CustomLayer (conforme a `geodesy_webgl_3d_spec.md` con decodifica DEM Terrarium e modello parapendio `.glb` in `data/models/`).
+  - **Engine di Fallback Consolidato**: CesiumJS (con coordinate cartesiane WGS84 native, come empiricamente verificato nei test ParaMeteo), pronto a intervenire senza riscritture dell'interfaccia o della telemetria in caso di anomalie sul layer MapLibre.
 
 ### Phase 8: PWA, Multilingual (i18n) & Offline Hardening
-- [ ] Service worker (`sw.js`) with cache-first static assets and network-first weather cache.
-- [ ] Web App Manifest (`manifest.json`) with high-contrast icons.
-- [ ] i18n support across 4 languages (Italian, English, French, German).
-- [ ] Audit for WCAG 2.1 AA accessibility and outdoor sunlight readability.
+- [ ] Service worker (`sw.js`) con cache-first per asset statici locali e modalità pass-through trasparente per tile cartografiche esterne (AWS S3 Terrarium, OpenTopoMap) per prevenire quote exceeded.
+- [ ] Web App Manifest (`manifest.json`) con icone ad alto contrasto per installazione standalone.
+- [ ] Supporto i18n per 4 lingue (Italiano, Inglese, Francese, Tedesco) con dizionari iniettati come dipendenze pure.
+- [ ] Audit di accessibilità WCAG 2.1 AA e verifica leggibilità outdoor sotto luce solare diretta.
 
 ---
 

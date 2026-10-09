@@ -22,12 +22,12 @@ GlideMind uses a persistent 5-tab navigation architecture:
 4. **Flight Logbook (`#view-logbook`)**:
    - Flight log cards (date, site, duration, max altitude, glider).
    - IGC upload drag-and-drop zone.
-   - Pilot career KPIs (total hours, flights, SIV syllabus checklist).
+   - Pilot career KPIs (total hours, flights, max altitude, duration).
    - 3D flight trajectory replay launcher (mounts the full-screen `#view-replay` via `SheetManager`).
 5. **Settings & Tools (`#view-settings`)**:
    - Unit preferences (km/h vs m/s, m vs ft, Celsius).
    - Wing hangar (gliders, harness, reserve chute repacking date).
-   - Peter Pan flight training syllabus tracker & Excel export.
+   - Backup, auto-sync and restore snapshot controls.
    - Cache management & offline diagnostic.
 
 ---

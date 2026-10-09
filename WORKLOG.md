@@ -141,3 +141,16 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Sincronizzazione reattiva tra [ui/views/ForecastView.js](file:///ui/views/ForecastView.js) e [ui/views/HomeDashboardView.js](file:///ui/views/HomeDashboardView.js) tramite `store.activeDate`: la selezione della data in Home ordina la volabilità di tutti i comprensori per quel giorno.
   - Aggiunte scorciatoie per voli passati (`Oggi`, `Ieri`, `Domenica`, `Sabato`) nel modulo di registrazione volo (`openAddFlightSheet`).
   - Creazione e aggiornamento delle suite [tests/core/datePresets.test.mjs](file:///tests/core/datePresets.test.mjs), [tests/ui/forecastView.test.mjs](file:///tests/ui/forecastView.test.mjs) e [tests/ui/homeDashboardView.test.mjs](file:///tests/ui/homeDashboardView.test.mjs) (235/235 test passanti con successo).
+
+---
+
+## 2026-10-09 - Bonifica Architetturale Piani Futuri & Governance Persistenza
+- **Tipo**: Architettura / Governance / ADR / Roadmap Remediation
+- **Dettagli**: [.agents/worklog.d/2026-10-09_remediation-plan-backup-sync-3d-adapter.md](file:///.agents/worklog.d/2026-10-09_remediation-plan-backup-sync-3d-adapter.md)
+- **Sintesi**:
+  - Eseguito audit approfondito sulle Fasi 5, 6, 7 e 8 di [MASTER_PLAN.md](file:///MASTER_PLAN.md) ed emersi 4 rischi architetturali critici.
+  - Rimosso totalmente il Syllabus Peter Pan dallo scope di GlideMind, mantenendo il Logbook snello, focalizzato su IGC, card di volo, currency pilota e KPI di carriera (zero bloat).
+  - Formalizzato il modulo **Backup, Auto-Sync & Restore Engine** (`core/backupManager.js` e `core/syncDirtyTracker.js`): full system snapshot (LocalStorage + IndexedDB), esportazione/ripristino modulare e indipendente del solo Logbook (JSON/IGC bundle), sync dirty tracking e reminder periodico non invasivo (>14gg o >=3 voli).
+  - Progettata l'architettura 3D Replay ad Adapter Unificato (`IReplay3dEngine`): primario MapLibre GL 3D + Three.js DEM Terrarium con fallback solido e collaudato a CesiumJS (coordinate cartesiane WGS84 native), azzerando il rischio di blocco implementativo e proteggendo i controlli UI e la telemetria 2D su Canvas.
+  - Riformulata la mappa (Fase 5) per adottare un batch statico sul catalogo (`data/locations.json`) con aggiornamento in RAM istantaneo (eliminazione rischio HTTP 429) e Headless Map Adapter per test in Node.js.
+  - Aggiornati [MASTER_PLAN.md](file:///MASTER_PLAN.md), [DESIDERATA.md](file:///DESIDERATA.md) e [MEMORY.md](file:///MEMORY.md) (Lezioni 21-24).

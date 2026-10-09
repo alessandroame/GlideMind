@@ -113,7 +113,7 @@ export function mergeManeuversPreservingExisting(existingManeuvers = [], detecte
 /**
  * Non-destructively reconciles flight maneuvers during telemetry engine upgrades.
  * Removes legacy automated 'inversioni' / 's-turn' pseudo-maneuvers while strictly preserving
- * all manual pilot notes, custom syllabus entries, and newly detected maneuvers.
+ * all manual pilot notes, custom exercise entries, and newly detected maneuvers.
  * 
  * @param {Array<string>} [existingManeuvers=[]]
  * @param {Array<string>} [newDetectedKeys=[]]
