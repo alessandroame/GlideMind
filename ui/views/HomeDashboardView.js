@@ -38,6 +38,7 @@ import {
   getPastDatePresets,
   formatDateIso
 } from '../../core/datePresets.js';
+import { getFormattedVersion, getFormattedBuild } from '../../core/version.js';
 
 /**
  * Escapes HTML strings to prevent XSS in view rendering.
@@ -207,15 +208,20 @@ export class HomeDashboardViewController {
    */
   renderHtml() {
     const state = this.store ? this.store.getState() : {};
-    const activeDate = state.activeDate || new Date().toISOString().split('T')[0];
     const evaluatedList = this.getEvaluatedComprensori();
 
     return `
       <div class="gm-home-view max-w-4xl mx-auto flex flex-col gap-2">
-        <!-- Ultra-Clean Header (Glanceable, Zero Marketing Fluff) -->
+        <!-- Ultra-Clean Header (Glanceable, Version & Build Info) -->
         <header class="flex items-center justify-between pb-2 border-b border-[var(--gm-border)]">
-          <h1 class="text-base font-bold tracking-tight text-[var(--gm-text-primary)]">GlideMind</h1>
-          <span class="text-xs font-mono text-[var(--gm-text-secondary)]">${escapeHtml(activeDate)}</span>
+          <div class="flex items-center gap-2">
+            <img src="assets/icons/icon-192.png" alt="" width="22" height="22" class="gm-brand-icon gm-brand-icon-sm">
+            <div class="flex items-baseline gap-1.5">
+              <h1 class="text-base font-bold tracking-tight text-[var(--gm-text-primary)]">GlideMind</h1>
+              <span class="text-xs font-mono text-[var(--gm-text-muted)] font-normal">${escapeHtml(getFormattedVersion())}</span>
+            </div>
+          </div>
+          <span class="text-xs font-mono text-[var(--gm-text-muted)] tracking-tight">${escapeHtml(getFormattedBuild())}</span>
         </header>
 
         <!-- SEZIONE 1: Stato Attività Pilota (Prima Sezione) -->

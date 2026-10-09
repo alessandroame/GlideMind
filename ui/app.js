@@ -9,6 +9,7 @@ import { initSheetManager } from './sheetManager.js';
 import { homeDashboardView } from './views/HomeDashboardView.js';
 import { forecastView } from './views/ForecastView.js';
 import { normalizeLocationsCatalog, DEFAULT_COMPRENSORI } from '../core/comprensorio.js';
+import { APP_VERSION, APP_BUILD } from '../core/version.js';
 
 /**
  * Loads the master real locations catalog from /data/locations.json.
@@ -69,7 +70,8 @@ export function bootstrapApp() {
       store,
       router,
       loadLocationsCatalog,
-      version: '2.0.0'
+      version: APP_VERSION,
+      build: APP_BUILD
     };
   }
 }

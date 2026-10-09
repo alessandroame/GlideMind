@@ -33,6 +33,18 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     // Search bar check: clean "Ricerca..." placeholder without redundant words
     assert.ok(html.includes('placeholder="Ricerca..."'), 'Search bar placeholder must be simple Ricerca...');
 
+    // Header check: Brand icon next to GlideMind title, version badge and build stamp
+    assert.ok(html.includes('assets/icons/icon-192.png'), 'Must render real brand icon in header');
+    assert.ok(html.includes('gm-brand-icon'), 'Must include gm-brand-icon class');
+    assert.ok(html.includes('GlideMind</h1>'), 'Must render GlideMind title');
+    assert.ok(html.includes('v2.0.0'), 'Must render current app version near title');
+    assert.ok(html.includes('build'), 'Must render build tag in header');
+
+    // Header must NOT contain redundant date string in title bar
+    const headerMatch = html.match(/<header[\s\S]*?<\/header>/);
+    assert.ok(headerMatch, 'Header must exist');
+    assert.equal(/\b\d{4}-\d{2}-\d{2}\b/.test(headerMatch[0]), false, 'Header must NOT contain date string');
+
     // Block 2: Pilot Activity & Logbook KPIs
     assert.ok(html.includes('Attività Pilota'), 'Must include Pilot Activity section');
     assert.ok(html.includes('Ore di Volo'), 'Must include flight hours KPI tile');

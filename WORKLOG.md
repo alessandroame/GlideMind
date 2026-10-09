@@ -278,8 +278,17 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Implementata la salvaguardia del focus dell'utente sul campo di ricerca durante l'idratazione in HomeDashboardView.
   - Creata la suite [tests/ui/locationsCatalogHydration.test.mjs](file:///tests/ui/locationsCatalogHydration.test.mjs) (274/274 test passati).
 
+---
 
-
-
-
+## 2026-10-09 - Integrazione Icona Brand, Versione e Build Stamp nell'Header Mobile (HomeDashboardView)
+- **Tipo**: UI Enhancement / HMI Ergonomics / Brand Alignment / Metadata
+- **Dettagli**: [.agents/worklog.d/2026-10-09_mobile-header-brand-icon-integration.md](file:///.agents/worklog.d/2026-10-09_mobile-header-brand-icon-integration.md)
+- **Sintesi**:
+  - Valutate le opzioni di collocazione icona: respinta la sostituzione dell'icona standard della casa nella bottom bar (violazione di Jakob's Law e Law of Similarity); approvata l'integrazione a fianco del titolo nell'header mobile.
+  - Integrato l'asset reale `assets/icons/icon-192.png` con classi `.gm-brand-icon .gm-brand-icon-sm` (22×22 px) subito a sinistra del tag `<h1>GlideMind</h1>` in [ui/views/HomeDashboardView.js](file:///ui/views/HomeDashboardView.js).
+  - Aggiunta a fianco del titolo la versione corrente (`v2.0.0`) in font ridotto monospace.
+  - Rimossa la data ridondante dall'header e sostituita con l'indicatore `build 5bf6d1c` sempre visibile sulla destra per la tracciabilità delle build di test.
+  - Creato il modulo centralizzato [core/version.js](file:///core/version.js) (SSOT per versione, commit build e data rilascio), collegato a [ui/app.js](file:///ui/app.js) in `window.__GLIDEMIND__`.
+  - Aggiunte regole CSS in [css/theme.css](file:///css/theme.css) per allineamento inline flessibile (`vertical-align: middle; flex-shrink: 0;`) e variante dimensionale compatta.
+  - Aggiunta suite di test [tests/core/version.test.mjs](file:///tests/core/version.test.mjs) ed estesa [tests/ui/homeDashboardView.test.mjs](file:///tests/ui/homeDashboardView.test.mjs) (278/278 test superati nel test runner nativo).
 
