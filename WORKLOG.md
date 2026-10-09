@@ -167,3 +167,19 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Progettata l'interfaccia outdoor HMI in [css/theme.css](file:///css/theme.css) e nei fogli modali di [ui/views/ForecastView.js](file:///ui/views/ForecastView.js) e [ui/views/HomeDashboardView.js](file:///ui/views/HomeDashboardView.js): bordo inferiore 3px colorato, pillola status con icona e microcopy multimodale, indicatore sinottico (>7gg) e legenda aeronautica esplicita.
   - Aggiornate le suite di test [tests/core/flyability.test.mjs](file:///tests/core/flyability.test.mjs), [tests/core/datePresets.test.mjs](file:///tests/core/datePresets.test.mjs), [tests/ui/forecastView.test.mjs](file:///tests/ui/forecastView.test.mjs) e [tests/ui/homeDashboardView.test.mjs](file:///tests/ui/homeDashboardView.test.mjs) (241/241 test passanti).
 
+---
+
+## 2026-10-09 - Idratazione Progressiva Mappa per Zoom e Salvaguardie di Persistenza
+- **Tipo**: Architettura / Governance / ADR / Roadmap Remediation
+- **Dettagli**: [.agents/worklog.d/2026-10-09_phase-5-zoom-progressive-hydration-and-persistence-audit.md](file:///.agents/worklog.d/2026-10-09_phase-5-zoom-progressive-hydration-and-persistence-audit.md)
+- **Sintesi**:
+  - Eseguito audit approfondito sulle Fasi 5, 6, 6-bis, 7 e 8 di [MASTER_PLAN.md](file:///MASTER_PLAN.md).
+  - Formalizzata l'architettura a **Due Livelli di Zoom con Idratazione Progressiva** per la mappa (Fase 5): a livello Macro (zoom 5-8.9) batch per macro-regione (max 25-30 spot, payload < 500 KB, URL < 800 caratteri); a livello Micro (zoom >= 9) zero chiamate di rete, riuso dati in RAM per renderizzare cono decollo $T_{\text{best}}$, vento a quota decollo, atterraggio $L_{\text{safe}}$ e cono di planata $E_{\text{richiesta}} \le E_{\text{glider}}$.
+  - Introdotto il pattern `HeadlessMapAdapter` (`IMapEngine`) per testabilità al 100% in Node.js.
+  - Introdotta la salvaguardia anti-eviction mobile con richiesta esplicita `navigator.storage.persist()` all'inizializzazione di IndexedDB (Fase 6).
+  - Specificato il parsing chunkato asincrono per tracciati IGC lunghi (>30k record) e deduplicazione deterministica tramite fingerprint immutabile.
+  - Specificato il campo `updatedAt` in `flights_meta` per Last-Write-Wins nei ripristini Smart Merge (Fase 6-bis) e download sicuro blob anti-leak.
+  - Definito il Canvas 2D disaccoppiato a 60 FPS per la telemetria e degradazione spaziale offline per il Replay 3D (Fase 7).
+  - Definito l'isolamento della cache Service Worker per escludere tile esterne e prevenire `QuotaExceededError` (Fase 8).
+  - Rettificata la fixture test in [tests/core/flyability.test.mjs](file:///tests/core/flyability.test.mjs) e consolidati [MASTER_PLAN.md](file:///MASTER_PLAN.md), [DESIDERATA.md](file:///DESIDERATA.md) e [MEMORY.md](file:///MEMORY.md) (Lezioni 26-27).
+
