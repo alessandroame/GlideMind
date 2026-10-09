@@ -42,6 +42,13 @@ import {
   enrichWeatherData,
   fetchWeatherData
 } from '../../core/openMeteoApi.js';
+import {
+  getSmartDatePresets,
+  getAvailableCalendarDates,
+  formatDateIso,
+  parseDateIso,
+  formatShortDate
+} from '../../core/datePresets.js';
 
 /**
  * Normalizes an angle to [0, 360) range.
@@ -256,7 +263,8 @@ export class ForecastViewController {
     const currentHour = now.getHours();
     this.selectedHour = (currentHour >= 8 && currentHour <= 20) ? currentHour : 13;
     this.selectedSubSpot = 'overview'; // 'overview' | spotId
-    this.activeDate = this.getDateString(0);
+    const storeState = this.store ? this.store.getState() : {};
+    this.activeDate = storeState.activeDate || formatDateIso(now);
     this.cachedWeatherMap = new Map(); // key: spotId_date -> weatherPayload
     this.isLoadingWeather = false;
 
@@ -273,7 +281,7 @@ export class ForecastViewController {
   getDateString(dayOffset = 0) {
     const d = new Date();
     d.setDate(d.getDate() + dayOffset);
-    return d.toISOString().split('T')[0];
+    return formatDateIso(d);
   }
 
   /**
@@ -413,8 +421,8 @@ export class ForecastViewController {
     const briefing = generateGuidoBriefing(spot, weatherData, this.activeDate, glider);
 
     return `
-      <div id="forecast-view" class="gm-forecast-view flex flex-col gap-4 pb-28 max-w-lg mx-auto w-full">
-        <!-- 1. Header: Comprensorio Picker Trigger & 2-Level Sub-Spot Selector -->
+      <div id="forecast-view" class="gm-forecast-view flex flex-col gap-4 pb-48 max-w-lg mx-auto w-full">
+        <!-- 1. Header: Comprensorio Bar + Picker Trigger -->
         ${this.renderHeader(spot)}
 
         <!-- 2. Spot Card: Dual Unico Binomio or Focused Sub-Spot Detail -->
@@ -461,12 +469,7 @@ export class ForecastViewController {
    * @returns {string}
    */
   renderHeader(currentSpot) {
-    const dates = [
-      { offset: 0, label: 'Oggi', sub: this.formatDateTab(0) },
-      { offset: 1, label: 'Domani', sub: this.formatDateTab(1) },
-      { offset: 2, label: '+2 Giorni', sub: this.formatDateTab(2) }
-    ];
-
+    const smartData = getSmartDatePresets(new Date(), this.activeDate);
     const takeoffs = currentSpot.takeoffs || [];
     const landings = currentSpot.landings || [];
 
@@ -527,26 +530,46 @@ export class ForecastViewController {
           </select>
         </div>
 
-        <!-- 3-Day Date Tabs -->
+        <!-- Smart Adaptive Date Tabs + Calendar Button -->
         <div class="gm-date-tabs" role="tablist" aria-label="Selettore data previsione">
-          ${dates.map(d => {
-            const dateStr = this.getDateString(d.offset);
-            const isActive = dateStr === this.activeDate;
-            return `
-              <button 
-                type="button" 
-                class="gm-date-tab ${isActive ? 'active' : ''}"
-                data-action="select-date"
-                data-date="${dateStr}"
-                role="tab"
-                aria-selected="${isActive ? 'true' : 'false'}"
-              >
-                <span class="gm-date-tab-main">${d.label}</span>
-                <span class="gm-date-tab-sub">${d.sub}</span>
-              </button>
-            `;
-          }).join('')}
+          ${smartData.presets.map(p => `
+            <button 
+              type="button" 
+              class="gm-date-tab ${p.isActive ? 'active' : ''} ${p.isCustom ? 'custom' : ''}"
+              data-action="select-date"
+              data-date="${p.isoDate}"
+              role="tab"
+              aria-selected="${p.isActive ? 'true' : 'false'}"
+              title="${p.label} - ${p.subLabel}"
+            >
+              <span class="gm-date-tab-main">${p.label}</span>
+              <span class="gm-date-tab-sub">${p.subLabel}</span>
+            </button>
+          `).join('')}
+
+          <button 
+            type="button" 
+            class="gm-date-tab-calendar ${smartData.isCustomActive ? 'active' : ''}"
+            data-action="open-date-picker-sheet"
+            role="button"
+            aria-label="Scegli data dal calendario"
+            title="Scegli altra data"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="16" y1="2" x2="16" y2="6"></line>
+              <line x1="8" y1="2" x2="8" y2="6"></line>
+              <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+          </button>
         </div>
+
+        ${smartData.activeHorizon && smartData.activeHorizon.isSynoptic ? `
+          <div class="gm-horizon-notice" role="status">
+            <span class="gm-horizon-icon" aria-hidden="true">ℹ️</span>
+            <span><strong>Tendenza a lungo raggio:</strong> oltre 7 giorni le previsioni sono soggette a variazioni sinottiche.</span>
+          </div>
+        ` : ''}
       </header>
     `;
   }
@@ -1312,6 +1335,29 @@ export class ForecastViewController {
         .map(id => allSpots.find(s => s.id === id))
         .filter(Boolean)
         .filter(s => !pinnedIds.has(s.id));
+      const otherSpots = allSpots.filter(s => !pinnedIds.has(s.id) && !recentSpots.some(r => r.id === s.id));
+
+      const renderItem = (s) => {
+        const isPinned = pinnedIds.has(s.id);
+        const isActive = s.id === currentSpot.id;
+        return `
+          <div class="gm-picker-item ${isActive ? 'active' : ''}">
+            <div class="gm-picker-item-main" data-action="pick-spot" data-spot-id="${s.id}">
+              <div class="text-sm font-bold text-[var(--gm-text-primary)]">${escapeHtml(s.name)} (${escapeHtml(s.province)})</div>
+              <div class="text-xs text-[var(--gm-text-muted)]">${escapeHtml(s.region)}</div>
+            </div>
+            <button 
+              type="button" 
+              class="gm-star-btn ${isPinned ? 'pinned' : ''}" 
+              data-action="toggle-pin-spot" 
+              data-spot-id="${s.id}" 
+              aria-label="${isPinned ? 'Rimuovi dai' : 'Aggiungi ai'} preferiti"
+            >
+              ${isPinned ? '★' : '☆'}
+            </button>
+          </div>
+        `;
+      };
 
       return `
         <div class="gm-picker-sheet flex flex-col gap-3">
@@ -1328,69 +1374,46 @@ export class ForecastViewController {
           </div>
 
           ${!q ? `
-            <!-- Sezione Preferiti -->
-            <div class="gm-picker-section">
-              <span class="gm-picker-section-title">⭐ Preferiti</span>
-              ${pinnedSpots.length > 0 ? `
-                <div class="gm-picker-list">
-                  ${pinnedSpots.map(s => `
-                    <div class="gm-picker-item ${s.id === currentSpot.id ? 'active' : ''}">
-                      <div class="flex-1 cursor-pointer" data-action="pick-spot" data-spot-id="${s.id}">
-                        <div class="text-sm font-bold text-[var(--gm-text-primary)]">${escapeHtml(s.name)} (${escapeHtml(s.province)})</div>
-                        <div class="text-xs text-[var(--gm-text-muted)]">${escapeHtml(s.region)}</div>
-                      </div>
-                      <button type="button" class="gm-star-btn pinned" data-action="toggle-pin-spot" data-spot-id="${s.id}" aria-label="Rimuovi dai preferiti">
-                        ★
-                      </button>
-                    </div>
-                  `).join('')}
-                </div>
-              ` : `
-                <p class="text-xs text-[var(--gm-text-muted)] italic py-1 px-2">Nessun preferito. Tocca la stella accanto a uno spot per aggiungerlo.</p>
-              `}
-            </div>
-
-            <!-- Sezione Recenti -->
-            ${recentSpots.length > 0 ? `
+            <!-- Sezione Preferiti (Deduplicata) -->
+            ${pinnedSpots.length > 0 ? `
               <div class="gm-picker-section">
-                <span class="gm-picker-section-title">🕒 Recenti</span>
+                <span class="gm-picker-section-title">⭐ Preferiti (${pinnedSpots.length})</span>
                 <div class="gm-picker-list">
-                  ${recentSpots.map(s => `
-                    <div class="gm-picker-item ${s.id === currentSpot.id ? 'active' : ''}">
-                      <div class="flex-1 cursor-pointer" data-action="pick-spot" data-spot-id="${s.id}">
-                        <div class="text-sm font-bold text-[var(--gm-text-primary)]">${escapeHtml(s.name)} (${escapeHtml(s.province)})</div>
-                        <div class="text-xs text-[var(--gm-text-muted)]">${escapeHtml(s.region)}</div>
-                      </div>
-                      <button type="button" class="gm-star-btn" data-action="toggle-pin-spot" data-spot-id="${s.id}" aria-label="Aggiungi ai preferiti">
-                        ☆
-                      </button>
-                    </div>
-                  `).join('')}
+                  ${pinnedSpots.map(renderItem).join('')}
                 </div>
               </div>
             ` : ''}
-          ` : ''}
 
-          <!-- Sezione Tutti i Comprensori -->
-          <div class="gm-picker-section">
-            <span class="gm-picker-section-title">🗺️ ${q ? 'Risultati Ricerca' : 'Tutti i Comprensori'} (${filtered.length})</span>
-            <div class="gm-picker-list">
-              ${filtered.map(s => {
-                const isPinned = pinnedIds.has(s.id);
-                return `
-                  <div class="gm-picker-item ${s.id === currentSpot.id ? 'active' : ''}">
-                    <div class="flex-1 cursor-pointer" data-action="pick-spot" data-spot-id="${s.id}">
-                      <div class="text-sm font-bold text-[var(--gm-text-primary)]">${escapeHtml(s.name)} (${escapeHtml(s.province)})</div>
-                      <div class="text-xs text-[var(--gm-text-muted)]">${escapeHtml(s.region)}</div>
-                    </div>
-                    <button type="button" class="gm-star-btn ${isPinned ? 'pinned' : ''}" data-action="toggle-pin-spot" data-spot-id="${s.id}" aria-label="${isPinned ? 'Rimuovi' : 'Aggiungi'} preferito">
-                      ${isPinned ? '★' : '☆'}
-                    </button>
-                  </div>
-                `;
-              }).join('')}
+            <!-- Sezione Recenti (Deduplicata) -->
+            ${recentSpots.length > 0 ? `
+              <div class="gm-picker-section">
+                <span class="gm-picker-section-title">🕒 Recenti (${recentSpots.length})</span>
+                <div class="gm-picker-list">
+                  ${recentSpots.map(renderItem).join('')}
+                </div>
+              </div>
+            ` : ''}
+
+            <!-- Sezione Altri Comprensori (Zero Sovrapposizioni) -->
+            <div class="gm-picker-section">
+              <span class="gm-picker-section-title">
+                🗺️ ${(pinnedSpots.length > 0 || recentSpots.length > 0) ? 'Altri Comprensori' : 'Tutti i Comprensori'} (${(pinnedSpots.length > 0 || recentSpots.length > 0) ? otherSpots.length : allSpots.length})
+              </span>
+              <div class="gm-picker-list">
+                ${((pinnedSpots.length > 0 || recentSpots.length > 0) ? otherSpots : allSpots).map(renderItem).join('')}
+              </div>
             </div>
-          </div>
+          ` : `
+            <!-- Risultati Ricerca -->
+            <div class="gm-picker-section">
+              <span class="gm-picker-section-title">🔍 Risultati Ricerca (${filtered.length})</span>
+              <div class="gm-picker-list">
+                ${filtered.length > 0 
+                  ? filtered.map(renderItem).join('') 
+                  : '<p class="text-xs text-[var(--gm-text-muted)] italic py-2">Nessun comprensorio trovato.</p>'}
+              </div>
+            </div>
+          `}
         </div>
       `;
     };
@@ -1402,7 +1425,7 @@ export class ForecastViewController {
       onOpen: () => {
         const input = document.getElementById('picker-search-input');
         if (input) {
-          input.focus();
+          // Zero intrusive autofocus: leave virtual keyboard closed on open so favorites are 1-tap accessible
           input.addEventListener('input', (e) => {
             const sheetBodyEl = document.querySelector('.gm-sheet-content');
             if (sheetBodyEl) {
@@ -1412,6 +1435,94 @@ export class ForecastViewController {
                 newInput.focus();
                 newInput.setSelectionRange(newInput.value.length, newInput.value.length);
               }
+            }
+          });
+        }
+      }
+    });
+  }
+
+  /**
+   * Opens the accessible bottom sheet to select any date within the forecast horizon (up to 14 days).
+   */
+  openDatePickerSheet() {
+    const today = new Date();
+    const minDate = formatDateIso(today);
+    const maxDate = formatDateIso(new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000));
+    const availableDates = getAvailableCalendarDates(today, 14);
+
+    const renderContent = () => `
+      <div class="gm-date-picker-sheet flex flex-col gap-4">
+        <!-- Direct Native Input -->
+        <div class="gm-form-field">
+          <label for="custom-date-native-input" class="gm-form-label font-bold text-xs uppercase tracking-wider text-[var(--gm-text-muted)]">
+            Inserisci data specifica (max +14gg):
+          </label>
+          <div class="flex items-center gap-2">
+            <input 
+              type="date" 
+              id="custom-date-native-input" 
+              class="gm-form-control flex-1 font-mono text-sm" 
+              min="${minDate}" 
+              max="${maxDate}" 
+              value="${this.activeDate}" 
+              aria-label="Data personalizzata"
+            />
+            <button 
+              type="button" 
+              class="gm-btn gm-btn-primary px-3 py-2 font-bold text-xs" 
+              data-action="apply-custom-date"
+            >
+              Conferma
+            </button>
+          </div>
+        </div>
+
+        <!-- 14-Day Fast Tap Grid -->
+        <div class="gm-date-sheet-section">
+          <span class="text-xs font-bold uppercase tracking-wider text-[var(--gm-text-muted)] block mb-2">
+            Giorni di Volo Disponibili (Prossimi 14gg)
+          </span>
+          <div class="gm-date-grid">
+            ${availableDates.map(d => {
+              const isSelected = d.isoDate === this.activeDate;
+              return `
+                <button 
+                  type="button" 
+                  class="gm-date-grid-item ${isSelected ? 'active' : ''} ${d.isWeekend ? 'weekend' : ''}"
+                  data-action="pick-calendar-date"
+                  data-date="${d.isoDate}"
+                  aria-selected="${isSelected ? 'true' : 'false'}"
+                  title="${d.dayName} ${d.formatted} (${d.horizon.label})"
+                >
+                  <span class="grid-day-name">${escapeHtml(d.dayName)}</span>
+                  <span class="grid-day-number">${d.dayNumber}</span>
+                  <span class="grid-month">${escapeHtml(d.formatted.split(' ')[1])}</span>
+                  ${d.horizon.isSynoptic ? `<span class="grid-synoptic-dot" title="Tendenza sinottica">●</span>` : ''}
+                </button>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      </div>
+    `;
+
+    openSheet({
+      id: 'date-picker-sheet',
+      title: 'Seleziona Data di Volo',
+      content: renderContent(),
+      onOpen: () => {
+        const input = document.getElementById('custom-date-native-input');
+        if (input) {
+          input.addEventListener('change', (e) => {
+            const val = e.target.value;
+            if (val) {
+              this.activeDate = val;
+              if (this.store) {
+                this.store.setState({ activeDate: val });
+              }
+              closeSheet();
+              this.render();
             }
           });
         }
@@ -1445,6 +1556,28 @@ export class ForecastViewController {
         if (this.store) {
           this.store.setState({ activeDate: dateAttr });
         }
+        this.render();
+      }
+    } else if (action === 'open-date-picker-sheet') {
+      this.openDatePickerSheet();
+    } else if (action === 'apply-custom-date') {
+      const input = document.getElementById('custom-date-native-input');
+      if (input && input.value) {
+        this.activeDate = input.value;
+        if (this.store) {
+          this.store.setState({ activeDate: input.value });
+        }
+        closeSheet();
+        this.render();
+      }
+    } else if (action === 'pick-calendar-date') {
+      const dateAttr = actionEl.getAttribute('data-date');
+      if (dateAttr) {
+        this.activeDate = dateAttr;
+        if (this.store) {
+          this.store.setState({ activeDate: dateAttr });
+        }
+        closeSheet();
         this.render();
       }
     } else if (action === 'back-to-home') {

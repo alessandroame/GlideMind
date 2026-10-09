@@ -24,6 +24,12 @@ import {
 } from '../../core/logbook.js';
 import { parseIgc } from '../../core/igcParser.js';
 import { openSheet, closeSheet } from '../sheetManager.js';
+import {
+  getSmartDatePresets,
+  getAvailableCalendarDates,
+  getPastDatePresets,
+  formatDateIso
+} from '../../core/datePresets.js';
 
 /**
  * Escapes HTML strings to prevent XSS in view rendering.
@@ -183,6 +189,9 @@ export class HomeDashboardViewController {
             <span>${evaluatedList.length} siti</span>
           </div>
 
+          <!-- Smart Date Selector for Comprensori Flyability (Weekend & Quick Presets) -->
+          ${this.renderDateBar(state)}
+
           <!-- Compact Search Bar (Sotto il titolo Volabilità) -->
           <div class="gm-search-wrapper">
             <svg class="gm-search-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2">
@@ -190,19 +199,70 @@ export class HomeDashboardViewController {
               <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
             </svg>
             <input 
-              type="search"
-              id="home-spot-search"
-              class="gm-search-input"
-              placeholder="Ricerca..."
-              value="${escapeHtml(this.searchQuery)}"
-              autocomplete="off"
-              aria-label="Ricerca"
+              type="search" 
+              id="home-spot-search" 
+              class="gm-search-input" 
+              placeholder="Ricerca..." 
+              value="${escapeHtml(this.searchQuery)}" 
+              autocomplete="off" 
+              aria-label="Ricerca" 
             />
           </div>
 
           ${this.renderComprensoriList(evaluatedList)}
         </section>
       </div>
+    `;
+  }
+
+  /**
+   * Renders the Smart Date Bar for comprensori flyability filtering.
+   * @param {object} state
+   * @returns {string}
+   */
+  renderDateBar(state) {
+    const activeDate = state.activeDate || formatDateIso(new Date());
+    const smartData = getSmartDatePresets(new Date(), activeDate);
+
+    return `
+      <div class="gm-date-tabs mb-1" role="tablist" aria-label="Selettore data volabilità">
+        ${smartData.presets.map(p => `
+          <button 
+            type="button" 
+            class="gm-date-tab ${p.isActive ? 'active' : ''} ${p.isCustom ? 'custom' : ''}" 
+            data-action="select-date" 
+            data-date="${p.isoDate}" 
+            role="tab" 
+            aria-selected="${p.isActive ? 'true' : 'false'}" 
+            title="${p.label} - ${p.subLabel}"
+          >
+            <span class="gm-date-tab-main">${p.label}</span>
+            <span class="gm-date-tab-sub">${p.subLabel}</span>
+          </button>
+        `).join('')}
+
+        <button 
+          type="button" 
+          class="gm-date-tab-calendar ${smartData.isCustomActive ? 'active' : ''}" 
+          data-action="open-date-picker-sheet" 
+          role="button" 
+          aria-label="Scegli data dal calendario" 
+          title="Scegli altra data"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+        </button>
+      </div>
+      ${smartData.activeHorizon && smartData.activeHorizon.isSynoptic ? `
+        <div class="gm-horizon-notice mb-1" role="status">
+          <span class="gm-horizon-icon" aria-hidden="true">ℹ️</span>
+          <span><strong>Tendenza sinottica:</strong> previsione oltre 7 giorni a carattere indicativo.</span>
+        </div>
+      ` : ''}
     `;
   }
 
@@ -447,6 +507,13 @@ export class HomeDashboardViewController {
         <div class="gm-form-field">
           <label for="flight-date-input" class="gm-form-label">Data del Volo</label>
           <input type="date" id="flight-date-input" class="gm-form-control" value="${escapeHtml(defaultDate)}" required />
+          <div class="gm-past-presets" role="group" aria-label="Scorciatoie data volo">
+            ${getPastDatePresets(new Date()).map(p => `
+              <button type="button" class="gm-past-preset-btn" data-action="set-flight-date" data-date="${p.isoDate}">
+                ${p.label} (${p.subLabel})
+              </button>
+            `).join('')}
+          </div>
         </div>
 
         <div class="gm-form-field">
@@ -501,6 +568,18 @@ export class HomeDashboardViewController {
         const durationInput = document.getElementById('flight-duration-input');
         const igcInput = document.getElementById('flight-igc-input');
         let parsedTrackPoints = null;
+
+        // Past date preset buttons handler
+        const pastDateBtns = form.querySelectorAll('.gm-past-preset-btn');
+        pastDateBtns.forEach(btn => {
+          btn.addEventListener('click', () => {
+            const dateAttr = btn.getAttribute('data-date');
+            const dateInput = document.getElementById('flight-date-input');
+            if (dateInput && dateAttr) {
+              dateInput.value = dateAttr;
+            }
+          });
+        });
 
         // Preset chips handler
         const presetBtns = form.querySelectorAll('.gm-preset-btn');
@@ -583,6 +662,93 @@ export class HomeDashboardViewController {
   }
 
   /**
+   * Opens the accessible bottom sheet to select any date within the forecast horizon (up to 14 days).
+   */
+  openDatePickerSheet() {
+    const state = this.store ? this.store.getState() : {};
+    const activeDate = state.activeDate || formatDateIso(new Date());
+    const today = new Date();
+    const minDate = formatDateIso(today);
+    const maxDate = formatDateIso(new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000));
+    const availableDates = getAvailableCalendarDates(today, 14);
+
+    const renderContent = () => `
+      <div class="gm-date-picker-sheet flex flex-col gap-4">
+        <!-- Direct Native Input -->
+        <div class="gm-form-field">
+          <label for="custom-date-native-input" class="gm-form-label font-bold text-xs uppercase tracking-wider text-[var(--gm-text-muted)]">
+            Inserisci data specifica (max +14gg):
+          </label>
+          <div class="flex items-center gap-2">
+            <input 
+              type="date" 
+              id="custom-date-native-input" 
+              class="gm-form-control flex-1 font-mono text-sm" 
+              min="${minDate}" 
+              max="${maxDate}" 
+              value="${activeDate}" 
+              aria-label="Data personalizzata"
+            />
+            <button 
+              type="button" 
+              class="gm-btn gm-btn-primary px-3 py-2 font-bold text-xs" 
+              data-action="apply-custom-date"
+            >
+              Conferma
+            </button>
+          </div>
+        </div>
+
+        <!-- 14-Day Fast Tap Grid -->
+        <div class="gm-date-sheet-section">
+          <span class="text-xs font-bold uppercase tracking-wider text-[var(--gm-text-muted)] block mb-2">
+            Giorni di Volo Disponibili (Prossimi 14gg)
+          </span>
+          <div class="gm-date-grid">
+            ${availableDates.map(d => {
+              const isSelected = d.isoDate === activeDate;
+              return `
+                <button 
+                  type="button" 
+                  class="gm-date-grid-item ${isSelected ? 'active' : ''} ${d.isWeekend ? 'weekend' : ''}"
+                  data-action="pick-calendar-date"
+                  data-date="${d.isoDate}"
+                  aria-selected="${isSelected ? 'true' : 'false'}"
+                  title="${d.dayName} ${d.formatted} (${d.horizon.label})"
+                >
+                  <span class="grid-day-name">${escapeHtml(d.dayName)}</span>
+                  <span class="grid-day-number">${d.dayNumber}</span>
+                  <span class="grid-month">${escapeHtml(d.formatted.split(' ')[1])}</span>
+                  ${d.horizon.isSynoptic ? `<span class="grid-synoptic-dot" title="Tendenza sinottica">●</span>` : ''}
+                </button>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      </div>
+    `;
+
+    openSheet({
+      id: 'home-date-picker-sheet',
+      title: 'Seleziona Data Volabilità Siti',
+      content: renderContent(),
+      onOpen: () => {
+        const input = document.getElementById('custom-date-native-input');
+        if (input) {
+          input.addEventListener('change', (e) => {
+            const val = e.target.value;
+            if (val && this.store) {
+              this.store.setState({ activeDate: val });
+              closeSheet();
+              this.render();
+            }
+          });
+        }
+      }
+    });
+  }
+
+  /**
    * Handles user clicks within the view via event delegation.
    * @param {MouseEvent} evt
    */
@@ -596,7 +762,29 @@ export class HomeDashboardViewController {
     const action = actionEl.getAttribute('data-action');
     const id = actionEl.getAttribute('data-id');
 
-    if (action === 'set-pilot-period') {
+    if (action === 'select-date') {
+      const dateAttr = actionEl.getAttribute('data-date');
+      if (dateAttr && this.store) {
+        this.store.setState({ activeDate: dateAttr });
+        this.render();
+      }
+    } else if (action === 'open-date-picker-sheet') {
+      this.openDatePickerSheet();
+    } else if (action === 'apply-custom-date') {
+      const input = document.getElementById('custom-date-native-input');
+      if (input && input.value && this.store) {
+        this.store.setState({ activeDate: input.value });
+        closeSheet();
+        this.render();
+      }
+    } else if (action === 'pick-calendar-date') {
+      const dateAttr = actionEl.getAttribute('data-date');
+      if (dateAttr && this.store) {
+        this.store.setState({ activeDate: dateAttr });
+        closeSheet();
+        this.render();
+      }
+    } else if (action === 'set-pilot-period') {
       const period = actionEl.getAttribute('data-period');
       if (period === 'month' || period === 'year') {
         this.pilotPeriod = period;

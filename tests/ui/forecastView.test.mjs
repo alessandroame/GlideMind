@@ -328,6 +328,43 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.ok(soundingChartHtml.includes('id="forecast-sounding-chart-box"'), 'Must render sounding chart box');
   });
 
+  it('should render smart date tabs with calendar trigger and custom date support', () => {
+    const mockStore = createStore({ activeDate: '2026-10-25' }); // 16 days in future
+    const controller = new ForecastViewController({ store: mockStore });
+    controller.activeDate = '2026-10-25';
+
+    const html = controller.renderHtml();
+    assert.ok(html.includes('gm-date-tabs'), 'Must render smart date tabs');
+    assert.ok(html.includes('data-action="open-date-picker-sheet"'), 'Must render calendar button');
+    assert.ok(html.includes('gm-date-tab-calendar'), 'Must style calendar button');
+    assert.ok(html.includes('gm-horizon-notice'), 'Must render synoptic horizon notice for > 7 days');
+
+    // Test picking date from calendar
+    let rendered = false;
+    controller.render = () => { rendered = true; };
+
+    controller.handleClick({
+      target: {
+        closest(sel) {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute(attr) {
+                if (attr === 'data-action') return 'pick-calendar-date';
+                if (attr === 'data-date') return '2026-10-18';
+                return null;
+              }
+            };
+          }
+          return null;
+        }
+      }
+    });
+
+    assert.equal(controller.activeDate, '2026-10-18');
+    assert.equal(mockStore.getState().activeDate, '2026-10-18');
+    assert.equal(rendered, true);
+  });
+
   it('should clean up listeners and subscriptions safely on unmount', () => {
     const mockStore = createStore();
     const controller = new ForecastViewController({ store: mockStore });

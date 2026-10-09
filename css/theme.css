@@ -1681,11 +1681,166 @@ input.gm-input:focus {
 .gm-date-tab-main {
   font-size: 0.85rem;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .gm-date-tab-sub {
   font-size: 0.72rem;
   opacity: 0.85;
+  white-space: nowrap;
+}
+
+.gm-date-tab.custom {
+  border-style: dashed;
+}
+
+/* Calendar Button (48x48px Touch Target) */
+.gm-date-tab-calendar {
+  flex: 0 0 48px;
+  width: 48px;
+  min-height: var(--gm-touch-min);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--gm-bg-surface);
+  color: var(--gm-text-secondary);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-sm);
+  cursor: pointer;
+  transition: background-color var(--gm-transition-fast), border-color var(--gm-transition-fast), color var(--gm-transition-fast);
+}
+
+.gm-date-tab-calendar:hover {
+  background-color: var(--gm-bg-hover);
+  color: var(--gm-text-primary);
+}
+
+.gm-date-tab-calendar.active {
+  background-color: var(--gm-accent);
+  color: var(--gm-text-inverse);
+  border-color: var(--gm-accent-strong);
+}
+
+/* Horizon Warning Notice (> 7 days) */
+.gm-horizon-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background-color: rgba(255, 160, 0, 0.08);
+  border: 1px solid rgba(255, 160, 0, 0.3);
+  border-radius: var(--gm-radius-sm);
+  color: var(--gm-accent);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.gm-horizon-icon {
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+/* Date Picker Sheet Content & Grid */
+.gm-date-picker-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.gm-date-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+@media (max-width: 440px) {
+  .gm-date-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.gm-date-grid-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--gm-touch-min);
+  padding: 8px 4px;
+  background-color: var(--gm-bg-surface);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-sm);
+  color: var(--gm-text-secondary);
+  cursor: pointer;
+  position: relative;
+  transition: background-color var(--gm-transition-fast), border-color var(--gm-transition-fast), color var(--gm-transition-fast);
+}
+
+.gm-date-grid-item:hover {
+  background-color: var(--gm-bg-hover);
+  color: var(--gm-text-primary);
+}
+
+.gm-date-grid-item.active {
+  background-color: var(--gm-accent);
+  border-color: var(--gm-accent-strong);
+  color: var(--gm-text-inverse);
+  font-weight: 700;
+}
+
+.gm-date-grid-item.weekend:not(.active) {
+  border-color: rgba(255, 160, 0, 0.35);
+}
+
+.gm-date-grid-item .grid-day-name {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.gm-date-grid-item .grid-day-number {
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.1;
+  margin: 1px 0;
+}
+
+.gm-date-grid-item .grid-month {
+  font-size: 0.68rem;
+  opacity: 0.8;
+}
+
+.gm-date-grid-item .grid-synoptic-dot {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-size: 0.55rem;
+  color: var(--gm-status-caution);
+}
+
+/* Past date presets for flight entry */
+.gm-past-presets {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.gm-past-preset-btn {
+  min-height: 32px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background-color: var(--gm-bg-surface);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-sm);
+  color: var(--gm-text-secondary);
+  cursor: pointer;
+  transition: background-color var(--gm-transition-fast), color var(--gm-transition-fast);
+}
+
+.gm-past-preset-btn:hover {
+  background-color: var(--gm-bg-hover);
+  color: var(--gm-text-primary);
 }
 
 /* Timeline Direction Arrow */
@@ -1898,19 +2053,30 @@ input.gm-input:focus {
  * 16. Forecast Scrubber Sticky Bottom & Interactive Charts
  * ------------------------------------------------------------- */
 .gm-timeline-scrubber-sticky {
-  position: sticky;
-  bottom: 0;
-  z-index: 30;
-  background-color: rgba(27, 32, 44, 0.94);
+  position: fixed;
+  bottom: calc(var(--gm-nav-height-mobile, 64px) + env(safe-area-inset-bottom, 0px));
+  left: 0;
+  right: 0;
+  z-index: 90;
+  background-color: rgba(27, 32, 44, 0.96);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-top: 1px solid var(--gm-border-strong);
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
   padding: 8px 12px 10px;
-  margin-left: -16px;
-  margin-right: -16px;
-  width: calc(100% + 32px);
+  width: 100%;
   box-sizing: border-box;
+}
+
+@media (min-width: 768px) {
+  .gm-timeline-scrubber-sticky {
+    position: sticky;
+    bottom: 0;
+    width: 100%;
+    max-width: 512px;
+    margin: 0 auto;
+    border-radius: var(--gm-radius-md) var(--gm-radius-md) 0 0;
+  }
 }
 
 .gm-timeline-grid-13 {
@@ -2113,13 +2279,15 @@ input.gm-input:focus {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
+  padding: 6px 8px 6px 14px;
   background-color: var(--gm-bg-card);
   border: 1px solid var(--gm-border);
   border-radius: var(--gm-radius-sm);
   cursor: pointer;
   transition: border-color var(--gm-transition-fast), background-color var(--gm-transition-fast);
-  min-height: 48px;
+  min-height: 52px;
+  gap: 8px;
+  box-sizing: border-box;
 }
 
 .gm-picker-item:hover {
@@ -2132,21 +2300,33 @@ input.gm-input:focus {
   background-color: var(--gm-bg-surface);
 }
 
+.gm-picker-item-main {
+  flex: 1;
+  cursor: pointer;
+  padding: 4px 0;
+  min-width: 0;
+}
+
 .gm-star-btn {
-  min-width: 44px;
-  min-height: 44px;
+  min-width: 48px;
+  min-height: 48px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   background: transparent;
   border: none;
+  border-left: 1px solid var(--gm-border);
+  padding-left: 6px;
   color: var(--gm-text-muted);
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: 0 4px 4px 0;
+  font-size: 1.25rem;
   transition: color var(--gm-transition-fast), transform var(--gm-transition-fast);
+  -webkit-tap-highlight-color: transparent;
 }
 
 .gm-star-btn:hover {
+  color: var(--gm-text-primary);
   transform: scale(1.15);
 }
 

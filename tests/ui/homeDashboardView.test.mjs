@@ -277,5 +277,35 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     assert.equal(methodStr.includes('gm-type-selector'), false, 'Must NOT contain gm-type-selector');
     assert.ok(methodStr.includes('flight-igc-input'), 'Must provide optional IGC track input');
     assert.ok(methodStr.includes('dedotte in automatico'), 'Must explain automatic activity deduction from track');
+    assert.ok(methodStr.includes('gm-past-presets'), 'Must provide fast past date presets (Oggi, Ieri, Weekend)');
+  });
+
+  it('should render smart date bar in Section 2 (Volabilità) and allow switching date', () => {
+    const mockStore = createStore({ activeDate: '2026-10-09' });
+    const controller = new HomeDashboardViewController({ store: mockStore });
+
+    const html = controller.renderHtml();
+    assert.ok(html.includes('gm-date-tabs'), 'Must render smart date tabs in Home');
+    assert.ok(html.includes('data-action="open-date-picker-sheet"'), 'Must render calendar button in Home');
+
+    // Simulate clicking a date preset
+    controller.handleClick({
+      target: {
+        closest(sel) {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute(attr) {
+                if (attr === 'data-action') return 'select-date';
+                if (attr === 'data-date') return '2026-10-10';
+                return null;
+              }
+            };
+          }
+          return null;
+        }
+      }
+    });
+
+    assert.equal(mockStore.getState().activeDate, '2026-10-10');
   });
 });
