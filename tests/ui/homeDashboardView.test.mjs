@@ -308,4 +308,40 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
 
     assert.equal(mockStore.getState().activeDate, '2026-10-10');
   });
+
+  it('should open the 14-day date picker sheet with 4-color flyability indicators and legend in HomeDashboard', async () => {
+    const { initSheetManager } = await import('../../ui/sheetManager.js');
+    let capturedHtml = '';
+    const mockContainer = {
+      innerHTML: '',
+      querySelector(sel) {
+        if (sel === '#sheet-backdrop') return { addEventListener() {} };
+        if (sel === '.gm-sheet') return { addEventListener() {}, setAttribute() {} };
+        if (sel === '.gm-sheet-title') return { textContent: '' };
+        if (sel === '.gm-sheet-content') return {
+          get innerHTML() { return capturedHtml; },
+          set innerHTML(val) { capturedHtml = val; },
+          appendChild() {}
+        };
+        if (sel === '.gm-sheet-close-btn') return { addEventListener() {} };
+        return null;
+      },
+      classList: { add() {}, remove() {}, contains() { return false; } },
+      setAttribute() {}
+    };
+
+    initSheetManager(mockContainer);
+    const mockStore = createStore();
+    const controller = new HomeDashboardViewController({ store: mockStore });
+
+    controller.openDatePickerSheet();
+
+    assert.ok(capturedHtml.includes('Calendario Previsioni (Prossimi 14 Giorni)'));
+    assert.ok(capturedHtml.includes('grid-fly-status'));
+    assert.ok(capturedHtml.includes('gm-date-sheet-legend'));
+    assert.ok(capturedHtml.includes('Volabile'));
+    assert.ok(capturedHtml.includes('Cautela'));
+    assert.ok(capturedHtml.includes('Chiuso'));
+    assert.ok(capturedHtml.includes('Severo'));
+  });
 });
