@@ -183,3 +183,17 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Definito l'isolamento della cache Service Worker per escludere tile esterne e prevenire `QuotaExceededError` (Fase 8).
   - Rettificata la fixture test in [tests/core/flyability.test.mjs](file:///tests/core/flyability.test.mjs) e consolidati [MASTER_PLAN.md](file:///MASTER_PLAN.md), [DESIDERATA.md](file:///DESIDERATA.md) e [MEMORY.md](file:///MEMORY.md) (Lezioni 26-27).
 
+---
+
+## 2026-10-09 - Architettura Pipeline di Harvesting e Validazione Spot (ETL + Subagent)
+- **Tipo**: Architettura / Ingestione Dati / Governance / Tooling
+- **Dettagli**: [.agents/worklog.d/2026-10-09_spot-harvesting-and-validation-architecture.md](file:///.agents/worklog.d/2026-10-09_spot-harvesting-and-validation-architecture.md)
+- **Sintesi**:
+  - Eseguita analisi di fattibilità su XContest: esclusa per assenza di API aperta, protezioni anti-scraping e mancanza di metadati strutturati di sicurezza.
+  - Selezionate le sorgenti primarie aperte e verificabili: OpenStreetMap (Overpass API `sport=free_flying`), Paragliding Earth (REST API) e registri waypoint gare (.cup/.wpt).
+  - Progettata l'architettura ibrida a 2 livelli:
+    1. Pre-filtro geometrico deterministico in Node.js (clustering Haversine $\le 100\text{ m}$, validazione quota DEM Copernicus $|\Delta h| \le 30\text{ m}$, cono planata $E \le 7$).
+    2. Subagent di audit semantico (`SpotDataAuditorAgent`) per deduplicazione toponimi, estrazione pericoli (`hazards`), verifica chiusure atterraggi e assegnazione punteggio di attendibilità.
+  - Definito l'isolamento di staging (`data/staging-locations.json`) per azzerare qualsiasi rischio di interferenza con il runtime di GlideMind.
+  - Aggiornati [MEMORY.md](file:///MEMORY.md) (Lezione 29) e [DESIDERATA.md](file:///DESIDERATA.md).
+
