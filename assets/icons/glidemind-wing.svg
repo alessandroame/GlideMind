@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
   <defs>
     <linearGradient id="gm-wing-grad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#fde047" />
@@ -7,12 +7,12 @@
       <stop offset="100%" stop-color="#d97706" />
     </linearGradient>
     <filter id="gm-wing-glow" x="-25%" y="-25%" width="150%" height="150%">
-      <feGaussianBlur stdDeviation="12" result="blur" />
+      <feGaussianBlur stdDeviation="9" result="blur" />
       <feColorMatrix in="blur" type="matrix" values="
         1 0 0 0 0.96
         0 1 0 0 0.62
         0 0 1 0 0.04
-        0 0 0 0.45 0" result="coloredBlur" />
+        0 0 0 0.42 0" result="coloredBlur" />
       <feMerge>
         <feMergeNode in="coloredBlur" />
         <feMergeNode in="SourceGraphic" />
@@ -20,26 +20,45 @@
     </filter>
   </defs>
 
-  <!-- GlideMind Master Aeronautical Wing Emblem -->
   <g filter="url(#gm-wing-glow)">
+    <!-- 1. Top Wing (Swept Leading Edge & Apex Feather) -->
     <path fill="url(#gm-wing-grad)" d="
-      M 160,345
-      C 148,345 140,337 146,325
-      L 204,218
-      C 220,188 252,162 295,148
-      C 342,132 396,132 432,136
-      C 441,137 445,145 439,152
-      C 424,168 392,185 352,198
-      C 300,215 252,228 222,256
-      C 217,261 221,269 228,269
-      C 264,267 325,252 384,233
-      C 394,230 400,238 394,246
-      C 378,263 346,278 292,292
-      C 246,304 236,310 242,318
-      C 247,324 258,324 272,321
-      C 302,316 338,308 360,301
-      C 369,298 374,306 369,314
-      C 353,332 316,345 220,345
+      M 102,348
+      C 98,348 97,344 100,339
+      L 168,230
+      C 188,198 220,166 268,154
+      C 318,142 380,133 434,130
+      C 440,130 442,135 438,139
+      C 422,156 395,182 388,188
+      C 348,202 294,216 244,233
+      C 205,246 172,274 154,308
+      L 106,346
+      C 104,348 103,348 102,348
+      Z
+    " />
+
+    <!-- 2. Middle Feather -->
+    <path fill="url(#gm-wing-grad)" d="
+      M 184,286
+      C 180,286 178,282 181,278
+      C 192,266 215,254 246,246
+      C 292,234 350,224 394,222
+      C 400,222 402,227 398,232
+      C 384,248 368,266 362,272
+      C 328,283 274,295 228,302
+      C 208,305 194,302 184,286
+      Z
+    " />
+
+    <!-- 3. Bottom Feather -->
+    <path fill="url(#gm-wing-grad)" d="
+      M 134,348
+      L 186,294
+      C 190,290 196,290 202,292
+      C 236,300 286,308 334,312
+      C 340,312 342,317 338,322
+      C 326,334 316,342 308,348
+      L 134,348
       Z
     " />
   </g>

@@ -4,7 +4,7 @@
   "description": "Piattaforma di aerologia, pianificazione comprensori e logbook telemetrico per il volo libero in parapendio e deltaplano.",
   "start_url": "./index.html",
   "display": "standalone",
-  "orientation": "portrait",
+  "orientation": "portrait-primary",
   "background_color": "#0b0d12",
   "theme_color": "#0b0d12",
   "icons": [

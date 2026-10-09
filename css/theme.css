@@ -143,7 +143,7 @@ button, input, select, textarea {
   padding-bottom: calc(var(--gm-nav-height-mobile) + env(safe-area-inset-bottom, 16px) + 16px);
 }
 
-@media (min-width: 768px) {
+@media (min-width: 768px) and (min-height: 550px) {
   #main-view {
     padding: 24px 32px;
     padding-bottom: 32px;
@@ -291,7 +291,7 @@ button, input, select, textarea {
   filter: drop-shadow(0 0 6px var(--gm-accent-glow));
 }
 
-@media (min-width: 768px) {
+@media (min-width: 768px) and (min-height: 550px) {
   #desktop-nav-bar {
     display: flex;
   }
@@ -565,7 +565,7 @@ button, input, select, textarea {
   padding: 20px;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 768px) and (min-height: 550px) {
   #sheet-container {
     align-items: center;
   }
@@ -638,7 +638,7 @@ button, input, select, textarea {
   margin: 12px 0;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 768px) and (min-height: 550px) {
   .gm-stat-grid {
     grid-template-columns: repeat(4, 1fr);
   }
@@ -2159,7 +2159,7 @@ input.gm-input:focus {
   box-sizing: border-box;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 768px) and (min-height: 550px) {
   .gm-timeline-scrubber-sticky {
     position: sticky;
     bottom: 0;
@@ -2423,6 +2423,90 @@ input.gm-input:focus {
 
 .gm-star-btn.pinned {
   color: var(--gm-accent);
+}
+
+/* ==========================================================================
+   Splash Screen Overlay (Doherty Threshold < 400ms)
+   ========================================================================== */
+#gm-splash-screen {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  z-index: 99999;
+  background-color: #0b0d12;
+  background-image: url('../assets/brand/glidemind_splash.jpg');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 300ms cubic-bezier(0.4, 0, 0.2, 1), visibility 300ms;
+  pointer-events: auto;
+}
+
+@media (min-width: 768px) and (min-height: 550px) {
+  #gm-splash-screen {
+    background-size: contain;
+  }
+}
+
+#gm-splash-screen.gm-splash-hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.gm-brand-icon {
+  width: 26px;
+  height: 26px;
+  object-fit: cover;
+  border-radius: 6px;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.3);
+}
+
+/* ==========================================================================
+   Mobile Landscape Guard (Outdoor HMI Ergonomics)
+   ========================================================================== */
+#gm-landscape-guard {
+  display: none;
+}
+
+@media (orientation: landscape) and (max-height: 520px) and (max-width: 1000px) and (pointer: coarse) {
+  #gm-landscape-guard {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100dvh;
+    background-color: rgba(11, 13, 18, 0.97);
+    backdrop-filter: blur(8px);
+    z-index: 99998;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    text-align: center;
+  }
+  .gm-landscape-content {
+    max-width: 440px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  .gm-landscape-content h3 {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--gm-text-primary);
+    letter-spacing: -0.01em;
+  }
+  .gm-landscape-content p {
+    margin: 0;
+    font-size: 0.88rem;
+    color: var(--gm-text-secondary);
+    line-height: 1.45;
+  }
 }
 
 

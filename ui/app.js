@@ -26,6 +26,9 @@ export function bootstrapApp() {
   // Initialize router
   router.init();
 
+  // Dismiss splash screen within Doherty threshold (<400ms)
+  dismissSplashScreen();
+
   // Expose global debug interface for automated tests and dev inspection
   if (typeof window !== 'undefined') {
     window.__GLIDEMIND__ = {
@@ -34,6 +37,23 @@ export function bootstrapApp() {
       version: '2.0.0'
     };
   }
+}
+
+/**
+ * Dismisses the initial zero-FOUC splash screen with a smooth transition
+ * keeping time-to-interactive strictly within the Doherty threshold (<400ms).
+ */
+export function dismissSplashScreen() {
+  if (typeof document === 'undefined') return;
+  const splash = document.getElementById('gm-splash-screen');
+  if (!splash) return;
+
+  splash.classList.add('gm-splash-hidden');
+  setTimeout(() => {
+    if (splash && splash.parentNode) {
+      splash.parentNode.removeChild(splash);
+    }
+  }, 350);
 }
 
 // Auto-bootstrap when document is ready

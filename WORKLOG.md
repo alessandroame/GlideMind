@@ -210,4 +210,36 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Aggiunta suite di test unitari in [tests/core/comprensorio.test.mjs](file:///tests/core/comprensorio.test.mjs) con 265/265 test superati.
   - Registrata Lezione #30 in [MEMORY.md](file:///MEMORY.md).
 
+---
+
+## 2026-10-09 - Fase 2-bis: Brand Identity, Icon Bundle PWA Reale & Splash Screen Zero-FOUC
+- **Tipo**: Brand Identity / PWA Assets / UI Shell / Testing
+- **Dettagli**: [.agents/worklog.d/2026-10-09_pwa-real-icons-and-splash-screen.md](file:///.agents/worklog.d/2026-10-09_pwa-real-icons-and-splash-screen.md)
+- **Sintesi**:
+  - Generato e consolidato il rendering master dell'icona (emblema alare a tre piume aerodinamiche in oro satinato con bagliore ambrato e texture carbon weave scura `#0b0d12`) e lo splash screen 9:16 full-bleed con payoff bonificato `FREE FLIGHT AEROLOGY & LOGBOOK`.
+  - Esportato su disco il bundle completo delle icone reali PWA: [assets/icons/icon-512.png](file:///assets/icons/icon-512.png) (355 KB), [assets/icons/icon-192.png](file:///assets/icons/icon-192.png) (60 KB), [assets/icons/apple-touch-icon.png](file:///assets/icons/apple-touch-icon.png) (54 KB), [assets/icons/icon-maskable-512.png](file:///assets/icons/icon-maskable-512.png) (232 KB, safe-zone 80%), [assets/icons/favicon-32.png](file:///assets/icons/favicon-32.png) (1.8 KB) e lo splash master [assets/brand/glidemind_splash.jpg](file:///assets/brand/glidemind_splash.jpg).
+  - Configurato [manifest.webmanifest](file:///manifest.webmanifest) con modalità `standalone`, tema `#0b0d12` e mapping completo delle icone.
+  - Aggiornato [index.html](file:///index.html) con link a favicon, apple-touch-icon, manifest, overlay splash screen `#gm-splash-screen` e sostituzione del placeholder dell'header con `.gm-brand-icon`.
+  - Integrata in [ui/app.js](file:///ui/app.js) la funzione `dismissSplashScreen()` per transizione fluida e rimozione DOM entro la soglia di Doherty (<400ms).
+  - Aggiunta suite di test [tests/ui/brandAndSplash.test.mjs](file:///tests/ui/brandAndSplash.test.mjs) (269/269 test passanti nel test runner nativo).
+  - Aggiornata la matrice di stato [DESIDERATA.md](file:///DESIDERATA.md) con la Fase 2-bis completata.
+
+
+---
+
+## 2026-10-09 - Fase 2-bis: Brand Asset PWA, Splash Screen & Vincolo Mobile Portrait-Only
+- **Tipo**: UI Architecture / Brand Identity / Outdoor Ergonomics / PWA
+- **Dettagli**: [.agents/worklog.d/2026-10-09_pwa-real-icons-and-splash-screen.md](file:///.agents/worklog.d/2026-10-09_pwa-real-icons-and-splash-screen.md)
+- **Sintesi**:
+  - Esportato il bundle icone PWA reali (512x512, 192x192, apple-touch-icon, maskable 80% safe zone, favicon-32) e master splash screen in [assets/icons/](file:///assets/icons/) e [assets/brand/](file:///assets/brand/).
+  - Integrato lo splash screen zero-FOUC `#gm-splash-screen` con rimozione asincrona entro la soglia di Doherty (<400ms) in [ui/app.js](file:///ui/app.js) e [css/theme.css](file:///css/theme.css).
+  - Collegati manifest e icone in [index.html](file:///index.html) mantenendo la shell al di sotto del limite di 200 righe.
+  - Applicato il vincolo ergonomico **Mobile Portrait-Only**:
+    1. Impostato `"orientation": "portrait-primary"` in [manifest.webmanifest](file:///manifest.webmanifest).
+    2. Modificate tutte le media query desktop in [css/theme.css](file:///css/theme.css) con la condizione combinata `@media (min-width: 768px) and (min-height: 550px)` per impedire che smartphone orizzontali attivino la shell desktop e collassino layout, timeline e fogli modali.
+    3. Aggiunto l'overlay ergonomico `#gm-landscape-guard` in [index.html](file:///index.html) attivo per touch device `(pointer: coarse)` in landscape con altezza $\le 520\text{px}$.
+  - Creata la suite [tests/ui/brandAndSplash.test.mjs](file:///tests/ui/brandAndSplash.test.mjs) con 269/269 test passanti.
+  - Registrata la Lezione #31 in [MEMORY.md](file:///MEMORY.md) e aggiornato [DESIDERATA.md](file:///DESIDERATA.md) con Fase 2-bis completata.
+
+
 

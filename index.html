@@ -6,9 +6,28 @@
   <title>GlideMind - Free Flight Aerology & Logbook</title>
   <meta name="description" content="Piattaforma di aerologia, pianificazione comprensori e logbook telemetrico per il volo libero in parapendio e deltaplano.">
   <meta name="theme-color" content="#0b0d12">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="css/theme.css">
 </head>
 <body>
+  <!-- Inline Zero-FOUC Splash Screen Overlay (Doherty Threshold < 400ms) -->
+  <div id="gm-splash-screen" role="status" aria-label="Caricamento GlideMind"></div>
+
+  <!-- Mobile Landscape Orientation Guard (Outdoor HMI Ergonomics) -->
+  <div id="gm-landscape-guard" role="alert" aria-live="polite">
+    <div class="gm-landscape-content">
+      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="var(--gm-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+        <line x1="12" y1="18" x2="12.01" y2="18"></line>
+      </svg>
+      <h3>Orientamento Verticale Richiesto</h3>
+      <p>GlideMind è ottimizzato per l'ergonomia outdoor a una mano. Ruota lo smartphone in verticale per consultare previsioni e comprensori.</p>
+    </div>
+  </div>
+
   <a href="#main-view" class="gm-skip-link">Salta al contenuto principale</a>
 
   <div id="app-root">
@@ -16,11 +35,7 @@
     <header id="desktop-nav-bar" role="banner">
       <div class="gm-brand-group">
         <div class="gm-brand-logo">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--gm-accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M12 2L2 19h20L12 2z"></path>
-            <path d="M12 9v4"></path>
-            <path d="M12 17h.01"></path>
-          </svg>
+          <img src="assets/icons/icon-192.png" alt="" width="26" height="26" class="gm-brand-icon">
           Glide<span>Mind</span>
         </div>
         <span class="gm-badge gm-badge-flyable" style="font-size: 0.7rem; padding: 2px 8px;">Aero V2</span>
