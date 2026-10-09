@@ -59,7 +59,7 @@ export function buildComprensoriFromClusters(takeoffs, landings) {
     comprensori.push({
       id: slugifyComprensorio(compName),
       location: `${compName}`,
-      description: takeoff.description || `Comprensorio di volo censito con decollo ed atterraggio verificati. [attendibilità ${reliability}%]`,
+      description: takeoff.description || 'Comprensorio di volo censito con decollo ed atterraggio verificati.',
       club: takeoff.operator ? { name: takeoff.operator } : null,
       reliability,
       takeoffs: [
@@ -68,7 +68,7 @@ export function buildComprensoriFromClusters(takeoffs, landings) {
           coordinates: `${takeoff.coordinates.lat.toFixed(6)}, ${takeoff.coordinates.lon.toFixed(6)}`,
           altitude: takeoff.altitude,
           heading: takeoff.heading ?? 180,
-          description: takeoff.description || `Decollo censito [attendibilità ${reliability}%]`,
+          description: takeoff.description || 'Decollo censito su OpenStreetMap.',
           reliability
         }
       ],
@@ -78,7 +78,7 @@ export function buildComprensoriFromClusters(takeoffs, landings) {
           name: l.landingName,
           coordinates: `${l.coordinates.lat.toFixed(6)}, ${l.coordinates.lon.toFixed(6)}`,
           altitude: l.altitude,
-          description: `Atterraggio ufficiale raggiungibile (efficienza richiesta: ${l.requiredGlide}). [attendibilità ${landingRel}%]`,
+          description: `Atterraggio ufficiale raggiungibile (efficienza richiesta: ${l.requiredGlide}).`,
           reliability: landingRel
         };
       })

@@ -197,3 +197,17 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Definito l'isolamento di staging (`data/staging-locations.json`) per azzerare qualsiasi rischio di interferenza con il runtime di GlideMind.
   - Aggiornati [MEMORY.md](file:///MEMORY.md) (Lezione 29) e [DESIDERATA.md](file:///DESIDERATA.md).
 
+---
+
+## 2026-10-09 - Decoupling Metadati di Attendibilità e Bonifica Testuale Catalogo
+- **Tipo**: Data Quality / Refactoring / Architettura / Outdoor HMI
+- **Dettagli**: [.agents/worklog.d/2026-10-09_locations-metadata-decoupling-and-sanitization.md](file:///.agents/worklog.d/2026-10-09_locations-metadata-decoupling-and-sanitization.md)
+- **Sintesi**:
+  - Individuata e risolta la commistione di metadati tecnici `[attendibilità XX%]` all'interno del testo libero utente (`description`, `hazards`, `rules`, `shuttle`, `access`).
+  - Creata la funzione pura `cleanUserText(text)` e aggiornata `normalizeLocationsCatalog` in [core/comprensorio.js](file:///core/comprensorio.js) per garantire zero tag tecnici a livello di presentazione UI.
+  - Aggiornato [scripts/build-locations-catalog.mjs](file:///scripts/build-locations-catalog.mjs) per isolare l'attendibilità esclusivamente nel campo numerico `reliability`.
+  - Implementato [scripts/sanitize-locations-metadata.mjs](file:///scripts/sanitize-locations-metadata.mjs) e bonificati con successo 780 tag in [data/locations.json](file:///data/locations.json) (134 comprensori) e 640 tag in [data/staging-locations.json](file:///data/staging-locations.json) (199 comprensori).
+  - Aggiunta suite di test unitari in [tests/core/comprensorio.test.mjs](file:///tests/core/comprensorio.test.mjs) con 265/265 test superati.
+  - Registrata Lezione #30 in [MEMORY.md](file:///MEMORY.md).
+
+

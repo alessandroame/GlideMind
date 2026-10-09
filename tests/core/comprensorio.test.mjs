@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   parseCoordinates,
   slugifyComprensorio,
+  cleanUserText,
   DEFAULT_COMPRENSORI,
   normalizeLocationsCatalog,
   calculateGlideToLanding,
@@ -395,6 +396,78 @@ describe('GlideMind Comprensorio Locality & Dual Launch/Landing Evaluator', () =
       assert.equal(result.isTakeoffOverridden, false);
       assert.equal(result.status, 'unflyable');
       assert.equal(result.badge, 'Chiuso');
+    });
+  });
+
+  describe('Text Sanitization & Reliability Metadata Decoupling', () => {
+    it('should strip technical attendibilità tags and trim text cleanly', () => {
+      const dirty1 = 'Scenario unico al mondo sotto la celebre Rocca. [attendibilità 94%]';
+      assert.equal(cleanUserText(dirty1), 'Scenario unico al mondo sotto la celebre Rocca.');
+
+      const dirty2 = 'Volo d\'alta montagna; attenzione alle raffiche. [attendibilita 85%]';
+      assert.equal(cleanUserText(dirty2), 'Volo d\'alta montagna; attenzione alle raffiche.');
+
+      const cleanAlready = 'Prato immenso, decollo facile.';
+      assert.equal(cleanUserText(cleanAlready), 'Prato immenso, decollo facile.');
+
+      assert.equal(cleanUserText(null), '');
+      assert.equal(cleanUserText(undefined), '');
+    });
+
+    it('should sanitize raw locations catalog and expose structured reliability numbers', () => {
+      const rawCatalog = {
+        IT: {
+          Abruzzo: [
+            {
+              location: 'Rocca Calascio (Calascio - AQ)',
+              description: 'Panorama spettacolare sul Gran Sasso. [attendibilità 93%]',
+              reliability: 93,
+              club: {
+                name: 'Club Gran Sasso',
+                shuttle: 'Navetta disponibile nei weekend. [attendibilità 90%]'
+              },
+              takeoffs: [
+                {
+                  name: 'Decollo Sud',
+                  altitude: 1450,
+                  heading: 180,
+                  description: 'Decollo con moquette. [attendibilità 95%]',
+                  hazards: 'Raffiche pomeridiane. [attendibilità 88%]',
+                  reliability: 95
+                }
+              ],
+              landings: [
+                {
+                  name: 'Atterraggio Fossa',
+                  altitude: 1100,
+                  description: 'Grande prato. [attendibilità 96%]',
+                  hazards: 'Recinzione a nord. [attendibilità 80%]',
+                  rules: 'Rispettare le greggi. [attendibilità 85%]',
+                  reliability: 96
+                }
+              ]
+            }
+          ]
+        }
+      };
+
+      const normalized = normalizeLocationsCatalog(rawCatalog);
+      assert.equal(normalized.length, 1);
+      const site = normalized[0];
+
+      // Text must be 100% clean of technical tags
+      assert.equal(site.description, 'Panorama spettacolare sul Gran Sasso.');
+      assert.equal(site.club.shuttle, 'Navetta disponibile nei weekend.');
+      assert.equal(site.takeoffs[0].description, 'Decollo con moquette.');
+      assert.equal(site.takeoffs[0].hazards, 'Raffiche pomeridiane.');
+      assert.equal(site.landings[0].description, 'Grande prato.');
+      assert.equal(site.landings[0].hazards, 'Recinzione a nord.');
+      assert.equal(site.landings[0].rules, 'Rispettare le greggi.');
+
+      // Structured reliability scores must be preserved as numbers
+      assert.equal(site.reliability, 93);
+      assert.equal(site.takeoffs[0].reliability, 95);
+      assert.equal(site.landings[0].reliability, 96);
     });
   });
 });

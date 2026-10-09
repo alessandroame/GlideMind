@@ -195,6 +195,19 @@ export const DEFAULT_COMPRENSORI = Object.freeze([
 ]);
 
 /**
+ * Strips technical metadata tags like "[attendibilità 94%]" or "[attendibilita 80%]"
+ * from human-readable descriptions, hazards, and rules strings.
+ * @param {string|null|undefined} text
+ * @returns {string}
+ */
+export function cleanUserText(text) {
+  if (typeof text !== 'string') return '';
+  return text
+    .replace(/\s*\[attendibilit[àa]\s*\d+%\]/gi, '')
+    .trim();
+}
+
+/**
  * Normalizes raw location JSON into structured Comprensorio instances.
  * @param {object} rawJson
  * @returns {Array<object>}
@@ -230,8 +243,9 @@ export function normalizeLocationsCatalog(rawJson) {
           altitude: Number(t.altitude) || 0,
           heading: typeof t.heading === 'number' ? t.heading : null,
           isPrimary: t.isPrimary !== undefined ? Boolean(t.isPrimary) : (idx === 0),
-          description: t.description || '',
-          hazards: t.hazards || ''
+          description: cleanUserText(t.description),
+          hazards: cleanUserText(t.hazards),
+          reliability: typeof t.reliability === 'number' ? t.reliability : (typeof loc.reliability === 'number' ? loc.reliability : 0)
         }));
 
         const landings = (loc.landings || []).map((l, idx) => ({
@@ -241,9 +255,10 @@ export function normalizeLocationsCatalog(rawJson) {
           altitude: Number(l.altitude) || 0,
           isPrimary: l.isPrimary !== undefined ? Boolean(l.isPrimary) : (idx === 0),
           isOfficial: Boolean(l.isOfficial || (l.name && l.name.toLowerCase().includes('ufficiale'))),
-          description: l.description || '',
-          hazards: l.hazards || '',
-          rules: l.rules || ''
+          description: cleanUserText(l.description),
+          hazards: cleanUserText(l.hazards),
+          rules: cleanUserText(l.rules),
+          reliability: typeof l.reliability === 'number' ? l.reliability : (typeof loc.reliability === 'number' ? loc.reliability : 0)
         }));
 
         results.push({
@@ -253,9 +268,13 @@ export function normalizeLocationsCatalog(rawJson) {
           region: regionName,
           country: countryCode,
           location: loc.location,
-          description: loc.description || '',
+          description: cleanUserText(loc.description),
           webcam: loc.webcam || null,
-          club: loc.club || null,
+          club: loc.club ? {
+            ...loc.club,
+            shuttle: cleanUserText(loc.club.shuttle)
+          } : null,
+          reliability: typeof loc.reliability === 'number' ? loc.reliability : (takeoffs[0]?.reliability || 0),
           takeoffs,
           landings
         });
