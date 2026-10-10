@@ -510,3 +510,39 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
   5. **Event Delegation su Container Persistente (`input`)**: I listener per campi di input di ricerca non devono essere agganciati direttamente al singolo elemento `input` (che viene ricreato a ogni re-render asincrono della vista indotto da store o caricamento catalogo), bensì delegati sul contenitore principale persistente (`this.containerEl.addEventListener('input', ...)`), garantendo che l'interazione da parte dell'utente non si disattivi mai.
   6. **Soppressione Controlli Nativi Duplicati nei Campi `type="search"`**: Quando si implementa un pulsante custom di cancellazione (per garantire target touch outdoor $\ge 44\text{px}$ conforme a Fitts), è obbligatorio sopprimere via CSS i bottoni nativi del browser (`.gm-search-input::-webkit-search-cancel-button { -webkit-appearance: none; display: none; }`) per prevenire la comparsa di due icone 'X' affiancate.
 
+---
+
+## 51. Governance UX Dati Meteo Offline & Gestione Dati Non Disponibili (Zero Mock Mascherati)
+- **Problema**: In assenza di connessione o selezionando una data futura non presente in cache, le card degli spot mostravano parametri meteo concreti (es. "15 km/h da SW", "Raffiche Moderate") e verdetti di volo ("CAUTELA", "NON VOLABILE") calcolati su costanti di fallback o su cache di giorni precedenti, mentre il badge di stato rimaneva bloccato in "AGGIORNAMENTO...". Questo induceva nel pilota la convinzione ingannevole e pericolosa che esistesse una reale previsione per quella data.
+- **Causa Radice**: 
+  1. `evaluateComprensorio` nel Core iniettava valori sintetici arbitrari (`windSpeed = 12`, `windDir = 180`) quando `weatherData` era `null`.
+  2. La mappa cache della Home indicizzava i payload unicamente per `spotId` anziché per `spotId_targetDate`.
+  3. Il fallimento o l'assenza di dati nella chiamata batch non commutava lo stato di loading allo stato terminale offline.
+  4. `fetchBatchComprensoriWeather` richiedeva staticamente solo 2 giorni di previsione (`forecast_days = 2`).
+- **Pattern Vincolante**:
+  1. **Divieto di Dati Mascherati (Zero Placebo)**: Se non esistono dati orari reali in cache per la data attiva, la card DEVE mostrare lo stato neutro `Dati N/D` (`.gm-badge-nd`), sostituire il vento con `-- km/h` ed esplicitare `Previsione non disponibile offline`. È vietato calcolare verdetti o visualizzare direzioni/raffiche stimate.
+  2. **Preservazione Geometria Orogrorafica**: L'efficienza geometrica di planata tra decollo e atterraggio primari (`1:X.X`) e le quote devono essere sempre visualizzate poiché sono costanti geografiche certe e non dipendono dalla rete.
+  3. **Tassonomia dei 3 Stati**: Distinguere rigorosamente tra Cache Valida (`Offline / Stima`), Assenza Dati (`Dati N/D`) e Transitorio di Caricamento (Skeleton screen a struttura fissa anti-CLS se privi di cache).
+  4. **Chiusura Deterministica del Loading**: Qualsiasi operazione asincrona di fetch deve ripulire la guardia `isLoading` in blocco `finally` e commutare il badge su `'offline'` in caso di insuccesso.
+
+---
+
+## 52. Ergonomia Date Picker Mobile (Scroll-Snap Orizzontale), Contrasto Sunlight WCAG AA e WAI-ARIA Tablist Compliance
+- **Problema**:
+  1. Su viewport mobile stretti ($\le 390\text{px}$, es. iPhone SE o schermi Android da 360px), i pulsanti preset data (4 preset + calendario + eventuale data custom attiva) superano la larghezza orizzontale utile, causando a capo irregolari o inducendo lo scorrimento orizzontale accidentale dell'intero viewport applicativo, violando il vincolo *Zero Horizontal Scrollbar*.
+  2. Nei contenitori con semantica `role="tablist"`, la presenza di controlli privi di `role="tab"` e `aria-selected` corrompe l'albero di accessibilità WAI-ARIA.
+  3. Nella modalità ad alta luminanza (*Sunlight Mode* / `[data-theme="light"]`), il testo bianco `#ffffff` sui pulsanti e tab attivi color ambra (`--gm-accent: #d97706`) presenta un contrasto di appena 3.2:1, fallendo il requisito WCAG AA ($\ge 4.5:1$) e compromettendo la leggibilità sotto la luce solare diretta.
+  4. Nei controller delle viste, eseguire `store.setState({ activeDate })` e contestualmente invocare manualmente `render()` e chiamate asincrone di rete genera doppi rendering e doppie query di rete, poiché il listener reattivo dello store scatta sincronicamente alla mutazione dello stato.
+- **Causa Radice**:
+  1. Assenza di confinamento orizzontale con snap sul container flex `.gm-date-tabs`.
+  2. Markup bottoni eterogeneo senza semantica ARIA uniforme dentro la tablist.
+  3. Mancata sovrascrittura del colore testo per elementi attivi/selezionati nel tema chiaro.
+  4. Ridondanza tra dispatching reattivo dello store e invocazione procedurale all'interno dei gestori di click.
+- **Pattern Vincolante**:
+  1. **Scroll-Snap Carousel a Riga Singola**: I tab orizzontali su mobile devono adottare sempre `display: flex; flex-wrap: nowrap; overflow-x: auto; scroll-snap-type: x mandatory; touch-action: pan-x; -webkit-overflow-scrolling: touch; scrollbar-width: none;` con figli diretti a `flex-shrink: 0; scroll-snap-align: start; min-height: 48px;`.
+  2. **WAI-ARIA Tablist Uniforme**: Qualsiasi controllo interattivo all'interno di `role="tablist"` deve esporre `role="tab"` ed esplicitare `aria-selected="true|false"`.
+  3. **High-Contrast Dark Text su Sfondo Chiaro Ambra**: In `[data-theme="light"]`, gli elementi con classe `.active` su sfondo `--gm-accent` devono adottare colore scuro `#09090b`, garantendo un rapporto di contrasto $\ge 8.5:1$ conforme a WCAG AA/AAA.
+  4. **Single Source of Truth nei Click Handler**: Quando un click handler commuta lo stato applicativo tramite `store.setState`, la vista deve delegare l'aggiornamento visuale e il recupero dati al listener reattivo dello store, evitando duplicazioni di rendering e traffico di rete ridondante.
+
+
+

@@ -95,7 +95,9 @@ export class HomeDashboardViewController {
     this.boundFileInputHandler = this.handleFileInput.bind(this);
     this.boundSearchInputHandler = this.handleSearchInput.bind(this);
     this.boundInputHandler = this.handleInput.bind(this);
+    this.boundDocumentClickHandler = this.handleDocumentClick.bind(this);
     
+    this.isThemeMenuOpen = false;
     this.searchQuery = '';
     this.gliderSearchQuery = '';
     this.gliderSelectedBrand = '';
@@ -105,6 +107,54 @@ export class HomeDashboardViewController {
     this.networkStatus = 'offline'; // 'live' | 'loading' | 'offline'
     this.cachedWeatherMap = new Map(); // key: spotId -> weatherPayload
     this._customFetchFn = options.fetchFn || null;
+  }
+
+  /**
+   * Toggles the top bar theme dropdown menu.
+   * @param {boolean} [forceOpen]
+   */
+  toggleThemeMenu(forceOpen) {
+    this.isThemeMenuOpen = typeof forceOpen === 'boolean' ? forceOpen : !this.isThemeMenuOpen;
+    if (this.containerEl) {
+      const trigger = this.containerEl.querySelector('#gm-theme-menu-trigger');
+      const dropdown = this.containerEl.querySelector('#gm-theme-menu-dropdown');
+      if (trigger) {
+        trigger.setAttribute('aria-expanded', this.isThemeMenuOpen ? 'true' : 'false');
+      }
+      if (dropdown) {
+        if (this.isThemeMenuOpen) {
+          dropdown.classList.remove('hidden');
+        } else {
+          dropdown.classList.add('hidden');
+        }
+      }
+    }
+  }
+
+  /**
+   * Closes the theme dropdown menu if open.
+   */
+  closeThemeMenu() {
+    if (this.isThemeMenuOpen) {
+      this.toggleThemeMenu(false);
+    }
+  }
+
+  /**
+   * Global document click handler to close theme menu when clicking outside.
+   * @param {MouseEvent} evt
+   */
+  handleDocumentClick(evt) {
+    if (!this.isThemeMenuOpen) return;
+    const target = evt.target;
+    if (!target) return;
+    if (this.containerEl) {
+      const menuContainer = this.containerEl.querySelector('.gm-theme-selector');
+      if (menuContainer && typeof menuContainer.contains === 'function' && menuContainer.contains(target)) {
+        return;
+      }
+    }
+    this.closeThemeMenu();
   }
 
   /**
@@ -175,13 +225,20 @@ export class HomeDashboardViewController {
     const state = this.store ? this.store.getState() : {};
     const targetDate = state.activeDate || formatDateIso(new Date());
 
+    const pinnedIds = state.pinnedSpotIds || [];
+    const favorites = this.comprensoriCatalog.filter(c => isSpotPinned(c, pinnedIds));
+    const targetSpots = favorites.length > 0 ? favorites : this.comprensoriCatalog.slice(0, 30);
+
+    const hasAnyCache = targetSpots.some(s => this.cachedWeatherMap.has(`${s.id}_${targetDate}`));
+    if (!hasAnyCache) {
+      this.isLoading = true;
+      this.render();
+    }
+
     this.networkStatus = 'loading';
     this.updateLiveStatusBadgeInDom();
 
     try {
-      const pinnedIds = state.pinnedSpotIds || [];
-      const favorites = this.comprensoriCatalog.filter(c => isSpotPinned(c, pinnedIds));
-      const targetSpots = favorites.length > 0 ? favorites : this.comprensoriCatalog.slice(0, 30);
       const batchMap = await fetchBatchComprensoriWeather(targetSpots, {
         targetDate,
         weatherModel: 'best_match',
@@ -190,15 +247,20 @@ export class HomeDashboardViewController {
 
       if (batchMap && batchMap.size > 0) {
         for (const [id, payload] of batchMap.entries()) {
+          this.cachedWeatherMap.set(`${id}_${targetDate}`, payload);
           this.cachedWeatherMap.set(id, payload);
         }
-        this.networkStatus = 'live';
-        this.render();
+        const hasStale = Array.from(batchMap.values()).some(v => v.isStaleOfflineFallback);
+        this.networkStatus = hasStale ? 'offline' : 'live';
         return batchMap;
+      } else {
+        this.networkStatus = 'offline';
       }
     } catch (_) {
       this.networkStatus = 'offline';
-      this.updateLiveStatusBadgeInDom();
+    } finally {
+      this.isLoading = false;
+      this.render();
     }
     return null;
   }
@@ -240,9 +302,10 @@ export class HomeDashboardViewController {
   mount(containerEl, params = {}) {
     this.containerEl = containerEl;
 
-    // Subscribe to reactive store changes (weatherData, activeDate, selectedSpot, locationsCatalog)
+    // Subscribe to reactive store changes (weatherData, activeDate, selectedSpot, locationsCatalog, theme)
     if (this.store && typeof this.store.subscribe === 'function') {
       this.storeUnsubscribe = this.store.subscribe((state, prev) => {
+        const themeChanged = Boolean(state.ui && prev?.ui && state.ui.theme !== prev.ui.theme);
         if (
           !prev ||
           state.weatherData !== prev.weatherData ||
@@ -250,12 +313,16 @@ export class HomeDashboardViewController {
           state.locationsCatalog !== prev.locationsCatalog ||
           state.pinnedSpotIds !== prev.pinnedSpotIds ||
           state.activeGlider !== prev.activeGlider ||
-          state.glider !== prev.glider
+          state.glider !== prev.glider ||
+          themeChanged
         ) {
           if (state.locationsCatalog && state.locationsCatalog !== this.comprensoriCatalog) {
             this.setComprensoriCatalog(state.locationsCatalog);
           } else {
             this.render();
+          }
+          if (!themeChanged && (state.activeDate !== prev?.activeDate || state.locationsCatalog !== prev?.locationsCatalog)) {
+            this.fetchBatchWeatherAsync();
           }
         }
       });
@@ -285,12 +352,21 @@ export class HomeDashboardViewController {
     if (this.sheetContainerEl && typeof this.sheetContainerEl.addEventListener === 'function') {
       this.sheetContainerEl.addEventListener('click', this.boundClickHandler);
     }
+
+    if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+      document.addEventListener('click', this.boundDocumentClickHandler);
+    }
   }
 
   /**
    * Unmounts the view controller, cleans up listeners and store subscriptions.
    */
   unmount() {
+    this.closeThemeMenu();
+    if (typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
+      document.removeEventListener('click', this.boundDocumentClickHandler);
+    }
+
     if (typeof this.storeUnsubscribe === 'function') {
       this.storeUnsubscribe();
       this.storeUnsubscribe = null;
@@ -336,20 +412,30 @@ export class HomeDashboardViewController {
       : favoriteComprensori;
 
     const evaluated = [];
+    const targetDate = state.activeDate || null;
 
     for (const comprensorio of sourceComprensori) {
       let spotWeather = null;
-      if (this.cachedWeatherMap.has(comprensorio.id)) {
-        spotWeather = this.cachedWeatherMap.get(comprensorio.id);
-      } else if (weatherData && state.selectedSpot && state.selectedSpot.id === comprensorio.id) {
-        spotWeather = weatherData;
+      const dateKey = targetDate ? `${comprensorio.id}_${targetDate}` : null;
+      if (dateKey && this.cachedWeatherMap.has(dateKey)) {
+        spotWeather = this.cachedWeatherMap.get(dateKey);
+      } else if (this.cachedWeatherMap.has(comprensorio.id)) {
+        const candidate = this.cachedWeatherMap.get(comprensorio.id);
+        if (!targetDate || !candidate.hourly?.time || candidate.hourly.time.some(t => typeof t === 'string' && t.startsWith(`${targetDate}T`))) {
+          spotWeather = candidate;
+        }
+      } else if (weatherData && (!state.selectedSpot || state.selectedSpot.id === comprensorio.id)) {
+        if (!targetDate || !weatherData.hourly?.time || weatherData.hourly.time.some(t => typeof t === 'string' && t.startsWith(`${targetDate}T`)) || weatherData.hourly?.time?.length <= 24) {
+          spotWeather = weatherData;
+        }
       }
 
       const result = evaluateComprensorio({
         comprensorio,
         weatherData: spotWeather,
         glider: activeGlider,
-        targetDate: state.activeDate
+        targetDate,
+        allowSynthetic: false
       });
 
       evaluated.push(result);
@@ -365,10 +451,17 @@ export class HomeDashboardViewController {
   renderHtml() {
     const state = this.store ? this.store.getState() : {};
     const evaluatedList = this.getEvaluatedComprensori();
+    const currentTheme = (state.ui && state.ui.theme) || 'dark';
+    const themeMeta = {
+      light: { label: 'Chiaro', icon: '☀️' },
+      dark: { label: 'Scuro', icon: '🌙' },
+      auto: { label: 'Auto', icon: '⚙️' }
+    };
+    const currentThemeMeta = themeMeta[currentTheme] || themeMeta.dark;
 
     return `
       <div class="gm-home-view max-w-4xl mx-auto flex flex-col gap-2">
-        <!-- Ultra-Clean Header (Glanceable, Version & Build Info) -->
+        <!-- Ultra-Clean Header (Glanceable, Version, Build Info & Expandable Theme Selector) -->
         <header class="gm-home-header">
           <div class="gm-header-brand">
             <img src="assets/icons/icon-192.png" alt="" width="22" height="22" class="gm-brand-icon gm-brand-icon-sm">
@@ -377,7 +470,71 @@ export class HomeDashboardViewController {
               <span class="gm-header-version">${escapeHtml(getFormattedVersion())}</span>
             </h1>
           </div>
-          <span class="gm-header-build">${escapeHtml(getFormattedBuild())}</span>
+          <div class="gm-header-meta">
+            <span class="gm-header-build">${escapeHtml(getFormattedBuild())}</span>
+            <div class="gm-theme-selector" role="region" aria-label="Selettore tema">
+              <button 
+                type="button" 
+                id="gm-theme-menu-trigger"
+                class="gm-theme-menu-trigger" 
+                data-action="toggle-theme-menu" 
+                aria-haspopup="true"
+                aria-expanded="${this.isThemeMenuOpen ? 'true' : 'false'}"
+                aria-controls="gm-theme-menu-dropdown"
+                title="Cambia tema visivo (attivo: ${currentThemeMeta.label})"
+              >
+                <span class="gm-theme-trigger-icon" aria-hidden="true">${currentThemeMeta.icon}</span>
+                <span class="gm-theme-trigger-label">${currentThemeMeta.label}</span>
+                <span class="gm-theme-trigger-chevron" aria-hidden="true">▾</span>
+              </button>
+              <div 
+                id="gm-theme-menu-dropdown" 
+                class="gm-theme-dropdown ${this.isThemeMenuOpen ? '' : 'hidden'}" 
+                role="menu" 
+                aria-label="Opzioni tema visivo"
+              >
+                <button 
+                  type="button" 
+                  role="menuitem"
+                  class="gm-theme-btn gm-theme-menu-item ${currentTheme === 'light' ? 'active' : ''}" 
+                  data-action="set-theme" 
+                  data-theme="light"
+                  aria-pressed="${currentTheme === 'light' ? 'true' : 'false'}"
+                  title="Tema chiaro (alta luminosità)"
+                >
+                  <span class="gm-theme-item-icon" aria-hidden="true">☀️</span>
+                  <span class="gm-theme-item-text">Chiaro</span>
+                  ${currentTheme === 'light' ? '<span class="gm-theme-item-check" aria-hidden="true">✓</span>' : ''}
+                </button>
+                <button 
+                  type="button" 
+                  role="menuitem"
+                  class="gm-theme-btn gm-theme-menu-item ${currentTheme === 'dark' ? 'active' : ''}" 
+                  data-action="set-theme" 
+                  data-theme="dark"
+                  aria-pressed="${currentTheme === 'dark' ? 'true' : 'false'}"
+                  title="Tema scuro (antiriflesso)"
+                >
+                  <span class="gm-theme-item-icon" aria-hidden="true">🌙</span>
+                  <span class="gm-theme-item-text">Scuro</span>
+                  ${currentTheme === 'dark' ? '<span class="gm-theme-item-check" aria-hidden="true">✓</span>' : ''}
+                </button>
+                <button 
+                  type="button" 
+                  role="menuitem"
+                  class="gm-theme-btn gm-theme-menu-item ${currentTheme === 'auto' ? 'active' : ''}" 
+                  data-action="set-theme" 
+                  data-theme="auto"
+                  aria-pressed="${currentTheme === 'auto' ? 'true' : 'false'}"
+                  title="Tema automatico (di sistema)"
+                >
+                  <span class="gm-theme-item-icon" aria-hidden="true">⚙️</span>
+                  <span class="gm-theme-item-text">Auto</span>
+                  ${currentTheme === 'auto' ? '<span class="gm-theme-item-check" aria-hidden="true">✓</span>' : ''}
+                </button>
+              </div>
+            </div>
+          </div>
         </header>
 
         <!-- SEZIONE 1: Stato Attività Pilota (Prima Sezione) -->
@@ -516,7 +673,8 @@ export class HomeDashboardViewController {
           type="button" 
           class="gm-date-tab-calendar ${smartData.isCustomActive ? 'active' : ''}" 
           data-action="open-date-picker-sheet" 
-          role="button" 
+          role="tab" 
+          aria-selected="${smartData.isCustomActive ? 'true' : 'false'}"
           aria-label="Scegli data dal calendario" 
           title="Scegli altra data"
         >
@@ -535,7 +693,7 @@ export class HomeDashboardViewController {
             <line x1="12" y1="16" x2="12" y2="12"></line>
             <line x1="12" y1="8" x2="12.01" y2="8"></line>
           </svg>
-          <span><strong>Tendenza sinottica:</strong> previsione oltre 7 giorni a carattere indicativo.</span>
+          <span><strong>Tendenza a lungo raggio:</strong> oltre 7 giorni le previsioni sono indicative.</span>
         </div>
       ` : ''}
     `;
@@ -620,16 +778,18 @@ export class HomeDashboardViewController {
     const landingName = (landing.name || 'Atterraggio').replace(/^Atterraggio\s*/i, '');
     const takeoffAlt = takeoff.altitude ? `${takeoff.altitude}m` : '-';
     const landingAlt = landing.altitude ? `${landing.altitude}m` : '-';
-    const windSpeedStr = weather.windSpeed != null ? `${weather.windSpeed} km/h` : '-';
-    const windDirStr = weather.windDir != null ? `${getCardinalDirection(weather.windDir)} (${weather.windDir}°)` : '';
+    const isUnavailable = item.status === 'unavailable';
+    const windSpeedStr = (!isUnavailable && weather.windSpeed != null) ? `${weather.windSpeed} km/h` : '-- km/h';
+    const windDirStr = (!isUnavailable && weather.windDir != null) ? `${getCardinalDirection(weather.windDir)} (${weather.windDir}°)` : '';
 
     let badgeClass = 'gm-badge-flyable';
     if (item.status === 'caution') badgeClass = 'gm-badge-caution';
     else if (item.status === 'unflyable') badgeClass = 'gm-badge-unflyable';
+    else if (isUnavailable) badgeClass = 'gm-badge-nd';
 
     return `
       <article 
-        class="gm-spot-card" 
+        class="gm-spot-card ${isUnavailable ? 'gm-spot-card-unavailable' : ''}" 
         data-comprensorio-id="${escapeHtml(item.comprensorioId)}"
         data-action="view-forecast"
         data-id="${escapeHtml(item.comprensorioId)}"
@@ -675,7 +835,7 @@ export class HomeDashboardViewController {
             </div>
             <div class="gm-flight-data">
               <span class="gm-glide-label">Efficienza</span>
-              <span class="gm-glide-val ${glide.isSafe ? 'text-[var(--gm-status-flyable)]' : 'text-[var(--gm-status-caution)]'}">
+              <span class="gm-glide-val ${isUnavailable ? 'text-[var(--gm-text-muted)]' : (glide.isSafe ? 'text-[var(--gm-status-flyable)]' : 'text-[var(--gm-status-caution)]')}">
                 1:${glide.requiredGlideRatio}
               </span>
             </div>
@@ -683,8 +843,8 @@ export class HomeDashboardViewController {
         </div>
 
         <!-- Line 3: Explainability String (Direct physical reason) -->
-        <div class="gm-spot-explain">
-          <span class="gm-explain-bullet">●</span>
+        <div class="gm-spot-explain ${isUnavailable ? 'text-[var(--gm-text-muted)]' : ''}">
+          <span class="gm-explain-bullet">${isUnavailable ? '○' : '●'}</span>
           <span>${escapeHtml(item.reason)}</span>
         </div>
       </article>
@@ -1217,32 +1377,7 @@ export class HomeDashboardViewController {
 
     const renderContent = () => `
       <div class="gm-date-picker-sheet flex flex-col gap-4">
-        <!-- Direct Native Input -->
-        <div class="gm-form-field">
-          <label for="custom-date-native-input" class="gm-form-label font-bold text-xs uppercase tracking-wider text-[var(--gm-text-muted)]">
-            Inserisci data specifica (max +14gg):
-          </label>
-          <div class="flex items-center gap-2">
-            <input 
-              type="date" 
-              id="custom-date-native-input" 
-              class="gm-form-control flex-1 font-mono text-sm" 
-              min="${minDate}" 
-              max="${maxDate}" 
-              value="${activeDate}" 
-              aria-label="Data personalizzata"
-            />
-            <button 
-              type="button" 
-              class="gm-btn gm-btn-primary px-3 py-2 font-bold text-xs" 
-              data-action="apply-custom-date"
-            >
-              Conferma
-            </button>
-          </div>
-        </div>
-
-        <!-- 14-Day Fast Tap Grid (Neutral Calendar for Multi-Spot Dashboard) -->
+        <!-- 14-Day Fast Tap Grid (Hero Primary Action) -->
         <div class="gm-date-sheet-section">
           <span class="text-xs font-bold uppercase tracking-wider text-[var(--gm-text-muted)] block mb-2">
             Calendario Previsioni (Prossimi 14 Giorni)
@@ -1269,6 +1404,31 @@ export class HomeDashboardViewController {
             }).join('')}
           </div>
         </div>
+
+        <!-- Secondary Native Input -->
+        <div class="gm-form-field pt-2 border-t border-[var(--gm-border)]">
+          <label for="custom-date-native-input" class="gm-form-label font-bold text-xs uppercase tracking-wider text-[var(--gm-text-muted)] block mb-1">
+            Oppure specifica altra data:
+          </label>
+          <div class="flex items-center gap-2">
+            <input 
+              type="date" 
+              id="custom-date-native-input" 
+              class="gm-form-control flex-1 font-mono text-sm" 
+              min="${minDate}" 
+              max="${maxDate}" 
+              value="${activeDate}" 
+              aria-label="Data personalizzata"
+            />
+            <button 
+              type="button" 
+              class="gm-btn gm-btn-primary px-3 py-2 font-bold text-xs" 
+              data-action="apply-custom-date"
+            >
+              Conferma
+            </button>
+          </div>
+        </div>
       </div>
     `;
 
@@ -1285,7 +1445,9 @@ export class HomeDashboardViewController {
               if (val && this.store) {
                 this.store.setState({ activeDate: val });
                 closeSheet();
-                this.render();
+                if (!this.storeUnsubscribe) {
+                  this.render();
+                }
               }
             });
           }
@@ -1301,9 +1463,17 @@ export class HomeDashboardViewController {
   handleKeyDown(evt) {
     if (!evt || !evt.key) return;
 
-    if (evt.key === 'Escape' && this.searchQuery) {
-      this.clearSearch();
-      return;
+    if (evt.key === 'Escape') {
+      if (this.isThemeMenuOpen) {
+        this.closeThemeMenu();
+        const trigger = this.containerEl ? this.containerEl.querySelector('#gm-theme-menu-trigger') : null;
+        if (trigger && typeof trigger.focus === 'function') trigger.focus();
+        return;
+      }
+      if (this.searchQuery) {
+        this.clearSearch();
+        return;
+      }
     }
 
     if (evt.key !== 'Enter' && evt.key !== ' ') return;
@@ -1382,12 +1552,33 @@ export class HomeDashboardViewController {
 
     if (action === 'clear-search') {
       this.clearSearch();
+    } else if (action === 'toggle-theme-menu') {
+      this.toggleThemeMenu();
+    } else if (action === 'set-theme') {
+      const selectedTheme = actionEl.getAttribute('data-theme');
+      this.closeThemeMenu();
+      if (selectedTheme === 'light' || selectedTheme === 'dark' || selectedTheme === 'auto') {
+        if (this.store) {
+          const currentUi = (this.store.getState().ui) || {};
+          this.store.setState({
+            ui: {
+              ...currentUi,
+              theme: selectedTheme
+            }
+          });
+        }
+        if (!this.storeUnsubscribe) {
+          this.render();
+        }
+      }
     } else if (action === 'select-date') {
       const dateAttr = actionEl.getAttribute('data-date');
       if (dateAttr && this.store) {
         this.store.setState({ activeDate: dateAttr });
-        this.render();
-        this.fetchBatchWeatherAsync();
+        if (!this.storeUnsubscribe) {
+          this.render();
+          this.fetchBatchWeatherAsync();
+        }
       }
     } else if (action === 'open-date-picker-sheet') {
       this.openDatePickerSheet();
@@ -1396,16 +1587,20 @@ export class HomeDashboardViewController {
       if (input && input.value && this.store) {
         this.store.setState({ activeDate: input.value });
         closeSheet();
-        this.render();
-        this.fetchBatchWeatherAsync();
+        if (!this.storeUnsubscribe) {
+          this.render();
+          this.fetchBatchWeatherAsync();
+        }
       }
     } else if (action === 'pick-calendar-date') {
       const dateAttr = actionEl.getAttribute('data-date');
       if (dateAttr && this.store) {
         this.store.setState({ activeDate: dateAttr });
         closeSheet();
-        this.render();
-        this.fetchBatchWeatherAsync();
+        if (!this.storeUnsubscribe) {
+          this.render();
+          this.fetchBatchWeatherAsync();
+        }
       }
     } else if (action === 'set-pilot-period') {
       const period = actionEl.getAttribute('data-period');

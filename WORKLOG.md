@@ -515,5 +515,35 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Convalidati 331 test su 46 suite (+6 test unitari dedicati in [tests/ui/homeDashboardView.test.mjs](file:///tests/ui/homeDashboardView.test.mjs)) e verifica visiva completata via DevTools browser live.
   - Registrata la Lezione Appresa #50 in [MEMORY.md](file:///MEMORY.md).
 
+---
+
+## 2026-10-10 - Governance UX Dati Meteo Offline & Gestione Dati Non Disponibili (Zero Mock Mascherati)
+- **Tipo**: UX Architecture / Integrità Dati / Anti-Sycophancy
+- **Dettagli**: [.agents/worklog.d/2026-10-10_offline-and-unavailable-weather-ux.md](file:///.agents/worklog.d/2026-10-10_offline-and-unavailable-weather-ux.md)
+- **Sintesi**:
+  - Eliminata la generazione di valori meteo sintetici e verdetti fittizi (`CAUTELA`, `NON VOLABILE`, `15 km/h da SW`) quando la data selezionata non è presente in cache o si è offline, applicando il principio *Zero Placebo UI*.
+  - Introdotto lo stato neutro esplicito `Dati N/D` (`.gm-badge-nd`), vento `-- km/h` e messaggio `Previsione non disponibile offline`, preservando al contempo l'efficienza orografica di planata (`1:X.X`) come dato geometrico certo indipendente dalla rete.
+  - Indicizzata la mappa cache per `spotId_targetDate` in [ui/views/HomeDashboardView.js](file:///ui/views/HomeDashboardView.js), con chiusura deterministica del transitorio di caricamento (skeleton screen) in blocco `finally` e commutazione affidabile a `'live'` o `'offline'`.
+  - Introdotto parametro `allowSynthetic: false` in [core/comprensorio.js](file:///core/comprensorio.js) ed esteso il calcolo dinamico di `forecast_days` in [core/openMeteoApi.js](file:///core/openMeteoApi.js) per supportare batch fino a 14-16 giorni.
+  - Aggiunta suite di test [tests/ui/offlineWeatherUX.test.mjs](file:///tests/ui/offlineWeatherUX.test.mjs) (4 test dedicati, 335 totali superati).
+  - Registrata la Lezione Appresa #51 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-10 - Ergonomia Date Picker, Contrasto WCAG e Selettore Tema Top Bar
+- **Tipo**: Feature & UX/A11y Remediation / Ergonomia Outdoor
+- **Dettagli**: [.agents/worklog.d/2026-10-10_date-picker-ergonomics-and-theme-selector.md](file:///.agents/worklog.d/2026-10-10_date-picker-ergonomics-and-theme-selector.md)
+- **Sintesi**:
+  - Risolto il problema di overflow orizzontale dei preset data su schermi mobile stretti ($\le 390\text{px}$) mediante carosello a snap orizzontale a riga singola (`.gm-date-tabs` con `overflow-x: auto`, `scroll-snap-type: x mandatory`, `touch-action: pan-x`), preservando target touch $\ge 48\text{px}$ e azzerando l'overflow della pagina.
+  - Allineata la conformità WAI-ARIA tablist: assegnato `role="tab"` e `aria-selected` al pulsante calendario `.gm-date-tab-calendar`.
+  - Aggiunto stile `:focus-visible` (`outline: 2px solid var(--gm-accent)`) per gli elementi della griglia data (WCAG 2.4.7).
+  - Garantito contrasto WCAG AA/AAA ($\ge 8.5:1$) in Sunlight Mode (`[data-theme="light"]`) forzando il colore del testo a scuro (`#09090b`) su sfondo ambra per tab, date e pulsanti attivi.
+  - Riorganizzato il bottom sheet data applicando il principio Occam's Razor: griglia 14 giorni posizionata in cima come azione primaria Hero 1-tap, con form nativo relegato a opzione secondaria.
+  - Risolta la desincronizzazione di `activeDate` in [ui/views/ForecastView.js](file:///ui/views/ForecastView.js) ed eliminati doppi render/fetch ridondanti nei click handler di [ui/views/HomeDashboardView.js](file:///ui/views/HomeDashboardView.js) tramite delegazione al listener reattivo dello store.
+  - Implementato selettore tema rapido a 3 stati (*Chiaro* / *Scuro* / *Auto*) nella top bar a destra del numero di build in Home, con supporto alla media query `prefers-color-scheme` in [ui/app.js](file:///ui/app.js) e persistenza nello store (`ui.theme`).
+  - Aggiunti test in [tests/ui/homeDashboardView.test.mjs](file:///tests/ui/homeDashboardView.test.mjs) e [tests/ui/forecastView.test.mjs](file:///tests/ui/forecastView.test.mjs) (338/338 test superati).
+  - Registrata la Lezione Appresa #52 in [MEMORY.md](file:///MEMORY.md).
+
+
 
 

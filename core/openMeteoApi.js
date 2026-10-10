@@ -1393,7 +1393,17 @@ export async function fetchBatchComprensoriWeather(comprensori, options = {}) {
     url.searchParams.append('latitude', lats);
     url.searchParams.append('longitude', lons);
     url.searchParams.append('timezone', 'auto');
-    url.searchParams.append('forecast_days', '2');
+
+    let forecastDays = 2;
+    if (targetDate) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const target = new Date(targetDate);
+        target.setHours(0, 0, 0, 0);
+        const diffDays = Math.round((target.getTime() - today.getTime()) / (24 * 3600 * 1000));
+        forecastDays = Math.max(2, Math.min(16, diffDays >= 0 ? diffDays + 1 : 2));
+    }
+    url.searchParams.append('forecast_days', String(forecastDays));
     url.searchParams.append('hourly', 'temperature_2m,dewpoint_2m,windspeed_10m,winddirection_10m,windgusts_10m,cape,precipitation');
     url.searchParams.append('daily', 'sunrise,sunset');
 

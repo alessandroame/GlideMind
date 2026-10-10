@@ -911,5 +911,113 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     controller.unmount();
     assert.equal(listeners.has('input'), false, 'Container input listener must be cleaned up on unmount');
   });
+
+  it('should render expandable theme selector in header next to build number and switch between chiaro, scuro, auto', () => {
+    const mockStore = createStore({ ui: { theme: 'dark' } });
+    const controller = new HomeDashboardViewController({ store: mockStore });
+
+    const html = controller.renderHtml();
+    assert.ok(html.includes('gm-theme-selector'), 'Header must contain gm-theme-selector');
+    assert.ok(html.includes('gm-theme-menu-trigger'), 'Must have expandable menu trigger button');
+    assert.ok(html.includes('data-action="toggle-theme-menu"'), 'Must declare data-action toggle-theme-menu');
+    assert.ok(html.includes('aria-expanded="false"'), 'Trigger must initially have aria-expanded false');
+    assert.ok(html.includes('data-theme="light"'), 'Theme selector must contain light (Chiaro) option');
+    assert.ok(html.includes('data-theme="dark"'), 'Theme selector must contain dark (Scuro) option');
+    assert.ok(html.includes('data-theme="auto"'), 'Theme selector must contain auto (Auto) option');
+    assert.ok(html.includes('gm-header-build'), 'Must have build number preceding theme selector');
+
+    // Toggle menu open
+    controller.handleClick({
+      target: {
+        closest(sel) {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute(attr) {
+                if (attr === 'data-action') return 'toggle-theme-menu';
+                return null;
+              }
+            };
+          }
+          return null;
+        }
+      }
+    });
+    assert.equal(controller.isThemeMenuOpen, true, 'isThemeMenuOpen must be true after toggle');
+
+    // Simulate clicking "Chiaro" (light theme) - should switch theme and close menu
+    controller.handleClick({
+      target: {
+        closest(sel) {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute(attr) {
+                if (attr === 'data-action') return 'set-theme';
+                if (attr === 'data-theme') return 'light';
+                return null;
+              }
+            };
+          }
+          return null;
+        }
+      }
+    });
+
+    assert.equal(mockStore.getState().ui.theme, 'light', 'Store ui.theme must update to light');
+    assert.equal(controller.isThemeMenuOpen, false, 'Theme menu must be closed after selecting option');
+
+    // Test Escape closes theme menu
+    controller.toggleThemeMenu(true);
+    assert.equal(controller.isThemeMenuOpen, true);
+    controller.handleKeyDown({ key: 'Escape' });
+    assert.equal(controller.isThemeMenuOpen, false, 'Escape key must close theme menu');
+
+    // Test click outside closes theme menu
+    controller.toggleThemeMenu(true);
+    assert.equal(controller.isThemeMenuOpen, true);
+    controller.handleDocumentClick({ target: {} });
+    assert.equal(controller.isThemeMenuOpen, false, 'Clicking outside must close theme menu');
+
+    // Simulate clicking "Auto" (system auto theme)
+    controller.handleClick({
+      target: {
+        closest(sel) {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute(attr) {
+                if (attr === 'data-action') return 'set-theme';
+                if (attr === 'data-theme') return 'auto';
+                return null;
+              }
+            };
+          }
+          return null;
+        }
+      }
+    });
+
+    assert.equal(mockStore.getState().ui.theme, 'auto', 'Store ui.theme must update to auto');
+  });
+
+  it('should enforce date picker ergonomics, touch-action pan-x, and focus-visible in theme.css', async () => {
+    const fs = await import('fs');
+    const css = fs.readFileSync('css/theme.css', 'utf-8');
+
+    // Verify .gm-date-tabs horizontal scroll and touch-action pan-x
+    assert.ok(css.includes('touch-action: pan-x'), 'theme.css must declare touch-action: pan-x for date tabs');
+    assert.ok(css.includes('scroll-snap-type: x mandatory'), 'theme.css must declare scroll-snap-type: x mandatory for date tabs');
+
+    // Verify .gm-date-grid-item:focus-visible
+    assert.ok(css.includes('.gm-date-grid-item:focus-visible'), 'theme.css must declare :focus-visible for calendar grid items');
+
+    // Verify light theme contrast override for active date items
+    assert.ok(css.includes('[data-theme="light"] .gm-date-tab.active'), 'theme.css must declare light theme contrast override for active date tab');
+    assert.ok(css.includes('[data-theme="light"] .gm-date-grid-item.active'), 'theme.css must declare light theme contrast override for active date grid item');
+
+    // Verify theme switcher dropdown styling
+    assert.ok(css.includes('.gm-theme-selector'), 'theme.css must declare .gm-theme-selector styles');
+    assert.ok(css.includes('.gm-theme-menu-trigger'), 'theme.css must declare .gm-theme-menu-trigger styles');
+    assert.ok(css.includes('.gm-theme-dropdown'), 'theme.css must declare .gm-theme-dropdown styles');
+    assert.ok(css.includes('.gm-theme-menu-item'), 'theme.css must declare .gm-theme-menu-item styles');
+  });
 });
 

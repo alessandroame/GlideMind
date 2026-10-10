@@ -652,5 +652,32 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.ok(cssContent.includes('.gm-forecast-sticky-bar.visible'), 'theme.css must declare .gm-forecast-sticky-bar.visible');
     assert.ok(cssContent.includes('.gm-sticky-bar-scrolltop-btn'), 'theme.css must declare .gm-sticky-bar-scrolltop-btn');
   });
+
+  it('should reactively synchronize activeDate and re-fetch weather data when store activeDate updates', () => {
+    const mockStore = createStore({ activeDate: '2026-10-10' });
+    let fetchedDate = null;
+    const controller = new ForecastViewController({ store: mockStore });
+    controller.fetchWeatherDataAsync = async (_spot, dateStr) => {
+      fetchedDate = dateStr;
+      return null;
+    };
+
+    const mockContainer = {
+      innerHTML: '',
+      addEventListener() {},
+      removeEventListener() {}
+    };
+
+    controller.mount(mockContainer);
+    assert.equal(controller.activeDate, '2026-10-10');
+
+    // Simulate external store date update (e.g. from Home or another component)
+    mockStore.setState({ activeDate: '2026-10-15' });
+
+    assert.equal(controller.activeDate, '2026-10-15', 'Controller activeDate must sync from store');
+    assert.equal(fetchedDate, '2026-10-15', 'fetchWeatherDataAsync must be invoked with new date');
+
+    controller.unmount();
+  });
 });
 

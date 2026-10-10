@@ -606,10 +606,17 @@ export class ForecastViewController {
 
     if (this.store) {
       this.unsubscribeStore = this.store.subscribe((nextState) => {
+        let needsWeatherFetch = false;
         if (nextState.locationsCatalog && nextState.locationsCatalog !== this.comprensoriCatalog) {
           this.setComprensoriCatalog(nextState.locationsCatalog);
-        } else {
-          this.render();
+        }
+        if (nextState.activeDate && nextState.activeDate !== this.activeDate) {
+          this.activeDate = nextState.activeDate;
+          needsWeatherFetch = true;
+        }
+        this.render();
+        if (needsWeatherFetch) {
+          this.fetchWeatherDataAsync(this.getCurrentSpot(), this.activeDate);
         }
       });
     }
@@ -1129,7 +1136,8 @@ export class ForecastViewController {
             type="button" 
             class="gm-date-tab-calendar ${smartData.isCustomActive ? 'active' : ''}"
             data-action="open-date-picker-sheet"
-            role="button"
+            role="tab"
+            aria-selected="${smartData.isCustomActive ? 'true' : 'false'}"
             aria-label="Scegli data dal calendario"
             title="Scegli altra data"
           >
@@ -2096,32 +2104,7 @@ export class ForecastViewController {
 
     const renderContent = () => `
       <div class="gm-date-picker-sheet flex flex-col gap-4">
-        <!-- Direct Native Input -->
-        <div class="gm-form-field">
-          <label for="custom-date-native-input" class="gm-form-label font-bold text-xs uppercase tracking-wider text-[var(--gm-text-muted)]">
-            Inserisci data specifica (max +14gg):
-          </label>
-          <div class="flex items-center gap-2">
-            <input 
-              type="date" 
-              id="custom-date-native-input" 
-              class="gm-form-control flex-1 font-mono text-sm" 
-              min="${minDate}" 
-              max="${maxDate}" 
-              value="${this.activeDate}" 
-              aria-label="Data personalizzata"
-            />
-            <button 
-              type="button" 
-              class="gm-btn gm-btn-primary px-3 py-2 font-bold text-xs" 
-              data-action="apply-custom-date"
-            >
-              Conferma
-            </button>
-          </div>
-        </div>
-
-        <!-- 14-Day Fast Tap Grid -->
+        <!-- 14-Day Fast Tap Grid (Hero Primary Action) -->
         <div class="gm-date-sheet-section">
           <span class="text-xs font-bold uppercase tracking-wider text-[var(--gm-text-muted)] block mb-2">
             Calendario Previsioni (Prossimi 14 Giorni)
@@ -2159,6 +2142,31 @@ export class ForecastViewController {
             <span class="flex items-center gap-1"><span class="text-[var(--gm-status-caution)]">▲</span> Cautela</span>
             <span class="flex items-center gap-1"><span class="text-[var(--gm-status-unflyable)]">✕</span> Non Volabile</span>
             <span class="flex items-center gap-1"><span class="text-[#f87171]">⚡</span> Severo</span>
+          </div>
+        </div>
+
+        <!-- Secondary Native Input -->
+        <div class="gm-form-field pt-2 border-t border-[var(--gm-border)]">
+          <label for="custom-date-native-input" class="gm-form-label font-bold text-xs uppercase tracking-wider text-[var(--gm-text-muted)] block mb-1">
+            Oppure specifica altra data:
+          </label>
+          <div class="flex items-center gap-2">
+            <input 
+              type="date" 
+              id="custom-date-native-input" 
+              class="gm-form-control flex-1 font-mono text-sm" 
+              min="${minDate}" 
+              max="${maxDate}" 
+              value="${this.activeDate}" 
+              aria-label="Data personalizzata"
+            />
+            <button 
+              type="button" 
+              class="gm-btn gm-btn-primary px-3 py-2 font-bold text-xs" 
+              data-action="apply-custom-date"
+            >
+              Conferma
+            </button>
           </div>
         </div>
       </div>

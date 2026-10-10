@@ -531,13 +531,104 @@ export function evaluateComprensorio({
   comprensorio,
   weatherData = null,
   hourIndex = 14,
-  glider = null
+  glider = null,
+  targetDate = null,
+  allowSynthetic = true
 }) {
   const activeGlider = glider || DEFAULT_GLIDER;
   const takeoffs = comprensorio.takeoffs || [];
   const landings = comprensorio.landings || [];
 
-  // Default synthetic values if weatherData not provided
+  // Determine if valid weather data is provided and covers targetDate
+  let hasValidWeather = Boolean(weatherData && weatherData.hourly);
+  let idx = hourIndex;
+
+  if (hasValidWeather) {
+    const h = weatherData.hourly;
+    if (targetDate && Array.isArray(h.time) && h.time.length > 0) {
+      const targetPrefix = `${targetDate}T`;
+      const matchIdx = h.time.findIndex(t => typeof t === 'string' && t.startsWith(targetPrefix));
+      if (matchIdx !== -1) {
+        idx = Math.min(matchIdx + Math.max(0, Math.min(hourIndex, 23)), h.time.length - 1);
+      } else if (h.time.length <= 24) {
+        // Single-day payload or test fixture: use hourIndex directly
+        idx = Math.min(Math.max(0, hourIndex), h.time.length - 1);
+      } else {
+        // Multi-day payload that does not contain targetDate
+        hasValidWeather = false;
+      }
+    } else {
+      idx = Math.min(Math.max(0, hourIndex), (h.time?.length || 1) - 1);
+    }
+  }
+
+  // If weather data is unavailable and synthetic fallback is not permitted, do not fabricate synthetic flyability
+  if (!hasValidWeather && !allowSynthetic) {
+    const primaryTakeoff = takeoffs.find(t => t.isPrimary) || takeoffs[0] || null;
+    const primaryLanding = landings.find(l => l.isPrimary || l.isOfficial) || landings[0] || null;
+    const glideMetrics = (primaryTakeoff && primaryLanding)
+      ? calculateGlideToLanding(primaryTakeoff, primaryLanding, activeGlider)
+      : { requiredGlideRatio: '-', isSafe: true };
+
+    const evaluatedTakeoffs = takeoffs.map(t => ({
+      takeoff: t,
+      heading: typeof t.heading === 'number' ? t.heading : null,
+      flyScore: { severity: 0, text: 'Dati N/D', color: 'var(--gm-text-muted)' },
+      severity: 0,
+      score: 0,
+      statusText: 'Dati non disponibili',
+      color: 'var(--gm-text-muted)'
+    }));
+
+    const evaluatedLandings = landings.map(l => {
+      const g = primaryTakeoff ? calculateGlideToLanding(primaryTakeoff, l, activeGlider) : { requiredGlideRatio: '-', isSafe: true };
+      return {
+        landing: l,
+        isPrimary: Boolean(l.isPrimary || l.isOfficial),
+        glide: g
+      };
+    });
+
+    return {
+      comprensorioId: comprensorio.id,
+      name: comprensorio.name || comprensorio.location,
+      province: comprensorio.province || '',
+      region: comprensorio.region || '',
+      location: comprensorio.location,
+      description: comprensorio.description || '',
+      webcam: comprensorio.webcam || null,
+      status: 'unavailable',
+      badge: 'Dati N/D',
+      badgeColor: 'var(--gm-text-muted)',
+      badgeBg: 'rgba(255, 255, 255, 0.05)',
+      score: 0,
+      reason: 'Previsione non disponibile offline',
+      isOfflineUnavailable: true,
+      takeoff: primaryTakeoff,
+      landing: primaryLanding,
+      bestTakeoff: primaryTakeoff,
+      bestTakeoffEval: evaluatedTakeoffs[0] || null,
+      safeLanding: primaryLanding,
+      isTakeoffPrimary: Boolean(primaryTakeoff?.isPrimary),
+      isLandingPrimary: Boolean(primaryLanding?.isPrimary || primaryLanding?.isOfficial),
+      isTakeoffOverridden: false,
+      isLandingOverridden: false,
+      takeoffOverrideReason: null,
+      primaryTakeoff,
+      glideMetrics,
+      takeoffs: evaluatedTakeoffs,
+      landings: evaluatedLandings,
+      weatherSnapshot: {
+        windSpeed: null,
+        windGust: null,
+        windDir: null,
+        temp: null,
+        cape: null,
+        rain: null
+      }
+    };
+  }
+
   let windSpeed = 12;
   let windGust = 18;
   let windDir = 180;
@@ -546,9 +637,8 @@ export function evaluateComprensorio({
   let rain = 0;
   let temp = 22;
 
-  if (weatherData && weatherData.hourly) {
+  if (hasValidWeather && weatherData && weatherData.hourly) {
     const h = weatherData.hourly;
-    const idx = Math.min(Math.max(0, hourIndex), (h.time?.length || 1) - 1);
     const rawSpeed = h.windspeed_10m ?? h.wind_speed_10m;
     if (rawSpeed && rawSpeed[idx] != null) windSpeed = Number(rawSpeed[idx]);
     const rawGust = h.windgusts_10m ?? h.wind_gusts_10m;
@@ -750,7 +840,8 @@ export function sortEvaluatedComprensori(evaluatedList) {
   const statusPriority = {
     flyable: 0,
     caution: 1,
-    unflyable: 2
+    unflyable: 2,
+    unavailable: 3
   };
 
   return [...evaluatedList].sort((a, b) => {

@@ -75,6 +75,7 @@ export function createLocalStorageAdapter(storage = null) {
 
 import { DEFAULT_SEED_FLIGHTS } from './logbook.js';
 import { DEFAULT_GLIDER } from './flyability.js';
+import { formatDateIso } from './datePresets.js';
 
 /**
  * Default initial state for GlideMind application.
@@ -82,7 +83,7 @@ import { DEFAULT_GLIDER } from './flyability.js';
 export const DEFAULT_INITIAL_STATE = Object.freeze({
   activeView: 'home',
   selectedSpot: null,
-  activeDate: new Date().toISOString().split('T')[0],
+  activeDate: formatDateIso(new Date()),
   weatherData: null,
   locationsCatalog: null,
   activeGlider: DEFAULT_GLIDER,
