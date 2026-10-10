@@ -3376,6 +3376,19 @@ export class ForecastViewController {
     // If both spot card container and metrics container are missing from DOM, fallback to full render
     if (!spotCardContainer && !metricsContainer) {
       this.render();
+      if (this.isFlightAnalysisOpen) {
+        const spot = this.getCurrentSpot();
+        const glider = this.getActiveGlider();
+        const weatherData = this.getWeatherData(spot, this.activeDate);
+        const evaluated = evaluateComprensorio({
+          comprensorio: spot,
+          weatherData,
+          hourIndex: this.selectedHour,
+          glider,
+          targetDate: this.activeDate
+        });
+        this.updateFlightAnalysisOverlay(evaluated);
+      }
       return;
     }
 
