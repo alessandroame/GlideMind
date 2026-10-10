@@ -671,6 +671,17 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Rimosso lo svelamento forzato della scheda "Vento in Decollo", consentendo al pilota una visione immediata a colpo d'occhio di tutti i 7 parametri di volo con relative scale semaforiche a 4 stati e valori sintetici.
   - Aggiornati i test di integrazione in [tests/ui/forecastView.test.mjs](file:///tests/ui/forecastView.test.mjs) verificando l'assenza di corpi espansi al primo render e la corretta espansione/collasso su tocco (379/379 test superati).
 
+---
+
+## 2026-10-10 - Piano Architetturale Mini Mappa e Manica a Vento Vettoriale in Previsioni
+- **Tipo**: Architectural Planning / Domain Modeling / Roadmap Prioritization
+- **Dettagli**: [.agents/worklog.d/2026-10-10_forecast-minimap-and-windsock-plan.md](file:///.agents/worklog.d/2026-10-10_forecast-minimap-and-windsock-plan.md)
+- **Sintesi**:
+  - Redatto documento formale di specifiche in [docs/FORECAST_MINIMAP_AND_WINDSOCK_PLAN.md](file:///docs/FORECAST_MINIMAP_AND_WINDSOCK_PLAN.md) per l'integrazione del visore orografico contestuale e della manica a vento animata a 12 segmenti (derivata da ParaMeteo).
+  - Definito il disaccoppiamento del calcolo cinematico/fisico puro in `core/windsock.js` (zero dipendenze DOM, 100% testabile in Node.js) ed estensione cartografica Leaflet in `ui/map/mapEngineAdapter.js`.
+  - Stabilite le guardie ergonomiche mobile (`touch-action: pan-y`, `dragging: false` anti-scroll trap, Fitts target $\ge 44\text{px}$) e la sincronizzazione a 60 FPS con lo scrubber orario (08:00 - 20:00).
+  - Allineata la matrice di stato [DESIDERATA.md](file:///DESIDERATA.md) alla Fase 5-bis, contrassegnata come `🔴 Prioritario (Prossima Sessione)`.
+
 
 
 
