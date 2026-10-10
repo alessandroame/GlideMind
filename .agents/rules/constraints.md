@@ -16,7 +16,9 @@
 ---
 
 ## 2. Coding Standards
-- **Language**: English for all code identifiers, functions, variables, comments, and commit messages.
+- **Strict English in Source Code**:
+  - All source code must be exclusively in English: identifiers (variables, constants, functions, classes, methods, filenames), comments (`//`, `/* */`), JSDoc docstrings, automated tests (`describe`, `it`, `test`), internal console/error logs, and Git commit messages.
+  - **UI Strings Exception**: User-facing copy and localized UI text in the application interface follow product requirements (Italian for GlideMind UI strings). Dictionary keys and surrounding code remain in English.
 - **Single Responsibility Principle (SRP)**:
   - Each module handles one cohesive domain (e.g., `igcParser.js` parses files; `flightTelemetry.js` calculates kinematics).
 - **Zero Workarounds & Anti-Hack Policy**:
