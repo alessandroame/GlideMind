@@ -1514,6 +1514,275 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.ok(src.includes('data-action="center-comprensorio"'), 'Must define center-comprensorio item');
     assert.ok(src.includes('data-action="center-gps"'), 'Must define center-gps item');
   });
+
+  it('should render takeoff and landing selection chips in spot picker sheet when spot has multiple takeoffs or landings', () => {
+    const multiSpot = {
+      id: 'spot-multi-test',
+      name: 'Monte Multiplo',
+      location: 'Monte Multiplo (LC)',
+      province: 'LC',
+      region: 'Lombardia',
+      takeoffs: [
+        { id: 'to-1', name: 'Decollo Alto', altitude: 1200, heading: 180, isPrimary: true },
+        { id: 'to-2', name: 'Decollo Basso', altitude: 900, heading: 170, isPrimary: false }
+      ],
+      landings: [
+        { id: 'ld-1', name: 'Atterraggio Prato', altitude: 250, isPrimary: true, isOfficial: true },
+        { id: 'ld-2', name: 'Atterraggio Lago', altitude: 200, isPrimary: false, isOfficial: false }
+      ]
+    };
+    const singleSpot = {
+      id: 'spot-single-test',
+      name: 'Monte Singolo',
+      location: 'Monte Singolo (AQ)',
+      province: 'AQ',
+      region: 'Abruzzo',
+      takeoffs: [
+        { id: 'to-single', name: 'Decollo Unico', altitude: 1000, heading: 180, isPrimary: true }
+      ],
+      landings: [
+        { id: 'ld-single', name: 'Atterraggio Unico', altitude: 400, isPrimary: true, isOfficial: true }
+      ]
+    };
+
+    const mockStore = createStore({
+      selectedSpot: multiSpot,
+      comprensori: [multiSpot, singleSpot]
+    });
+    const controller = new ForecastViewController({ store: mockStore });
+    controller.comprensoriCatalog = [multiSpot, singleSpot];
+
+    const pickerHtml = controller.renderPickerSections('');
+
+    // Multi-spot assertions
+    assert.ok(pickerHtml.includes('data-spot-id="spot-multi-test"'), 'Must render multi-spot card');
+    assert.ok(pickerHtml.includes('2 decolli · 2 atterraggi'), 'Must render count badge for multi-subspots');
+    assert.ok(pickerHtml.includes('gm-picker-subselection'), 'Must render subselection container');
+    assert.ok(pickerHtml.includes('data-action="pick-spot-takeoff"'), 'Must render takeoff chips');
+    assert.ok(pickerHtml.includes('data-action="pick-spot-landing"'), 'Must render landing chips');
+    assert.ok(pickerHtml.includes('Decollo Alto'), 'Must render takeoff 1 name');
+    assert.ok(pickerHtml.includes('Decollo Basso'), 'Must render takeoff 2 name');
+    assert.ok(pickerHtml.includes('Atterraggio Prato'), 'Must render landing 1 name');
+    assert.ok(pickerHtml.includes('Atterraggio Lago'), 'Must render landing 2 name');
+    assert.ok(pickerHtml.includes('data-action="pick-spot-apply"'), 'Must render visualizza previsioni apply button');
+
+    // Single-spot assertions
+    assert.ok(pickerHtml.includes('data-spot-id="spot-single-test"'), 'Must render single-spot card');
+    const singleCardMatch = pickerHtml.match(/data-spot-id="spot-single-test"[\s\S]*?<\/div>\s*<\/article>/);
+    if (singleCardMatch) {
+      assert.ok(!singleCardMatch[0].includes('gm-picker-subselection'), 'Single spot must not render subselection container');
+      assert.ok(!singleCardMatch[0].includes('gm-picker-badge-count'), 'Single spot must not render count badge');
+    }
+  });
+
+  it('should handle clicking takeoff and landing chips in picker sheet and applying selection', () => {
+    const multiSpot = {
+      id: 'spot-multi-test',
+      name: 'Monte Multiplo',
+      location: 'Monte Multiplo (LC)',
+      province: 'LC',
+      region: 'Lombardia',
+      takeoffs: [
+        { id: 'to-1', name: 'Decollo Alto', altitude: 1200, heading: 180, isPrimary: true },
+        { id: 'to-2', name: 'Decollo Basso', altitude: 900, heading: 170, isPrimary: false }
+      ],
+      landings: [
+        { id: 'ld-1', name: 'Atterraggio Prato', altitude: 250, isPrimary: true, isOfficial: true },
+        { id: 'ld-2', name: 'Atterraggio Lago', altitude: 200, isPrimary: false, isOfficial: false }
+      ]
+    };
+
+    const mockStore = createStore({
+      selectedSpot: multiSpot,
+      comprensori: [multiSpot]
+    });
+    const controller = new ForecastViewController({ store: mockStore });
+    controller.comprensoriCatalog = [multiSpot];
+
+    let rendered = false;
+    controller.render = () => { rendered = true; };
+
+    // Mock picker item card in DOM
+    const cardAttrs = {
+      'data-spot-id': 'spot-multi-test',
+      'data-takeoff-id': 'to-1',
+      'data-landing-id': 'ld-1'
+    };
+    const mockCard = {
+      attributes: cardAttrs,
+      setAttribute(k, v) { this.attributes[k] = v; },
+      getAttribute(k) { return this.attributes[k]; },
+      classList: {
+        contains(c) { return c === 'gm-picker-item'; }
+      },
+      querySelectorAll(sel) {
+        return [];
+      }
+    };
+
+    // 1. Simulate clicking takeoff chip for 'to-2'
+    const takeoffChipEvt = {
+      stopPropagation: () => {},
+      target: {
+        closest(sel) {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute(attr) {
+                if (attr === 'data-action') return 'pick-spot-takeoff';
+                if (attr === 'data-takeoff-id') return 'to-2';
+                return null;
+              },
+              closest(s) {
+                if (s === '.gm-picker-item') return mockCard;
+                return null;
+              }
+            };
+          }
+          return null;
+        }
+      }
+    };
+    controller.handleClick(takeoffChipEvt);
+    assert.equal(mockCard.getAttribute('data-takeoff-id'), 'to-2', 'Card data-takeoff-id must be updated to to-2');
+
+    // 2. Simulate clicking landing chip for 'ld-2'
+    const landingChipEvt = {
+      stopPropagation: () => {},
+      target: {
+        closest(sel) {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute(attr) {
+                if (attr === 'data-action') return 'pick-spot-landing';
+                if (attr === 'data-landing-id') return 'ld-2';
+                return null;
+              },
+              closest(s) {
+                if (s === '.gm-picker-item') return mockCard;
+                return null;
+              }
+            };
+          }
+          return null;
+        }
+      }
+    };
+    controller.handleClick(landingChipEvt);
+    assert.equal(mockCard.getAttribute('data-landing-id'), 'ld-2', 'Card data-landing-id must be updated to ld-2');
+
+    // 3. Simulate clicking "Visualizza Previsioni" apply button
+    const applyEvt = {
+      target: {
+        closest(sel) {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute(attr) {
+                if (attr === 'data-action') return 'pick-spot-apply';
+                if (attr === 'data-spot-id') return 'spot-multi-test';
+                return null;
+              },
+              closest(s) {
+                if (s === '.gm-picker-item') return mockCard;
+                return null;
+              }
+            };
+          }
+          return null;
+        }
+      }
+    };
+    controller.handleClick(applyEvt);
+
+    const updatedState = mockStore.getState();
+    assert.equal(updatedState.selectedSpot.id, 'spot-multi-test');
+    assert.equal(updatedState.activeTakeoffId, 'to-2', 'Store activeTakeoffId must be set to to-2');
+    assert.equal(updatedState.activeLandingId, 'ld-2', 'Store activeLandingId must be set to ld-2');
+    assert.equal(controller.activeTakeoffId, 'to-2');
+    assert.equal(controller.activeLandingId, 'ld-2');
+    assert.equal(rendered, true, 'Applying spot selection must trigger render');
+  });
+
+  it('should render header pill selectors when current spot has multiple subspots and allow switching', () => {
+    const multiSpot = {
+      id: 'spot-multi-test',
+      name: 'Monte Multiplo',
+      location: 'Monte Multiplo (LC)',
+      province: 'LC',
+      region: 'Lombardia',
+      takeoffs: [
+        { id: 'to-1', name: 'Decollo Alto', altitude: 1200, heading: 180, isPrimary: true },
+        { id: 'to-2', name: 'Decollo Basso', altitude: 900, heading: 170, isPrimary: false }
+      ],
+      landings: [
+        { id: 'ld-1', name: 'Atterraggio Prato', altitude: 250, isPrimary: true, isOfficial: true },
+        { id: 'ld-2', name: 'Atterraggio Lago', altitude: 200, isPrimary: false, isOfficial: false }
+      ]
+    };
+
+    const mockStore = createStore({
+      selectedSpot: multiSpot,
+      activeTakeoffId: 'to-1',
+      activeLandingId: 'ld-1'
+    });
+    const controller = new ForecastViewController({ store: mockStore });
+
+    const html = controller.renderHtml();
+    assert.ok(html.includes('gm-spot-subselection-container'), 'Header must contain subselection container');
+    assert.ok(html.includes('data-action="set-active-takeoff"'), 'Header must contain takeoff selector pills');
+    assert.ok(html.includes('data-action="set-active-landing"'), 'Header must contain landing selector pills');
+    assert.ok(html.includes('data-takeoff-id="to-1"'), 'Must render pill for to-1');
+    assert.ok(html.includes('data-takeoff-id="to-2"'), 'Must render pill for to-2');
+    assert.ok(html.includes('data-landing-id="ld-1"'), 'Must render pill for ld-1');
+    assert.ok(html.includes('data-landing-id="ld-2"'), 'Must render pill for ld-2');
+
+    let rendered = false;
+    controller.render = () => { rendered = true; };
+
+    // Simulate clicking takeoff pill 'to-2'
+    const toClickEvt = {
+      target: {
+        closest(sel) {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute(attr) {
+                if (attr === 'data-action') return 'set-active-takeoff';
+                if (attr === 'data-takeoff-id') return 'to-2';
+                return null;
+              }
+            };
+          }
+          return null;
+        }
+      }
+    };
+    controller.handleClick(toClickEvt);
+    assert.equal(controller.activeTakeoffId, 'to-2');
+    assert.equal(mockStore.getState().activeTakeoffId, 'to-2');
+    assert.equal(rendered, true);
+
+    // Simulate clicking landing pill 'ld-2'
+    rendered = false;
+    const ldClickEvt = {
+      target: {
+        closest(sel) {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute(attr) {
+                if (attr === 'data-action') return 'set-active-landing';
+                if (attr === 'data-landing-id') return 'ld-2';
+                return null;
+              }
+            };
+          }
+          return null;
+        }
+      }
+    };
+    controller.handleClick(ldClickEvt);
+    assert.equal(controller.activeLandingId, 'ld-2');
+    assert.equal(mockStore.getState().activeLandingId, 'ld-2');
+    assert.equal(rendered, true);
+  });
 });
 
 

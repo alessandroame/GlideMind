@@ -6058,4 +6058,151 @@ input.gm-input:focus {
   background-color: currentColor;
 }
 
+/* ==========================================================================
+   Comprensorio Multi-Takeoff & Multi-Landing Selectors (Forecast & Picker)
+   ========================================================================== */
+
+.gm-picker-badge-count {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--gm-text-muted);
+  background: var(--gm-bg-base);
+  border: 1px solid var(--gm-border);
+  padding: 2px 8px;
+  border-radius: var(--gm-radius-full, 9999px);
+  white-space: nowrap;
+}
+
+.gm-picker-subselection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.gm-picker-subgroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gm-picker-subgroup-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--gm-text-muted);
+}
+
+.gm-picker-chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.gm-picker-chip {
+  min-height: var(--gm-touch-min, 48px);
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border-radius: var(--gm-radius-md, 8px);
+  background-color: var(--gm-bg-surface);
+  border: 1px solid var(--gm-border);
+  color: var(--gm-text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all var(--gm-transition-fast);
+}
+
+.gm-picker-chip:hover {
+  background-color: var(--gm-bg-hover);
+  border-color: var(--gm-border-strong);
+  color: var(--gm-text-primary);
+}
+
+.gm-picker-chip.active {
+  background-color: var(--gm-accent-glow, rgba(56, 189, 248, 0.15));
+  border-color: var(--gm-accent, #38bdf8);
+  color: var(--gm-accent, #38bdf8);
+  font-weight: 700;
+}
+
+.gm-picker-apply-btn {
+  min-height: var(--gm-touch-min, 48px);
+  padding: 8px 16px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  border-radius: var(--gm-radius-md, 8px);
+  background-color: var(--gm-accent, #38bdf8);
+  color: var(--gm-text-on-accent, #0b0d12);
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: transform var(--gm-transition-fast), filter var(--gm-transition-fast);
+}
+
+.gm-picker-apply-btn:hover {
+  filter: brightness(1.1);
+}
+
+/* Header Launch and Landing Selectors */
+.gm-spot-subselection-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.gm-spot-subselector-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gm-spot-subselector-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  touch-action: pan-x;
+  scrollbar-width: thin;
+}
+
+.gm-spot-pill {
+  min-height: var(--gm-touch-min, 48px);
+  padding: 6px 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border-radius: var(--gm-radius-full, 9999px);
+  background-color: var(--gm-bg-card);
+  border: 1px solid var(--gm-border);
+  color: var(--gm-text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all var(--gm-transition-fast);
+}
+
+.gm-spot-pill:hover {
+  background-color: var(--gm-bg-hover);
+  border-color: var(--gm-border-strong);
+  color: var(--gm-text-primary);
+}
+
+.gm-spot-pill.active {
+  background-color: var(--gm-accent-glow, rgba(56, 189, 248, 0.15));
+  border-color: var(--gm-accent, #38bdf8);
+  color: var(--gm-accent, #38bdf8);
+  font-weight: 700;
+  box-shadow: 0 0 0 1px var(--gm-accent, #38bdf8);
+}
+
+
 

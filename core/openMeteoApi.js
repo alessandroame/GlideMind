@@ -761,7 +761,7 @@ export function generateSyntheticWeather(coords, options = {}) {
         timezone: 'Europe/Rome',
         timezone_abbreviation: 'CEST',
         weather_model: options.weatherModel || 'best_match',
-        takeoff_azimuth: options.takeoffAzimuth != null ? Number(options.takeoffAzimuth) : 180,
+        takeoff_azimuth: (options.takeoffAzimuth != null && !isNaN(Number(options.takeoffAzimuth))) ? Number(options.takeoffAzimuth) : null,
         slope_deg: options.slopeDeg != null ? Number(options.slopeDeg) : 18,
         slope_pct: Math.round(Math.tan((options.slopeDeg || 18) * Math.PI / 180) * 100),
         daily: {
@@ -1162,8 +1162,8 @@ export async function fetchWeekOverview(coords, options = {}) {
         cache.set(cacheKey, payload);
     }
 
-    const azimuth = options.takeoffAzimuth != null ? Number(options.takeoffAzimuth) : 180;
-    const summaries = calculateDailyFlyabilitySummary(payload, null, null);
+    const azimuth = (options.takeoffAzimuth != null && !isNaN(Number(options.takeoffAzimuth))) ? Number(options.takeoffAzimuth) : null;
+    const summaries = calculateDailyFlyabilitySummary(payload, azimuth != null ? { heading: azimuth } : null, null);
     const weekOverview = calculateWeekOverview(payload, true, azimuth, null);
 
     return {
@@ -1424,7 +1424,9 @@ export async function fetchBatchComprensoriWeather(comprensori, options = {}) {
                 rawPayload.weather_model = activeModel;
                 rawPayload.targetDate = targetDate;
                 rawPayload.fetchTimestamp = Date.now();
-                rawPayload.takeoff_azimuth = item.takeoff.heading || 180;
+                rawPayload.takeoff_azimuth = (item.takeoff?.heading != null && !isNaN(Number(item.takeoff.heading)))
+                    ? Number(item.takeoff.heading)
+                    : null;
                 rawPayload._isSynthetic = false;
 
                 const cacheKey = generateWeatherCacheKey(item.coords.lat, item.coords.lon, targetDate, activeModel);

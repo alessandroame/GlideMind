@@ -610,7 +610,7 @@ export function formatShortWindLabel(windEval) {
  * @returns {string}
  */
 export function formatShortDirLabel(dirEval) {
-  if (!dirEval) return 'In asse';
+  if (!dirEval || dirEval.hasExposure === false) return 'Esposiz. N/D';
   const text = dirEval.text || '';
   if (dirEval.severity === 3) return 'Sottovento';
   if (dirEval.severity === 2) {
@@ -639,7 +639,9 @@ export function evaluateComprensorio({
   hourIndex = 14,
   glider = null,
   targetDate = null,
-  allowSynthetic = true
+  allowSynthetic = true,
+  takeoffId = null,
+  landingId = null
 }) {
   const activeGlider = glider || DEFAULT_GLIDER;
   const takeoffs = comprensorio.takeoffs || [];
@@ -676,8 +678,10 @@ export function evaluateComprensorio({
 
   // If weather data is unavailable and synthetic fallback is not permitted, do not fabricate synthetic flyability
   if (!hasValidWeather && !allowSynthetic) {
-    const primaryTakeoff = takeoffs.find(t => t.isPrimary) || takeoffs[0] || null;
-    const primaryLanding = landings.find(l => l.isPrimary || l.isOfficial) || landings[0] || null;
+    const explicitTakeoff = takeoffId ? takeoffs.find(t => t.id === takeoffId) : null;
+    const primaryTakeoff = explicitTakeoff || takeoffs.find(t => t.isPrimary) || takeoffs[0] || null;
+    const explicitLanding = landingId ? landings.find(l => l.id === landingId) : null;
+    const primaryLanding = explicitLanding || landings.find(l => l.isPrimary || l.isOfficial) || landings[0] || null;
     const glideMetrics = (primaryTakeoff && primaryLanding)
       ? calculateGlideToLanding(primaryTakeoff, primaryLanding, activeGlider)
       : { requiredGlideRatio: '-', isSafe: true };
@@ -827,34 +831,47 @@ export function evaluateComprensorio({
     };
   });
 
-  // 2. Select Single Takeoff via "Ibrido con Override Meteo"
+  // 2. Select Single Takeoff via "Ibrido con Override Meteo" or Explicit Selection
   // Default to primary takeoff (isPrimary: true, or first)
   const primaryTakeoffEval = evaluatedTakeoffs.find(e => e.takeoff.isPrimary) || evaluatedTakeoffs[0] || null;
   
-  let selectedTakeoffEval = primaryTakeoffEval;
+  let selectedTakeoffEval = null;
   let isTakeoffOverridden = false;
   let takeoffOverrideReason = null;
 
-  if (primaryTakeoffEval && primaryTakeoffEval.severity > 0) {
-    // If primary is not optimal, look for an alternative with strictly lower severity or better flyability
-    const alternatives = [...evaluatedTakeoffs]
-      .filter(e => e !== primaryTakeoffEval)
-      .sort((a, b) => {
-        if (a.severity !== b.severity) return a.severity - b.severity;
-        return b.score - a.score;
-      });
+  if (takeoffId) {
+    selectedTakeoffEval = evaluatedTakeoffs.find(e => e.takeoff.id === takeoffId) || null;
+    if (selectedTakeoffEval) {
+      isTakeoffOverridden = selectedTakeoffEval !== primaryTakeoffEval;
+      if (isTakeoffOverridden) {
+        takeoffOverrideReason = `Decollo manuale: ${selectedTakeoffEval.takeoff.name}`;
+      }
+    }
+  }
 
-    const bestAlt = alternatives[0];
-    if (bestAlt && bestAlt.severity < primaryTakeoffEval.severity) {
-      selectedTakeoffEval = bestAlt;
-      isTakeoffOverridden = true;
-      takeoffOverrideReason = `Decollo alternativo ${bestAlt.takeoff.name}: ${primaryTakeoffEval.takeoff.name} non favorevole (${primaryTakeoffEval.statusText})`;
+  if (!selectedTakeoffEval) {
+    selectedTakeoffEval = primaryTakeoffEval;
+    if (primaryTakeoffEval && primaryTakeoffEval.severity > 0) {
+      // If primary is not optimal, look for an alternative with strictly lower severity or better flyability
+      const alternatives = [...evaluatedTakeoffs]
+        .filter(e => e !== primaryTakeoffEval)
+        .sort((a, b) => {
+          if (a.severity !== b.severity) return a.severity - b.severity;
+          return b.score - a.score;
+        });
+
+      const bestAlt = alternatives[0];
+      if (bestAlt && bestAlt.severity < primaryTakeoffEval.severity) {
+        selectedTakeoffEval = bestAlt;
+        isTakeoffOverridden = true;
+        takeoffOverrideReason = `Decollo alternativo ${bestAlt.takeoff.name}: ${primaryTakeoffEval.takeoff.name} non favorevole (${primaryTakeoffEval.statusText})`;
+      }
     }
   }
 
   const selectedTakeoff = selectedTakeoffEval ? selectedTakeoffEval.takeoff : null;
 
-  // 3. Evaluate Landings from the selected takeoff (Default to primary/official landing)
+  // 3. Evaluate Landings from the selected takeoff (Default to primary/official landing or Explicit Selection)
   let safeLanding = null;
   let glideMetrics = null;
   let isLandingOverridden = false;
@@ -871,22 +888,33 @@ export function evaluateComprensorio({
 
     const primaryLandingEval = evaluatedLandings.find(e => e.isPrimary) || evaluatedLandings[0];
 
-    if (primaryLandingEval && primaryLandingEval.glide.isSafe) {
-      safeLanding = primaryLandingEval.landing;
-      glideMetrics = primaryLandingEval.glide;
-    } else {
-      // Look for a safe alternative with lowest required glide ratio
-      const safeAlternatives = evaluatedLandings
-        .filter(e => e.glide.isSafe)
-        .sort((a, b) => a.glide.requiredGlideRatio - b.glide.requiredGlideRatio);
-
-      if (safeAlternatives.length > 0) {
-        safeLanding = safeAlternatives[0].landing;
-        glideMetrics = safeAlternatives[0].glide;
+    if (landingId) {
+      const explicitLandingEval = evaluatedLandings.find(e => e.landing.id === landingId);
+      if (explicitLandingEval) {
+        safeLanding = explicitLandingEval.landing;
+        glideMetrics = explicitLandingEval.glide;
         isLandingOverridden = safeLanding !== primaryLandingEval?.landing;
+      }
+    }
+
+    if (!safeLanding) {
+      if (primaryLandingEval && primaryLandingEval.glide.isSafe) {
+        safeLanding = primaryLandingEval.landing;
+        glideMetrics = primaryLandingEval.glide;
       } else {
-        safeLanding = primaryLandingEval ? primaryLandingEval.landing : evaluatedLandings[0].landing;
-        glideMetrics = primaryLandingEval ? primaryLandingEval.glide : evaluatedLandings[0].glide;
+        // Look for a safe alternative with lowest required glide ratio
+        const safeAlternatives = evaluatedLandings
+          .filter(e => e.glide.isSafe)
+          .sort((a, b) => a.glide.requiredGlideRatio - b.glide.requiredGlideRatio);
+
+        if (safeAlternatives.length > 0) {
+          safeLanding = safeAlternatives[0].landing;
+          glideMetrics = safeAlternatives[0].glide;
+          isLandingOverridden = safeLanding !== primaryLandingEval?.landing;
+        } else {
+          safeLanding = primaryLandingEval ? primaryLandingEval.landing : evaluatedLandings[0].landing;
+          glideMetrics = primaryLandingEval ? primaryLandingEval.glide : evaluatedLandings[0].glide;
+        }
       }
     }
   }
@@ -935,9 +963,18 @@ export function evaluateComprensorio({
     badgeColor = 'var(--gm-status-flyable)';
     badgeBg = 'var(--gm-status-flyable-bg)';
     if (isTakeoffOverridden) {
-      reason = `Alt. ${selectedTakeoff.name}: vento in asse (${primaryTakeoffEval.takeoff.name} non volabile)`;
+      reason = `Alt. ${selectedTakeoff.name}: vento favorevole (${primaryTakeoffEval.takeoff.name} non volabile)`;
+    } else if (selectedTakeoff?.heading != null) {
+      const dirDetails = selectedTakeoffEval?.flyScore?.details?.direction;
+      if (dirDetails && dirDetails.diffFromFront != null && dirDetails.diffFromFront <= 35) {
+        reason = `Vento ${Math.round(windSpeed)} km/h da ${windDir}° in asse col decollo`;
+      } else if (windSpeed <= 4) {
+        reason = `Brezza debole / vento calmo (${Math.round(windSpeed)} km/h da ${getCardinalDirection(windDir)})`;
+      } else {
+        reason = `Vento ${Math.round(windSpeed)} km/h da ${windDir}° (${getCardinalDirection(windDir)}) favorevole`;
+      }
     } else {
-      reason = `Vento ${Math.round(windSpeed)} km/h da ${windDir}° in asse col decollo`;
+      reason = `Vento ${Math.round(windSpeed)} km/h da ${windDir}° (${getCardinalDirection(windDir)}) • Esposizione N/D`;
     }
   }
 
@@ -993,14 +1030,23 @@ export function evaluateComprensorio({
         desc: selectedTakeoffEval?.flyScore?.details?.wind?.desc || ''
       },
       direction: {
-        severity: selectedTakeoffEval?.flyScore?.details?.direction ? selectedTakeoffEval.flyScore.details.direction.severity : 0,
-        label: formatShortDirLabel(selectedTakeoffEval?.flyScore?.details?.direction),
-        fullText: selectedTakeoffEval?.flyScore?.details?.direction?.text || 'In asse',
+        severity: (selectedTakeoff?.heading != null && selectedTakeoffEval?.flyScore?.details?.direction)
+          ? selectedTakeoffEval.flyScore.details.direction.severity
+          : 0,
+        label: formatShortDirLabel(selectedTakeoff?.heading != null ? selectedTakeoffEval?.flyScore?.details?.direction : null),
+        fullText: (selectedTakeoff?.heading != null && selectedTakeoffEval?.flyScore?.details?.direction?.hasExposure !== false)
+          ? (selectedTakeoffEval.flyScore.details.direction.text || 'In asse')
+          : 'Esposizione N/D',
         degrees: Math.round(windDir),
         cardinal: getCardinalDirection(windDir),
         heading: selectedTakeoff?.heading ?? null,
-        diffDegrees: selectedTakeoffEval?.flyScore?.details?.direction?.diffFromFront ?? null,
-        desc: selectedTakeoffEval?.flyScore?.details?.direction?.desc || ''
+        hasExposure: selectedTakeoff?.heading != null,
+        diffDegrees: (selectedTakeoff?.heading != null && selectedTakeoffEval?.flyScore?.details?.direction)
+          ? selectedTakeoffEval.flyScore.details.direction.diffFromFront
+          : null,
+        desc: (selectedTakeoff?.heading != null && selectedTakeoffEval?.flyScore?.details?.direction)
+          ? (selectedTakeoffEval.flyScore.details.direction.desc || '')
+          : 'Esposizione del pendio non nota nel catalogo. Valutare l\'allineamento del vento direttamente sul posto.'
       },
       glide: {
         severity: typeof glideMetrics?.severity === 'number' ? glideMetrics.severity : (glideMetrics?.isSafe ? 0 : 2),

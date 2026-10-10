@@ -69,6 +69,7 @@ const DEFAULT_STRINGS = {
     'fly.warn_tailwind': 'Vento da Dietro',
     'fly.warn_lee': 'Sottovento Sostenuto',
     'fly.no_fly_lee': 'NO FLY: Sottovento Sostenuto',
+    'fly.exposure_unknown': 'Esposizione N/D',
     'fly.fly_perfect': 'Condizioni Ottimali',
     'meteo.wind': 'Vento',
     'meteo.turbulence': 'Turbolenza',
@@ -503,11 +504,12 @@ export function isTakeoffSite(targetLocation, weatherMeta) {
  * @returns {object|null}
  */
 export function evaluateDirectionFlyability(wind, windDir = 0, takeoffAzimuth = null, isTakeoff = true, translator = null) {
-    if (!isTakeoff || takeoffAzimuth == null) {
+    if (!isTakeoff || takeoffAzimuth == null || isNaN(Number(takeoffAzimuth))) {
         return null;
     }
 
-    let diffFromFront = Math.abs(windDir - takeoffAzimuth);
+    const az = Number(takeoffAzimuth);
+    let diffFromFront = Math.abs(windDir - az);
     if (diffFromFront > 180) diffFromFront = 360 - diffFromFront;
 
     let text = resolveTranslation('fly.exposure_ok', null, translator);
@@ -515,7 +517,7 @@ export function evaluateDirectionFlyability(wind, windDir = 0, takeoffAzimuth = 
     let bg = "bg-emerald-500";
     let severity = 0;
     let isLeeSide = false;
-    let desc = `Vento perfettamente orientato in asse al decollo (scostamento ${diffFromFront}° rispetto all'azimut ${takeoffAzimuth}°). Flusso laminare frontale ideale per il decollo.`;
+    let desc = `Vento perfettamente orientato in asse al decollo (scostamento ${diffFromFront}° rispetto all'azimut ${az}°). Flusso laminare frontale ideale per il decollo.`;
 
     if (wind < 4) {
         if (diffFromFront > 90) {
@@ -540,14 +542,22 @@ export function evaluateDirectionFlyability(wind, windDir = 0, takeoffAzimuth = 
             color = "text-emerald-500";
             bg = "bg-emerald-500";
             severity = 0;
-            desc = `Vento orientato nel cono frontale di decollo (scostamento ${diffFromFront}° rispetto all'azimut ${takeoffAzimuth}°). Flusso favorevole per la corsa e il decollo.`;
+            desc = `Vento orientato nel cono frontale di decollo (scostamento ${diffFromFront}° rispetto all'azimut ${az}°). Flusso favorevole per la corsa e il decollo.`;
         } else if (diffFromFront <= 90) {
             isLeeSide = false;
-            text = resolveTranslation('fly.warn_crosswind', null, translator);
-            color = "text-amber-400";
-            bg = "bg-amber-400";
-            severity = 1;
-            desc = `Vento traverso/fuori asse (scostamento ${diffFromFront}° rispetto all'azimut del pendio ${takeoffAzimuth}°). Nelle previsioni sinottiche a griglia 10km, le brezze termiche locali in decollo tendono frequentemente a riallineare il vento.`;
+            if (wind > 14) {
+                text = resolveTranslation('fly.warn_crosswind', null, translator);
+                color = "text-red-500";
+                bg = "bg-red-500";
+                severity = 2;
+                desc = `Vento traverso forte (${wind} km/h, scostamento ${diffFromFront}° rispetto all'azimut del pendio ${az}°). Forte componente laterale che supera i limiti di decollo in sicurezza.`;
+            } else {
+                text = resolveTranslation('fly.warn_crosswind', null, translator);
+                color = "text-amber-400";
+                bg = "bg-amber-400";
+                severity = 1;
+                desc = `Vento traverso/fuori asse (scostamento ${diffFromFront}° rispetto all'azimut del pendio ${az}°). Nelle previsioni sinottiche a griglia 10km, le brezze termiche locali in decollo tendono frequentemente a riallineare il vento.`;
+            }
         } else {
             isLeeSide = true;
             if (wind > 18) {
@@ -578,6 +588,7 @@ export function evaluateDirectionFlyability(wind, windDir = 0, takeoffAzimuth = 
         color,
         bg,
         severity,
+        hasExposure: true,
         isLeeSide,
         diffFromFront,
         desc
@@ -708,7 +719,19 @@ export function getFlyabilityScore(
     };
 
     if (thermEval) details.thermals = thermEval;
-    if (dirEval) details.direction = dirEval;
+    details.direction = dirEval || {
+        name: resolveTranslation('meteo.exposure', null, translator),
+        text: resolveTranslation('fly.exposure_unknown', null, translator),
+        color: "text-slate-400",
+        bg: "bg-slate-500",
+        severity: 0,
+        hasExposure: false,
+        isLeeSide: false,
+        diffFromFront: null,
+        desc: isTakeoff
+            ? "Esposizione del decollo non nota nel catalogo. Valutare l'allineamento del vento direttamente sul posto prima del decollo."
+            : "Sito non classificato come decollo."
+    };
 
     if (worstEval.severity === 0) {
         return {
@@ -842,7 +865,11 @@ export function calculateWeekOverview(payload, isTakeoffOverride = true, heading
 
     const days = [];
     const isTakeoff = isTakeoffOverride;
-    const azimuth = headingOverride != null ? parseFloat(headingOverride) : 0;
+    const azimuth = (headingOverride != null && !isNaN(parseFloat(headingOverride)))
+        ? parseFloat(headingOverride)
+        : (payload.meta && payload.meta.takeoff_azimuth != null && !isNaN(parseFloat(payload.meta.takeoff_azimuth)))
+            ? parseFloat(payload.meta.takeoff_azimuth)
+            : null;
 
     payload.daily.time.forEach((dateStr, dIdx) => {
         const srStr = payload.daily.sunrise?.[dIdx] ? payload.daily.sunrise[dIdx].substring(11, 16) : '06:00';

@@ -632,4 +632,143 @@ describe('GlideMind Comprensorio Locality & Dual Launch/Landing Evaluator', () =
       assert.equal(result.indicators.direction.label, 'Dati N/D');
     });
   });
+
+  describe('Subspot Pinning & Explicit Takeoff/Landing Selection', () => {
+    const multiSpot = {
+      id: 'test-multi-spot',
+      name: 'Test Multi-Spot',
+      province: 'BG',
+      region: 'Lombardia',
+      location: 'Test Multi-Spot (BG)',
+      takeoffs: [
+        {
+          id: 'takeoff-south',
+          name: 'Decollo Sud',
+          coordinates: '45.800000, 9.800000',
+          altitude: 1200,
+          heading: 180,
+          isPrimary: true
+        },
+        {
+          id: 'takeoff-north',
+          name: 'Decollo Nord',
+          coordinates: '45.805000, 9.800000',
+          altitude: 1250,
+          heading: 0,
+          isPrimary: false
+        }
+      ],
+      landings: [
+        {
+          id: 'landing-official',
+          name: 'Atterraggio Principale',
+          coordinates: '45.780000, 9.800000',
+          altitude: 300,
+          isPrimary: true,
+          isOfficial: true
+        },
+        {
+          id: 'landing-alternative',
+          name: 'Atterraggio Campo Scuola',
+          coordinates: '45.770000, 9.800000',
+          altitude: 280,
+          isPrimary: false,
+          isOfficial: false
+        }
+      ]
+    };
+
+    const southWindWeather = {
+      hourly: {
+        time: ['2026-10-10T14:00'],
+        wind_speed_10m: [12],
+        wind_gusts_10m: [16],
+        wind_direction_10m: [180],
+        precipitation: [0],
+        cape: [100],
+        turbulence_edr: [0.10],
+        temperature_2m: [20]
+      }
+    };
+
+    it('defaults to best aligned takeoff and safe landing when no ids are specified', () => {
+      const res = evaluateComprensorio({
+        comprensorio: multiSpot,
+        weatherData: southWindWeather,
+        glider: GLIDER_CLASSES.EN_A
+      });
+      assert.equal(res.takeoff.id, 'takeoff-south');
+      assert.equal(res.landing.id, 'landing-official');
+      assert.equal(res.isTakeoffOverridden, false);
+      assert.equal(res.isLandingOverridden, false);
+    });
+
+    it('evaluates explicit takeoff when takeoffId is passed even if not best aligned', () => {
+      const res = evaluateComprensorio({
+        comprensorio: multiSpot,
+        weatherData: southWindWeather,
+        takeoffId: 'takeoff-north',
+        glider: GLIDER_CLASSES.EN_A
+      });
+      assert.equal(res.takeoff.id, 'takeoff-north');
+      assert.equal(res.bestTakeoff.id, 'takeoff-north');
+      assert.equal(res.isTakeoffOverridden, true);
+      assert.ok(res.takeoffOverrideReason.includes('Decollo manuale'));
+      assert.ok(res.indicators.direction.severity >= 2);
+    });
+
+    it('evaluates explicit landing when landingId is passed', () => {
+      const res = evaluateComprensorio({
+        comprensorio: multiSpot,
+        weatherData: southWindWeather,
+        landingId: 'landing-alternative',
+        glider: GLIDER_CLASSES.EN_A
+      });
+      assert.equal(res.landing.id, 'landing-alternative');
+      assert.equal(res.safeLanding.id, 'landing-alternative');
+      assert.equal(res.isLandingOverridden, true);
+      assert.ok(res.glideMetrics.distanceMeters > 0);
+    });
+
+    it('evaluates explicit pair (takeoffId + landingId) concurrently', () => {
+      const res = evaluateComprensorio({
+        comprensorio: multiSpot,
+        weatherData: southWindWeather,
+        takeoffId: 'takeoff-north',
+        landingId: 'landing-alternative',
+        glider: GLIDER_CLASSES.EN_A
+      });
+      assert.equal(res.takeoff.id, 'takeoff-north');
+      assert.equal(res.landing.id, 'landing-alternative');
+      assert.equal(res.isTakeoffOverridden, true);
+      assert.equal(res.isLandingOverridden, true);
+    });
+
+    it('falls back gracefully when takeoffId or landingId is unknown or invalid', () => {
+      const res = evaluateComprensorio({
+        comprensorio: multiSpot,
+        weatherData: southWindWeather,
+        takeoffId: 'non-existent-takeoff',
+        landingId: 'non-existent-landing',
+        glider: GLIDER_CLASSES.EN_A
+      });
+      assert.equal(res.takeoff.id, 'takeoff-south');
+      assert.equal(res.landing.id, 'landing-official');
+    });
+
+    it('respects explicit takeoffId and landingId in offline mode without weather', () => {
+      const res = evaluateComprensorio({
+        comprensorio: multiSpot,
+        weatherData: null,
+        allowSynthetic: false,
+        takeoffId: 'takeoff-north',
+        landingId: 'landing-alternative',
+        glider: GLIDER_CLASSES.EN_A
+      });
+      assert.equal(res.status, 'unavailable');
+      assert.equal(res.takeoff.id, 'takeoff-north');
+      assert.equal(res.landing.id, 'landing-alternative');
+      assert.ok(res.glideMetrics.distanceMeters > 0);
+    });
+  });
 });

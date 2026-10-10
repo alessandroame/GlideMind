@@ -83,6 +83,8 @@ import { formatDateIso } from './datePresets.js';
 export const DEFAULT_INITIAL_STATE = Object.freeze({
   activeView: 'home',
   selectedSpot: null,
+  activeTakeoffId: null,
+  activeLandingId: null,
   activeDate: formatDateIso(new Date()),
   weatherData: null,
   locationsCatalog: null,
@@ -138,7 +140,7 @@ function deepClone(obj) {
  */
 export function createStore(initialStateOverrides = {}, customStorageAdapter = null) {
   let storageAdapter = customStorageAdapter || createInMemoryStorageAdapter();
-  let persistedKeys = new Set(['pinnedSpots', 'pinnedSpotIds', 'recentSpotIds', 'units', 'selectedSpot', 'flights', 'pilotPeriod', 'activeGlider', 'glider', 'ui']);
+  let persistedKeys = new Set(['pinnedSpots', 'pinnedSpotIds', 'recentSpotIds', 'units', 'selectedSpot', 'activeTakeoffId', 'activeLandingId', 'flights', 'pilotPeriod', 'activeGlider', 'glider', 'ui']);
   const STORAGE_PREFIX = 'glidemind_store_';
 
   // Deep clone defaults and apply overrides

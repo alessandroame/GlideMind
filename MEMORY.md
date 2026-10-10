@@ -1133,6 +1133,17 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
   3. **Fingerprinting Deterministico Sincrono (FNV-1a 64-bit)**: Calcolare l'hash univoco del volo con algoritmo matematico puro in JS sincrono (senza `crypto.subtle`), garantendo funzionamento universale a 0ms anche su LAN/HTTP non protetti.
   4. **IndexedDB come SSOT & Store Reattivo in RAM**: IndexedDB è l'unica sorgente di verità persistente. `store.flights` risiede in RAM e non serializza su `localStorage`, prevenendo `QuotaExceededError`.
 
+---
+
+## 94. Selezione Esplicita di Decolli e Atterraggi Multipli nel Comprensorio (Unico Binomio Dinamico & Fallback Conservativo)
+- **Problema**: Nei comprensori dotati di più decolli o atterraggi (es. Monte Cornizzolo, Meduno, Monte Cuarnan), il calcolo orario selezionava esclusivamente l'accoppiata automatica $T_{\text{best}}$ e $L_{\text{safe}}$. Il pilota non poteva né simulare condizioni su un decollo alternativo (es. decollo alto vs basso, decollo esposto ad est) né vincolare un atterraggio specifico (es. campetto scuola vs atterraggio ufficiale) direttamente dalla selezione spot o dalla vista previsioni.
+- **Causa Radice**: La funzione `evaluateComprensorio` nel core non accettava identificatori espliciti `takeoffId` e `landingId`, imponendo sempre la selezione euristica automatica, e l'interfaccia non esponeva selettori touch ad alto contrasto per le opzioni multiple.
+- **Pattern Vincolante**:
+  1. **Supporto Parametri Espliciti nel Core (`core/comprensorio.js`)**: `evaluateComprensorio({ comprensorio, weatherData, hourIndex, glider, targetDate, allowSynthetic, takeoffId, landingId })` accetta identificatori opzionali. Se specificati, calcola orientamento, severità e cono di planata per l'esatta coppia indicata (`isTakeoffOverridden: true`, `isLandingOverridden: true`). In caso di parametro nullo, indefinito o inesistente, scatta il fallback automatico conservativo su $T_{\text{best}}$ e $L_{\text{safe}}$ senza eccezioni sia in modalità online che offline.
+  2. **Persistenza SSOT nello Store (`core/store.js`)**: Le chiavi `activeTakeoffId` e `activeLandingId` sono parte integrante dello stato reattivo e del set `persistedKeys`.
+  3. **Zero Clutter UI & Standard Ergonomico Outdoor**: Nello sheet di ricerca spot e nell'header delle previsioni, i controlli di sub-selezione appaiono esclusivamente se `takeoffs.length > 1` o `landings.length > 1` (zero controlli ridondanti per spot singoli). Tutte le chip e pill interattive rispettano il floor touch $\ge 48\times 48\text{px}$, adottano `touch-action: pan-x` per scorrimento orizzontale a riga singola senza sovrapposizioni verticali e dichiarano semantica WAI-ARIA (`aria-checked="true"` / `aria-pressed="true"`).
+
+
 
 
 
