@@ -376,4 +376,69 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
   2. **In-Place Reactive DOM Update (`setHour`)**: Durante lo scrubbing attivo, aggiornare chirurgicamente in place i container interni (`#forecast-spot-card-container`, `#forecast-wind-panel-container`, `#forecast-sounding-panel-container`) e le classi `.active` delle colonne senza distruggere lo scrubber nel DOM. Latenza di aggiornamento $< 2\text{ms}$ (sotto Doherty Threshold).
   3. **Haptic Micro-Feedback**: Emettere un micro-impulso aptico opzionale (`navigator.vibrate(8)`) al passaggio tra le colonne per restituire una percezione fisica tangibile della selezione oraria.
 
+---
+
+## 39. Batch Ingestion Multi-Coordinate Open-Meteo, Indicizzazione Timestamp Multi-Day e Resilienza Offline
+- **Problema**: L'interrogazione sequenziale di 30-50 comprensori nella Home causa latenze di rete elevate e rischio di throttling HTTP 429. Inoltre, nei forecast orari multi-giorno (orizzonte 7-8 giorni, 192 ore), l'accesso diretto via indice orario giornaliero `[hourIndex]` (es. `hourIndex = 14`) ricade erroneamente sempre sul giorno corrente (Day 0), ignorando la data target selezionata. Infine, la caduta della connessione rischia di generare sfarfallii se la lettura da cache sovrascrive lo stato offline con uno stato 'live' fittizio.
+- **Causa Radice**:
+  1. Omissione del supporto alle query multi-coordinate supportate nativamente da Open-Meteo (`latitude=lat1,lat2&longitude=lon1,lon2`).
+  2. Presunzione che l'array `hourly.time` contenga esclusivamente le 24 ore della giornata target.
+  3. Mancata separazione tra flag di fallimento di rete attivo (`_networkFailed = true`) e presenza di record storici residui in cache.
+- **Pattern Vincolante**:
+  1. **Batch Ingestion Unificata**: Per dashboard con molteplici località (`HomeDashboardView`), raggruppare tutte le coordinate in un'unica richiesta batch (`fetchBatchComprensoriWeather`), memorizzando i risultati per singolo comprensorio nella cache LRU in-memory.
+  2. **Timestamp Prefix Resolution**: In qualsiasi funzione di arricchimento o valutazione (`evaluateComprensorio`), individuare l'indice dell'ora tramite matching esplicito del prefisso data ISO: `timePrefix = targetDate + 'T' + String(hourIndex).padStart(2, '0')`.
+  3. **Stale-While-Revalidate & Guardie Offline**: Inizializzare la UI con render ottimistico a 0ms (dati in cache o sintetici). Quando la richiesta di rete fallisce, impostare `networkStatus = 'offline'` e `_networkFailed = true`, impedendo alle letture di fallback sincrone da cache di ripristinare indebitamente il badge 'live'.
+
+---
+
+## 40. Fitts's Law su Viewport Mobili Compatti: Stepper Orario Dedicato, Bonifica Emoji Decorative e Tema Sunlight Mode
+- **Problema**:
+  1. Su schermi smartphone da 390px, la divisione dello scrubber orario in 13 slot produce colonne larghe ~28px, rendendo il tocco discreto del singolo slot orario difficoltoso con dita fredde o guanti da volo (Fitts's Law).
+  2. La presenza di emoji decorative nei controlli e nei titoli riduce la nitidezza e il contrasto visivo all'aperto, violando il principio di sobrietà visiva.
+  3. L'uso esclusivo della tavolozza scura genera riflessi speculari sotto la luce solare zenitale diretta in alta montagna.
+- **Causa Radice**:
+  1. Conflitto geometrico tra l'esigenza di mostrare l'intera finestra diurna a colpo d'occhio (08:00–20:00) senza scroll orizzontale e il target touch minimo ($\ge 44\text{px}$).
+  2. Residui di formattazione non strutturata con emoji invece di icone vettoriali semantiche conformi agli standard outdoor.
+- **Pattern Vincolante**:
+  1. **Stepper Fitts-Compliant**: Mantenere la visualizzazione compressa a 13 colonne per il colpo d'occhio e il dragging continuo, ma affiancarla con due pulsanti stepper (`<` e `>`) con area cliccabile virtuale estesa via pseudo-elemento `::before` a $\ge 44\times 44\text{px}$.
+  2. **Iconografia Monocromatica Semantica**: Eliminare emoji decorative da pulsanti e titoli; utilizzare esclusivamente SVG monocromatici scalabili con attributi ARIA corretti.
+  3. **Tavolozza Sunlight Light Mode**: Definire le variabili `[data-theme="light"]` con contrasto WCAG AAA ($\ge 7:1$) e sincronizzare reattivamente `document.documentElement` e `<meta name="theme-color">` tramite lo store.
+
+---
+
+## 41. Preferiti Pilota come Filtro Primario della Home e Gestione Migrazione Seed
+- **Problema**: Mostrare tutti i comprensori del catalogo nazionale (135 siti) nella Home Dashboard satura la vista con località irrilevanti per il pilota locale (es. siti di altre regioni lontane centinaia di km), degradando la glanceable UI e moltiplicando inutilmente il traffico di rete batch verso Open-Meteo.
+- **Causa Radice**: Assenza di un filtro sui preferiti (`pinnedSpotIds`) a livello di radice della vista Home, che delegava il filtraggio esclusivamente alla ricerca testuale anziché al set di siti selezionati dal pilota nella vista Previsioni.
+- **Pattern Vincolante**:
+  1. **Home Filtrata su Preferiti Pilota**: In assenza di ricerca testuale attiva, la vista Home Dashboard deve istanziare e valutare esclusivamente i comprensori contrassegnati come preferiti (`state.pinnedSpotIds`), mantenendo come default iniziale il set essenziale locale del pilota (Chialamberto, Martiniana Po, Monte Cavallaria).
+  2. **Ricerca Espansa On-Demand**: Quando l'utente digita una query di ricerca nella Home, la scansione si espande sull'intero catalogo normalizzato per consentire la rapida consultazione di qualsiasi sito, tornando automaticamente ai soli preferiti una volta cancellata la query.
+  3. **Migrazione Trasparente dei Seed Legacy**: In fase di idratazione dello store da `localStorage` (`loadPersistedState`), intercettare le configurazioni seed legacy e migrarle automaticamente ai nuovi default senza richiedere pulizie manuali della cache del browser.
+  4. **Stato Vuoto Esplicito & Call-to-Action**: Se l'utente rimuove tutti i preferiti, la lista non deve rimanere vuota o rotta, ma deve renderizzare un feedback esplicito con pulsante di navigazione diretta alla pagina Previsioni per consentire la selezione di nuovi spot con l'icona stella.
+
+---
+
+## 42. In-Flow Flex Docking vs `position: fixed` Subpixel Leakage su Display Hi-DPI
+- **Problema**: Su display ad alta densità di pixel (`devicePixelRatio != 1`, es. 1.25, 1.5, 2.0) o con altezze decimali del viewport (es. 669.6px), barre o scrubber posizionati con `position: fixed; bottom: 0;` generano fessure subpixel (0.4px - 1px) attraverso le quali traspaiono elementi della pagina in fase di scorrimento. Inoltre, attribuire un padding artificiale (`pb-48`) al contenitore della pagina consente ai nodi del DOM di scorrere fisicamente sotto i componenti dockati.
+- **Causa Radice**: Discretizzazione numerica tra coordinate CSS logiche (floating point) e pixel hardware fisici nei motori di rendering, combinata con layout fixed overlay in cui il contenitore scorrevole non è limitato all'altezza utile effettiva.
+- **Pattern Vincolante**:
+  1. **In-Flow Flex Shell (Zero Fixed Overlays per Dock Primari)**: `#app-root` deve essere un flexbox a colonna rigido (`display: flex; flex-direction: column; height: 100dvh; max-height: 100dvh; overflow: clip;`).
+  2. **Contenitore Utile Scorrevole Autonomo**: I contenuti scorrevoli di ciascuna vista devono essere incapsulati in un contenitore interno (`flex: 1 1 0%; min-height: 0; overflow-y: auto;`), la cui altezza termina esattamente sopra il primo componente dockato.
+  3. **Docked Footers come Fratelli Flex In-Flow**: Elementi dockati in basso (come lo scrubber orario `.gm-timeline-scrubber-sticky` e la barra di navigazione `#bottom-nav-bar`) devono essere posizionati in-flow nel flexbox (`position: relative; flex-shrink: 0; width: 100%;`), garantendo adiacenza geometrica perfetta (0px di gap) e assenza totale di elementi scorrevoli al di sotto.
+  4. **Sigillo Anti-Leak**: Applicare `overflow: clip` ad `#app-root` e `overflow: hidden` ad `html, body` e `#sheet-container`.
+
+---
+
+## 44. Catalogo Modelli di Parapendio, Filtro per Costruttore e Deduzione Aerodinamica Automatica per Vele Custom (Postel's Law / Tesler's Law)
+- **Problema**: Limitare la selezione dell'attrezzatura di volo alle sole 4 classi generiche EN-A..EN-D obbliga il pilota ad approssimare la propria ala reale e non permette di memorizzare marca e modello specifici (es. "Ozone Buzz Z7", "Advance Iota DLS"). Al contempo, forzare l'utente a inserire manualmente parametri fisici complessi (velocità di trim, velocità di affondo, efficienza massima, allungamento alare) introduce forte attrito operativo e rischio di errori manuali.
+- **Causa Radice**:
+  1. Assenza di una base dati di ali certificate e categorizzate per costruttore.
+  2. Modelli di configurazione che scaricano la complessità dei parametri fisici sull'utente anziché risolverla via software (violazione della Tesler's Law).
+- **Pattern Vincolante**:
+  1. **Catalogo Modelli Certificato Headless (`core/gliders.js`)**: Mantenere un catalogo curato e verificato empiricamente di oltre 50 modelli iconici dei principali 14 costruttori mondiali, con attributi completi (`brand`, `model`, `category`, `vTrim`, `vMax`, `glideRatio`, `ar`).
+  2. **Interfaccia a Selezione Rapida (Filtri a Chip & Ricerca Istantanea)**: Nel modal sheet di selezione della vela, offrire una riga orizzontale a scorrimento di chip per marca (`.gm-glider-brand-chips`) combinata con una casella di ricerca reattiva a testo libero (`#glider-search-input`), azzerando il tempo di selezione a meno di 2 tap.
+  3. **Deduzione Aerodinamica Automatica (Tesler's Law)**: In caso di modelli non ancora a catalogo, permettere l'inserimento libero di marca e modello; i parametri aerodinamici fondamentali vengono calcolati e dedotti automaticamente dalla classe EN indicata (`getGliderClassDefaults(category)`).
+  4. **Retrocompatibilità e Headless Purity**: Ogni oggetto vela (di serie, da catalogo o personalizzato) espone sempre le proprietà `category`, `name`, `vTrim` e `glideRatio`, garantendo che i motori di calcolo della volabilità e dei coni di atterraggio operino senza modifiche né dipendenze dal browser.
+
+
+
 

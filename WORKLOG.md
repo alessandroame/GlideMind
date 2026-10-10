@@ -344,4 +344,98 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Collaudato con Chrome DevTools su browser reale con selezione e ricerca spot reali ("Norma", "Meduno", "Grappa") e aggiunti test di regressione in [tests/ui/locationsCatalogHydration.test.mjs](file:///tests/ui/locationsCatalogHydration.test.mjs) (285/285 test superati).
   - Registrata la Lezione #37 in [MEMORY.md](file:///MEMORY.md).
 
+---
 
+## 2026-10-09 - Fase 4-bis: Live Weather Data Ingestion & Cache Sync (Open-Meteo)
+- **Tipo**: Feature / Data Ingestion / Network Sync / Resilienza Offline
+- **Dettagli**: [.agents/worklog.d/2026-10-09_phase-4-bis-live-data-ingestion-complete.md](file:///.agents/worklog.d/2026-10-09_phase-4-bis-live-data-ingestion-complete.md)
+- **Sintesi**:
+  - Implementato il pattern Stale-While-Revalidate a 0ms in [ui/views/ForecastView.js](file:///ui/views/ForecastView.js) e [ui/views/HomeDashboardView.js](file:///ui/views/HomeDashboardView.js): primo render istantaneo da cache LRU o dati sintetici, con fetch asincrono in background verso le API reali di Open-Meteo in ambiente browser.
+  - Implementato in [core/openMeteoApi.js](file:///core/openMeteoApi.js) il batching multi-coordinate `fetchBatchComprensoriWeather(comprensori)` per aggregare 35-50 località in un'unica richiesta HTTP (`lat1,lat2...`), azzerando il rischio di rate limiting HTTP 429 nella Home.
+  - Corretta l'indicizzazione dei timestamp orari su orizzonti multi-giorno (192 ore) in [core/comprensorio.js](file:///core/comprensorio.js) tramite matching esplicito del prefisso data ISO `targetDate + 'T' + hour`.
+  - Introdotti in [css/theme.css](file:///css/theme.css) i token e le animazioni per il micro-badge di stato rete `.gm-live-badge` (`.live`, `.loading`, `.offline`).
+  - Gestita la commutazione offline sicura con flag `_networkFailed` e marcatura `isStaleOfflineFallback: true` in caso di mancata connettività o timeout DNS.
+  - Creata la suite di test [tests/ui/liveWeatherDataIngestion.test.mjs](file:///tests/ui/liveWeatherDataIngestion.test.mjs) con 7 nuovi test (293/293 test totali superati in 44 suite nel test runner nativo Node.js).
+  - Registrata la Lezione #39 in [MEMORY.md](file:///MEMORY.md) e aggiornato [DESIDERATA.md](file:///DESIDERATA.md) a 🟢 Completato.
+
+---
+
+## 2026-10-09 - Audit Euristico UI, Ergonomia Stepper Mobile e Sunlight Light Mode
+- **Tipo**: UI Heuristic Audit / Mobile Ergonomics / Laws of UX / Outdoor HMI
+- **Dettagli**: [.agents/worklog.d/2026-10-09_ui-audit-and-ergonomics-remediation.md](file:///.agents/worklog.d/2026-10-09_ui-audit-and-ergonomics-remediation.md)
+- **Sintesi**:
+  - Condotto audit completo sulle 30 Laws of UX, 10 Euristiche NN/G, standard Outdoor HMI e Novice Pilot Auditor, producendo l'artifact di analisi prioritizzata `ui_audit_report.md`.
+  - Risolta la criticità ergonomica Fitts's Law dello scrubber compresso a 13 colonne su schermi mobile 390px tramite l'introduzione di controlli stepper dedicati (`.gm-stepper-btn`, `<` e `>`) con area di tocco espansa virtualmente via `::before` a $\ge 44\times 44\text{px}$.
+  - Introdotti in [css/theme.css](file:///css/theme.css) i token CSS per il tema ad alta luminanza `[data-theme="light"]` (WCAG AAA $\ge 7:1$) per l'uso sotto la luce solare zenitale diretta, sincronizzati tramite `applyTheme` in [ui/app.js](file:///ui/app.js) e persistiti nello store.
+  - Assegnato `touch-action: pan-y` sui grafici SVG e bussola vento per prevenire conflitti nei gesti di scorrimento verticale.
+  - Bonificate le emoji decorative nei controlli e nei titoli (`Grafico`, briefing SVG monocromatico, rimozione emoji da notice sinottici e scrubber).
+  - Allineata la classificazione di volabilità del briefing Guido alla classe della vela (EN-A / EN-B / EN-C), eliminando le etichette soggettive ("allievi/brevettati").
+  - Integrata la guardia di prevenzione errori (*dirty state check*) nel form di inserimento volo in [ui/views/HomeDashboardView.js](file:///ui/views/HomeDashboardView.js) e supportata la chiusura accessibile con `Escape` del popover sub-spot in [ui/views/ForecastView.js](file:///ui/views/ForecastView.js).
+  - Estesa la suite di test [tests/ui/uiIntegrityAudit.test.mjs](file:///tests/ui/uiIntegrityAudit.test.mjs), [tests/ui/forecastView.test.mjs](file:///tests/ui/forecastView.test.mjs) e [tests/ui/brandAndSplash.test.mjs](file:///tests/ui/brandAndSplash.test.mjs) (298/298 test superati nel test runner nativo Node.js).
+  - Registrata la Lezione #40 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-09 - Filtraggio Località Home per Preferiti e Default Piemonte
+- **Tipo**: Architettura UI / State Synchronization / User Preference
+- **Dettagli**: [.agents/worklog.d/2026-10-09_home-favorites-filter-and-piemonte-defaults.md](file:///.agents/worklog.d/2026-10-09_home-favorites-filter-and-piemonte-defaults.md)
+- **Sintesi**:
+  - Ridefinita la visualizzazione delle località nella vista Home Dashboard ([ui/views/HomeDashboardView.js](file:///ui/views/HomeDashboardView.js)) per mostrare esclusivamente i comprensori contrassegnati come preferiti (icona stella nella vista Previsioni).
+  - Impostati i 3 comprensori preferiti predefiniti: **Chialamberto** (`chialamberto-valli-di-lanzo-to-to`), **Martiniana Po** (`martiniana-po-valle-po-cn-cn`) e **Monte Cavallaria** (`monte-cavallaria-calea-to-to`).
+  - Aggiornato `DEFAULT_INITIAL_STATE.pinnedSpotIds` in [core/store.js](file:///core/store.js) con migrazione trasparente dei seed legacy memorizzati in `localStorage`.
+  - Integrati i 3 comprensori preferiti in `DEFAULT_COMPRENSORI` in [core/comprensorio.js](file:///core/comprensorio.js) ed esportata la funzione condivisa `isSpotPinned(spot, pinnedIds)`.
+  - Ottimizzato il batching meteo in background `fetchBatchWeatherAsync` per interrogare prioritariamente i comprensori preferiti dell'utente.
+  - Implementato lo stato vuoto esplicito in Home quando nessun preferito è selezionato, con CTA diretta verso Previsioni (`data-action="go-to-forecast"`).
+  - Aggiornati i test in [tests/ui/homeDashboardView.test.mjs](file:///tests/ui/homeDashboardView.test.mjs) e [tests/ui/locationsCatalogHydration.test.mjs](file:///tests/ui/locationsCatalogHydration.test.mjs) (299/299 test superati in 44 suite).
+  - Registrata la Lezione #41 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-09 - Integrazione Selettore Vela Attiva nella Home Dashboard
+- **Tipo**: Feature / UI Ergonomics / State Management & Persistence
+- **Dettagli**: [.agents/worklog.d/2026-10-09_active-glider-selector-home-integration.md](file:///.agents/worklog.d/2026-10-09_active-glider-selector-home-integration.md)
+- **Sintesi**:
+  - Ripristinato e integrato il controllo per la selezione della vela attiva nella card "Attività Pilota" in [ui/views/HomeDashboardView.js](file:///ui/views/HomeDashboardView.js) tramite pill touch-friendly `.gm-glider-pill` (Fitts's Law $\ge 48\text{px}$) con badge cromatico per classe EN e chevron.
+  - Implementato il bottom sheet dedicato `openGliderSheet()` tramite [ui/sheetManager.js](file:///ui/sheetManager.js) con presentazione delle 4 classi di omologazione FAI/EN (`GLIDER_CLASSES`), velocità trim e glide ratio.
+  - Sincronizzata la selezione nello store [core/store.js](file:///core/store.js) su `activeGlider` e `glider`, con persistenza in `localStorage` across page reload.
+  - Aggiornate le sottoscrizioni reattive in `HomeDashboardView` e `ForecastView` per ricalibrare istantaneamente a 0ms i limiti di vento e i coni di planata ($E_{\text{richiesta}} \le E_{\text{glider}}$).
+  - Definiti i token CSS in [css/theme.css](file:///css/theme.css) per entrambe le modalità Dark e Sunlight Light Mode.
+  - Test suite unitari e UI con 302 test superati.
+
+---
+
+## 2026-10-10 - In-Flow Bottom Docking & Bonifica Fessura Subpixel
+- **Tipo**: UI Layout / Shell / ForecastView / Ergonomia HMI
+- **Dettagli**: [.agents/worklog.d/2026-10-10_in-flow-bottom-docking-and-subpixel-leak-fix.md](file:///.agents/worklog.d/2026-10-10_in-flow-bottom-docking-and-subpixel-leak-fix.md)
+- **Sintesi**:
+  - Risolto il difetto di trasparimento/fessura subpixel (0.4px - 1px) sul fondo dello schermo su display ad alta densità (`devicePixelRatio != 1`) convertendo il layout da `position: fixed` a flexbox a colonna rigido in-flow.
+  - `#app-root` configurato come flexbox a colonna (`100dvh`, `overflow: clip`); `#main-view` elemento flex ad espansione (`flex: 1 1 0%; min-height: 0; position: relative; overflow: hidden;`); `#bottom-nav-bar` convertito a componente in-flow in fondo al root.
+  - Incapsulato il contenuto di `ForecastView` in `.gm-forecast-scroll-container` (`overflow-y: auto; flex: 1 1 0%; min-height: 0;`), posizionando lo scrubber orario `.gm-timeline-scrubber-sticky` come footer in-flow flex dockato a filo sopra la navbar con tolleranza 0px.
+  - Armonizzato `DEFAULT_COMPRENSORI` per preservare il dataset di test e i preferiti storici del Piemonte (Chialamberto, Martiniana Po, Monte Cavallaria).
+  - Verificato con ispezione geometrica Chromium via Chrome DevTools MCP e suite di test automatizzati (311/311 passati).
+
+---
+
+## 2026-10-10 - Fase 3-bis: Selettore Vele per Marca e Modello con Catalogo Certificato e Input Custom
+- **Tipo**: Feature / Core Engine / UI Layer / Ergonomia Aeronautica / Laws of UX
+- **Dettagli**: [.agents/worklog.d/2026-10-10_paraglider-brand-model-selector.md](file:///.agents/worklog.d/2026-10-10_paraglider-brand-model-selector.md)
+- **Sintesi**:
+  - Implementato il catalogo headless [core/gliders.js](file:///core/gliders.js) (zero DOM dependencies, 100% testabile Node.js) con 14 costruttori mondiali (`PARAGLIDER_BRANDS`) e 50+ modelli certificati FAI/EN (`POPULAR_GLIDERS`), con velocità trim ($v_{\text{trim}}$), velocità accelerata ($v_{\text{max}}$), efficienza di planata ($L/D$) e allungamento ($AR$).
+  - Implementate funzioni pure di ricerca `searchGliders({ query, brand, category })`, lookup deterministico `getGliderById(id)`, e creazione modelli custom `createCustomGlider` con deduzione aerodinamica automatica da `getGliderClassDefaults(category)` (Tesler's Law).
+  - Riesportate `GLIDER_CLASSES` e `DEFAULT_GLIDER` in [core/flyability.js](file:///core/flyability.js) per retrocompatibilità al 100%.
+  - Integrato nel bottom sheet di [ui/views/HomeDashboardView.js](file:///ui/views/HomeDashboardView.js) il campo di ricerca istantanea `#glider-search-input`, la riga scorrevole di brand chips (`.gm-glider-brand-chips`), l'elenco modelli dinamico (`#glider-models-list`) con badge EN e specifiche, e la sezione per profili generici o ali personalizzate.
+  - Aggiornata la pillola attiva nella Home per visualizzare il nome completo `${brand} ${model}`.
+  - Definiti i token e stili in [css/theme.css](file:///css/theme.css) per entrambe le modalità Dark e Sunlight Light Mode.
+  - Create ed estese le suite [tests/core/gliders.test.mjs](file:///tests/core/gliders.test.mjs) e [tests/ui/homeDashboardView.test.mjs](file:///tests/ui/homeDashboardView.test.mjs) con 315/315 test passati con successo.
+  - Registrata la Lezione #44 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-10 - Fase 3-bis: Integrazione Costruttore Axis e Catalogo Modelli da ParaMeteo
+- **Tipo**: Feature / Core Engine / Allineamento Dati di Dominio
+- **Dettagli**: [.agents/worklog.d/2026-10-10_axis-brand-and-parameteo-gliders-integration.md](file:///.agents/worklog.d/2026-10-10_axis-brand-and-parameteo-gliders-integration.md)
+- **Sintesi**:
+  - Allineato il catalogo vele con il database canonico di ParaMeteo (`C:\github\ParaMeteo\data\gliders.json`), aggiungendo il costruttore **Axis** a `PARAGLIDER_BRANDS` e tutti i suoi 6 modelli certificati (`Compact 4`, `Pluto 4`, `Comet 4`, `Vega 6`, `Venus 4 / SC`, `Sirius 2 (Tandem)`) a `POPULAR_GLIDERS` in [core/gliders.js](file:///core/gliders.js).
+  - Riconciliati anche i modelli ParaMeteo per altri costruttori (`Ozone Zeno 2`, `Nova Sector`, `Niviuk Artik R`).
+  - Aggiornati i test unitari di catalogo in [tests/core/gliders.test.mjs](file:///tests/core/gliders.test.mjs) e i test UI in [tests/ui/homeDashboardView.test.mjs](file:///tests/ui/homeDashboardView.test.mjs) con verifica del brand chip Axis, filtri per marca e ricerca rapida.
+  - Tutti i 316 test passati con successo (100% pass rate).
