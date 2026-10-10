@@ -183,6 +183,12 @@ The new application will deliver:
 - [ ] Arricchimento dati in `data/locations/it.json` con perimetri reali (es. Cavallaria: zona atterraggio verde, zone rosse divieto, zona arancione piegaggio).
 - [ ] Renderizzazione passiva dei poligoni territoriali nell'overlay `ForecastView.js` senza logica CAD complessa.
 
+### Phase 5-sexies: Raccolta, Correzione Spot & Pipeline Ingestion Proposte Pilota (⚪ Pianificato)
+- [ ] Piano architetturale: [docs/plans/phase-5-sexies-community-spot-proposals.md](file:///docs/plans/phase-5-sexies-community-spot-proposals.md).
+- [ ] Modulo headless `core/spotProposalValidator.js`: validazione sintattica, geodetica ($E \le 7.0$, $H_{\text{takeoff}} > H_{\text{landing}}$), WGS84 e controllo prossimità/duplicati senza dipendenze DOM.
+- [ ] Form mobile outdoor `SpotContributionView.js` con chunking a 3 step, 1-tap geolocation GPS, salvataggio continuo draft in LocalStorage, supporto foto con link pubblico ed esportazione payload JSON standardizzato (Web Share API / download / clipboard).
+- [ ] Tooling CLI maintainer `scripts/review-proposal.mjs` per ispezione diff interattiva e merge controllato con flag `--apply` in `data/locations/<country>.json` e riesecuzione di `shard-locations-catalog.mjs`.
+
 ### Phase 6: Flight Logbook & Telemetry Module (🔴 Prossimo Step Primario)
 - [ ] Piano architetturale: [docs/plans/phase-6-flight-logbook-and-telemetry.md](file:///docs/plans/phase-6-flight-logbook-and-telemetry.md).
 - [ ] Implement `core/logbookDb.js`:
