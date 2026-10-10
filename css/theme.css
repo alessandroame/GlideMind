@@ -6732,6 +6732,9 @@ input.gm-input:focus {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .gm-stats-metric-val {
@@ -6753,6 +6756,10 @@ input.gm-input:focus {
   font-size: 0.7rem;
   color: var(--gm-text-secondary);
   margin-top: 2px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .gm-stats-distribution-grid {
@@ -6775,30 +6782,43 @@ input.gm-input:focus {
   border: 1px solid var(--gm-border);
   border-radius: var(--gm-radius-md);
   padding: 12px;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .gm-dist-row {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
 }
 
 .gm-dist-info {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
   font-size: 0.8rem;
+  width: 100%;
+  min-width: 0;
 }
 
 .gm-dist-name {
   font-weight: 600;
   color: var(--gm-text-primary);
+  min-width: 0;
+  flex: 1 1 0%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .gm-dist-count {
   font-size: 0.75rem;
   color: var(--gm-text-muted);
   font-feature-settings: "tnum";
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .gm-dist-bar-bg {
