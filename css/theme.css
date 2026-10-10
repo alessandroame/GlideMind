@@ -6218,98 +6218,187 @@ input.gm-input:focus {
   padding: 12px 16px 80px 16px;
 }
 
-.gm-career-kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-  width: 100%;
-}
-
-@media (min-width: 640px) {
-  .gm-career-kpi-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
-
-.gm-career-kpi-card {
-  background: var(--gm-bg-card);
-  border: 1px solid var(--gm-border);
-  border-radius: var(--gm-radius-md);
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  user-select: none;
-}
-
-.gm-career-kpi-val {
-  font-size: 1.35rem;
-  font-weight: 700;
-  color: var(--gm-text-primary);
-  font-feature-settings: "tnum";
-  line-height: 1.2;
-}
-
-.gm-career-kpi-label {
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--gm-text-muted);
-  font-weight: 600;
-}
-
-.gm-logbook-dropzone {
-  border: 2px dashed var(--gm-border-strong);
-  border-radius: var(--gm-radius-lg);
-  background: var(--gm-bg-surface);
-  padding: 24px 16px;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  transition: border-color var(--gm-transition-fast), background-color var(--gm-transition-fast);
-}
-
-.gm-logbook-dropzone.dragover {
-  border-color: var(--gm-accent, #38bdf8);
-  background: rgba(56, 189, 248, 0.08);
-}
-
-.gm-logbook-dropzone-title {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--gm-text-primary);
-}
-
-.gm-logbook-dropzone-hint {
-  font-size: 0.8rem;
-  color: var(--gm-text-muted);
-  max-width: 480px;
-}
-
-.gm-logbook-progress-wrap {
-  width: 100%;
-  max-width: 320px;
-  height: 6px;
-  background: var(--gm-bg-base);
-  border-radius: var(--gm-radius-full);
-  overflow: hidden;
-  margin-top: 8px;
-}
-
-.gm-logbook-progress-bar {
-  height: 100%;
-  background: var(--gm-accent, #38bdf8);
-  width: 0%;
-  transition: width 0.2s ease-out;
-}
-
-.gm-flight-list {
+/* Header & Segmented Sub-Tab Switcher */
+.gm-logbook-header {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  width: 100%;
+}
+
+.gm-logbook-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.gm-logbook-title {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--gm-text-primary);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.gm-logbook-import-btn {
+  font-weight: 700;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.gm-segmented-control {
+  display: flex;
+  gap: 4px;
+  background: var(--gm-bg-surface);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-full, 9999px);
+  padding: 3px;
+  width: 100%;
+}
+
+.gm-segment-btn {
+  flex: 1;
+  text-align: center;
+  padding: 8px 12px;
+  border-radius: var(--gm-radius-full, 9999px);
+  border: none;
+  background: transparent;
+  color: var(--gm-text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--gm-transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gm-segment-btn:hover {
+  color: var(--gm-text-primary);
+}
+
+.gm-segment-btn.active {
+  background: var(--gm-bg-card);
+  color: var(--gm-text-primary);
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="light"] .gm-segment-btn.active {
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+/* Search Box & Quick Filter Chips */
+.gm-logbook-search-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.gm-search-input-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.gm-search-icon {
+  position: absolute;
+  left: 14px;
+  color: var(--gm-text-muted);
+  pointer-events: none;
+}
+
+.gm-logbook-search-input {
+  width: 100%;
+  min-height: var(--gm-touch-min, 48px);
+  padding: 10px 38px 10px 42px;
+  background: var(--gm-bg-surface);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-md);
+  font-size: 0.875rem;
+  color: var(--gm-text-primary);
+  outline: none;
+  transition: border-color var(--gm-transition-fast);
+}
+
+.gm-logbook-search-input:focus {
+  border-color: var(--gm-accent, #38bdf8);
+}
+
+.gm-search-clear-btn {
+  position: absolute;
+  right: 8px;
+  min-height: 36px;
+  min-width: 36px;
+  background: transparent;
+  border: none;
+  color: var(--gm-text-muted);
+  font-size: 1.25rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gm-logbook-filters-carousel {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  touch-action: pan-x;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.gm-logbook-filters-carousel::-webkit-scrollbar {
+  display: none;
+}
+
+.gm-filter-chip {
+  flex-shrink: 0;
+  min-height: 36px;
+  padding: 6px 14px;
+  border-radius: var(--gm-radius-full, 9999px);
+  border: 1px solid var(--gm-border);
+  background: var(--gm-bg-surface);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--gm-text-muted);
+  cursor: pointer;
+  transition: all var(--gm-transition-fast);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gm-filter-chip:hover {
+  color: var(--gm-text-primary);
+  border-color: var(--gm-border-strong);
+}
+
+.gm-filter-chip.active {
+  background: var(--gm-accent-sky, #38bdf8);
+  border-color: var(--gm-accent-sky, #38bdf8);
+  color: #0f172a;
+  font-weight: 700;
+}
+
+[data-theme="light"] .gm-filter-chip.active {
+  background: #0284c7;
+  border-color: #0284c7;
+  color: #ffffff;
+}
+
+/* Flight List & Lean Cards (~110px) */
+.gm-flight-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   width: 100%;
 }
 
@@ -6318,23 +6407,30 @@ input.gm-input:focus {
   background: var(--gm-bg-card);
   border: 1px solid var(--gm-border);
   border-radius: var(--gm-radius-md);
-  padding: 14px;
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  transition: border-color var(--gm-transition-fast);
+  gap: 8px;
+  transition: border-color var(--gm-transition-fast), transform var(--gm-transition-fast);
 }
 
-.gm-flight-card:hover {
-  border-color: var(--gm-border-strong);
+.gm-flight-card.gm-flight-card-compact {
+  cursor: pointer;
+}
+
+.gm-flight-card.gm-flight-card-compact:hover {
+  border-color: var(--gm-accent, #38bdf8);
+}
+
+.gm-flight-card.gm-flight-card-compact:active {
+  transform: scale(0.995);
 }
 
 .gm-flight-card-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
 }
 
 .gm-flight-number-badge {
@@ -6343,7 +6439,7 @@ input.gm-input:focus {
   justify-content: center;
   font-family: var(--gm-font-mono, monospace);
   font-weight: 800;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   line-height: 1;
   padding: 3px 6px;
   border-radius: var(--gm-radius-sm);
@@ -6351,7 +6447,6 @@ input.gm-input:focus {
   color: var(--gm-accent-sky, #38bdf8);
   border: 1px solid rgba(56, 189, 248, 0.28);
   flex-shrink: 0;
-  margin-top: 2px;
 }
 
 [data-theme="light"] .gm-flight-number-badge {
@@ -6362,54 +6457,49 @@ input.gm-input:focus {
 
 .gm-flight-site-title {
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   color: var(--gm-text-primary);
-  min-width: 0;
-  word-break: break-word;
+  margin: 0;
+}
+
+.gm-flight-delete-btn {
+  background: transparent;
+  border: none;
+  color: var(--gm-text-muted);
+  font-size: 1.25rem;
+  line-height: 1;
+  padding: 4px 8px;
+  min-height: 32px;
+  min-width: 32px;
+  border-radius: var(--gm-radius-sm);
+  cursor: pointer;
+  transition: all var(--gm-transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gm-flight-delete-btn:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
 }
 
 .gm-flight-card-sub {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
   flex-wrap: wrap;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   color: var(--gm-text-muted);
 }
 
-.gm-flight-metrics-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  padding: 8px 0;
-  border-top: 1px solid var(--gm-border);
-  border-bottom: 1px solid var(--gm-border);
-}
-
-.gm-flight-metric-item {
-  display: flex;
-  flex-direction: column;
-}
-
-.gm-flight-metric-num {
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--gm-text-primary);
-  font-feature-settings: "tnum";
-}
-
-.gm-flight-metric-desc {
-  font-size: 0.72rem;
-  color: var(--gm-text-muted);
-  text-transform: uppercase;
-}
-
+/* Lean Altimetric Sparkline */
 .gm-flight-sparkline-wrap {
   width: 100%;
-  height: 36px;
+  height: 22px;
   background: var(--gm-bg-surface);
   border-radius: var(--gm-radius-sm);
-  padding: 2px 4px;
+  padding: 1px 4px;
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -6429,12 +6519,393 @@ input.gm-input:focus {
   stroke-linejoin: round;
 }
 
-.gm-flight-card-actions {
+/* Glanceable 3-Metric Row */
+.gm-flight-metrics-row {
   display: flex;
-  gap: 8px;
-  justify-content: flex-end;
   align-items: center;
+  gap: 8px;
   flex-wrap: wrap;
+  padding-top: 2px;
+}
+
+.gm-flight-metric-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.76rem;
+  background: var(--gm-bg-surface);
+  padding: 3px 8px;
+  border-radius: var(--gm-radius-sm);
+  border: 1px solid var(--gm-border);
+}
+
+.gm-flight-metric-label {
+  color: var(--gm-text-muted);
+  font-weight: 500;
+}
+
+.gm-flight-metric-val {
+  color: var(--gm-text-primary);
+  font-weight: 700;
+  font-feature-settings: "tnum";
+}
+
+.gm-flight-chevron {
+  margin-left: auto;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--gm-text-muted);
+  line-height: 1;
+}
+
+/* Pilot Statistics & Currency Tab Styles */
+.gm-stats-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.gm-currency-card {
+  background: var(--gm-bg-card);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-md);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gm-currency-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.gm-currency-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: var(--gm-radius-full, 9999px);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.gm-currency-active {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.gm-currency-reentry {
+  background: rgba(234, 179, 8, 0.15);
+  color: #eab308;
+  border: 1px solid rgba(234, 179, 8, 0.3);
+}
+
+.gm-currency-lapsed {
+  background: rgba(249, 115, 22, 0.15);
+  color: #f97316;
+  border: 1px solid rgba(249, 115, 22, 0.3);
+}
+
+.gm-currency-neutral {
+  background: rgba(148, 163, 184, 0.15);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.gm-currency-period-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-top: 4px;
+}
+
+@media (min-width: 640px) {
+  .gm-currency-period-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.gm-currency-period-item {
+  background: var(--gm-bg-surface);
+  border-radius: var(--gm-radius-sm);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gm-currency-period-num {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--gm-text-primary);
+  font-feature-settings: "tnum";
+}
+
+.gm-currency-period-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  color: var(--gm-text-muted);
+  font-weight: 600;
+}
+
+.gm-stats-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gm-stats-section-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--gm-text-muted);
+  margin: 0;
+}
+
+.gm-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+@media (min-width: 640px) {
+  .gm-stats-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.gm-stats-metric-card {
+  background: var(--gm-bg-card);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-md);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gm-stats-metric-val {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--gm-text-primary);
+  font-feature-settings: "tnum";
+  line-height: 1.2;
+}
+
+.gm-stats-metric-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  color: var(--gm-text-muted);
+  font-weight: 600;
+}
+
+.gm-stats-metric-sub {
+  font-size: 0.7rem;
+  color: var(--gm-text-secondary);
+  margin-top: 2px;
+}
+
+.gm-stats-distribution-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 640px) {
+  .gm-stats-distribution-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.gm-dist-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--gm-bg-card);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-md);
+  padding: 12px;
+}
+
+.gm-dist-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gm-dist-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+}
+
+.gm-dist-name {
+  font-weight: 600;
+  color: var(--gm-text-primary);
+}
+
+.gm-dist-count {
+  font-size: 0.75rem;
+  color: var(--gm-text-muted);
+  font-feature-settings: "tnum";
+}
+
+.gm-dist-bar-bg {
+  width: 100%;
+  height: 6px;
+  background: var(--gm-bg-surface);
+  border-radius: var(--gm-radius-full, 9999px);
+  overflow: hidden;
+}
+
+.gm-dist-bar-fill {
+  height: 100%;
+  background: var(--gm-accent-sky, #38bdf8);
+  border-radius: var(--gm-radius-full, 9999px);
+}
+
+/* Import Dedicated Sheet Styles */
+.gm-import-sheet-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 8px 4px;
+}
+
+.gm-import-sheet-intro {
+  font-size: 0.85rem;
+  color: var(--gm-text-secondary);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.gm-import-sheet-dropzone {
+  border: 2px dashed var(--gm-border-strong);
+  border-radius: var(--gm-radius-lg);
+  background: var(--gm-bg-surface);
+  padding: 28px 16px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: border-color var(--gm-transition-fast), background-color var(--gm-transition-fast);
+}
+
+.gm-import-sheet-dropzone.dragover {
+  border-color: var(--gm-accent, #38bdf8);
+  background: rgba(56, 189, 248, 0.08);
+}
+
+.gm-import-dropzone-icon {
+  color: var(--gm-accent, #38bdf8);
+  margin-bottom: 2px;
+}
+
+.gm-import-sheet-dropzone-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--gm-text-primary);
+}
+
+.gm-import-sheet-dropzone-sub {
+  font-size: 0.8rem;
+  color: var(--gm-text-muted);
+}
+
+.gm-import-compat-card {
+  background: var(--gm-bg-surface);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-md);
+  padding: 12px;
+}
+
+.gm-import-compat-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--gm-text-muted);
+  margin-bottom: 6px;
+}
+
+.gm-import-compat-list {
+  list-style: disc;
+  padding-left: 18px;
+  font-size: 0.8rem;
+  color: var(--gm-text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+}
+
+.gm-import-progress-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  background: var(--gm-bg-surface);
+  border-radius: var(--gm-radius-md);
+}
+
+.gm-import-progress-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--gm-text-primary);
+}
+
+.gm-import-progress-bar-bg {
+  width: 100%;
+  height: 8px;
+  background: var(--gm-bg-base);
+  border-radius: var(--gm-radius-full, 9999px);
+  overflow: hidden;
+}
+
+.gm-import-progress-bar {
+  height: 100%;
+  background: var(--gm-accent, #38bdf8);
+  border-radius: var(--gm-radius-full, 9999px);
+  transition: width 0.2s ease-out;
+}
+
+.gm-import-summary-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  background: var(--gm-bg-surface);
+  border: 1px solid var(--gm-border-strong);
+  border-radius: var(--gm-radius-md);
+}
+
+.gm-import-summary-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.gm-import-summary-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  font-weight: 800;
+  flex-shrink: 0;
 }
 
 .gm-logbook-empty {

@@ -33,34 +33,18 @@ function createMockContainer() {
       }
     },
     querySelector(selector) {
-      if (selector === '#gm-logbook-file-input') {
-        let clicked = false;
+      if (selector === '#gm-logbook-search-input') {
         return {
-          id: 'gm-logbook-file-input',
-          type: 'file',
+          id: 'gm-logbook-search-input',
           value: '',
-          click() { clicked = true; },
-          get wasClicked() { return clicked; },
           addEventListener() {},
           removeEventListener() {}
         };
       }
-      if (selector === '#gm-logbook-dropzone') {
+      if (selector === '#gm-flight-list-container') {
         return {
-          id: 'gm-logbook-dropzone',
-          classList: {
-            classes: new Set(),
-            add(c) { this.classes.add(c); },
-            remove(c) { this.classes.delete(c); },
-            contains(c) { return this.classes.has(c); }
-          }
+          innerHTML: ''
         };
-      }
-      if (selector === '#gm-logbook-progress-wrap') {
-        return { style: { display: 'none' } };
-      }
-      if (selector === '#gm-logbook-progress-bar') {
-        return { style: { width: '0%' } };
       }
       if (selector.includes('gm-logbook-undo-banner')) {
         return {
@@ -139,6 +123,9 @@ describe('LogbookView Controller & Outdoor Ergonomics (UI Layer)', () => {
           tracksImportedCount: 1,
           newFlightsCount: 2
         };
+      },
+      async importIgcTrack(text, options = {}) {
+        return { success: true };
       }
     };
 
@@ -154,34 +141,31 @@ describe('LogbookView Controller & Outdoor Ergonomics (UI Layer)', () => {
     controller.unmount();
   });
 
-  it('should mount into container and render initial empty state with career KPIs', async () => {
+  it('should mount into container and render initial empty state with segmented control', async () => {
     await controller.mount(container);
 
-    assert.ok(container.innerHTML.includes('gm-logbook-view'), 'Must render root logbook view');
-    assert.ok(container.innerHTML.includes('Statistiche di Carriera'), 'Must render career KPIs heading');
-    assert.ok(container.innerHTML.includes('Ore Volate'), 'Must render Ore Volate KPI');
-    assert.ok(container.innerHTML.includes('Numero Voli'), 'Must render Numero Voli KPI');
-    assert.ok(container.innerHTML.includes('Quota Max MSL'), 'Must render Quota Max KPI');
-    assert.ok(container.innerHTML.includes('Distanza Max'), 'Must render Distanza Max KPI');
+    const html = container.innerHTML;
+    assert.ok(html.includes('gm-logbook-view'), 'Must render root logbook view');
+    assert.ok(html.includes('gm-segmented-control'), 'Must render segmented control');
+    assert.ok(html.includes('Voli (0)'), 'Must render Voli tab with 0 count');
+    assert.ok(html.includes('Statistiche &amp; Valuta'), 'Must render Statistiche & Valuta tab');
+
+    // Header upload trigger
+    assert.ok(html.includes('+ Importa'), 'Must render + Importa header button');
 
     // Empty state
-    assert.ok(container.innerHTML.includes('Nessun volo memorizzato'), 'Must render clean empty state');
-    assert.ok(container.innerHTML.includes('Carica il tuo primo file .IGC'));
-
-    // Upload action
-    assert.ok(container.innerHTML.includes('+ Importa Traccia IGC'), 'Must render prominent upload CTA');
-    assert.ok(container.innerHTML.includes('gm-logbook-dropzone'), 'Must render drag & drop zone');
+    assert.ok(html.includes('Nessun volo memorizzato nel Logbook'), 'Must render clean empty state');
+    assert.ok(html.includes('+ Importa Traccia IGC / Backup'), 'Must render primary upload button in empty state');
   });
 
-  it('should render flight list with responsive cards, altimetric sparklines, and glider classes', async () => {
+  it('should render flight list with lean cards, altimetric sparklines, and glider classes', async () => {
     storeInstance.setState({ flights: [mockFlight1, mockFlight2] });
     await controller.mount(container);
 
     const html = container.innerHTML;
 
-    // Career KPIs with 2 flights
-    assert.ok(html.includes('I Miei Voli (2)'));
-    assert.ok(html.includes('1.9 h') || html.includes('2 h'), 'Must show total formatted flight hours');
+    // Segmented tab shows count (2)
+    assert.ok(html.includes('Voli (2)'));
 
     // Flight 1 Card (Latest = #2)
     assert.ok(html.includes('gm-flight-number-badge'), 'Must render flight number badge');
@@ -192,9 +176,7 @@ describe('LogbookView Controller & Outdoor Ergonomics (UI Layer)', () => {
     assert.ok(html.includes('EN-A'));
     assert.ok(html.includes('1480 m'), 'Must show max altitude');
     assert.ok(html.includes('+420 m'), 'Must show altitude gain');
-    assert.ok(html.includes('3.2 m/s'), 'Must show climb rate');
-    assert.ok(html.includes('1 termica'), 'Must show thermal count');
-    assert.ok(html.includes('3.1 km'), 'Must show distance');
+    assert.ok(html.includes('45 min'), 'Must show duration');
 
     // Altimetric Sparkline SVG polyline
     assert.ok(html.includes('gm-flight-sparkline'));
@@ -205,12 +187,83 @@ describe('LogbookView Controller & Outdoor Ergonomics (UI Layer)', () => {
     assert.ok(html.includes('Ozone Rush 6'));
     assert.ok(html.includes('EN-B'));
     assert.ok(html.includes('1750 m'));
-    assert.ok(html.includes('3 termiche'));
+    assert.ok(html.includes('+850 m'));
+    assert.ok(html.includes('70 min'));
 
-    // Action buttons
-    assert.ok(html.includes('Visualizza Replay 3D'));
-    assert.ok(html.includes('Scarica IGC'));
-    assert.ok(html.includes('Elimina'));
+    // Entire card is touch interactive (Card-as-Target)
+    assert.ok(html.includes('data-action="open-flight-detail"'));
+    assert.ok(html.includes('data-action="delete-flight"'));
+
+    // Button clutter eliminated from feed (moved to detail sheet)
+    assert.ok(!html.includes('Visualizza Replay 3D'), 'Must not clutter card with 3D replay button');
+    assert.ok(!html.includes('Scarica IGC'), 'Must not clutter card with download button');
+  });
+
+  it('should filter flights by category chips and search query', async () => {
+    storeInstance.setState({ flights: [mockFlight1, mockFlight2] });
+    await controller.mount(container);
+
+    // Initial: both visible
+    assert.equal(controller.filterFlights([mockFlight1, mockFlight2]).length, 2);
+
+    // Filter by EN-A
+    controller.activeFilter = 'EN-A';
+    const enAFlights = controller.filterFlights([mockFlight1, mockFlight2]);
+    assert.equal(enAFlights.length, 1);
+    assert.equal(enAFlights[0].id, mockFlight1.id);
+
+    // Filter by EN-B
+    controller.activeFilter = 'EN-B';
+    const enBFlights = controller.filterFlights([mockFlight1, mockFlight2]);
+    assert.equal(enBFlights.length, 1);
+    assert.equal(enBFlights[0].id, mockFlight2.id);
+
+    // Filter by Search Query
+    controller.activeFilter = 'all';
+    controller.searchQuery = 'Cornizzolo';
+    const searchResult = controller.filterFlights([mockFlight1, mockFlight2]);
+    assert.equal(searchResult.length, 1);
+    assert.equal(searchResult[0].site, 'Monte Cornizzolo');
+
+    // Reset filters
+    controller.searchQuery = '';
+    assert.equal(controller.filterFlights([mockFlight1, mockFlight2]).length, 2);
+  });
+
+  it('should render Pilot Statistics and Currency Dashboard when switching to stats tab', async () => {
+    storeInstance.setState({ flights: [mockFlight1, mockFlight2] });
+    await controller.mount(container);
+
+    // Switch to stats sub-tab
+    controller.activeTab = 'stats';
+    controller.render();
+
+    const html = container.innerHTML;
+
+    // Currency Card
+    assert.ok(html.includes('Valuta &amp; Continuità Pilota'));
+    assert.ok(html.includes('gm-currency-card'));
+    assert.ok(html.includes('Voli (ultimi 30 gg)'));
+    assert.ok(html.includes('Ore (ultimi 30 gg)'));
+
+    // Career Totals
+    assert.ok(html.includes('Totali di Carriera'));
+    assert.ok(html.includes('Ore Totali'));
+    assert.ok(html.includes('Voli Totali'));
+    assert.ok(html.includes('Termiche Agganciate'));
+
+    // Personal Records
+    assert.ok(html.includes('Migliori Prestazioni Personali'));
+    assert.ok(html.includes('Quota Max MSL'));
+    assert.ok(html.includes('1750 m'), 'Must show highest altitude among flights');
+    assert.ok(html.includes('Maggior Guadagno'));
+    assert.ok(html.includes('+850 m'), 'Must show max gain');
+    assert.ok(html.includes('Volo Più Lungo'));
+    assert.ok(html.includes('70 min'), 'Must show max duration');
+
+    // Top Sites and Gliders
+    assert.ok(html.includes('Decolli Più Frequentati'));
+    assert.ok(html.includes('Vele Utilizzate'));
   });
 
   it('should adhere to Laws of UX (Von Restorff, Fitts >= 48px, WAI-ARIA and no banned emojis)', async () => {
@@ -221,10 +274,11 @@ describe('LogbookView Controller & Outdoor Ergonomics (UI Layer)', () => {
 
     // WAI-ARIA accessibility landmarks
     assert.ok(html.includes('role="region"'));
+    assert.ok(html.includes('role="tablist"'));
+    assert.ok(html.includes('role="tab"'));
     assert.ok(html.includes('role="list"'));
     assert.ok(html.includes('role="listitem"'));
     assert.ok(html.includes('aria-label="Libretto di Volo e Telemetria"'));
-    assert.ok(html.includes('aria-label="Caricamento Traccia IGC"'));
 
     // Fitts's Law touch target floor
     assert.ok(html.includes('--gm-touch-min, 48px'));
@@ -244,6 +298,8 @@ describe('LogbookView Controller & Outdoor Ergonomics (UI Layer)', () => {
 
     // Simulate clicking "Elimina"
     const deleteBtn = {
+      stopPropagation() {},
+      preventDefault() {},
       target: {
         closest: (sel) => {
           if (sel === '[data-action]') {
@@ -270,6 +326,8 @@ describe('LogbookView Controller & Outdoor Ergonomics (UI Layer)', () => {
 
     // Simulate clicking "Annulla"
     const undoBtn = {
+      stopPropagation() {},
+      preventDefault() {},
       target: {
         closest: (sel) => {
           if (sel === '[data-action]') {
@@ -322,6 +380,8 @@ describe('LogbookView Controller & Outdoor Ergonomics (UI Layer)', () => {
 
     // Dismiss banner
     const dismissBtn = {
+      stopPropagation() {},
+      preventDefault() {},
       target: {
         closest: (sel) => {
           if (sel === '[data-action]') {

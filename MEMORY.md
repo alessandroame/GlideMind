@@ -1246,4 +1246,32 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
      - `lapsed`: ultimo volo $> 90\text{ gg}$ -> `'Fermo prolungato'`, badge arancione (`gm-badge-alert`), raccomandata cautela, campetto di gonfiaggio o volo di ripresa.
   3. **Explainability Diretta sul Badge**: Il badge include sempre un attributo `title` con il numero esatto di giorni trascorsi dall'ultimo volo e un suggerimento pratico di sicurezza per orientare il pilota.
 
+---
 
+## 103. Separazione Tripartita della UX del Libretto di Volo (Logbook Puro, Dashboard Valuta e Ingestione Dedicata)
+- **Problema**: Accorpare in un'unica pagina a scorrimento verticale la dropzone permanente di upload IGC ($200\text{px}$), i riquadri delle statistiche di carriera, la ricerca, i filtri e l'elenco dei voli con card pesanti ($320\text{px}$) crea grave sovraccarico tematico (3 compiti disomogenei), occupa metà dello schermo con un'azione di upload episodica (1% del tempo d'uso) e costringe il pilota a scorrere a lungo per leggere anche un solo volo.
+- **Causa Radice**: Mancata separazione architetturale tra le tre distinte intenzioni d'uso (Jobs To Be Done): consultazione rapida del feed cronologico, analisi retrospettiva della sicurezza/progressione e procedura transazionale di caricamento file.
+- **Pattern Vincolante**:
+  1. **Segmented Control Sub-Navigazione**: All'interno del tab Logbook della barra inferiore (mantenendo invariate le 5 tab primarie per non degradare i touch target su mobile), prevedere un selettore a due schede immediate: `[ Voli (N) ]` e `[ Statistiche & Valuta ]`.
+  2. **Card Volo Snella & Card-as-Target (~110px)**: Nel feed `Voli`, eliminare le righe di bottoni testuali ridondanti (Replay 3D, Scarica IGC, Dettagli, Elimina); l'intera card diventa un unico touch target ergonomico ($\ge 48\text{px}$) che apre la `FlightDetailSheet`, mostrando `#NumeroVolo` come primissimo elemento, data/orario, 3 sole metriche glanceable (Tempo, Quota, Guadagno/Distanza), sparkline sottile e pulsante discreto di eliminazione rapida con finestra di grazia Undo 5s (NN/G #3).
+  3. **Dashboard Statistiche & Valuta Separata (`LogbookStatsView.js`)**: Dedicare la seconda sub-vista alla valuta del pilota (giorni dall'ultimo volo, raccomandazione didattica EN-A), totali di carriera (ore, termiche, manovre), record personali e distribuzione per decolli e vele.
+  4. **Ingestione On-Demand (`ImportFlightSheet.js`)**: L'upload di tracce IGC e backup ParaMeteo viene delegato a un modal sheet dedicato a piena altezza attivabile dal pulsante `+ Importa` in testata o in automatico se il libretto ha 0 voli, con dropzone touch, indicatore di avanzamento e report di deduplicazione, preservando la pulizia del feed principale.
+
+
+
+
+
+---
+
+## 103. Monitoraggio della Finestra di Contesto e Riavvio della Sessione (Session Longevity Guard)
+- **Problema**: L'accumulo prolungato di turni utente-agente e grandi payload di tool (dump file, test log, diff estesi) all'interno di una singola sessione di chat provoca saturazione della finestra di contesto, con conseguente decadimento delle prestazioni del modello LLM.
+- **Causa Radice**:
+  1. *Lost in the Middle & Attention Drift*: Il modello fatica a mantenere la focalizzazione su vincoli specifici stabiliti nei primi turni, rischiando di reintrodurre antipattern o fare regressioni.
+  2. *Ambiguità di Stato*: La presenza nel contesto di stati precedenti del codice, modifiche intermedie e log superati genera confusione rispetto allo stato corrente del filesystem.
+  3. *Latenza e Consumo Token*: Ogni nuovo turno deve ri-processare l'intera cronologia accumulata, rallentando drasticamente il tempo di risposta (TTFT).
+- **Pattern Vincolante**:
+  1. **Monitoraggio dei Turni**:
+     - *Soglia di Attenzione*: A $\ge 15-20$ turni utente (o con transcript densa di file dump), l'agente notifica l'avvicinamento al limite ottimale.
+     - *Soglia Critica*: A $\ge 25$ turni, l'agente raccomanda esplicitamente di sincronizzare lo stato cognitivo (`memory-sync`), completare il task e aprire una nuova chat pulita.
+  2. **Transizione Naturale su Confine di Task (Task Boundary)**: Il completamento di uno step di `DESIDERATA.md` o di un fix strutturale è il momento architetturalmente ideale per chiudere la sessione ed eseguire il riavvio fresco con `/next-step`.
+  3. **Alert Strutturato**: Inserimento a fine messaggio di un box di avviso esplicito con indicazione del comando `/next-step` per la sessione successiva.
