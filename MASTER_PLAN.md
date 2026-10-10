@@ -184,40 +184,41 @@ The new application will deliver:
 - [ ] Renderizzazione passiva dei poligoni territoriali nell'overlay `ForecastView.js` senza logica CAD complessa.
 
 ### Phase 6: Flight Logbook & Telemetry Module (🔴 Prossimo Step Primario)
+- [ ] Piano architetturale: [docs/plans/phase-6-flight-logbook-and-telemetry.md](file:///docs/plans/phase-6-flight-logbook-and-telemetry.md).
 - [ ] Implement `core/logbookDb.js`:
-  - Storage driver pattern con driver asincrono IndexedDB (`createIndexedDbAdapter`) e driver in-memory (`createMemoryDbAdapter`) per esecuzione headless e test in Node.js.
-  - **Salvaguardia Anti-Eviction Mobile**: Richiesta automatica di storage persistente tramite `navigator.storage.persist()` all'inizializzazione del database per impedire la cancellazione automatica dei voli da parte di iOS Safari o Android dopo 7 giorni di inattività.
+  - **Storage Driver Pattern Headless**: Interfaccia disaccoppiata con driver asincrono IndexedDB (`createIndexedDbAdapter`) e driver in-memory puro (`createMemoryDbAdapter`) per esecuzione e test Node.js al 100% a 0ms (Gate 2).
+  - **Salvaguardia Anti-Eviction Mobile**: Richiesta automatica di storage persistente tramite `navigator.storage.persist()` all'inizializzazione del database. Se non concessa, esposizione di banner informativo discreto per raccomandare l'installazione su Home Screen (PWA) e la salvaguardia da cancellazioni automatiche a 7 giorni (WebKit ITP).
   - **Schema a Due Livelli Anti-Bloat**:
-    - `flights_meta`: record leggero con KPI, metadati sintetici, timestamp deterministico `updatedAt` e fingerprint univoco del volo (deduplicazione idempotente anti-duplicati).
-    - `flights_raw`: blob di testo IGC e campionamenti GPS 1Hz, caricati asincronamente on-demand solo per il Replay 3D.
-  - **Parsing Chunkato Asincrono**: Elaborazione progressiva dei tracciati IGC di grandi dimensioni (>30.000 record) per preservare la reattività della UI e rispettare la Doherty Threshold (< 400ms).
+    - `flights_meta`: record leggero con KPI di volo, metadati sintetici, data, durata, modello vela, termiche, sparkline altimetrica SVG, timestamp deterministico `updatedAt` e fingerprint immutabile per deduplicazione idempotente anti-duplicati.
+    - `flights_raw`: blob di testo IGC e campionamenti GPS 1Hz, salvati separatamente e caricati asincronamente on-demand solo per il Replay 3D.
+  - **Parsing Chunkato Asincrono & Pre-Decimazione**: Elaborazione progressiva dei tracciati IGC di grandi dimensioni (>20.000 record) a blocchi di 2.000 righe rilasciando il thread principale con `scheduler.yield()` / `setTimeout(..., 0)` (soglia Doherty < 400ms); decimazione LTTB preventiva a 1.500 campioni prima del calcolo termiche/virate (`flightManeuvers.js`) per evitare saturazione heap (OOM).
 - [ ] Implement `ui/views/LogbookView.js`:
-  - Inserimento traccia IGC con drag-and-drop / file picker e parsing automatico immediato.
-  - Card di volo strutturate con profilo altimetrico sintetico, durata, conteggio termiche rilevate e vela associata.
-  - Contatori KPI di carriera (ore totali, numero voli, quota massima, durata massima) calcolati istantaneamente da `flights_meta`.
+  - Inserimento traccia IGC con drag-and-drop / file picker touch ($\ge 48\times 48\text{px}$) e parsing automatico immediato.
+  - Card di volo strutturate a larghezza 100% con sparkline altimetrico compatto, durata, decollo/atterraggio riconosciuti da catalogo, termiche rilevate e vela associata.
+  - Contatori KPI di carriera (ore totali, numero voli, quota massima, durata massima) calcolati istantaneamente dall'indice `flights_meta`.
 
 ### Phase 6-bis: Backup, Auto-Sync & Restore Engine (⚪ Pianificato)
 - [ ] Implement `core/backupManager.js` & `core/syncDirtyTracker.js`:
   - **Full System Snapshot**: Esportazione e importazione dell'intero stato applicativo (impostazioni LocalStorage, vele, località personalizzate + voli e tracce IndexedDB) in un singolo file `.json`. Opzioni di ripristino: *Sovrascrittura Completa* (Reconstruct) o *Smart Merge Non Distruttivo* guidato dal timestamp `updatedAt` (Last-Write-Wins).
   - **Prevenzione Quota Memory Blob**: Generazione del download tramite `URL.createObjectURL(new Blob([json], { type: 'application/json' }))` con rilascio immediato `URL.revokeObjectURL(url)` per evitare memory leak su backup > 30 MB.
   - **Backup & Restore Modulare del Logbook**: Esportazione e ripristino dedicati e indipendenti per il solo libretto di volo (metadati e tracce IGC), per consentire al pilota di archiviare o trasferire i propri voli separatamente dalle preferenze dell'app.
-  - **Auto-Sync & Dirty Tracking**: Rilevamento in memoria delle modifiche pendenti non archiviate (`syncDirtyTracker`), banner di notifica discreto nella Thumb Zone (se trascorsi >14 giorni o $\ge 3$ nuovi voli) e predisposizione architetturale per adapter di cloud sync (Google Drive / remote folder).
+  - **Auto-Sync & Dirty Tracking**: Rilevamento in memoria delle modifiche pendenti non archiviate (`syncDirtyTracker`), notifica discreta nella Thumb Zone (se trascorsi >14 giorni o $\ge 3$ nuovi voli) come barriera proattiva anti-eviction, e predisposizione architetturale per adapter di cloud sync (Google Drive / remote folder).
 
 ### Phase 7: 3D Flight Replay with Synced Telemetry (Dual-Engine Architecture) (⚪ Pianificato)
 - [ ] Implement `ui/views/FlightReplayView.js`:
   - **Interfaccia Astratta del Motore 3D (`IReplay3dEngine`)**:
     - Disaccoppiamento totale tra controller UI, controlli playback (play, pause, scrub, velocità 1x-20x, camera follow modes) e rendering 3D.
-    - **Telemetria 2D Indipendente su Canvas**: HUD e strip del profilo/variometro (gradiente FAI e decimazione LTTB) renderizzati su `HTMLCanvasElement` 2D separato e reattivo a 60 FPS, totalmente autonomo dal motore WebGL.
-    - **Degradazione Spaziale Antigravità**: In caso di assenza di rete per le tile DEM o mancato supporto WebGL, fallback a rendering vettoriale 3D spaziale su griglia geometrica senza crash.
+    - **Telemetria 2D Indipendente su Canvas**: HUD e strip del profilo/variometro (gradiente FAI e decimazione LTTB) renderizzati su `HTMLCanvasElement` 2D separato e reattivo a 60 FPS, totalmente autonomo dal motore WebGL per azzerare frame drop e sopravvivere a crash GPU.
+    - **Gestione Ciclo di Vita WebGL & Degradazione Offline**: Intercettazione esplicita degli eventi `webglcontextlost` e `webglcontextrestored`; fallback immediato a rendering vettoriale spaziale 3D su griglia cartesiana piana senza crash in caso di mancanza di rete per le tile DEM o perdita di contesto grafico.
   - **Engine Primario**: MapLibre GL 3D + Three.js CustomLayer (conforme a `geodesy_webgl_3d_spec.md` con decodifica DEM Terrarium e modello parapendio `.glb` in `data/models/`).
   - **Engine di Fallback Consolidato**: CesiumJS (con coordinate cartesiane WGS84 native, come empiricamente verificato nei test ParaMeteo), pronto a intervenire senza riscritture dell'interfaccia o della telemetria in caso di anomalie sul layer MapLibre.
 
 ### Phase 8: PWA, Multilingual (i18n) & Offline Hardening (⚪ Pianificato)
 - [ ] Service worker (`sw.js`) con architettura di caching a isolamento:
   - `Cache-First` rigoroso per asset statici applicativi locali (`index.html`, `css/theme.css`, file JS, catalogo comprensori, icone).
-  - `Network-Only` (pass-through trasparente non intercettato) per le tile cartografiche esterne (OpenTopoMap, DEM raster RGB) per prevenire categoricamente errori di quota storage esaurita (`QuotaExceededError`).
-- [ ] Web App Manifest (`manifest.webmanifest`) con icone ad alto contrasto per installazione standalone.
-- [ ] Supporto i18n per 4 lingue (Italiano, Inglese, Francese, Tedesco) con dizionari iniettati come dipendenze pure.
+  - `Network-Only` (pass-through trasparente non intercettato) categorico per tutti i server di tile cartografiche esterne (OpenTopoMap, Esri Satellite, CyclOSM, raster DEM RGB) per prevenire in modo assoluto errori di quota storage esaurita (`QuotaExceededError`) che bloccherebbero IndexedDB.
+- [ ] Web App Manifest (`manifest.webmanifest`) con icone ad alto contrasto e orientamento portrait per installazione standalone.
+- [ ] Supporto i18n per 4 lingue (Italiano, Inglese, Francese, Tedesco) con dizionari iniettati come moduli puri.
 - [ ] Audit di accessibilità WCAG 2.1 AA e verifica leggibilità outdoor sotto luce solare diretta con palette ad alto contrasto su entrambi i temi.
 
 ### Phase 8-bis: Settings View, Glider Hangar & Dual Theme Engine (🟢 Completata)

@@ -1058,3 +1058,53 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
      - `footer.gm-map-scrubber-container`: `position: relative; flex-shrink: 0;`, barra solida ancorata in basso con `border-top` ed elevazione discreta, contenente la timeline oraria.
   2. **Zero Occlusioni Cartografiche**: L'ingombro del canvas Leaflet calcola l'`invalidateSize()` sull'effettiva altezza utile tra le due barre, garantendo che centratura, bounds ed estensione dei comprensori restino sempre al 100% visibili.
 
+---
+
+## 87. Salvaguardia da Storage Eviction Mobile & PWA Prompt (IndexedDB Defense)
+- **Problema**: I motori browser mobili (WebKit ITP su iOS Safari e Android in low-storage) eliminano silenziosamente IndexedDB e LocalStorage dopo 7 giorni di mancata interazione o in caso di pressione sulla memoria di massa del dispositivo.
+- **Causa Radice**: Trattare IndexedDB come archivio permanente di default, ignorando che sui sistemi operativi mobili viene classificato come storage best-effort revocabile.
+- **Pattern Vincolante**:
+  1. Invocare sistematicamente `navigator.storage.persist()` all'inizializzazione del database di volo.
+  2. Se la richiesta restituisce `false`, esporre un avviso informativo non invasivo che raccomandi l'installazione come PWA ("Aggiungi a schermata Home", condizione che su iOS garantisce la persistenza a lungo termine).
+  3. Collegare la salvaguardia al `syncDirtyTracker` (Fase 6-bis) per sollecitare il download del file `.json` di backup se trascorrono >14 giorni o risultano memorizzati $\ge 3$ nuovi voli.
+
+---
+
+## 88. Prevenzione Thread-Lock & OOM nel Parsing di Tracce IGC Grandi (Chunking & Decimazione Preventiva)
+- **Problema**: L'importazione di file IGC estesi (>20.000 record B per voli di 4-6 ore) blocca il thread principale per oltre 1-2 secondi, superando la Doherty Threshold (<400ms) e rischiando freeze, crash da Out-Of-Memory (OOM) o avvisi di pagina non reattiva (ANR) su smartphone.
+- **Causa Radice**: Parsing sincrono in un singolo blocco e calcolo immediato di virate/termiche (`flightManeuvers.js`) sull'array completo dei punti GPS non decimati.
+- **Pattern Vincolante**:
+  1. **Parsing Asincrono Chunkato**: Elaborazione a blocchi di 2.000 righe rilasciando il thread principale con `scheduler.yield()` / `setTimeout(..., 0)` aggiornando una barra di avanzamento lineare deterministica.
+  2. **Pre-Decimazione LTTB**: Riduzione preventiva a 1.500 campioni significativi tramite `decimateLTTB` prima dell'esecuzione del rilevamento manovre e del guadagno termico, riducendo i tempi di calcolo da ~2s a <65ms.
+  3. **Segregazione Immediata della Memoria**: Memorizzare il testo integrale IGC nello store isolato `flights_raw` e deallocare immediatamente l'array completo dalla memoria heap.
+
+---
+
+## 89. Injectable Storage Adapter Pattern per Database Headless (Node.js Test Isolation)
+- **Problema**: L'uso diretto di riferimenti a `window.indexedDB` o `IDBKeyRange` nel modulo `core/logbookDb.js` provoca il fallimento a catena del test runner nativo Node.js (`node --test`), rompendo i 447 test della suite e violando il vincolo di Headless Core (Gate 2).
+- **Causa Radice**: Mancata astrazione dello strato di persistenza rispetto al runtime di esecuzione.
+- **Pattern Vincolante**:
+  1. `core/logbookDb.js` deve accettare un adapter iniettabile conforme all'interfaccia `ILogbookDbAdapter`.
+  2. Fornire come implementazione predefinita `createMemoryDbAdapter()` basata su `Map` JavaScript pura, utilizzata per tutti i test Node.js a 0ms senza polyfill.
+  3. `createIndexedDbAdapter()` deve essere montato unicamente dall'ambiente browser reale della UI.
+
+---
+
+## 90. Gestione WebGL Context Loss & Degradazione Spaziale Vettoriale Offline (Replay 3D Resiliente)
+- **Problema**: Sui dispositivi mobili, WebGL subisce frequenti perdite di contesto grafico (`webglcontextlost`) in condizioni di memoria GPU limitata o quando l'app va in background. Inoltre, l'assenza di connessione sui decolli impedisce il download di tile DEM raster remote, bloccando il Replay 3D.
+- **Causa Radice**: Mancata gestione del ciclo di vita WebGL e accoppiamento rigido del rendering 3D alle sole mesh DEM esterne.
+- **Pattern Vincolante**:
+  1. Intercettare e gestire esplicitamente `webglcontextlost` e `webglcontextrestored` nell'adapter `IReplay3dEngine`.
+  2. Disaccoppiare la telemetria 2D (variometro, profilo, quote FAI) su un elemento `Canvas` 2D autonomo renderizzato a 60 FPS, totalmente svincolato da WebGL.
+  3. Prevedere una modalità di degradazione spaziale vettoriale 3D su griglia cartesiana piana calibrata sulle quote barometriche IGC in caso di offline o crash GPU.
+
+---
+
+## 91. Politica Network-Only Categorica nel Service Worker per Tile Cartografiche (Anti-QuotaExceededError)
+- **Problema**: La memorizzazione automatica delle tile cartografiche esterne nella Cache Storage del Service Worker esaurisce rapidamente la quota massima consentita dal browser (50-100MB su WebKit), scatenando l'eccezione `QuotaExceededError` che blocca qualsiasi successiva scrittura su IndexedDB, impedendo di salvare nuovi voli o impostazioni.
+- **Causa Radice**: Mancato isolamento tra asset statici applicativi locali e stream di tile raster remote ad alto volume.
+- **Pattern Vincolante**:
+  1. Il Service Worker deve applicare una strategia `Network-Only` (pass-through trasparente non intercettato) per tutti i domini di tile cartografiche esterne (OpenTopoMap, Esri Satellite, CyclOSM, OpenStreetMap, DEM Terrarium).
+  2. Solo gli asset statici locali dell'applicazione (`index.html`, bundle CSS, icone, file JS e catalogo JSON delle località) possono risiedere nella Cache Storage con strategia `Cache-First`.
+
+

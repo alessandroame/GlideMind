@@ -966,3 +966,16 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Verificato con successo il caricamento effettivo di tutti i 4 layer su browser reale Headless Chrome: OpenTopo (curve di livello), Satellite (ortofoto Esri), CyclOSM (outdoor/sentieri) e Scuro.
   - Aggiunto test di regressione in `tests/ui/spotMapView.test.mjs`; 447/447 test passanti senza errori.
   - Registrata la Lezione Appresa #85 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-10 - Compensazione Criticità Roadmap & Integrazione Guardie nei Piani di Lavoro
+- **Tipo**: Governance / Architecture Planning / Critical Scrutiny / Pre-Flight Guards
+- **Dettagli**: [.agents/worklog.d/2026-10-10_roadmap-criticality-compensation-and-guards.md](file:///.agents/worklog.d/2026-10-10_roadmap-criticality-compensation-and-guards.md)
+- **Sintesi**:
+  - Eseguita l'analisi critica sui successivi piani di lavoro e identificate 5 vulnerabilità operative su storage eviction mobile (IndexedDB), blocco del thread UI e OOM su grandi file IGC, perdita di contesto WebGL e dipendenza DEM nel 3D, saturazione quota da tile cartografiche raster e rottura dei test headless.
+  - Redatto il piano architetturale formale [docs/plans/phase-6-flight-logbook-and-telemetry.md](file:///docs/plans/phase-6-flight-logbook-and-telemetry.md) con Injectable Storage Adapter Pattern (`createMemoryDbAdapter` vs `createIndexedDbAdapter`), schema a due livelli (`flights_meta` vs `flights_raw`), fingerprint immutabile per deduplicazione, parsing chunkato a 2.000 righe e pre-decimazione LTTB prima del calcolo manovre.
+  - Aggiornato [MASTER_PLAN.md](file:///MASTER_PLAN.md) integrando le contromisure di persistenza e le specifiche di resilienza WebGL e Service Worker per le Fasi 6, 6-bis, 7 e 8.
+  - Sincronizzata la matrice [DESIDERATA.md](file:///DESIDERATA.md).
+  - Formalizzate le Lezioni Apprese e Vincoli #87-#91 in [MEMORY.md](file:///MEMORY.md).
+
