@@ -112,14 +112,17 @@ describe('GlideMind Phase 4 - Smart Date Selector & Calendar Presets Engine', ()
 
     assert.equal(result.presets.length, 3);
     assert.equal(result.presets[0].label, 'Oggi');
+    assert.equal(result.presets[0].subLabel, '10 Ott');
     assert.equal(result.presets[0].isoDate, '2026-10-10');
     assert.equal(result.presets[0].isWeekend, true);
 
     assert.equal(result.presets[1].label, 'Domani');
+    assert.equal(result.presets[1].subLabel, '11 Ott');
     assert.equal(result.presets[1].isoDate, '2026-10-11');
     assert.equal(result.presets[1].isWeekend, true);
 
     assert.equal(result.presets[2].label, 'Prossimo Sab');
+    assert.equal(result.presets[2].subLabel, '17 Ott');
     assert.equal(result.presets[2].isoDate, '2026-10-17');
     assert.equal(result.presets[2].isWeekend, true);
   });
@@ -131,13 +134,16 @@ describe('GlideMind Phase 4 - Smart Date Selector & Calendar Presets Engine', ()
 
     assert.equal(result.presets.length, 3);
     assert.equal(result.presets[0].label, 'Oggi');
+    assert.equal(result.presets[0].subLabel, '11 Ott');
     assert.equal(result.presets[0].isoDate, '2026-10-11');
     assert.equal(result.presets[0].isWeekend, true);
 
     assert.equal(result.presets[1].label, 'Domani');
+    assert.equal(result.presets[1].subLabel, '12 Ott');
     assert.equal(result.presets[1].isoDate, '2026-10-12');
 
     assert.equal(result.presets[2].label, 'Prossimo Sab');
+    assert.equal(result.presets[2].subLabel, '17 Ott');
     assert.equal(result.presets[2].isoDate, '2026-10-17');
   });
 
@@ -217,7 +223,7 @@ describe('GlideMind Phase 4 - Smart Date Selector & Calendar Presets Engine', ()
     // 2: Rosso (Unflyable)
     const f2 = normalizeDateFlyability({ bestSeverity: 2, score: 30, limitingFactor: 'Pioggia' });
     assert.equal(f2.status, 'unflyable');
-    assert.equal(f2.label, 'Chiuso');
+    assert.equal(f2.label, 'Non Volabile');
     assert.equal(f2.icon, '✕');
     assert.equal(f2.color, 'var(--gm-status-unflyable)');
     assert.equal(f2.badgeClass, 'gm-badge-unflyable');
@@ -241,7 +247,7 @@ describe('GlideMind Phase 4 - Smart Date Selector & Calendar Presets Engine', ()
     const mockSummaries = [
       { dateStr: '2026-10-09', status: 'flyable', statusLabel: 'Volabile', bestSeverity: 0, score: 90 },
       { dateStr: '2026-10-10', status: 'caution', statusLabel: 'Cautela', bestSeverity: 1, score: 60 },
-      { dateStr: '2026-10-11', status: 'unflyable', statusLabel: 'Chiuso', bestSeverity: 2, score: 25 },
+      { dateStr: '2026-10-11', status: 'unflyable', statusLabel: 'Non Volabile', bestSeverity: 2, score: 25 },
       { dateStr: '2026-10-12', status: 'severe', statusLabel: 'Severo', bestSeverity: 3, score: 10 }
     ];
 
@@ -255,7 +261,7 @@ describe('GlideMind Phase 4 - Smart Date Selector & Calendar Presets Engine', ()
     assert.equal(enriched[1].flyability.label, 'Cautela');
 
     assert.equal(enriched[2].flyability.status, 'unflyable');
-    assert.equal(enriched[2].flyability.label, 'Chiuso');
+    assert.equal(enriched[2].flyability.label, 'Non Volabile');
 
     assert.equal(enriched[3].flyability.status, 'severe');
     assert.equal(enriched[3].flyability.label, 'Severo');

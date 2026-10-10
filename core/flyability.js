@@ -1107,7 +1107,7 @@ export function calculateDailyFlyabilitySummary(weather, targetLocOverride = nul
             badgeClass = 'gm-badge-severe';
         } else if (daySeverity === 2 || avgScore < 35) {
             status = 'unflyable';
-            statusLabel = 'Chiuso';
+            statusLabel = 'Non Volabile';
             statusIcon = '✕';
             color = 'var(--gm-status-unflyable)';
             bg = 'var(--gm-status-unflyable-bg)';

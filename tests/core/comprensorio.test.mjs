@@ -105,7 +105,7 @@ describe('GlideMind Comprensorio Locality & Dual Launch/Landing Evaluator', () =
   describe('Comprensorio Flyability Evaluation & Best Takeoff Selection', () => {
     const cornizzolo = DEFAULT_COMPRENSORI.find(c => c.id === 'monte-cornizzolo-lc');
 
-    it('should select best takeoff aligned with south wind and report Aperto', () => {
+    it('should select best takeoff aligned with south wind and report Volabile', () => {
       // Weather with wind from South (175°) at 12 km/h
       const mockWeather = {
         hourly: {
@@ -128,7 +128,7 @@ describe('GlideMind Comprensorio Locality & Dual Launch/Landing Evaluator', () =
       });
 
       assert.equal(result.status, 'flyable');
-      assert.equal(result.badge, 'Aperto');
+      assert.equal(result.badge, 'Volabile');
       assert.ok(result.bestTakeoff, 'Must select best takeoff');
       assert.equal(result.bestTakeoff.id, 'cornizzolo-risparmio', 'Risparmio (heading 170°) is best aligned with 175° wind');
       assert.ok(result.safeLanding);
@@ -136,7 +136,7 @@ describe('GlideMind Comprensorio Locality & Dual Launch/Landing Evaluator', () =
       assert.ok(result.reason.includes('in asse'), `Reason should explain alignment: ${result.reason}`);
     });
 
-    it('should report Chiuso / Unflyable when wind is tailwind (North wind on South takeoff)', () => {
+    it('should report Non Volabile / Unflyable when wind is tailwind (North wind on South takeoff)', () => {
       // Weather with strong North wind (0° / 360°) at 25 km/h
       const mockWeather = {
         hourly: {
@@ -159,7 +159,7 @@ describe('GlideMind Comprensorio Locality & Dual Launch/Landing Evaluator', () =
       });
 
       assert.equal(result.status, 'unflyable');
-      assert.equal(result.badge, 'Chiuso');
+      assert.equal(result.badge, 'Non Volabile');
       assert.ok(result.score <= 20);
     });
 
@@ -206,7 +206,7 @@ describe('GlideMind Comprensorio Locality & Dual Launch/Landing Evaluator', () =
   describe('Flyability-Sorted List of Comprensori', () => {
     it('should sort comprensori strictly in order: flyable -> caution -> unflyable', () => {
       const items = [
-        { name: 'Spot Chiuso', status: 'unflyable', score: 10 },
+        { name: 'Spot Non Volabile', status: 'unflyable', score: 10 },
         { name: 'Spot Perfetto B', status: 'flyable', score: 85 },
         { name: 'Spot Cautela', status: 'caution', score: 55 },
         { name: 'Spot Perfetto A', status: 'flyable', score: 95 }
@@ -216,7 +216,7 @@ describe('GlideMind Comprensorio Locality & Dual Launch/Landing Evaluator', () =
       assert.equal(sorted[0].name, 'Spot Perfetto A', 'Highest score flyable first');
       assert.equal(sorted[1].name, 'Spot Perfetto B', 'Second flyable');
       assert.equal(sorted[2].name, 'Spot Cautela', 'Caution follows flyable');
-      assert.equal(sorted[3].name, 'Spot Chiuso', 'Unflyable is last');
+      assert.equal(sorted[3].name, 'Spot Non Volabile', 'Unflyable is last');
     });
   });
 
@@ -358,7 +358,7 @@ describe('GlideMind Comprensorio Locality & Dual Launch/Landing Evaluator', () =
       assert.equal(result.isTakeoffOverridden, true);
       assert.ok(result.takeoffOverrideReason.includes('Decollo alternativo Decollo Nord'));
       assert.equal(result.status, 'flyable', 'Comprensorio remains flyable via alternative');
-      assert.equal(result.badge, 'Aperto');
+      assert.equal(result.badge, 'Volabile');
     });
 
     it('should retain primary takeoff when both primary and alternative are unflyable', () => {
@@ -397,7 +397,7 @@ describe('GlideMind Comprensorio Locality & Dual Launch/Landing Evaluator', () =
       assert.equal(result.takeoff.id, 't-sud', 'Should stay on primary takeoff if no better alternative exists');
       assert.equal(result.isTakeoffOverridden, false);
       assert.equal(result.status, 'unflyable');
-      assert.equal(result.badge, 'Chiuso');
+      assert.equal(result.badge, 'Non Volabile');
     });
   });
 
@@ -502,7 +502,7 @@ describe('GlideMind Comprensorio Locality & Dual Launch/Landing Evaluator', () =
       });
       assert.ok(evalResult);
       assert.equal(evalResult.status, 'flyable');
-      assert.equal(evalResult.badge, 'Aperto');
+      assert.equal(evalResult.badge, 'Volabile');
       assert.equal(evalResult.glideMetrics.isSafe, true);
       assert.equal(evalResult.glideMetrics.requiredGlideRatio, 0);
     });

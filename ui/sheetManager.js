@@ -32,6 +32,14 @@ export function initSheetManager(container = null, customStore = null) {
     return;
   }
 
+  if (containerEl.classList && !containerEl.classList.contains('active')) {
+    if (typeof containerEl.setAttribute === 'function') {
+      containerEl.setAttribute('aria-hidden', 'true');
+      containerEl.setAttribute('inert', '');
+    }
+    containerEl.inert = true;
+  }
+
   backdropEl = containerEl.querySelector('#sheet-backdrop');
   sheetEl = containerEl.querySelector('.gm-sheet');
   titleEl = containerEl.querySelector('.gm-sheet-title');
@@ -88,9 +96,11 @@ export function openSheet({ id = 'default', title, content, onOpen = null, onClo
     closeSheet(true);
   }
 
-  // Remember active element for focus restoration
-  if (typeof document !== 'undefined') {
-    previousActiveElement = document.activeElement;
+  // Remember active element for focus restoration (only if outside containerEl)
+  if (typeof document !== 'undefined' && document.activeElement) {
+    if (typeof containerEl.contains !== 'function' || !containerEl.contains(document.activeElement)) {
+      previousActiveElement = document.activeElement;
+    }
   }
 
   currentSheetConfig = { id, title, content, onOpen, onClose };
@@ -109,7 +119,13 @@ export function openSheet({ id = 'default', title, content, onOpen = null, onClo
   }
 
   containerEl.classList.add('active');
-  containerEl.setAttribute('aria-hidden', 'false');
+  if (typeof containerEl.setAttribute === 'function') {
+    containerEl.setAttribute('aria-hidden', 'false');
+  }
+  if (typeof containerEl.removeAttribute === 'function') {
+    containerEl.removeAttribute('inert');
+  }
+  containerEl.inert = false;
 
   if (activeStore && typeof activeStore.setState === 'function') {
     const uiState = activeStore.getState().ui || {};
@@ -137,15 +153,59 @@ export function openSheet({ id = 'default', title, content, onOpen = null, onClo
  * @param {boolean} [isReplacing=false] - If true, indicates an immediate replacement sheet will follow.
  */
 export function closeSheet(isReplacing = false) {
-  if (!containerEl || !containerEl.classList.contains('active')) {
+  if (!containerEl || !containerEl.classList || !containerEl.classList.contains('active')) {
     return;
   }
 
   const prevConfig = currentSheetConfig;
   currentSheetConfig = null;
 
+  // Clear focus from descendants before applying aria-hidden/inert.
+  // Modern browsers block aria-hidden if an active descendant retains focus.
+  if (
+    typeof document !== 'undefined' &&
+    document &&
+    document.activeElement &&
+    typeof containerEl.contains === 'function' &&
+    containerEl.contains(document.activeElement)
+  ) {
+    if (
+      !isReplacing &&
+      previousActiveElement &&
+      typeof previousActiveElement.focus === 'function' &&
+      document.body &&
+      typeof document.body.contains === 'function' &&
+      document.body.contains(previousActiveElement) &&
+      !containerEl.contains(previousActiveElement)
+    ) {
+      try {
+        previousActiveElement.focus();
+      } catch {
+        // Ignore focus restoration errors
+      }
+      previousActiveElement = null;
+    }
+    // If still inside containerEl, blur active element to ensure aria-hidden is not blocked
+    if (
+      typeof document !== 'undefined' &&
+      document.activeElement &&
+      containerEl.contains(document.activeElement) &&
+      typeof document.activeElement.blur === 'function'
+    ) {
+      try {
+        document.activeElement.blur();
+      } catch {
+        // Ignore blur errors
+      }
+    }
+  }
+
   containerEl.classList.remove('active');
-  containerEl.setAttribute('aria-hidden', 'true');
+  if (typeof containerEl.setAttribute === 'function') {
+    containerEl.setAttribute('aria-hidden', 'true');
+    containerEl.setAttribute('inert', '');
+  }
+  containerEl.inert = true;
 
   if (!isReplacing && activeStore && typeof activeStore.setState === 'function') {
     const uiState = activeStore.getState().ui || {};
@@ -163,7 +223,7 @@ export function closeSheet(isReplacing = false) {
     }, 300);
   }
 
-  // Restore previous focus
+  // Restore previous focus if not already restored
   if (!isReplacing && previousActiveElement && typeof previousActiveElement.focus === 'function') {
     try {
       previousActiveElement.focus();

@@ -437,8 +437,45 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
   1. **Catalogo Modelli Certificato Headless (`core/gliders.js`)**: Mantenere un catalogo curato e verificato empiricamente di oltre 50 modelli iconici dei principali 14 costruttori mondiali, con attributi completi (`brand`, `model`, `category`, `vTrim`, `vMax`, `glideRatio`, `ar`).
   2. **Interfaccia a Selezione Rapida (Filtri a Chip & Ricerca Istantanea)**: Nel modal sheet di selezione della vela, offrire una riga orizzontale a scorrimento di chip per marca (`.gm-glider-brand-chips`) combinata con una casella di ricerca reattiva a testo libero (`#glider-search-input`), azzerando il tempo di selezione a meno di 2 tap.
   3. **Deduzione Aerodinamica Automatica (Tesler's Law)**: In caso di modelli non ancora a catalogo, permettere l'inserimento libero di marca e modello; i parametri aerodinamici fondamentali vengono calcolati e dedotti automaticamente dalla classe EN indicata (`getGliderClassDefaults(category)`).
-  4. **Retrocompatibilità e Headless Purity**: Ogni oggetto vela (di serie, da catalogo o personalizzato) espone sempre le proprietà `category`, `name`, `vTrim` e `glideRatio`, garantendo che i motori di calcolo della volabilità e dei coni di atterraggio operino senza modifiche né dipendenze dal browser.
 
+---
 
+## 45. WAI-ARIA Focus Retention su Modali Nascosti e Discrepanza Interfaccia Router (`navigate` vs `navigateTo`)
+- **Problema**:
+  1. Alla chiusura dei pannelli o fogli modali (`#sheet-container`), i browser Chromium bloccano l'attributo emettendo l'avviso/errore: `Blocked aria-hidden on an element because its descendant retained focus. Avoid using aria-hidden on a focused element or its ancestor.`
+  2. Al click su una località/comprensorio nella Home Dashboard per aprire il meteo, l'applicazione si blocca con `Uncaught TypeError: this.router.navigateTo is not a function`.
+- **Causa Radice**:
+  1. In `ui/sheetManager.js`, `containerEl.setAttribute('aria-hidden', 'true')` veniva invocato prima che il focus venisse rimosso o ripristinato dall'elemento figlio cliccato (es. `<button class="gm-glider-option-card">`), violando le specifiche WAI-ARIA 1.2 che vietano `aria-hidden="true"` su un nodo che contiene `document.activeElement`. Inoltre, `#sheet-container` non impiegava l'attributo standard `inert`.
+  2. In `ui/router.js`, il metodo canonico di instradamento è sempre stato denominato `navigate`, mentre in `HomeDashboardView.js` e `ForecastView.js` veniva invocato `this.router.navigateTo`. Nei test unitari, mock ad-hoc implementavano `navigateTo`, mascherando il disallineamento rispetto al router reale singleton.
+- **Pattern Vincolante**:
+  1. **Focus Evacuation & Inert Marking**: Prima di applicare `aria-hidden="true"` ad un contenitore modale in fase di chiusura (`closeSheet`), verificare se `containerEl.contains(document.activeElement)`. Spostare immediatamente il focus sul trigger di apertura precedente (`previousActiveElement`) oppure invocare esplicitamente `document.activeElement.blur()`. Contestualmente, applicare l'attributo standard `inert` (`containerEl.setAttribute('inert', ''); containerEl.inert = true;`) quando chiuso e rimuoverlo all'apertura (`containerEl.removeAttribute('inert'); containerEl.inert = false;`).
+  2. **Interfaccia Router Resiliente**: `createRouter` in `ui/router.js` deve esportare l'alias `navigateTo: navigate`. Contestualmente, i view controller devono disporre di un metodo proxy sicuro `navigateTo(route, params)` che invoca `this.router.navigate || this.router.navigateTo`, garantendo robustezza assoluta sia con il router reale che con qualsiasi mock di test.
+  3. **Zero Faux-Testing sui Router Mock**: Nei test unitari, i contratti mockati devono riflettere l'API standard del router singleton (`navigate`), evitando asimmetrie tra ambiente di collaudo e runtime browser di produzione.
 
+---
+
+## 46. Collapsing Sticky Header per Continuità Cognitiva su Scroll (Recognition over Recall) & Defensive DOM Guards
+- **Problema**:
+  1. Durante lo scorrimento verso il basso in `ForecastView` (per consultare diagrammi del vento, radiosondaggi e briefing di Guido), i selettori di comprensorio e decollo scorrono fuori dal viewport. Il pilota perde l'ancoraggio visivo su quale decollo e quota siano selezionati, rischiando errori di valutazione sull'allineamento anemometrico del pendio (violazione dell'euristica NN/G #6 *Recognition over Recall*).
+  2. L'aggiunta di listener di scroll sul contenitore ha provocato fallimenti nei test unitari con mock container minimalistici: `TypeError: this.containerEl.querySelector is not a function`.
+- **Causa Radice**:
+  1. Header monolitico che scorre interamente con il corpo della pagina, in assenza di una testata contestuale collassabile.
+  2. Assunzione indebita della presenza di `querySelector` in mock container headless privi di layout engine o API DOM complete.
+- **Pattern Vincolante**:
+  1. **Collapsing Sticky Header Monofila GPU-Accelerato (`.gm-forecast-sticky-bar`)**: Posizionato con `position: absolute; top: 0; left: 0; right: 0; z-index: 25;` all'interno della vista relativa. A riposo (`scrollTop <= 60px`) è nascosto con `transform: translateY(-100%); opacity: 0; pointer-events: none`. Quando `scrollTop > 60px`, scivola in vista (`transform: translateY(0); opacity: 1; pointer-events: auto`) mantenendo visibili comprensorio, decollo attivo con quota e orientamento, badge di freschezza dati (`Live Open-Meteo` o `Offline`) e pulsante di scroll-to-top rapido (`data-action="scroll-to-top"`).
+  2. **Zero Layout Thrashing & Zero CLS**: Nessun reflow del contenitore scorrevole (CLS = 0) e listener di scorrimento passivo (`{ passive: true }`).
+  3. **Guardie Difensive su Metodi DOM (`typeof querySelector === 'function'`)**: In tutti i view controller e componenti, verificare sempre `typeof this.containerEl.querySelector === 'function'` prima di invocare selettori avanzati o manipolare listener su sotto-nodi, garantendo compatibilità al 100% sia con i browser reali sia con i mock semplificati dei test unitari.
+
+---
+
+## 47. Vocabolario Semantico Aeronautico vs Modello Struttura Fisica: Volabilità ('Volabile' / 'Non Volabile' vs 'Aperto' / 'Chiuso')
+- **Problema**: L'adozione dei termini "Aperto" e "Chiuso" per indicare la volabilità nelle card dei comprensori provocava disorientamento cognitivo nel pilota, inducendolo a credere che il sito fosse interdetto fisicamente, recintato o chiuso da un'ordinanza amministrativa, anziché indicare una condizione meteorologica avversa (es. raffiche forti). Inoltre, creava asimmetria rispetto alla legenda del calendario che riportava già "Volabile".
+- **Causa Radice**: Trasposizione acritica di convenzioni UI da stazioni sciistiche o strutture commerciali chiuse/aperte verso un'applicazione di volo libero in cui i decolli montani sono siti naturali governati esclusivamente da aerologia e micro-meteorologia.
+- **Pattern Vincolante**:
+  1. **Terminologia di Dominio Aeronautica**: Utilizzare sempre la scala semantica di volabilità espressa dal punto di vista dell'ala e del pilota:
+     - 🟢 **`Volabile`** (al posto di *Aperto*)
+     - 🟡 **`Cautela`** (condizioni impegnative o al limite operativo)
+     - 🔴 **`Non Volabile`** (al posto di *Chiuso*)
+     - ⚫ **`Severo`** (turbolenza estrema, temporali o NO-FLY)
+  2. **Coerenza Orizzontale Trasversale**: Mantenere la stessa identica etichettatura testuale in tutti i layer: algoritmo di sintesi comprensorio ([`core/comprensorio.js`](file:///c:/github/GlideMind/core/comprensorio.js)), resolver giornaliero ([`core/flyability.js`](file:///c:/github/GlideMind/core/flyability.js)), preset date ([`core/datePresets.js`](file:///c:/github/GlideMind/core/datePresets.js)), legende del calendario e badge a colpo d'occhio ([`ui/views/HomeDashboardView.js`](file:///c:/github/GlideMind/ui/views/HomeDashboardView.js), [`ui/views/ForecastView.js`](file:///c:/github/GlideMind/ui/views/ForecastView.js)).
 

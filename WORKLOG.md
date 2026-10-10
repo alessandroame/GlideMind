@@ -439,3 +439,39 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Riconciliati anche i modelli ParaMeteo per altri costruttori (`Ozone Zeno 2`, `Nova Sector`, `Niviuk Artik R`).
   - Aggiornati i test unitari di catalogo in [tests/core/gliders.test.mjs](file:///tests/core/gliders.test.mjs) e i test UI in [tests/ui/homeDashboardView.test.mjs](file:///tests/ui/homeDashboardView.test.mjs) con verifica del brand chip Axis, filtri per marca e ricerca rapida.
   - Tutti i 316 test passati con successo (100% pass rate).
+
+---
+
+## 2026-10-10 - Risoluzione Errore di Routing (`navigateTo`) e Blocco WAI-ARIA su Focus Retention in Sheet Modali
+- **Tipo**: Bug Fix / Accessibilità WAI-ARIA / Router UI Lifecycle
+- **Dettagli**: [.agents/worklog.d/2026-10-10_wai-aria-focus-retention-and-router-navigation-fix.md](file:///.agents/worklog.d/2026-10-10_wai-aria-focus-retention-and-router-navigation-fix.md)
+- **Sintesi**:
+  - Risolta l'eccezione di navigazione `TypeError: this.router.navigateTo is not a function` al click su una card comprensorio nella Home Dashboard.
+  - Aggiunto l'alias `navigateTo: navigate` al router singleton in [ui/router.js](file:///ui/router.js) e introdotto il proxy `navigateTo(route, params)` in [ui/views/HomeDashboardView.js](file:///ui/views/HomeDashboardView.js) e [ui/views/ForecastView.js](file:///ui/views/ForecastView.js) con supporto bi-direzionale `navigate` / `navigateTo`.
+  - Risolto il blocco di accessibilità Chromium `Blocked aria-hidden on an element because its descendant retained focus`: in [ui/sheetManager.js](file:///ui/sheetManager.js), alla chiusura del foglio modale (`closeSheet`), il focus viene evacuato preventivamente ripristinando `previousActiveElement` (se esterno) o invocando `.blur()` prima di applicare `aria-hidden="true"`.
+  - Applicato l'attributo standard `inert` su `#sheet-container` in [index.html](file:///index.html) e gestito dinamicamente in `openSheet` / `closeSheet`.
+  - Creata la nuova suite di test [tests/ui/sheetManager.test.mjs](file:///tests/ui/sheetManager.test.mjs) e aggiornate [tests/ui/router.test.mjs](file:///tests/ui/router.test.mjs) e [tests/ui/homeDashboardView.test.mjs](file:///tests/ui/homeDashboardView.test.mjs).
+  - Tutti i 325 test passati con successo (46 suite, 0 regressioni). Registrata la Lezione #45 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-10 - Collapsing Sticky Header in ForecastView e Ottimizzazione Sublabel Date Presets
+- **Tipo**: Feature / Ergonomia Outdoor HMI / Progressive Disclosure
+- **Dettagli**: [.agents/worklog.d/2026-10-10_collapsing-sticky-header-forecast-view.md](file:///.agents/worklog.d/2026-10-10_collapsing-sticky-header-forecast-view.md)
+- **Sintesi**:
+  - Implementato in [ui/views/ForecastView.js](file:///ui/views/ForecastView.js) il collapsing sticky header `#forecast-sticky-bar` con transizione GPU e threshold di scroll (60px), mantenendo visibili comprensorio, sub-spot attivo con quota, live badge e azione scroll-to-top rapida.
+  - Rimossa la ridondanza nominale del giorno della settimana nelle sublabel dei preset in [core/datePresets.js](file:///core/datePresets.js) (es. "Sabato 11 Ott" -> "11 Ott" sotto il pulsante "Oggi").
+  - Estesa la suite di test con 3 nuovi test in [tests/ui/forecastView.test.mjs](file:///tests/ui/forecastView.test.mjs).
+
+---
+
+## 2026-10-10 - Rifattorizzazione Vocabolario Volabilità: Transizione da "Aperto/Chiuso" a "Volabile/Non Volabile"
+- **Tipo**: Refactor / HMI Aeronautica / Allineamento Semantico
+- **Dettagli**: [.agents/worklog.d/2026-10-10_volabilita-badge-vocabulary-refactor.md](file:///.agents/worklog.d/2026-10-10_volabilita-badge-vocabulary-refactor.md)
+- **Sintesi**:
+  - Rimosso l'uso improprio di terminologia da impianti fisici o commerciali (`Aperto`, `Chiuso`), allineando l'applicazione alla volabilità meteorologica dell'aerologia locale: 🟢 **`Volabile`**, 🟡 **`Cautela`**, 🔴 **`Non Volabile`**, ⚫ **`Severo`**.
+  - Allineati deterministicamente: [core/comprensorio.js](file:///core/comprensorio.js), [core/flyability.js](file:///core/flyability.js), [core/datePresets.js](file:///core/datePresets.js), le legende del calendario e badge a colpo d'occhio in [ui/views/HomeDashboardView.js](file:///ui/views/HomeDashboardView.js) e [ui/views/ForecastView.js](file:///ui/views/ForecastView.js).
+  - Aggiornate tutte le suite di test collegate ([tests/core/comprensorio.test.mjs](file:///tests/core/comprensorio.test.mjs), [tests/core/flyability.test.mjs](file:///tests/core/flyability.test.mjs), [tests/core/datePresets.test.mjs](file:///tests/core/datePresets.test.mjs), [tests/ui/homeDashboardView.test.mjs](file:///tests/ui/homeDashboardView.test.mjs), [tests/ui/forecastView.test.mjs](file:///tests/ui/forecastView.test.mjs)).
+  - Registrata la Lezione Appresa #47 in [MEMORY.md](file:///MEMORY.md).
+
+

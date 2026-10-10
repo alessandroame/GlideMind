@@ -529,7 +529,7 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.ok(capturedHtml.includes('gm-date-sheet-legend'));
     assert.ok(capturedHtml.includes('Volabile'));
     assert.ok(capturedHtml.includes('Cautela'));
-    assert.ok(capturedHtml.includes('Chiuso'));
+    assert.ok(capturedHtml.includes('Non Volabile'));
     assert.ok(capturedHtml.includes('Severo'));
   });
 
@@ -550,4 +550,107 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.ok(cssContent.includes('safe-area-inset-top'), 'theme.css must support safe-area-inset-top for header breathing room');
     assert.ok(cssContent.includes('.gm-subspot-select'), 'theme.css must define .gm-subspot-select');
   });
+
+  it('should render collapsing sticky header with spot, sub-spot details and live badge', async () => {
+    const mockStore = createStore({
+      selectedSpot: DEFAULT_COMPRENSORI[0] // Monte Cornizzolo
+    });
+    const controller = new ForecastViewController({ store: mockStore });
+    
+    // Default overview mode
+    let html = controller.renderHtml();
+    assert.ok(html.includes('id="forecast-sticky-bar"'), 'Must render #forecast-sticky-bar in view');
+    assert.ok(html.includes('gm-forecast-sticky-bar'), 'Must have gm-forecast-sticky-bar class');
+    assert.ok(html.includes('Monte Cornizzolo'), 'Must display active spot name in sticky bar');
+    assert.ok(html.includes('Panoramica'), 'Must display Panoramica in default sticky bar');
+    assert.ok(html.includes('gm-forecast-live-badge-sticky'), 'Must render dedicated sticky live badge');
+    assert.ok(html.includes('data-action="scroll-to-top"'), 'Must provide scroll-to-top button');
+
+    // Focused takeoff mode
+    const takeoffs = DEFAULT_COMPRENSORI[0].takeoffs || [];
+    if (takeoffs.length > 0) {
+      controller.selectedSubSpot = takeoffs[0].id;
+      html = controller.renderHtml();
+      assert.ok(html.includes(takeoffs[0].name), 'Must display takeoff name in sticky bar when focused');
+      assert.ok(html.includes(`${takeoffs[0].altitude}m`), 'Must display takeoff altitude in sticky bar');
+    }
+  });
+
+  it('should toggle sticky bar visibility when scroll threshold is crossed in handleScroll', () => {
+    const mockStore = createStore();
+    const controller = new ForecastViewController({ store: mockStore });
+
+    let isVisible = false;
+    let ariaHidden = 'true';
+    const mockStickyBar = {
+      classList: {
+        toggle(cls, val) {
+          if (cls === 'visible') isVisible = Boolean(val);
+        }
+      },
+      setAttribute(name, val) {
+        if (name === 'aria-hidden') ariaHidden = val;
+      }
+    };
+
+    let scrollTopValue = 0;
+    const mockScrollContainer = {
+      get scrollTop() { return scrollTopValue; },
+      addEventListener() {},
+      removeEventListener() {},
+      scrollTo() {}
+    };
+
+    controller.scrollContainerEl = mockScrollContainer;
+    controller.stickyBarEl = mockStickyBar;
+
+    // Below threshold (scrollTop = 30 <= 60)
+    scrollTopValue = 30;
+    controller.handleScroll();
+    assert.equal(isVisible, false, 'Sticky bar must remain hidden below threshold');
+
+    // Above threshold (scrollTop = 85 > 60)
+    scrollTopValue = 85;
+    controller.handleScroll();
+    assert.equal(isVisible, true, 'Sticky bar must become visible above threshold');
+    assert.equal(ariaHidden, 'false');
+
+    // Back to top (scrollTop = 10 <= 60)
+    scrollTopValue = 10;
+    controller.handleScroll();
+    assert.equal(isVisible, false, 'Sticky bar must hide when scrolling back to top');
+    assert.equal(ariaHidden, 'true');
+  });
+
+  it('should smoothly scroll to top on scroll-to-top click and declare CSS styles in theme.css', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const mockStore = createStore();
+    const controller = new ForecastViewController({ store: mockStore });
+
+    let scrolledTo = null;
+    controller.scrollContainerEl = {
+      scrollTo(options) {
+        scrolledTo = options;
+      }
+    };
+
+    controller.handleClick({
+      target: {
+        closest(sel) {
+          if (sel === '[data-action]') return { getAttribute: () => 'scroll-to-top' };
+          return null;
+        }
+      }
+    });
+
+    assert.deepEqual(scrolledTo, { top: 0, behavior: 'smooth' }, 'Must scroll to top smoothly');
+
+    // Verify CSS tokens in theme.css
+    const cssContent = fs.readFileSync(path.resolve('css/theme.css'), 'utf-8');
+    assert.ok(cssContent.includes('.gm-forecast-sticky-bar'), 'theme.css must declare .gm-forecast-sticky-bar');
+    assert.ok(cssContent.includes('.gm-forecast-sticky-bar.visible'), 'theme.css must declare .gm-forecast-sticky-bar.visible');
+    assert.ok(cssContent.includes('.gm-sticky-bar-scrolltop-btn'), 'theme.css must declare .gm-sticky-bar-scrolltop-btn');
+  });
 });
+

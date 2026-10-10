@@ -97,4 +97,10 @@ describe('GlideMind Router - Route Management & Contracts', () => {
       }
     );
   });
+
+  it('should support navigateTo as an alias to navigate', () => {
+    const router = createRouter();
+    assert.equal(typeof router.navigateTo, 'function', 'router.navigateTo must be a function');
+    assert.equal(router.navigateTo, router.navigate, 'router.navigateTo must alias router.navigate');
+  });
 });

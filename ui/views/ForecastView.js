@@ -283,6 +283,12 @@ export class ForecastViewController {
     // View state for dual-mode panels
     this.windPanelView = 'summary'; // 'summary' | 'chart'
     this.soundingPanelView = 'summary'; // 'summary' | 'chart'
+
+    // Collapsing sticky header state on scroll
+    this.isScrolledPastHeader = false;
+    this.scrollContainerEl = null;
+    this.stickyBarEl = null;
+    this.boundScrollHandler = this.handleScroll.bind(this);
   }
 
   /**
@@ -334,12 +340,14 @@ export class ForecastViewController {
 
   /**
    * Renders the discrete network status badge (Live, Loading, Offline/Synthetic).
+   * @param {string} [suffix=''] Optional ID suffix for duplicate badge instances (e.g. 'sticky')
    * @returns {string}
    */
-  renderLiveWeatherBadge() {
+  renderLiveWeatherBadge(suffix = '') {
+    const badgeId = suffix ? `gm-forecast-live-badge-${suffix}` : 'gm-forecast-live-badge';
     if (this.networkStatus === 'loading') {
       return `
-        <span id="gm-forecast-live-badge" class="gm-live-badge loading" title="Aggiornamento dati meteo in corso da Open-Meteo">
+        <span id="${badgeId}" class="gm-live-badge loading" title="Aggiornamento dati meteo in corso da Open-Meteo">
           <span class="gm-live-badge-dot" aria-hidden="true"></span>
           <span>Aggiornamento...</span>
         </span>
@@ -347,14 +355,14 @@ export class ForecastViewController {
     }
     if (this.networkStatus === 'live') {
       return `
-        <span id="gm-forecast-live-badge" class="gm-live-badge live" title="Previsioni reali Open-Meteo attive">
+        <span id="${badgeId}" class="gm-live-badge live" title="Previsioni reali Open-Meteo attive">
           <span class="gm-live-badge-dot" aria-hidden="true"></span>
           <span>Live Open-Meteo</span>
         </span>
       `;
     }
     return `
-      <span id="gm-forecast-live-badge" class="gm-live-badge offline" title="Dati meteorologici simulati o offline">
+      <span id="${badgeId}" class="gm-live-badge offline" title="Dati meteorologici simulati o offline">
         <span class="gm-live-badge-dot" aria-hidden="true"></span>
         <span>Offline / Stima</span>
       </span>
@@ -369,6 +377,10 @@ export class ForecastViewController {
     const badgeEl = this.containerEl.querySelector('#gm-forecast-live-badge');
     if (badgeEl) {
       badgeEl.outerHTML = this.renderLiveWeatherBadge();
+    }
+    const stickyBadgeEl = this.containerEl.querySelector('#gm-forecast-live-badge-sticky');
+    if (stickyBadgeEl) {
+      stickyBadgeEl.outerHTML = this.renderLiveWeatherBadge('sticky');
     }
   }
 
@@ -642,6 +654,11 @@ export class ForecastViewController {
       this.containerEl.removeEventListener('pointercancel', this.boundPointerUp);
       this.containerEl = null;
     }
+    if (this.scrollContainerEl && this.boundScrollHandler && typeof this.scrollContainerEl.removeEventListener === 'function') {
+      this.scrollContainerEl.removeEventListener('scroll', this.boundScrollHandler);
+    }
+    this.scrollContainerEl = null;
+    this.stickyBarEl = null;
     if (this.sheetContainerEl && typeof this.sheetContainerEl.removeEventListener === 'function') {
       this.sheetContainerEl.removeEventListener('click', this.boundClickHandler);
       this.sheetContainerEl = null;
@@ -653,11 +670,54 @@ export class ForecastViewController {
   }
 
   /**
+   * Sets up scroll listener on the scrollable card container to control the collapsing sticky header.
+   */
+  setupScrollListener() {
+    if (!this.containerEl || typeof this.containerEl.querySelector !== 'function') return;
+    const scrollContainer = this.containerEl.querySelector('#forecast-scroll-container');
+    if (scrollContainer && scrollContainer !== this.scrollContainerEl) {
+      if (this.scrollContainerEl && this.boundScrollHandler && typeof this.scrollContainerEl.removeEventListener === 'function') {
+        this.scrollContainerEl.removeEventListener('scroll', this.boundScrollHandler);
+      }
+      this.scrollContainerEl = scrollContainer;
+      if (typeof this.scrollContainerEl.addEventListener === 'function') {
+        this.scrollContainerEl.addEventListener('scroll', this.boundScrollHandler, { passive: true });
+      }
+    }
+    this.stickyBarEl = this.containerEl.querySelector('#forecast-sticky-bar');
+  }
+
+  /**
+   * Handles scroll events inside #forecast-scroll-container with zero layout thrashing.
+   * Toggles the .visible state on #forecast-sticky-bar when scrolled past threshold.
+   */
+  handleScroll() {
+    if (!this.scrollContainerEl) return;
+    const threshold = 60;
+    const isScrolled = this.scrollContainerEl.scrollTop > threshold;
+    if (isScrolled !== this.isScrolledPastHeader) {
+      this.isScrolledPastHeader = isScrolled;
+      if (!this.stickyBarEl && this.containerEl && typeof this.containerEl.querySelector === 'function') {
+        this.stickyBarEl = this.containerEl.querySelector('#forecast-sticky-bar');
+      }
+      if (this.stickyBarEl) {
+        if (this.stickyBarEl.classList && typeof this.stickyBarEl.classList.toggle === 'function') {
+          this.stickyBarEl.classList.toggle('visible', isScrolled);
+        }
+        if (typeof this.stickyBarEl.setAttribute === 'function') {
+          this.stickyBarEl.setAttribute('aria-hidden', isScrolled ? 'false' : 'true');
+        }
+      }
+    }
+  }
+
+  /**
    * Renders the complete Forecast View HTML into the container.
    */
   render() {
     if (!this.containerEl) return;
     this.containerEl.innerHTML = this.renderHtml();
+    this.setupScrollListener();
   }
 
   /**
@@ -686,6 +746,9 @@ export class ForecastViewController {
 
     return `
       <div id="forecast-view" class="gm-forecast-view flex flex-col h-full w-full">
+        <!-- 0. Collapsing Sticky Header (Anchored when scrolled past main header) -->
+        ${this.renderStickyBar(spot, activeSubSpotObj)}
+
         <!-- Scrollable cards container (occupies only the usable height above the scrubber) -->
         <div id="forecast-scroll-container" class="gm-forecast-scroll-container flex-1 min-h-0 overflow-y-auto flex flex-col gap-4 p-4 max-w-lg mx-auto w-full">
           <!-- 1. Header: Comprensorio Bar + Picker Trigger -->
@@ -714,6 +777,82 @@ export class ForecastViewController {
 
         <!-- 6. Bottom Docked Scrubber: 13-slot timeline accessible to thumb -->
         ${this.renderStickyScrubber(spot, weatherData, glider)}
+      </div>
+    `;
+  }
+
+  /**
+   * Renders the collapsing sticky header anchored at the top of ForecastView.
+   * Visible only when the user scrolls down past the main header (>60px).
+   * Displays spot name, active takeoff/landing description, live badge, and scroll-to-top button.
+   * 
+   * @param {object} spot
+   * @param {object|null} activeSubSpot
+   * @returns {string}
+   */
+  renderStickyBar(spot, activeSubSpot) {
+    if (!spot) return '';
+
+    let subSpotLabel = 'Panoramica';
+    if (activeSubSpot) {
+      if (activeSubSpot.spotType === 'takeoff') {
+        subSpotLabel = `${activeSubSpot.name} (${activeSubSpot.altitude}m · ${getCardinalDirection(activeSubSpot.heading)})`;
+      } else if (activeSubSpot.spotType === 'landing') {
+        subSpotLabel = `${activeSubSpot.name} (${activeSubSpot.altitude}m)`;
+      }
+    }
+
+    const fullAriaLabel = `Località attiva: ${escapeHtml(spot.name)}, ${escapeHtml(subSpotLabel)}. Tocca per cambiare comprensorio.`;
+
+    return `
+      <div 
+        id="forecast-sticky-bar" 
+        class="gm-forecast-sticky-bar ${this.isScrolledPastHeader ? 'visible' : ''}"
+        role="region"
+        aria-label="Informazioni località attiva"
+        aria-hidden="${this.isScrolledPastHeader ? 'false' : 'true'}"
+      >
+        <div class="gm-sticky-bar-content flex items-center justify-between w-full h-full max-w-lg mx-auto px-4">
+          <button
+            type="button"
+            class="gm-sticky-bar-btn flex items-center gap-2 min-w-0 text-left"
+            data-action="open-picker-sheet"
+            aria-label="${fullAriaLabel}"
+            title="${fullAriaLabel}"
+          >
+            <span class="gm-sticky-bar-pin text-[var(--gm-accent)] flex-shrink-0" aria-hidden="true">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path>
+                <circle cx="12" cy="10" r="3"></circle>
+              </svg>
+            </span>
+            <div class="gm-sticky-bar-text min-w-0 flex items-center gap-1.5 truncate">
+              <span class="gm-sticky-bar-name font-bold text-sm text-[var(--gm-text-primary)] truncate">
+                ${escapeHtml(spot.name)}
+              </span>
+              <span class="gm-sticky-bar-sep text-[var(--gm-text-muted)] text-xs" aria-hidden="true">•</span>
+              <span class="gm-sticky-bar-subspot text-xs text-[var(--gm-text-secondary)] font-medium truncate">
+                ${escapeHtml(subSpotLabel)}
+              </span>
+              <span class="gm-sticky-bar-chevron text-[var(--gm-text-muted)] text-xs ml-0.5" aria-hidden="true">›</span>
+            </div>
+          </button>
+
+          <div class="gm-sticky-bar-actions flex items-center gap-2 flex-shrink-0">
+            ${this.renderLiveWeatherBadge('sticky')}
+            <button
+              type="button"
+              class="gm-sticky-bar-scrolltop-btn"
+              data-action="scroll-to-top"
+              aria-label="Torna in cima alla pagina"
+              title="Torna in cima"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="18 15 12 9 6 15"></polyline>
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
     `;
   }
@@ -2018,7 +2157,7 @@ export class ForecastViewController {
           <div class="gm-date-sheet-legend flex items-center justify-between text-[0.68rem] px-1 pt-3 text-[var(--gm-text-muted)] border-t border-[var(--gm-border)] mt-3">
             <span class="flex items-center gap-1"><span class="text-[var(--gm-status-flyable)]">●</span> Volabile</span>
             <span class="flex items-center gap-1"><span class="text-[var(--gm-status-caution)]">▲</span> Cautela</span>
-            <span class="flex items-center gap-1"><span class="text-[var(--gm-status-unflyable)]">✕</span> Chiuso</span>
+            <span class="flex items-center gap-1"><span class="text-[var(--gm-status-unflyable)]">✕</span> Non Volabile</span>
             <span class="flex items-center gap-1"><span class="text-[#f87171]">⚡</span> Severo</span>
           </div>
         </div>
@@ -2285,7 +2424,17 @@ export class ForecastViewController {
       }
     } else if (action === 'back-to-home') {
       if (this.router) {
-        this.router.navigateTo('home');
+        if (typeof this.router.navigate === 'function') {
+          this.router.navigate('home');
+        } else if (typeof this.router.navigateTo === 'function') {
+          this.router.navigateTo('home');
+        }
+      }
+    } else if (action === 'scroll-to-top') {
+      if (this.scrollContainerEl && typeof this.scrollContainerEl.scrollTo === 'function') {
+        this.scrollContainerEl.scrollTo({ top: 0, behavior: 'smooth' });
+      } else if (this.scrollContainerEl) {
+        this.scrollContainerEl.scrollTop = 0;
       }
     } else if (action === 'open-picker-sheet') {
       this.openPickerSheet();

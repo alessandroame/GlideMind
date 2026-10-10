@@ -263,6 +263,7 @@ export function createRouter(options = {}) {
 
   return {
     navigate,
+    navigateTo: navigate,
     registerView,
     getCurrentRoute: () => currentRoute,
     getViewRegistry: () => viewRegistry,

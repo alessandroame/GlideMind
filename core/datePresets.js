@@ -239,7 +239,7 @@ export function getSmartDatePresets(refDate = new Date(), activeDateIso = null, 
     presets.push({
       isoDate: todayIso,
       label: 'Oggi',
-      subLabel: 'Sabato ' + formatShortDate(ref),
+      subLabel: formatShortDate(ref),
       isToday: true,
       isWeekend: true
     });
@@ -247,7 +247,7 @@ export function getSmartDatePresets(refDate = new Date(), activeDateIso = null, 
     presets.push({
       isoDate: formatDateIso(sunDate),
       label: 'Domani',
-      subLabel: 'Domenica ' + formatShortDate(sunDate),
+      subLabel: formatShortDate(sunDate),
       isToday: false,
       isWeekend: true
     });
@@ -267,7 +267,7 @@ export function getSmartDatePresets(refDate = new Date(), activeDateIso = null, 
     presets.push({
       isoDate: todayIso,
       label: 'Oggi',
-      subLabel: 'Domenica ' + formatShortDate(ref),
+      subLabel: formatShortDate(ref),
       isToday: true,
       isWeekend: true
     });
@@ -275,7 +275,7 @@ export function getSmartDatePresets(refDate = new Date(), activeDateIso = null, 
     presets.push({
       isoDate: formatDateIso(tomorrowDate),
       label: 'Domani',
-      subLabel: 'Lunedì ' + formatShortDate(tomorrowDate),
+      subLabel: formatShortDate(tomorrowDate),
       isToday: false,
       isWeekend: false
     });
@@ -430,7 +430,7 @@ export function normalizeDateFlyability(fly) {
   let label = fly.statusLabel || fly.label;
   if (!label || label === fly.dateStr) {
     if (status === 'severe') label = 'Severo';
-    else if (status === 'unflyable') label = 'Chiuso';
+    else if (status === 'unflyable') label = 'Non Volabile';
     else if (status === 'caution') label = 'Cautela';
     else label = 'Volabile';
   }

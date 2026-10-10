@@ -408,7 +408,7 @@ describe('Flyability Engine - Waterfall Synthesis & Tie-Breaking', () => {
         // Every summary must have valid 4-color contract properties
         summaries.forEach(s => {
             assert.ok(['flyable', 'caution', 'unflyable', 'severe'].includes(s.status));
-            assert.ok(['Volabile', 'Cautela', 'Chiuso', 'Severo'].includes(s.statusLabel));
+            assert.ok(['Volabile', 'Cautela', 'Non Volabile', 'Severo'].includes(s.statusLabel));
             assert.ok(['●', '▲', '✕', '⚡'].includes(s.statusIcon));
             assert.ok(s.color.startsWith('var(--gm-status-'));
             assert.ok(s.bg.startsWith('var(--gm-status-'));

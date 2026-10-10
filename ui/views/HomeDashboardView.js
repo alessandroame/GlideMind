@@ -4,7 +4,7 @@
  * Aeronautical Glanceable UI (Colpo d'occhio):
  * - Clean high-density list: 3-4 comprensori visible on mobile at first glance
  * - Zero fluff: no decorative badges, no marketing taglines, zero clutter
- * - Zero PIN/favorites: direct meteorological flyability ranking (Aperto -> Cautela -> Chiuso)
+ * - Zero PIN/favorites: direct meteorological flyability ranking (Volabile -> Cautela -> Non Volabile)
  * - T_best (decollo) + L_safe (atterraggio) + Explainability on 3 compact lines per card
  * - Entire card is touch-interactive (Fitts's law >= 48px)
  */
@@ -89,6 +89,20 @@ export class HomeDashboardViewController {
     this.networkStatus = 'offline'; // 'live' | 'loading' | 'offline'
     this.cachedWeatherMap = new Map(); // key: spotId -> weatherPayload
     this._customFetchFn = options.fetchFn || null;
+  }
+
+  /**
+   * Safe navigation proxy supporting both router.navigate and router.navigateTo.
+   * @param {string} route
+   * @param {Object} [params]
+   */
+  navigateTo(route, params = {}) {
+    if (!this.router) return;
+    if (typeof this.router.navigate === 'function') {
+      this.router.navigate(route, params);
+    } else if (typeof this.router.navigateTo === 'function') {
+      this.router.navigateTo(route, params);
+    }
   }
 
   /**
@@ -1226,7 +1240,7 @@ export class HomeDashboardViewController {
           <div class="gm-date-sheet-legend flex items-center justify-between text-[0.68rem] px-1 pt-3 text-[var(--gm-text-muted)] border-t border-[var(--gm-border)] mt-3">
             <span class="flex items-center gap-1"><span class="text-[var(--gm-status-flyable)]">●</span> Volabile</span>
             <span class="flex items-center gap-1"><span class="text-[var(--gm-status-caution)]">▲</span> Cautela</span>
-            <span class="flex items-center gap-1"><span class="text-[var(--gm-status-unflyable)]">✕</span> Chiuso</span>
+            <span class="flex items-center gap-1"><span class="text-[var(--gm-status-unflyable)]">✕</span> Non Volabile</span>
             <span class="flex items-center gap-1"><span class="text-[#f87171]">⚡</span> Severo</span>
           </div>
         </div>
@@ -1366,23 +1380,19 @@ export class HomeDashboardViewController {
       closeSheet();
       this.render();
     } else if (action === 'go-to-forecast') {
-      if (this.router && typeof this.router.navigateTo === 'function') {
-        this.router.navigateTo('forecast');
-      }
+      this.navigateTo('forecast');
     } else if (action === 'view-forecast') {
       const comprensorio = this.comprensoriCatalog.find(c => c.id === id || (c.name && id && c.name.toLowerCase() === id.toLowerCase()));
       if (this.store && comprensorio) {
         this.store.setState({ selectedSpot: comprensorio });
       }
-      if (this.router) {
-        this.router.navigateTo('forecast');
-      }
+      this.navigateTo('forecast');
     } else if (action === 'upload-igc') {
       const fileInput = this.containerEl ? this.containerEl.querySelector('#home-igc-file-input') : null;
       if (fileInput) {
         fileInput.click();
-      } else if (this.router) {
-        this.router.navigateTo('logbook');
+      } else {
+        this.navigateTo('logbook');
       }
     }
   }
@@ -1447,9 +1457,7 @@ export class HomeDashboardViewController {
           this.render();
         } catch (err) {
           console.warn('Errore lettura traccia IGC:', err);
-          if (this.router) {
-            this.router.navigateTo('logbook');
-          }
+          this.navigateTo('logbook');
         }
       };
       reader.readAsText(file);

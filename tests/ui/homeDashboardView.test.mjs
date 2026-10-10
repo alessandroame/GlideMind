@@ -146,7 +146,7 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
 
     assert.ok(evaluated.length >= 2);
     assert.equal(evaluated[0].status, 'flyable', 'First evaluated item should be flyable');
-    assert.equal(evaluated[0].badge, 'Aperto');
+    assert.equal(evaluated[0].badge, 'Volabile');
   });
 
   it('should route to forecast when a comprensorio is clicked', () => {
@@ -184,6 +184,44 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     controller.handleClick(mockEvent);
 
     assert.equal(routedTo, 'forecast', 'Should navigate to forecast view');
+    assert.ok(mockStore.getState().selectedSpot, 'Selected spot must be set in store');
+    assert.equal(mockStore.getState().selectedSpot.id, 'monte-cornizzolo-lc');
+  });
+
+  it('should route to forecast when router implements navigate (standard API)', () => {
+    let navigatedTo = null;
+    const mockRouter = {
+      navigate(route) {
+        navigatedTo = route;
+      }
+    };
+    const mockStore = createStore();
+    const controller = new HomeDashboardViewController({
+      store: mockStore,
+      router: mockRouter
+    });
+
+    const mockEvent = {
+      target: {
+        closest(selector) {
+          if (selector === '[data-action]') {
+            return {
+              getAttribute(attr) {
+                if (attr === 'data-action') return 'view-forecast';
+                if (attr === 'data-id') return 'monte-cornizzolo-lc';
+                return null;
+              }
+            };
+          }
+          return null;
+        }
+      },
+      stopPropagation() {}
+    };
+
+    controller.handleClick(mockEvent);
+
+    assert.equal(navigatedTo, 'forecast', 'Should navigate to forecast view via navigate()');
     assert.ok(mockStore.getState().selectedSpot, 'Selected spot must be set in store');
     assert.equal(mockStore.getState().selectedSpot.id, 'monte-cornizzolo-lc');
   });
@@ -358,7 +396,7 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     assert.ok(capturedHtml.includes('gm-date-sheet-legend'));
     assert.ok(capturedHtml.includes('Volabile'));
     assert.ok(capturedHtml.includes('Cautela'));
-    assert.ok(capturedHtml.includes('Chiuso'));
+    assert.ok(capturedHtml.includes('Non Volabile'));
     assert.ok(capturedHtml.includes('Severo'));
   });
 

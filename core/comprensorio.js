@@ -7,7 +7,7 @@
  * 3. Simultaneous evaluation of best takeoff (T_best) and safe landing (L_safe)
  * 4. Aerodynamic glide ratio cone calculation (E_richiesta = D / Delta_H)
  * 5. Explainability (reason string with physical meteorological context)
- * 6. Dynamic flyability sorting (Flyable/Aperto -> Caution/Cautela -> Unflyable/Chiuso)
+ * 6. Dynamic flyability sorting (Flyable/Volabile -> Caution/Cautela -> Unflyable/Non Volabile)
  * 
  * ZERO DOM DEPENDENCIES: 100% testable in Node.js runtime.
  */
@@ -659,7 +659,7 @@ export function evaluateComprensorio({
 
   // 4. Overall Comprensorio Verdict & Explainability
   let status = 'flyable'; // 'flyable' | 'caution' | 'unflyable'
-  let badge = 'Aperto';
+  let badge = 'Volabile';
   let badgeColor = 'var(--gm-status-flyable)';
   let badgeBg = 'var(--gm-status-flyable-bg)';
   let overallScore = selectedTakeoffEval ? selectedTakeoffEval.score : 50;
@@ -667,7 +667,7 @@ export function evaluateComprensorio({
 
   if (!selectedTakeoffEval || selectedTakeoffEval.severity >= 2) {
     status = 'unflyable';
-    badge = 'Chiuso';
+    badge = 'Non Volabile';
     badgeColor = 'var(--gm-status-unflyable)';
     badgeBg = 'var(--gm-status-unflyable-bg)';
     overallScore = Math.min(overallScore, 20);
@@ -687,7 +687,7 @@ export function evaluateComprensorio({
     }
   } else {
     status = 'flyable';
-    badge = 'Aperto';
+    badge = 'Volabile';
     badgeColor = 'var(--gm-status-flyable)';
     badgeBg = 'var(--gm-status-flyable-bg)';
     if (isTakeoffOverridden) {
@@ -739,7 +739,7 @@ export function evaluateComprensorio({
 
 /**
  * Sorts an array of evaluated comprensori by flyability descending:
- * Flyable (Aperto) -> Caution (Cautela) -> Unflyable (Chiuso), with score and name tie-breakers.
+ * Flyable (Volabile) -> Caution (Cautela) -> Unflyable (Non Volabile), with score and name tie-breakers.
  * 
  * @param {Array<object>} evaluatedList
  * @returns {Array<object>}
