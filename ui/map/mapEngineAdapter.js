@@ -114,6 +114,10 @@ export class HeadlessMockMapEngine {
     this.isPaused = false;
     this.paused = false;
     this.destroyed = false;
+    this.hasTakeoffSector = false;
+    this.hasGlideLine = false;
+    this.glideMetrics = null;
+    this.lastFlightUpdateOptions = null;
   }
 
   init(containerEl, options = {}) {
@@ -236,6 +240,7 @@ export class HeadlessMockMapEngine {
 
   updateGlideLine(glideMetrics) {
     this.lastGlideUpdate = glideMetrics;
+    this.glideMetrics = glideMetrics;
   }
 
   renderComprensorioFlightMap(containerEl, data, options = {}) {
@@ -245,6 +250,9 @@ export class HeadlessMockMapEngine {
     this.circuitData = data?.circuitData || null;
     this.procedures = this.circuitData;
     this.renderedCircuitPolylines = data?.circuitData?.polylines ? Object.keys(data.circuitData.polylines) : [];
+    this.hasTakeoffSector = Boolean(data?.takeoff || data?.comprensorio?.takeoffs?.[0]);
+    this.hasGlideLine = Boolean((data?.takeoff || data?.comprensorio?.takeoffs?.[0]) && (data?.landing || data?.comprensorio?.landings?.[0]));
+    this.glideMetrics = data?.glideMetrics || null;
     this.paused = false;
     this.destroyed = false;
     return this;
@@ -254,8 +262,12 @@ export class HeadlessMockMapEngine {
     this.lastCircuitUpdate = circuitData;
     this.circuitData = circuitData;
     this.procedures = circuitData;
+    this.lastFlightUpdateOptions = options;
     if (circuitData?.polylines) {
       this.renderedCircuitPolylines = Object.keys(circuitData.polylines);
+    }
+    if (options.glideMetrics) {
+      this.glideMetrics = options.glideMetrics;
     }
   }
 
@@ -292,7 +304,11 @@ export class HeadlessMockMapEngine {
     this.lastWindsockUpdate = null;
     this.lastGlideUpdate = null;
     this.lastCircuitUpdate = null;
+    this.lastFlightUpdateOptions = null;
     this.renderedCircuitPolylines = [];
+    this.hasTakeoffSector = false;
+    this.hasGlideLine = false;
+    this.glideMetrics = null;
   }
 }
 
@@ -424,6 +440,12 @@ export class LeafletMapEngine {
     this.glidePolyline = null;
     this.landingMarker = null;
     this.takeoffMarker = null;
+    this.flightTakeoffPin = null;
+    this.flightTakeoffSector = null;
+    this.flightTakeoffWindsock = null;
+    this.flightLandingPin = null;
+    this.flightLandingWindsock = null;
+    this.flightGlideLine = null;
     this.theme = options.theme || 'dark';
     this.isMiniMap = Boolean(options.isMiniMap);
     this.canvasRenderer = null;
@@ -1000,9 +1022,14 @@ export class LeafletMapEngine {
   }
 
   updateGlideLine(glideMetrics) {
-    if (!this.glidePolyline || !glideMetrics) return;
+    if (!glideMetrics) return;
     const color = glideMetrics.isSafe ? '#16a34a' : (glideMetrics.severity === 1 ? '#ca8a04' : '#dc2626');
-    this.glidePolyline.setStyle({ color });
+    if (this.glidePolyline) {
+      this.glidePolyline.setStyle({ color });
+    }
+    if (this.flightGlideLine) {
+      this.flightGlideLine.setStyle({ color });
+    }
   }
 
   pause() {
@@ -1032,6 +1059,12 @@ export class LeafletMapEngine {
     this.activeFlightData = data;
     this.renderedMode = 'flightAnalysis';
     this.circuitLayers = {};
+    this.flightTakeoffPin = null;
+    this.flightTakeoffSector = null;
+    this.flightTakeoffWindsock = null;
+    this.flightLandingPin = null;
+    this.flightLandingWindsock = null;
+    this.flightGlideLine = null;
 
     if (!data) return this;
 
@@ -1053,25 +1086,28 @@ export class LeafletMapEngine {
     const lTurb = landingWeather.turbulence ?? 0.1;
     const lAlt = data.landing?.altitude || 300;
 
-    // 1. Takeoff Pin + Windsock
+    // 1. Takeoff Slope Exposure Sector (Cono e Azimut di Decollo) + Windsock
     if (tCoord) {
       const takeoffName = (data.takeoff?.name || 'Decollo').replace(/^Decollo\s*/i, '');
-      const tIcon = window.L.divIcon({
-        className: 'gm-map-div-icon',
-        html: `
-          <div class="gm-mini-pin gm-mini-pin-takeoff gm-mini-pin-focused" title="Decollo ${takeoffName} (${tAlt}m)">
-            <span class="gm-mini-pin-glyph">▲</span>
-            <span class="gm-mini-pin-alt">${tAlt}m</span>
-          </div>
-        `,
-        iconSize: [60, 24],
-        iconAnchor: [30, 12]
+      const sectorSvg = generateTakeoffSectorSvg(tHeading, tDir, tAlt, { prefix: 'fl-to-sector-' });
+      const sectorIcon = window.L.divIcon({
+        className: 'gm-takeoff-sector-marker-container',
+        html: sectorSvg,
+        iconSize: [130, 130],
+        iconAnchor: [65, 65]
       });
-      this.flightTakeoffPin = window.L.marker([tCoord.lat, tCoord.lon], {
-        icon: tIcon,
-        zIndexOffset: 500
+      this.flightTakeoffSector = window.L.marker([tCoord.lat, tCoord.lon], {
+        icon: sectorIcon,
+        title: `Decollo ${takeoffName} (${tAlt}m)`,
+        zIndexOffset: 450
       });
-      this.overlayLayerGroup.addLayer(this.flightTakeoffPin);
+      if (typeof data.onSelectSubSpot === 'function') {
+        this.flightTakeoffSector.on('click', () => {
+          data.onSelectSubSpot(data.takeoff?.id || 'takeoff');
+        });
+      }
+      this.overlayLayerGroup.addLayer(this.flightTakeoffSector);
+      this.flightTakeoffPin = this.flightTakeoffSector;
 
       const wsTakeoffHtml = generateWindsockSvg(tSpeed, tGust, tDir, tTurb, { prefix: 'fl-to-ws-', scale: 0.5 });
       const wsTakeoffIcon = window.L.divIcon({
@@ -1105,6 +1141,11 @@ export class LeafletMapEngine {
         icon: lIcon,
         zIndexOffset: 500
       });
+      if (typeof data.onSelectSubSpot === 'function') {
+        this.flightLandingPin.on('click', () => {
+          data.onSelectSubSpot(data.landing?.id || 'landing');
+        });
+      }
       this.overlayLayerGroup.addLayer(this.flightLandingPin);
 
       const wsLandingHtml = generateWindsockSvg(lSpeed, lGust, lDir, lTurb, { prefix: 'fl-ld-ws-', scale: 0.5 });
@@ -1121,7 +1162,23 @@ export class LeafletMapEngine {
       this.overlayLayerGroup.addLayer(this.flightLandingWindsock);
     }
 
-    // 3. Fit bounds strictly on authentic aeronautical points
+    // 3. Geodesic Glide Cone Line
+    if (tCoord && lCoord) {
+      const glide = data.glideMetrics || { isSafe: true };
+      const glideColor = glide.isSafe ? '#16a34a' : (glide.severity === 1 ? '#ca8a04' : '#dc2626');
+      this.flightGlideLine = window.L.polyline(
+        [[tCoord.lat, tCoord.lon], [lCoord.lat, lCoord.lon]],
+        {
+          color: glideColor,
+          weight: 3,
+          dashArray: '5, 7',
+          opacity: 0.9
+        }
+      );
+      this.overlayLayerGroup.addLayer(this.flightGlideLine);
+    }
+
+    // 4. Fit bounds strictly on authentic aeronautical points
     const allPoints = [];
     if (tCoord) allPoints.push([tCoord.lat, tCoord.lon]);
     if (lCoord) allPoints.push([lCoord.lat, lCoord.lon]);
@@ -1159,6 +1216,17 @@ export class LeafletMapEngine {
       }
     }
 
+    if (this.flightTakeoffSector && (options.takeoffWeather || options.weatherSnapshot)) {
+      const weather = options.takeoffWeather || options.weatherSnapshot || {};
+      const tHeading = options.takeoff?.heading ?? this.activeFlightData?.takeoff?.heading ?? 180;
+      const tAlt = options.takeoff?.altitude || this.activeFlightData?.takeoff?.altitude || 1000;
+      const dir = weather.windDirection ?? weather.windDir ?? 180;
+      const el = this.flightTakeoffSector.getElement();
+      if (el) {
+        el.innerHTML = generateTakeoffSectorSvg(tHeading, dir, tAlt, { prefix: 'fl-to-sector-' });
+      }
+    }
+
     if (options.landingWeather && this.flightLandingWindsock) {
       const el = this.flightLandingWindsock.getElement();
       if (el) {
@@ -1168,6 +1236,11 @@ export class LeafletMapEngine {
         const turb = options.landingWeather.turbulence ?? 0;
         el.innerHTML = generateWindsockSvg(speed, gust, dir, turb, { prefix: 'fl-ld-ws-', scale: 0.5 });
       }
+    }
+
+    if (this.flightGlideLine && options.glideMetrics) {
+      const glideColor = options.glideMetrics.isSafe ? '#16a34a' : (options.glideMetrics.severity === 1 ? '#ca8a04' : '#dc2626');
+      this.flightGlideLine.setStyle({ color: glideColor });
     }
   }
 

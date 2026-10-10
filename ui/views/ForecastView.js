@@ -4142,7 +4142,8 @@ export class ForecastViewController {
         landing,
         takeoffWeather,
         landingWeather,
-        circuitData
+        circuitData,
+        glideMetrics: evalData?.glideMetrics
       });
 
       // Focus close button
@@ -4164,7 +4165,8 @@ export class ForecastViewController {
         landing,
         takeoffWeather,
         landingWeather,
-        circuitData
+        circuitData,
+        glideMetrics: evalData?.glideMetrics
       });
     }
 
@@ -4351,7 +4353,13 @@ export class ForecastViewController {
     });
 
     if (this.flightAnalysisMapEngine && typeof this.flightAnalysisMapEngine.updateFlightProcedures === 'function') {
-      this.flightAnalysisMapEngine.updateFlightProcedures(circuitData, { takeoffWeather, landingWeather });
+      this.flightAnalysisMapEngine.updateFlightProcedures(circuitData, {
+        takeoffWeather,
+        landingWeather,
+        glideMetrics: evaluated?.glideMetrics,
+        takeoff,
+        landing
+      });
     }
 
     if (typeof document !== 'undefined' && this.flightAnalysisOverlayEl) {

@@ -123,6 +123,8 @@ describe('GlideMind Cartography - Takeoff Slope Exposure Sector & Launch Window'
     assert.equal(mockEngine.renderedMode, 'flightAnalysis');
     assert.equal(mockEngine.paused, false);
     assert.deepEqual(mockEngine.renderedCircuitPolylines, ['finalLeg', 'baseLeg', 'downwindLeg']);
+    assert.equal(mockEngine.hasTakeoffSector, true, 'Headless engine must flag takeoff sector present');
+    assert.equal(mockEngine.hasGlideLine, true, 'Headless engine must flag glide line present');
 
     // Pause / Resume
     mockEngine.pause();
@@ -137,11 +139,47 @@ describe('GlideMind Cartography - Takeoff Slope Exposure Sector & Launch Window'
         figureEight: [[45.818, 9.316], [45.818, 9.317], [45.818, 9.318]]
       }
     };
-    mockEngine.updateFlightProcedures(updatedCircuit);
+    mockEngine.updateFlightProcedures(updatedCircuit, {
+      glideMetrics: { requiredGlideRatio: 5.5, isSafe: true }
+    });
     assert.deepEqual(mockEngine.renderedCircuitPolylines, ['figureEight']);
+    assert.equal(mockEngine.glideMetrics.requiredGlideRatio, 5.5);
 
     mockEngine.destroy();
     assert.equal(mockEngine.destroyed, true);
     assert.equal(mockEngine.renderedCircuitPolylines.length, 0);
+    assert.equal(mockEngine.hasTakeoffSector, false);
+    assert.equal(mockEngine.hasGlideLine, false);
+  });
+
+  it('should render takeoff slope exposure sector and geodesic glide line in LeafletMapEngine flight analysis map', () => {
+    const engine = new LeafletMapEngine();
+    let sectorHtml = '';
+    let glideStyle = {};
+
+    const mockSectorEl = {
+      set innerHTML(val) { sectorHtml = val; },
+      get innerHTML() { return sectorHtml; }
+    };
+
+    engine.flightTakeoffSector = { getElement: () => mockSectorEl };
+    engine.flightGlideLine = { setStyle: (style) => { Object.assign(glideStyle, style); } };
+    engine.activeFlightData = { takeoff: { heading: 180, altitude: 1000 } };
+
+    // Update with 180° wind -> sector green
+    engine.updateFlightProcedures({}, {
+      takeoffWeather: { windDirection: 180, windSpeed: 10 },
+      glideMetrics: { isSafe: true }
+    });
+    assert.ok(sectorHtml.includes('stroke="#22c55e"'), '180deg wind vs 180deg heading -> Green sector in fullscreen flight map');
+    assert.equal(glideStyle.color, '#16a34a', 'Safe glide line must be green');
+
+    // Update with 0° wind (tailwind) -> sector red, and unsafe glide -> amber
+    engine.updateFlightProcedures({}, {
+      takeoffWeather: { windDirection: 0, windSpeed: 15 },
+      glideMetrics: { isSafe: false, severity: 1 }
+    });
+    assert.ok(sectorHtml.includes('stroke="#ef4444"'), '0deg tailwind vs 180deg heading -> Red sector in fullscreen flight map');
+    assert.equal(glideStyle.color, '#ca8a04', 'Caution glide line must be amber');
   });
 });

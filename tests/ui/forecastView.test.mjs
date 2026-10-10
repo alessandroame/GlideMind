@@ -1151,6 +1151,9 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.equal(controller.miniMapEngine.isPaused, true, 'miniMapEngine must be paused when overlay is open');
     assert.ok(controller.flightAnalysisMapEngine, 'flightAnalysisMapEngine must be instantiated');
     assert.ok(controller.flightAnalysisMapEngine.procedures, 'flightAnalysisMapEngine must receive initial flight procedures');
+    assert.equal(controller.flightAnalysisMapEngine.hasTakeoffSector, true, 'flightAnalysisMapEngine must render takeoff slope exposure sector');
+    assert.equal(controller.flightAnalysisMapEngine.hasGlideLine, true, 'flightAnalysisMapEngine must render geodesic glide line');
+    assert.ok(controller.flightAnalysisMapEngine.glideMetrics, 'flightAnalysisMapEngine must receive glide metrics');
 
     // Close flight analysis overlay
     controller.closeFlightAnalysisOverlay();
@@ -1184,11 +1187,16 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
 
     const initialProcedures = controller.flightAnalysisMapEngine.procedures;
     assert.ok(initialProcedures, 'Must have procedures before hour scrub');
+    assert.equal(controller.flightAnalysisMapEngine.hasTakeoffSector, true);
+    assert.equal(controller.flightAnalysisMapEngine.hasGlideLine, true);
 
     // Scrub hour to 16
     controller.setHour(16);
     assert.equal(controller.selectedHour, 16, 'Selected hour must update to 16');
     assert.ok(controller.flightAnalysisMapEngine.procedures, 'Procedures must be updated in-place on scrub');
+    assert.ok(controller.flightAnalysisMapEngine.lastFlightUpdateOptions, 'Update options must be recorded');
+    assert.ok(controller.flightAnalysisMapEngine.lastFlightUpdateOptions.takeoffWeather, 'Must receive takeoff weather update');
+    assert.ok(controller.flightAnalysisMapEngine.lastFlightUpdateOptions.glideMetrics, 'Must receive glide metrics update');
 
     controller.closeFlightAnalysisOverlay();
     controller.unmount();
