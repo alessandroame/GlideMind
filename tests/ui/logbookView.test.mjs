@@ -183,7 +183,10 @@ describe('LogbookView Controller & Outdoor Ergonomics (UI Layer)', () => {
     assert.ok(html.includes('I Miei Voli (2)'));
     assert.ok(html.includes('1.9 h') || html.includes('2 h'), 'Must show total formatted flight hours');
 
-    // Flight 1 Card
+    // Flight 1 Card (Latest = #2)
+    assert.ok(html.includes('gm-flight-number-badge'), 'Must render flight number badge');
+    assert.ok(html.includes('#2'), 'Must render progressive flight number #2 for newest flight');
+    assert.ok(html.includes('#1'), 'Must render progressive flight number #1 for older flight');
     assert.ok(html.includes('Decollo Risparmio') && html.includes('Atterraggio Ufficiale Suello'));
     assert.ok(html.includes('Axis Compact 4'));
     assert.ok(html.includes('EN-A'));
