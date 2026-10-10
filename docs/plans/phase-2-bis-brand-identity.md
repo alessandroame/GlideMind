@@ -1,4 +1,9 @@
-# 🦅 GlideMind - Brand Identity, Icon & Splash Screen Plan
+# GlideMind - Brand Identity, Icon & Splash Screen Plan
+
+> **Fase**: Fase 2-bis  
+> **Stato**: 🟢 Completato  
+> **Target Repo**: `GlideMind`  
+> **Riferimento Visivo**: `assets/brand/glidemind_splash_concept.jpg`
 
 Documento operativo per l'implementazione dell'identità visiva, del bundle iconografico PWA e dello splash screen per **GlideMind**.
 
@@ -6,8 +11,7 @@ Documento operativo per l'implementazione dell'identità visiva, del bundle icon
 
 ## 1. Riferimento Visivo di Partenza
 
-Il punto di riferimento approvato è il mockup dello splash screen verticale (9:16) archiviato in:
-👉 [`assets/brand/glidemind_splash_concept.jpg`](../assets/brand/glidemind_splash_concept.jpg)
+Il punto di riferimento approvato è il mockup dello splash screen verticale (9:16) archiviato in `assets/brand/glidemind_splash_concept.jpg`.
 
 ### Elementi Costitutivi del Brand
 - **Emblema Alare**: Profilo aerodinamico a tre elementi rastremati verso destra, che evoca l'ala del deltaplano/parapendio e la portanza delle correnti ascensionali.
@@ -65,7 +69,7 @@ Il punto di riferimento approvato è il mockup dello splash screen verticale (9:
 ---
 
 ### Fase 4: Integrazione Brand nell'Header dell'Applicazione
-- In `index.html` (linee 19-23), sostituire il placeholder SVG temporaneo con la variante inline dell'emblema alare per mantenere coerenza grafica tra avvio e interfaccia attiva.
+- In `index.html`, sostituire il placeholder SVG temporaneo con la variante inline dell'emblema alare per mantenere coerenza grafica tra avvio e interfaccia attiva.
 
 ---
 

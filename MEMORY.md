@@ -944,3 +944,50 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
      - *Dalla Mappa alla Barra*: Toccando un qualsiasi marker o cluster sulla mappa, il menu a tendina aggiorna automaticamente il proprio valore visivo per riflettere lo spot focalizzato.
      - *Ripartizione Dinamica*: Al cambio di macro-regione, le opzioni del dropdown vengono rigenerate dinamicamente per mostrare esclusivamente i comprensori dell'area attiva, ordinati per nome con indicatore di quota e provincia.
 
+---
+
+## 78. Integrazione Ibrida tra Convenzioni Fisiche di Aeroclub e Generazione Procedurale Meteo Live
+- **Problema**:
+  1. La generazione algoritmica automatica del circuito di atterraggio basata unicamente sull'anemometria oraria (`core/flightProcedures.js`) rischia di calcolare tratti di sottovento o base che sorvolano proprietà private vietate (aree rosse da bacheca club), rotori locali non mappati o ostacoli fisici (linee elettriche, fiumi con forre).
+  2. Al contrario, un disegno o tracciato puramente statico disegnato su mappa non adatta l'asse del finale alle rotazioni stagionali o pomeridiane della brezza, inducendo il pilota a tentare atterraggi col vento in coda o con lunghezza di planata inadeguata.
+- **Causa Radice**: Trattare la procedura di atterraggio o come problema puramente matematico-vettoriale istantaneo o come disegno statico immutabile, senza un layer di composizione che distingua i vincoli fisici permanenti dalle variabili micro-meteorologiche orarie.
+- **Pattern Vincolante**:
+  1. **Architettura Ibrida a Due Livelli (Hybrid Procedural Engine)**:
+     - *Layer A (Vincoli Fissi di Comprensorio / Club)*: perimetro ufficiale dell'atterraggio (zona verde), bersaglio/touchdown, zone rosse interdette (proprietà private, campi coltivati, rotori), zona piegaggio arancione e senso di virata obbligatorio (`mandatoryHand: 'left' | 'right'`).
+     - *Layer B (Adattamento Dinamico al Vento Live)*: orientamento del rettifilo finale controvento e dimensionamento della distanza in base a $v_{\text{ground}} = v_{\text{trim}} - v_{\text{wind}}$, vincolati e confinati rigidamente all'interno dello spazio consentito dal club.
+  2. **Tracciati Didattici Scuole di Volo (EN-A)**:
+     - Disaccoppiare la navigazione di volo in 3 segmenti distinti: corridoio di uscita in valle dal decollo (con quote minime MSL sui rilievi), box esercizi in aria calma (>300m AGL), e circuito di traffico di atterraggio con smaltimento quota.
+  3. **Touch Ergonomics per Editor di Disegno Outdoor**:
+     - I controlli di tracciamento e i vertici/waypoint interattivi devono garantire touch target minimi di $\ge 48\times 48\text{px}$, con stack reversibile Undo/Redo (fino a 50 stati) e smoothing delle polilinee tramite algoritmo di Chaikin headless puro.
+
+---
+
+## 79. Fedeltà Aeronautica Cartografica e Normalizzazione Touch Swipe su Scrubber Orari
+- **Problema**:
+  1. La renderizzazione diretta sulla cartografia topografica/satellitare di traiettorie geometriche sintetiche (polilinee per sottovento, base, finale a 8, cerchi di attesa, linee tratteggiate di planata) occludeva l'orografia e le curve di livello reali, generando confusione visiva ("invenzione di disegni") e inducendo una falsa percezione di rotte GPS pre-registrate.
+  2. Il gesto di swipe/trascinamento continuo con il dito sullo scrubber orario (da 08:00 a 20:00) non rispondeva su touch screen, bloccando l'aggiornamento dell'ora o perdendo il trascinamento al minimo movimento verticale.
+- **Causa Radice**:
+  1. Eccesso di renderizzazione vettoriale invasiva sulla mappa anziché limitarsi ai riferimenti fisici autentici di volo (decolli e atterraggi) con telemetria anemometrica orientata in tempo reale.
+  2. Nei `TouchEvent`, la coordinata orizzontale risiede in `evt.touches[0].clientX` (o `changedTouches`) anziché `evt.clientX`. Inoltre, il gestore puntatore era cablato esclusivamente su `#forecast-timeline-strip` (ignorando `#flight-analysis-timeline-strip` nell'overlay) e la strip non dichiarava `touch-action: none;`, consentendo al browser mobile di intercettare il gesto per lo scorrimento verticale della pagina.
+- **Pattern Vincolante**:
+  1. **Fedeltà Aeronautica a Zero Invasività**: Mantenere la mappa libera da disegni sintetici. Renderizzare unicamente i pin fisici autentici (`▲ [Nome] [Quota]m` e `⏚ [Nome] [Quota]m`) affiancati dalle maniche a vento vettoriali orientate dinamicamente dal vento live (`updateFlightProcedures`), lasciando il fondo cartografico completamente leggibile.
+  2. **Risoluzione Polimorfica della Strip (`findActiveTimelineStrip`)**: Cercare la strip attiva dinamicamente dall'evento (`target.closest('.gm-timeline-grid-13')`) o verificare la visibilità dei drawer aperti prima di ripiegare sulla vista principale.
+  3. **Normalizzazione Coordinate Multi-Input (`getClientX`)**: Estrarre la coordinata orizzontale tramite funzione unificata capace di discriminare tra `PointerEvent`, `TouchEvent` e `MouseEvent`.
+  4. **Aggancio Finestra e Disattivazione Gesti Nativi**: Dichiarare tassativamente `touch-action: none;` sui selettori orari continui e agganciare listener `window.addEventListener('pointermove' / 'touchmove')` con `{ passive: false }` durante la fase attiva di drag, invocando `preventDefault()` per prevenire il rimbalzo o lo scroll della pagina.
+
+---
+
+## 80. Consolidamento dei Piani di Lavoro, Governance della Roadmap e Prevenzione della Frammentazione dello Scope
+- **Problema**: Con il procedere dello sviluppo, si è verificata una frammentazione della documentazione di progetto:
+  1. I piani di dettaglio sono stati sparsi tra la radice di `docs/` e `docs/plans/` con convenzioni eterogenee.
+  2. `MASTER_PLAN.md` è rimasto disallineato rispetto all'avanzamento effettivo (omettendo le sotto-fasi 2-bis, 3-bis, 5-bis, 5-ter, 5-quater, 5-quinquies e lasciando desincronizzati i checkbox di completamento).
+  3. Alcuni piani operativi hanno introdotto sovrapposizioni e rischi di regressione: riapertura di debiti didattici scolastici precedentemente bonificati (Syllabus allievi), pianificazione di storage IndexedDB paralleli e inversione di priorità tra editor CAD interattivi di disegno e funzionalità primarie di volo (Logbook IGC e Replay 3D).
+- **Causa Radice**: Assenza di un repository centralizzato e normalizzato dei piani in `docs/plans/` e mancata riconciliazione periodica del Master Plan rispetto alla matrice granulare di `DESIDERATA.md`.
+- **Pattern Vincolante**:
+  1. **Cartella Canonica dei Piani (`docs/plans/`)**: Tutti i documenti architetturali e di fase risiedono esclusivamente in `docs/plans/` con prefisso di fase normalizzato (`phase-<N>-<topic>.md` o `future-<topic>.md`).
+  2. **Riconciliazione Bidirezionale Master Plan & Desiderata**: Ogni sotto-fase completata nel codice deve essere tempestivamente riflessa sia nella matrice operativa (`DESIDERATA.md`) sia nel documento di visione generale (`MASTER_PLAN.md`).
+  3. **Disaccoppiamento tra Dati Territoriali e Motori CAD**: I vincoli di sicurezza dei club di volo devono essere integrati come arricchimento dati statico nel catalogo (`data/locations/*.json`) con visualizzazione passiva, senza subordinare la sicurezza del comprensorio alla complessità di un editor di disegno interattivo.
+  4. **Tutela della Priorità del Core Domain**: L'implementazione delle funzionalità cardine di volo (Fase 6: Flight Logbook e Fase 7: Replay 3D) mantiene la precedenza assoluta rispetto a tooling CAD o editor grafici opzionali, che vanno posticipati come estensioni future.
+
+
+

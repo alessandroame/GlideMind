@@ -835,7 +835,41 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Analizzate le fotografie sul campo della bacheca del Parapendio Club Cavallaria (Brosso/Lessolo), formalizzando lo standard di zonizzazione geometrica: area verde atterraggio delimitata da paletti gialli con bersaglio, zone rosse di divieto assoluto per contenziosi o pericoli, zona arancione di ripiegamento vele, zona azzurra parcheggio/viabilità e manica a vento fisica.
   - Formalizzata l'architettura ibrida (Hybrid Procedural Engine) in `core/flightPlan.js` per fondere i vincoli geometrici del club con l'orientamento live del vento Open-Meteo, i corridoi di uscita in valle per allievi e il box di sicurezza per le manovre didattiche.
   - Redatto e archiviato il Master Plan esecutivo in [docs/FLIGHT_PROCEDURES_DRAWING_PLAN.md](file:///docs/FLIGHT_PROCEDURES_DRAWING_PLAN.md).
-  - Aggiornata la matrice [DESIDERATA.md](file:///DESIDERATA.md) con la nuova Fase 5-quinquies programmata.
+---
+
+## 2026-10-10 - Bonifica Cartografica Disegni Sintetici e Overhaul Swipe Continuo Scrubber Orario
+- **Tipo**: Cartografia / Ergonomia Touch / Bug Fix / Outdoor HMI
+- **Dettagli**: [.agents/worklog.d/2026-10-10_map-drawing-cleanup-and-scrubber-swipe-fix.md](file:///.agents/worklog.d/2026-10-10_map-drawing-cleanup-and-scrubber-swipe-fix.md)
+- **Sintesi**:
+  - Rimossi tutti i layer vettoriali geometrici sintetici dalla mappa comprensorio a schermo intero (`renderComprensorioFlightMap` in [ui/map/mapEngineAdapter.js](file:///ui/map/mapEngineAdapter.js)): eliminati circuito di atterraggio a C / a 8, cerchio di attesa quota, linea tratteggiata di planata e settore di decollo.
+  - Preservati esclusivamente i punti fisici di riferimento aeronautico autentico (pin decollo `▲` e pin atterraggio `⏚`) con maniche a vento vettoriali animate e orientate dinamicamente dal vento live calcolato in-place al cambio ora (`updateFlightProcedures`), lasciando il fondo cartografico topografico/satellitare libero al 100%.
+  - Risolto il blocco dello swipe continuo sullo scrubber orario:
+    1. Implementata la ricerca polimorfica della timeline attiva (`findActiveTimelineStrip`) per supportare sia la strip della vista principale (`#forecast-timeline-strip`) sia quella del cassetto overlay (`#flight-analysis-timeline-strip`).
+    2. Creata la funzione `getClientX(evt)` per normalizzare deterministicamente la coordinata orizzontale su `PointerEvent`, `TouchEvent` (`evt.touches` / `evt.changedTouches`) e `MouseEvent`.
+    3. Agganciati listener di tracciamento continui a livello di `window` durante la fase attiva di trascinamento con `{ passive: false }` e soppressione dello scroll di pagina nativo.
+    4. Aggiunto `touch-action: none;` a `.gm-flight-analysis-scrubber` in [css/theme.css](file:///css/theme.css).
+  - Aggiunto subtest di governance in [tests/ui/forecastView.test.mjs](file:///tests/ui/forecastView.test.mjs); suite completa con 438/438 test passanti senza regressioni.
+  - Registrata la Lezione Appresa #79 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-10 - Consolidamento Piani di Lavoro, Normalizzazione docs/plans/ e Riconciliazione Roadmap
+- **Tipo**: Governance / Architecture Planning / ADR / Roadmap Reconciliation
+- **Dettagli**: [.agents/worklog.d/2026-10-10_work-plans-consolidation-and-roadmap-reconciliation.md](file:///.agents/worklog.d/2026-10-10_work-plans-consolidation-and-roadmap-reconciliation.md)
+- **Sintesi**:
+  - Eseguito l'audit sui documenti di piano: riscontrate sovrapposizioni tra circuiti procedurali sintetici (precedentemente bonificati da MEMORY #79) e zonizzazione di club, riapertura di debiti didattici scolastici (Syllabus allievi, in contrasto con ADR #21) e inversione di priorità tra editor CAD interattivi e il modulo Logbook.
+  - Normalizzata la directory `docs/plans/` con naming standard:
+    - [phase-2-bis-brand-identity.md](file:///docs/plans/phase-2-bis-brand-identity.md) (🟢 Completato)
+    - [phase-5-bis-forecast-minimap.md](file:///docs/plans/phase-5-bis-forecast-minimap.md) (🟢 Completato)
+    - [phase-5-ter-flight-analysis-overlay.md](file:///docs/plans/phase-5-ter-flight-analysis-overlay.md) (🟢 Completato con nota su bonifica MEMORY #79)
+    - [phase-5-quater-european-expansion.md](file:///docs/plans/phase-5-quater-european-expansion.md) (🟢 Completato)
+    - [phase-5-quinquies-club-safety-zoning.md](file:///docs/plans/phase-5-quinquies-club-safety-zoning.md) (⚪ Pianificato - Arricchimento dati territoriali di sicurezza, esente da complessità CAD)
+    - [future-interactive-drawing-engine.md](file:///docs/plans/future-interactive-drawing-engine.md) (⚪ Posticipato a fase successiva al Replay 3D).
+  - Rimosse le schede sparse e ridondanti nella radice di `docs/`.
+  - Aggiornato [MASTER_PLAN.md](file:///MASTER_PLAN.md) riconciliando tutte le fasi completate (Fasi 0, 1, 2, 2-bis, 3, 3-bis, 4, 4-bis, 5, 5-bis, 5-ter, 5-quater, 8-bis con `[x]`).
+  - Sbloccata la priorità primaria in [DESIDERATA.md](file:///DESIDERATA.md) su **Fase 6: Modulo Logbook di Volo (`LogbookView.js` & `core/logbookDb.js`)** (`🔴 Prioritario`).
+  - Registrata la Lezione Appresa #80 in [MEMORY.md](file:///MEMORY.md).
+
 
 
 
