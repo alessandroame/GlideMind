@@ -35,13 +35,16 @@ A seguito dell'audit euristico sui controlli di selezione data per le viste Home
    - `HomeDashboardView` evita doppie invocazioni sincrone di render e fetch di rete delegando l'aggiornamento al listener dello store.
    - `store.activeDate` inizializzato con `formatDateIso(new Date())` per scongiurare derive di fuso orario UTC tra le 00:00 e le 02:00 locali.
 
-5. **Selettore Tema nella Top Bar (Chiaro / Scuro / Auto)**:
-   - Inserito in `HomeDashboardView.renderHtml()` a destra del numero di build (`.gm-header-meta`).
-   - Implementato supporto per l'opzione `auto` in `ui/app.js` con listener `matchMedia('(prefers-color-scheme: light)')`.
-   - Persistenza automatica nello store (`ui.theme`).
+5. **Selettore Tema nella Top Bar in Menu ad Espansione (Chiaro / Scuro / Auto)**:
+   - Inserito in `HomeDashboardView.renderHtml()` a destra del numero di build (`.gm-header-meta`) racchiuso in un menu compatto ad espansione (`.gm-theme-selector` con trigger `#gm-theme-menu-trigger` e menu a comparsa `#gm-theme-menu-dropdown`).
+   - Riduzione dell'ingombro orizzontale di oltre il 50%: il trigger mostra unicamente l'icona e il tema attivo (es. `☀️ Chiaro ▾`, `🌙 Scuro ▾`, `⚙️ Auto ▾`) con target touch $\ge 44\text{px}$ espanso tramite pseudo-elemento.
+   - Allineamento accessibilità e controllo da tastiera: `aria-haspopup="true"`, `aria-expanded`, gestione tasto `Escape` con ripristino del focus sul trigger, chiusura automatica al click esterno sul documento e alla selezione di un'opzione.
+   - Supporto all'opzione `auto` in `ui/app.js` con listener reattivo `matchMedia('(prefers-color-scheme: light)')` e persistenza nello store (`ui.theme`).
 
 ---
 
 ## 3. Impatti e Verifica
-- `npm test`: 338 test superati con 0 fallimenti (inclusi 3 nuovi test unitari su selettore tema, ergonomia CSS e sincronizzazione reattiva).
+- `npm test`: 338 test superati con 0 fallimenti (inclusa suite estesa per trigger, toggle menu, tasto Escape e chiusura al click esterno).
+- Verifica runtime eseguita tramite browser headless via Chrome DevTools MCP: validata apertura menu, selezione tema chiaro con commutazione `data-theme="light"`, e chiusura corretta con tasto Escape.
 - UI outdoor-ready e verificata contro i criteri Fitts, Jakob, Occam e WCAG AA.
+

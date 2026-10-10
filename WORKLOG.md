@@ -540,7 +540,7 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Garantito contrasto WCAG AA/AAA ($\ge 8.5:1$) in Sunlight Mode (`[data-theme="light"]`) forzando il colore del testo a scuro (`#09090b`) su sfondo ambra per tab, date e pulsanti attivi.
   - Riorganizzato il bottom sheet data applicando il principio Occam's Razor: griglia 14 giorni posizionata in cima come azione primaria Hero 1-tap, con form nativo relegato a opzione secondaria.
   - Risolta la desincronizzazione di `activeDate` in [ui/views/ForecastView.js](file:///ui/views/ForecastView.js) ed eliminati doppi render/fetch ridondanti nei click handler di [ui/views/HomeDashboardView.js](file:///ui/views/HomeDashboardView.js) tramite delegazione al listener reattivo dello store.
-  - Implementato selettore tema rapido a 3 stati (*Chiaro* / *Scuro* / *Auto*) nella top bar a destra del numero di build in Home, con supporto alla media query `prefers-color-scheme` in [ui/app.js](file:///ui/app.js) e persistenza nello store (`ui.theme`).
+  - Implementato selettore tema compatto a 3 stati (*Chiaro* / *Scuro* / *Auto*) nella top bar a destra del numero di build in Home, racchiuso in un menu ad espansione con trigger a icona/etichetta e target touch conforme ($\ge 44\text{px}$), supporto alla media query `prefers-color-scheme` in [ui/app.js](file:///ui/app.js), controllo da tastiera (Escape/focus restore) e persistenza nello store (`ui.theme`).
   - Aggiunti test in [tests/ui/homeDashboardView.test.mjs](file:///tests/ui/homeDashboardView.test.mjs) e [tests/ui/forecastView.test.mjs](file:///tests/ui/forecastView.test.mjs) (338/338 test superati).
   - Registrata la Lezione Appresa #52 in [MEMORY.md](file:///MEMORY.md).
 
