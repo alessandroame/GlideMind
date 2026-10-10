@@ -1049,3 +1049,32 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Verificato il superamento al 100% di tutti i 546 test su 87 suite native (`npm test`).
   - Registrate le Lezioni Apprese #103, #105 e #106 in [MEMORY.md](file:///MEMORY.md).
 
+---
+
+## 2026-10-10 - Fase 6-ter: Full-Screen Flight Detail View & Allineamento Schema Telemetrico
+- **Tipo**: Refactoring UI / Ergonomia Mobile Outdoor / Bugfix Schema
+- **Dettagli**: [.agents/worklog.d/2026-10-10_fullscreen-flight-detail-and-schema-remediation.md](file:///.agents/worklog.d/2026-10-10_fullscreen-flight-detail-and-schema-remediation.md)
+- **Sintesi**:
+  - Superamento dell'anti-pattern bottom sheet ("flyer") per la consultazione del debriefing di volo e della telemetria, migrando a una vista dedicata a tutto schermo (`.gm-flight-detail-fullscreen`, `fixed inset-0 100vw 100dvh z-1050`).
+  - Introdotta la Top Bar fissa con pulsante di navigazione prominente (`← Libretto`) con touch target $\ge 48\text{px}$, compatibile con l'Escape da tastiera e la chiusura da history hash.
+  - Implementata la Sticky Bottom Action Bar nella Thumb Zone con azione primaria ad alto contrasto "Visualizza Replay 3D" e secondaria "Scarica Traccia IGC (FAI)".
+  - Aggiunta in `css/theme.css` la griglia responsive `.gm-flight-metrics-grid` (2 colonne mobile / 3 colonne desktop) e le relative card per raggruppamento visivo (Gestalt Common Region).
+  - Risolti i bug di schema dati: mapping `originDeg` (evitando `undefined°` nel vento), mapping `altGain` (evitando `+0 m` nelle termiche), `turnCount`, `turnDirection` ed `efficiencyPercent`.
+  - Integrato autosave con debounce (800ms) su note personali del pilota con indicatore visivo "Salvate".
+  - Creata la suite unitaria `tests/flightDetailView.test.js`, con passaggio di tutti i 557 test su 89 suite native (`npm test`).
+  - Registrata la Lezione Appresa #109 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-10 - Fase 4: Barra Unificata Comprensorio/Sub-Spot e Rimozione Controlli Ridondanti
+- **Tipo**: Refactoring UI / Ergonomia Mobile Outdoor / Semplificazione Header
+- **Dettagli**: [.agents/worklog.d/2026-10-10_unified-comprensorio-and-subspot-control.md](file:///.agents/worklog.d/2026-10-10_unified-comprensorio-and-subspot-control.md)
+- **Sintesi**:
+  - Compresso il controllo a 2 livelli (barra comprensorio + dropdown sub-spot) in un'unica barra orizzontale a $\ge 48\text{px}$ (`.gm-unified-spot-bar`) con badge contestuale per il sub-spot attivo (`.gm-unified-subspot-badge`).
+  - Riorganizzato lo sheet di selezione (`openPickerSheet`) aggiungendo in testa la sezione `.gm-picker-current-spot-section` con 3 gruppi semantici ad accesso 1-tap a 0 scroll: `Panoramica`, `Decolli (N)` e `Atterraggi (N)`.
+  - Rimossa la sezione ridondante `.gm-spot-subselection-container` (chip di sub-selezione orizzontali `DECOLLO: (N)` e `ATTERRAGGIO: (N)`) posizionata tra la barra del comprensorio e il selettore date, recuperando oltre 115px verticali complessivi nell'header.
+  - Bonificati gli stili CSS correlati in `css/theme.css` e aggiornati i test di governance in `tests/ui/forecastView.test.mjs`.
+  - Verificato il passaggio al 100% dei test (`npm test`, 557/557 test superati su 89 suite native).
+  - Registrata la Lezione Appresa #110 in [MEMORY.md](file:///MEMORY.md).
+
+

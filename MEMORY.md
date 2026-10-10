@@ -1344,3 +1344,26 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
      - Il tap su un chip di decollo specifico (`data-action="pick-spot-takeoff"`) o di atterraggio (`data-action="pick-spot-landing"`) seleziona istantaneamente il sub-spot associato, chiude lo sheet e renderizza la schermata previsioni senza passaggi intermedi.
      - Il pulsante stella preferiti (`data-action="toggle-pin-spot"`) rimane isolato e preserva l'apertura dello sheet.
   3. **Risoluzione Deterministica di `spotId`**: Il controller deve risolvere `spotId` primariamente dal target attivo (`actionEl.getAttribute('data-spot-id')`) con fallback trasparente sulla card padre (`card.getAttribute('data-spot-id')`).
+
+---
+
+## 109. Debriefing Analitico di Volo: Full-Screen Dedicated View vs Bottom Sheet Drawer (Anti-Pattern Flyer) & Allineamento di Schema Telemetrico
+- **Problema**: L'adozione di un bottom sheet modale ("flyer") per la consultazione del debriefing di volo e della telemetria densa comprimeva l'area utile (`max-height: 88dvh`), generava collisioni di gesto (*drag-to-dismiss* vs scroll verticale di grafici SVG e textarea note), nascondeva la CTA primaria "Visualizza Replay 3D" in fondo a pagine di scorrimento e non supportava il tasto "Back" nativo dello smartphone. Inoltre, discrepanze tra i nomi di proprietà nel core (`altGain`, `originDeg`, `turnCount`, `efficiencyPercent`) e nella UI (`netGain`, `bearingDeg`, `turns`, `efficiency`) producevano stringhe corrotte (`undefined°` nel vento, `+0 m` nelle termiche).
+- **Causa Radice**: Confinamento di un'attività di analisi complessa (post-flight debriefing) in un pattern concepito per azioni transitorie (picker/drawer) e mancata adozione di un test di contratto tra l'oggetto telemetrico del core e il template di rendering visuale.
+- **Pattern Vincolante**:
+  1. **Full-Screen View Dedicata (`100dvh`)**: Le viste analitiche dense devono occupare l'intero schermo (`.gm-flight-detail-fullscreen`, `fixed inset-0 z-1050 100vw 100dvh`), senza backdrop oscurato o drag handles di chiusura.
+  2. **Top Bar con Touch Target Ampio ($\ge 48\times 48\text{px}$)**: Navigazione di ritorno prominente (`← Libretto`) agganciata all'Escape da tastiera e alla cronologia hash, con ripristino del focus per accessibilità WCAG.
+  3. **Sticky Bottom Action Bar nella Thumb Zone**: La CTA primaria (Replay 3D) e secondaria (Export IGC) risiedono in una barra inferiore fissa facilmente raggiungibile dal pollice su schermi outdoor.
+  4. **Gestalt Common Region per la Telemetria**: Le metriche cinematiche devono essere incapsulate in tessere responsive (`.gm-flight-metrics-grid`, 2 colonne mobile / 3 colonne desktop) con card a contrasto e unità esplicite.
+  5. **Resilienza di Schema (Defensive Property Access)**: Nei template UI, accedere alle grandezze fisiche con fallback sicuri (`altGain ?? netGain`, `originDeg ?? bearingDeg`) e convalidare l'assenza di `undefined` o numeri privi di unità tramite test automatici dedicati.
+
+---
+
+## 110. Compressione Monofila dell'Header Previsioni & Rimozione dei Controlli di Sub-Selezione Ridondanti (Occam's Razor)
+- **Problema**: Nella vista Previsioni (`ForecastView`), la selezione del comprensorio e dei suoi decolli/atterraggî multipli era frammentata tra dropdown, chip orizzontali duplicate (`DECOLLO: (N)` e `ATTERRAGGIO: (N)`) e picker sheet. Le chip duplicate occupavano oltre 75px verticali, si avvolgevano disordinatamente o troncavano le label sui display mobile compatti (360px-390px), violando il principio del Rasoio di Occam (moltiplicazione inutile di controlli concorrenti per il medesimo scopo).
+- **Causa Radice**: Stratificazione di controlli UI introdotti in fasi successive senza consolidamento sistemico (un controllo in-page e uno modale per la stessa identica funzione).
+- **Pattern Vincolante**:
+  1. **Barra Unificata Comprensorio & Sub-Spot (`.gm-unified-spot-bar`)**: Un solo target ergonomico $\ge 48\text{px}$ nell'header che espone il comprensorio e il punto/decollo attivo come badge contestuale (`.gm-unified-subspot-badge`).
+  2. **Accesso Rapido Nello Sheet con Raggruppamento Semantico**: La selezione e il cambio di decollo/atterraggio risiedono unicamente all'interno della prima sezione dello sheet (`.gm-picker-current-spot-section`), strutturata in 3 gruppi chiari con icone dedicate: `Panoramica`, `Decolli (N)` e `Atterraggi (N)`.
+  3. **Zero Controlli Duplicati In-Page**: Vietato inserire container di chip orizzontali o pillole di sub-selezione tra l'header e la barra delle date (`.gm-date-tabs`), massimizzando la vertical clearance per i dati meteorologici e i grafici orari.
+

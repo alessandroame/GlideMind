@@ -2940,6 +2940,40 @@ input.gm-input:focus {
   gap: 4px;
 }
 
+.gm-subspot-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gm-subspot-group + .gm-subspot-group {
+  border-top: 1px solid var(--gm-border);
+  padding-top: 6px;
+  margin-top: 4px;
+}
+
+.gm-subspot-group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px 4px 8px;
+  font-size: 0.70rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--gm-text-muted);
+}
+
+.gm-subspot-group-header svg {
+  color: var(--gm-accent);
+}
+
+.gm-subspot-group-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 /* -------------------------------------------------------------
  * 15c. Forecast Collapsing Sticky Header (Slim Bar on Scroll)
  * ------------------------------------------------------------- */
@@ -6259,61 +6293,6 @@ input.gm-input:focus {
   filter: brightness(1.1);
 }
 
-/* Header Launch and Landing Selectors */
-.gm-spot-subselection-container {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: 100%;
-}
-
-.gm-spot-subselector-row {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.gm-spot-subselector-chips {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  overflow-x: auto;
-  padding-bottom: 2px;
-  touch-action: pan-x;
-  scrollbar-width: thin;
-}
-
-.gm-spot-pill {
-  min-height: var(--gm-touch-min, 48px);
-  padding: 6px 14px;
-  font-size: 0.82rem;
-  font-weight: 600;
-  border-radius: var(--gm-radius-full, 9999px);
-  background-color: var(--gm-bg-card);
-  border: 1px solid var(--gm-border);
-  color: var(--gm-text-secondary);
-  cursor: pointer;
-  white-space: nowrap;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  transition: all var(--gm-transition-fast);
-}
-
-.gm-spot-pill:hover {
-  background-color: var(--gm-bg-hover);
-  border-color: var(--gm-border-strong);
-  color: var(--gm-text-primary);
-}
-
-.gm-spot-pill.active {
-  background-color: var(--gm-accent-glow, rgba(56, 189, 248, 0.15));
-  border-color: var(--gm-accent, #38bdf8);
-  color: var(--gm-accent, #38bdf8);
-  font-weight: 700;
-  box-shadow: 0 0 0 1px var(--gm-accent, #38bdf8);
-}
-
 /* ==========================================================================
    Flight Logbook & Telemetry View Styles (Fase 6)
    ========================================================================== */
@@ -7438,6 +7417,146 @@ input.gm-input:focus {
 .gm-flight-notes-textarea:focus {
   outline: 2px solid var(--gm-accent-sky, #0ea5e9);
 }
+
+/* ==========================================================================
+   Flight Detail Full-Screen View Styles (Laws of UX & HMI)
+   ========================================================================== */
+.gm-flight-detail-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: 100dvh;
+  max-height: 100dvh;
+  background-color: var(--gm-bg-base);
+  color: var(--gm-text-primary);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.gm-flight-detail-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  min-height: 56px;
+  background-color: var(--gm-bg-elevated);
+  border-bottom: 1px solid var(--gm-border-strong);
+  flex-shrink: 0;
+  z-index: 10;
+  box-sizing: border-box;
+}
+
+.gm-flight-detail-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--gm-touch-min, 48px);
+  min-width: var(--gm-touch-min, 48px);
+  padding: 8px 14px;
+  border-radius: var(--gm-radius-md);
+  background: var(--gm-bg-card);
+  border: 1px solid var(--gm-border);
+  color: var(--gm-text-primary);
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color var(--gm-transition-fast), border-color var(--gm-transition-fast);
+}
+
+.gm-flight-detail-back-btn:hover {
+  background-color: var(--gm-bg-hover);
+  border-color: var(--gm-border-strong);
+}
+
+.gm-flight-detail-back-btn:focus-visible {
+  outline: 2px solid var(--gm-accent-sky, #0ea5e9);
+  outline-offset: 2px;
+}
+
+.gm-flight-detail-scroll-body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  padding: 16px 20px 24px 20px;
+  max-width: 860px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.gm-flight-detail-bottom-bar {
+  display: flex;
+  align-items: center;
+  padding: 12px 20px;
+  background-color: var(--gm-bg-elevated);
+  border-top: 1px solid var(--gm-border-strong);
+  flex-shrink: 0;
+  z-index: 10;
+  padding-bottom: max(12px, env(safe-area-inset-bottom, 12px));
+  box-sizing: border-box;
+}
+
+.gm-flight-detail-bottom-bar-inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 860px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* Kinetic Telemetry 2-col / 3-col Grid */
+.gm-flight-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (min-width: 640px) {
+  .gm-flight-metrics-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+}
+
+.gm-flight-metric-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px 14px;
+  background: var(--gm-bg-card);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-md);
+  box-sizing: border-box;
+}
+
+.gm-flight-metric-num {
+  font-size: 1.15rem;
+  font-weight: 800;
+  font-family: monospace;
+  color: var(--gm-text-primary);
+  line-height: 1.2;
+}
+
+.gm-flight-metric-desc {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--gm-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
 
 
 

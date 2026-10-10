@@ -1807,7 +1807,7 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.equal(rendered, true, 'Applying spot selection must trigger render');
   });
 
-  it('should render header pill selectors when current spot has multiple subspots and allow switching', () => {
+  it('should keep header clean without redundant subselection pills and allow switching subspots', () => {
     const multiSpot = {
       id: 'spot-multi-test',
       name: 'Monte Multiplo',
@@ -1832,26 +1832,29 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     const controller = new ForecastViewController({ store: mockStore });
 
     const html = controller.renderHtml();
-    assert.ok(html.includes('gm-spot-subselection-container'), 'Header must contain subselection container');
-    assert.ok(html.includes('data-action="set-active-takeoff"'), 'Header must contain takeoff selector pills');
-    assert.ok(html.includes('data-action="set-active-landing"'), 'Header must contain landing selector pills');
-    assert.ok(html.includes('data-takeoff-id="to-1"'), 'Must render pill for to-1');
-    assert.ok(html.includes('data-takeoff-id="to-2"'), 'Must render pill for to-2');
-    assert.ok(html.includes('data-landing-id="ld-1"'), 'Must render pill for ld-1');
-    assert.ok(html.includes('data-landing-id="ld-2"'), 'Must render pill for ld-2');
+    assert.ok(!html.includes('gm-spot-subselection-container'), 'Header must not contain redundant subselection container');
+    assert.ok(html.includes('gm-unified-spot-bar'), 'Header must contain unified spot bar');
+
+    // Verify sub-spots are organized in picker sheet sections
+    const pickerHtml = controller.renderPickerSections('');
+    assert.ok(pickerHtml.includes('gm-subspot-group'), 'Picker must render grouped subspots');
+    assert.ok(pickerHtml.includes('Decolli (2)'), 'Picker must group takeoffs');
+    assert.ok(pickerHtml.includes('Atterraggi (2)'), 'Picker must group landings');
+    assert.ok(pickerHtml.includes('data-subspot-id="to-2"'), 'Must render option for to-2');
+    assert.ok(pickerHtml.includes('data-subspot-id="ld-2"'), 'Must render option for ld-2');
 
     let rendered = false;
     controller.render = () => { rendered = true; };
 
-    // Simulate clicking takeoff pill 'to-2'
+    // Simulate clicking takeoff option 'to-2'
     const toClickEvt = {
       target: {
         closest(sel) {
           if (sel === '[data-action]') {
             return {
               getAttribute(attr) {
-                if (attr === 'data-action') return 'set-active-takeoff';
-                if (attr === 'data-takeoff-id') return 'to-2';
+                if (attr === 'data-action') return 'select-subspot';
+                if (attr === 'data-subspot-id') return 'to-2';
                 return null;
               }
             };
@@ -1865,7 +1868,7 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.equal(mockStore.getState().activeTakeoffId, 'to-2');
     assert.equal(rendered, true);
 
-    // Simulate clicking landing pill 'ld-2'
+    // Simulate clicking landing option 'ld-2'
     rendered = false;
     const ldClickEvt = {
       target: {
@@ -1873,8 +1876,8 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
           if (sel === '[data-action]') {
             return {
               getAttribute(attr) {
-                if (attr === 'data-action') return 'set-active-landing';
-                if (attr === 'data-landing-id') return 'ld-2';
+                if (attr === 'data-action') return 'select-subspot';
+                if (attr === 'data-subspot-id') return 'ld-2';
                 return null;
               }
             };
@@ -1888,7 +1891,8 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.equal(mockStore.getState().activeLandingId, 'ld-2');
     assert.equal(rendered, true);
 
-    // Verify that the overview summary card (#forecast-summary-card) uses the selected takeoff and landing
+    // Verify overview card reflects selected subspots when in overview mode
+    controller.selectedSubSpot = 'overview';
     const updatedHtml = controller.renderHtml();
     assert.ok(updatedHtml.includes('id="forecast-summary-card"'), 'Must render #forecast-summary-card');
     assert.ok(updatedHtml.includes('Decollo Basso'), 'Overview card must reflect selected takeoff Decollo Basso');
@@ -2274,6 +2278,11 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
 
       assert.ok(sheetHtml.includes('gm-picker-current-spot-section'), 'Picker sheet must render current sub-spots section');
       assert.ok(sheetHtml.includes('Punto di Volo Attivo'), 'Must have descriptive section title');
+      assert.ok(sheetHtml.includes('gm-subspot-group-overview'), 'Must divide into overview group');
+      assert.ok(sheetHtml.includes('gm-subspot-group-takeoffs'), 'Must divide into takeoffs group');
+      assert.ok(sheetHtml.includes('gm-subspot-group-landings'), 'Must divide into landings group');
+      assert.ok(sheetHtml.includes('Decolli ('), 'Must render Decolli header with count');
+      assert.ok(sheetHtml.includes('Atterraggi ('), 'Must render Atterraggi header with count');
       assert.ok(sheetHtml.includes('data-action="select-subspot"'), 'Must have select-subspot buttons');
       assert.ok(sheetHtml.includes('data-subspot-id="overview"'), 'Must include Panoramica option');
       // Must include takeoffs from Cornizzolo

@@ -23,7 +23,10 @@ Questa separazione occupava oltre 92px verticali di viewport prima ancora di vis
 
 2. **Sheet Gerarchico a 2 Livelli con Accesso Rapido 1-Tap (`openPickerSheet`)**:
    - In cima allo sheet di selezione, prima della ricerca e della lista globale, è inserita la sezione dedicata `.gm-picker-current-spot-section`:
-     - Elenca immediatamente la Panoramica Binomio e tutti i decolli e atterraggi del comprensorio attualmente selezionato.
+     - Elenca la Panoramica e tutti i punti di volo del sito attivo, suddivisi in **3 sezioni semantiche con intestazioni e icone dedicate**:
+       1. **Panoramica** (`.gm-subspot-group-overview`) con icona binomio e spunta di selezione attiva.
+       2. **Decolli** (`.gm-subspot-group-takeoffs`) con conteggio dinamico, quota ed esposizione azimutale.
+       3. **Atterraggi** (`.gm-subspot-group-landings`) con conteggio dinamico, quota e indicatore di ufficialità.
      - Permette il cambio di decollo o ritorno alla panoramica in **1 solo tap a 0 scroll**.
    - Al tocco di un'opzione di sub-spot (`select-subspot`), lo sheet si chiude automaticamente (`closeSheet()`), lo store si aggiorna e la vista si re-idrata reattivamente sotto la soglia di Doherty (<50ms).
 
@@ -37,7 +40,13 @@ Questa separazione occupava oltre 92px verticali di viewport prima ancora di vis
      - Generazione della sezione sub-spot rapida nello sheet di selezione.
      - Interazione di click con cambio sub-spot e sincronizzazione store/state.
 
+5. **Rimozione delle Righe di Chip Ridondanti (`.gm-spot-subselection-container`)**:
+   - Rimosse le due righe di chip orizzontali duplicate (`DECOLLO: (N)` e `ATTERRAGGIO: (N)`) posizionate tra la barra del comprensorio e le date tabs in `ForecastView.js`.
+   - Bonificati gli stili obsoleti in `css/theme.css` (`.gm-spot-subselection-container`, `.gm-spot-subselector-row`, `.gm-spot-subselector-chips`, `.gm-spot-pill`).
+   - L'accesso e la commutazione dei decolli/atterraggî multipli sono ora completamente e unicamente governati dallo sheet a 1-tap (`.gm-picker-current-spot-section`), azzerando il sovraccarico visivo nell'header e recuperando ulteriori ~75px verticali.
+   - Aggiornata la suite di test in `tests/ui/forecastView.test.mjs` verificando l'assenza di `.gm-spot-subselection-container` nell'header e la corretta commutazione dei punti di volo tramite `select-subspot`.
+
 ## Verifica & Shift-Left Pre-Flight
-- `npm test`: 551/551 test superati (88 suite su 88).
+- `npm test`: 557/557 test superati (89 suite su 89).
 - Zero regressioni sui test pre-esistenti.
-- Riduzione netta di 44px nell'header della vista Previsioni, migliorando l'ergonomia su viewport mobile ristretti (360px - 390px).
+- Riduzione complessiva di oltre 115px nell'header della vista Previsioni (eliminazione dropdown + rimozione chip sub-selezione), migliorando drasticamente la superficie utile per i dati meteorologici e l'ergonomia su viewport mobile ristretti (360px - 390px).
