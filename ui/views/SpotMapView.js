@@ -41,6 +41,8 @@ export class SpotMapView {
     this.activeMacroRegion = DEFAULT_MACRO_REGION;
     this.activeHour = 12;
     this.activeDate = formatDateIso(new Date());
+    this.activeLayer = 'dark';
+    this.focusedSpotId = null;
     this.topSpot = null;
     this.isFetchingWeather = false;
     this.storeUnsub = null;
@@ -61,6 +63,18 @@ export class SpotMapView {
   }
 
   /**
+   * Gets display title for the currently focused spot in scrubber header.
+   * @returns {string}
+   */
+  getFocusedSpotTitle() {
+    if (this.focusedSpotId) {
+      const spot = this.comprensoriCatalog.find(s => s.id === this.focusedSpotId);
+      if (spot) return spot.name;
+    }
+    return this.topSpot?.name || 'Osservazione Spot';
+  }
+
+  /**
    * Mounts the Spot Map view into the specified container element.
    * @param {HTMLElement} containerEl
    * @param {object} [params]
@@ -77,6 +91,9 @@ export class SpotMapView {
     } else {
       this.activeHour = 12;
     }
+
+    this.activeLayer = (state.ui && state.ui.mapLayer) || 'dark';
+    this.focusedSpotId = state.selectedSpotId || null;
 
     if (params && params.macroRegion) {
       this.activeMacroRegion = params.macroRegion;
@@ -101,50 +118,82 @@ export class SpotMapView {
                 `).join('')}
               </select>
 
-              <!-- Date Badge Indicator -->
-              <div class="gm-map-pill-btn" id="gm-map-date-chip" aria-label="Data visualizzata: ${this.activeDate}">
-                <span>📅</span>
-                <span class="gm-map-date-text">${this.formatDateDisplay(this.activeDate)}</span>
-              </div>
+              <!-- Layer Switcher Dropdown Button -->
+              <select id="gm-map-layer-select" class="gm-map-pill-btn" aria-label="Seleziona layer cartografico">
+                <option value="dark" ${this.activeLayer === 'dark' ? 'selected' : ''}>Scuro</option>
+                <option value="topo" ${this.activeLayer === 'topo' ? 'selected' : ''}>OpenTopo</option>
+                <option value="satellite" ${this.activeLayer === 'satellite' ? 'selected' : ''}>Satellite</option>
+                <option value="streets" ${this.activeLayer === 'streets' ? 'selected' : ''}>CyclOSM</option>
+              </select>
             </div>
 
             <div class="gm-map-group-right">
               <!-- Live Data Freshness Badge -->
               <span id="gm-map-network-badge" class="gm-badge gm-badge-flyable" style="font-size: 0.72rem; padding: 4px 8px;">
-                🟢 Live Open-Meteo
+                Live Open-Meteo
               </span>
 
               <!-- 1-Tap Top Spot Focus Recommendation Pill -->
               <button type="button" id="gm-map-top-spot-btn" class="gm-map-top-spot-btn" aria-label="Centra sullo spot migliore">
                 <span class="gm-top-spot-dot">●</span>
                 <span class="gm-top-spot-title" id="gm-top-spot-name">Top Spot...</span>
-                <span class="gm-top-spot-focus" aria-hidden="true">🎯</span>
+                <span class="gm-top-spot-focus" aria-hidden="true">›</span>
               </button>
             </div>
           </div>
         </header>
 
         <!-- Bottom Docked Timeline Scrubber (Thumb Zone, Clearance >=24px) -->
-        <div class="gm-map-scrubber-container" role="region" aria-label="Selettore orario">
+        <div class="gm-map-scrubber-container" role="region" aria-label="Selettore orario volabilità">
           <div class="gm-map-scrubber-inner">
             <div class="gm-map-scrubber-header">
-              <span>Timeline Volabilità (09:00 - 18:00)</span>
-              <span id="gm-map-active-hour-label" class="gm-flight-alt">Ore ${this.activeHour}:00</span>
+              <div class="gm-map-scrubber-title-group">
+                <span class="gm-map-scrubber-title">Timeline Volabilità</span>
+                <span id="gm-map-scrubber-spot-pill" class="gm-map-scrubber-spot-pill">
+                  ${this.getFocusedSpotTitle()}
+                </span>
+              </div>
+              <div class="gm-map-scrubber-hour-display">
+                <span id="gm-map-active-hour-label" class="gm-flight-alt">Ore ${String(this.activeHour).padStart(2, '0')}:00</span>
+              </div>
             </div>
-            <div class="gm-map-scrubber-slots" role="radiogroup" aria-label="Ore disponibili">
-              ${this.hoursRange.map(h => `
-                <button
-                  type="button"
-                  class="gm-map-hour-slot ${h === this.activeHour ? 'active' : ''}"
-                  data-hour="${h}"
-                  role="radio"
-                  aria-checked="${h === this.activeHour ? 'true' : 'false'}"
-                  aria-label="Ore ${h}:00"
-                >
-                  <span class="gm-hour-text">${h}</span>
-                  <span class="gm-hour-fly-bar" data-slot-hour="${h}"></span>
-                </button>
-              `).join('')}
+
+            <div class="gm-map-scrubber-stepper-row">
+              <button
+                type="button"
+                id="gm-map-prev-hour-btn"
+                class="gm-map-stepper-btn"
+                aria-label="Ora precedente"
+                ${this.activeHour <= 9 ? 'disabled' : ''}
+              >
+                ‹
+              </button>
+
+              <div class="gm-map-scrubber-slots" role="radiogroup" aria-label="Ore disponibili">
+                ${this.hoursRange.map(h => `
+                  <button
+                    type="button"
+                    class="gm-map-hour-slot ${h === this.activeHour ? 'active' : ''}"
+                    data-hour="${h}"
+                    role="radio"
+                    aria-checked="${h === this.activeHour ? 'true' : 'false'}"
+                    aria-label="Ore ${h}:00"
+                  >
+                    <span class="gm-hour-text">${String(h).padStart(2, '0')}</span>
+                    <span class="gm-hour-fly-bar" data-slot-hour="${h}"></span>
+                  </button>
+                `).join('')}
+              </div>
+
+              <button
+                type="button"
+                id="gm-map-next-hour-btn"
+                class="gm-map-stepper-btn"
+                aria-label="Ora successiva"
+                ${this.activeHour >= 18 ? 'disabled' : ''}
+              >
+                ›
+              </button>
             </div>
           </div>
         </div>
@@ -160,9 +209,15 @@ export class SpotMapView {
       center: regionConfig.defaultCenter,
       zoom: regionConfig.defaultZoom,
       theme: currentTheme,
-      onSpotSelect: (spot) => this.handleSpotClick(spot),
+      layer: this.activeLayer,
+      onSpotSelect: (spot) => this.handleSpotFocus(spot),
+      onSpotOpenSheet: (spot) => this.handleSpotClick(spot),
       onMoveEnd: (view) => this.handleMapMove(view)
     });
+
+    if (this.mapEngine && typeof this.mapEngine.setLayer === 'function') {
+      this.mapEngine.setLayer(this.activeLayer);
+    }
 
     // Bind UI Event Listeners
     this.bindEvents();
@@ -175,11 +230,23 @@ export class SpotMapView {
         if (s.ui && s.ui.theme && this.mapEngine) {
           this.mapEngine.setTheme(s.ui.theme);
         }
+        // Check map layer change
+        if (s.ui && s.ui.mapLayer && s.ui.mapLayer !== this.activeLayer && this.mapEngine) {
+          this.activeLayer = s.ui.mapLayer;
+          const select = this.container?.querySelector('#gm-map-layer-select');
+          if (select) select.value = this.activeLayer;
+          if (typeof this.mapEngine.setLayer === 'function') {
+            this.mapEngine.setLayer(this.activeLayer);
+          }
+        }
+        // Check selected spot change
+        if (s.selectedSpotId && s.selectedSpotId !== this.focusedSpotId) {
+          this.focusedSpotId = s.selectedSpotId;
+          this.renderMapContent();
+        }
         // Check date change
         if (s.activeDate && s.activeDate !== this.activeDate) {
           this.activeDate = s.activeDate;
-          const dateLabel = this.container?.querySelector('.gm-map-date-text');
-          if (dateLabel) dateLabel.textContent = this.formatDateDisplay(this.activeDate);
           this.renderMapContent();
         }
         // Check hour change
@@ -225,16 +292,70 @@ export class SpotMapView {
       });
     }
 
+    // Layer switcher
+    const layerSelect = this.container.querySelector('#gm-map-layer-select');
+    if (layerSelect) {
+      layerSelect.addEventListener('change', (e) => {
+        const newLayer = e.target.value;
+        this.activeLayer = newLayer;
+        if (this.mapEngine && typeof this.mapEngine.setLayer === 'function') {
+          this.mapEngine.setLayer(newLayer);
+        }
+        if (typeof store.setState === 'function') {
+          const ui = (store.getState().ui) || {};
+          store.setState({ ui: { ...ui, mapLayer: newLayer } });
+        }
+      });
+    }
+
     // Top spot focus button
     const topSpotBtn = this.container.querySelector('#gm-map-top-spot-btn');
     if (topSpotBtn) {
       topSpotBtn.addEventListener('click', () => {
         if (this.topSpot) {
+          this.focusedSpotId = this.topSpot.id || this.topSpot.comprensorio?.id;
           const coords = getComprensorioCoordinates(this.topSpot.comprensorio || this.topSpot);
           if (coords && this.mapEngine) {
             this.mapEngine.flyTo(coords, 10);
-            this.handleSpotClick(this.topSpot);
+            this.handleSpotFocus(this.topSpot);
+            if (typeof this.mapEngine.openSpotPopup === 'function') {
+              setTimeout(() => {
+                this.mapEngine.openSpotPopup(this.focusedSpotId);
+              }, 300);
+            }
           }
+        }
+      });
+    }
+
+    // Scrubber header spot pill (tap to open sheet)
+    const spotPill = this.container.querySelector('#gm-map-scrubber-spot-pill');
+    if (spotPill) {
+      spotPill.style.cursor = 'pointer';
+      spotPill.addEventListener('click', () => {
+        const evaluatedSpots = this.getEvaluatedSpotsForActiveRegion();
+        const cur = (this.focusedSpotId && evaluatedSpots.find(s => (s.id || s.comprensorio?.id) === this.focusedSpotId)) || this.topSpot;
+        if (cur) {
+          this.handleSpotClick(cur);
+        }
+      });
+    }
+
+    // Stepper buttons for 1-hour jump
+    const prevBtn = this.container.querySelector('#gm-map-prev-hour-btn');
+    if (prevBtn) {
+      prevBtn.addEventListener('click', () => {
+        if (this.activeHour > 9) {
+          this.setActiveHour(this.activeHour - 1, true);
+        }
+      });
+    }
+
+    const nextBtn = this.container.querySelector('#gm-map-next-hour-btn');
+    if (nextBtn) {
+      nextBtn.addEventListener('click', () => {
+        if (this.activeHour < 18) {
+          this.setActiveHour(this.activeHour + 1, true);
         }
       });
     }
@@ -282,7 +403,13 @@ export class SpotMapView {
 
     if (this.container) {
       const activeLabel = this.container.querySelector('#gm-map-active-hour-label');
-      if (activeLabel) activeLabel.textContent = `Ore ${hour}:00`;
+      if (activeLabel) activeLabel.textContent = `Ore ${String(hour).padStart(2, '0')}:00`;
+
+      const prevBtn = this.container.querySelector('#gm-map-prev-hour-btn');
+      if (prevBtn) prevBtn.disabled = hour <= 9;
+
+      const nextBtn = this.container.querySelector('#gm-map-next-hour-btn');
+      if (nextBtn) nextBtn.disabled = hour >= 18;
 
       const slots = this.container.querySelectorAll('.gm-map-hour-slot');
       slots.forEach(slot => {
@@ -308,7 +435,7 @@ export class SpotMapView {
   handleMapMove(view) {
     if (!this.mapEngine) return;
     const evaluated = this.getEvaluatedSpotsForActiveRegion();
-    this.mapEngine.renderOverlays(evaluated, view.zoom, store.getState().activeGlider);
+    this.mapEngine.renderOverlays(evaluated, view.zoom, store.getState().activeGlider, this.focusedSpotId);
   }
 
   /**
@@ -346,14 +473,20 @@ export class SpotMapView {
     const evaluatedSpots = this.getEvaluatedSpotsForActiveRegion();
     const activeGlider = store.getState().activeGlider;
 
-    // Update map overlays
-    if (this.mapEngine) {
-      const currentView = this.mapEngine.getView();
-      this.mapEngine.renderOverlays(evaluatedSpots, currentView.zoom, activeGlider);
-    }
-
     // Find and update top-spot recommendation pill
     this.topSpot = findTopFlyableSpot(evaluatedSpots);
+
+    // Default focused spot to top-spot or first spot if not explicitly set
+    if (!this.focusedSpotId && this.topSpot) {
+      this.focusedSpotId = this.topSpot.id || this.topSpot.comprensorio?.id;
+    }
+
+    // Update map overlays with active spot beacon
+    if (this.mapEngine) {
+      const currentView = this.mapEngine.getView();
+      this.mapEngine.renderOverlays(evaluatedSpots, currentView.zoom, activeGlider, this.focusedSpotId);
+    }
+
     if (this.container && this.topSpot) {
       const topNameEl = this.container.querySelector('#gm-top-spot-name');
       const topDotEl = this.container.querySelector('.gm-top-spot-dot');
@@ -366,8 +499,9 @@ export class SpotMapView {
       }
     }
 
-    // Update mini flyability bars on the hourly scrubber slots for the top spot
-    this.updateScrubberBars(this.topSpot || evaluatedSpots[0]);
+    // Update mini flyability bars on the hourly scrubber slots for the focused spot
+    const focusedEval = (this.focusedSpotId && evaluatedSpots.find(s => (s.id || s.comprensorio?.id) === this.focusedSpotId)) || this.topSpot || evaluatedSpots[0];
+    this.updateScrubberBars(focusedEval);
   }
 
   /**
@@ -395,6 +529,13 @@ export class SpotMapView {
         bar.style.backgroundColor = style.fill;
       }
     });
+
+    const spotPill = this.container.querySelector('#gm-map-scrubber-spot-pill');
+    if (spotPill) {
+      const style = STATUS_COLORS[spotEvaluation.status] || STATUS_COLORS.unavailable;
+      spotPill.textContent = `${spot.name || 'Spot'} (${style.badge})`;
+      spotPill.style.color = style.fill;
+    }
   }
 
   /**
@@ -454,12 +595,32 @@ export class SpotMapView {
   }
 
   /**
+   * Handles spot selection/focus on the map and synchronizes scrubber and store without forcing the sheet.
+   * @param {object} spotEval
+   */
+  handleSpotFocus(spotEval) {
+    if (!spotEval) return;
+    const spot = spotEval.comprensorio || spotEval;
+    const spotId = spot.id || spotEval.id;
+    if (spotId && spotId !== this.focusedSpotId) {
+      this.focusedSpotId = spotId;
+      if (typeof store.setState === 'function') {
+        store.setState({ selectedSpotId: spotId });
+      }
+    }
+    this.updateScrubberBars(spotEval);
+  }
+
+  /**
    * Opens the contextual Bottom Sheet drawer upon clicking any spot marker.
    * @param {object} spotEval
    */
   handleSpotClick(spotEval) {
     if (!spotEval) return;
     const spot = spotEval.comprensorio || spotEval;
+    if (spot.id && spot.id !== this.focusedSpotId) {
+      this.handleSpotFocus(spotEval);
+    }
     const statusStyle = STATUS_COLORS[spotEval.status] || STATUS_COLORS.unavailable;
     const takeoff = spotEval.takeoff || spot.takeoffs?.[0];
     const landing = spotEval.landing || spot.landings?.[0];

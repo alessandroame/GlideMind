@@ -693,6 +693,50 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Dimezzato l'ingombro orizzontale da 17 a 9 caratteri nella barra comandi, massimizzando il respiro del toggle `[ Schede | Solo Grafici ]` sui display outdoor compatti.
   - Aggiornato l'attributo `aria-label="Modalità di visualizzazione aerologia"` e aggiunta asserzione di regressione semantica in [tests/ui/forecastView.test.mjs](file:///tests/ui/forecastView.test.mjs) (379/379 test superati).
 
+---
+
+## 2026-10-10 - Fase 5-bis: Mini Mappa & Manica a Vento Vettoriale in Previsioni
+- **Tipo**: Feature Implementation / Cartography / Aerodynamics / Headless Core
+- **Dettagli**: [.agents/worklog.d/2026-10-10_forecast-minimap-and-windsock-implementation.md](file:///.agents/worklog.d/2026-10-10_forecast-minimap-and-windsock-implementation.md)
+- **Sintesi**:
+  - Implementato modulo headless puro [core/windsock.js](file:///core/windsock.js) (zero DOM, Gate 1): deformazione e allungamento fisico in base a velocità, raffiche e turbolenza EDR, 12 segmenti aerodinamici con curve a S (onda whip-wave), oscillazione fluida e generazione SVG pura.
+  - Esteso [ui/map/mapEngineAdapter.js](file:///ui/map/mapEngineAdapter.js) con `renderSpotMiniMap`: marker manica a vento animata sul decollo, pin avionici compatti e linea geodetica di planata.
+  - Integrata la mini mappa nel layout di [ui/views/ForecastView.js](file:///ui/views/ForecastView.js) con disaccoppiamento DOM (`#forecast-spot-metrics-container` vs `#forecast-mini-map-container`) per garantire aggiornamento reattivo senza ricaricamento dei tile durante lo scrubbing orario.
+  - Pulizia ciclo di vita in `unmount()` e stili dedicati in [css/theme.css](file:///css/theme.css) per entrambi i temi.
+
+---
+
+## 2026-10-10 - Mappa Comprensori: Marker Circolari Semantici Invarianti e Fumetto al Tap
+- **Tipo**: UI/UX Cartography Refactoring / Ergonomics / Progressive Disclosure
+- **Dettagli**: [.agents/worklog.d/2026-10-10_permanent-circular-markers-and-speech-bubble-popup.md](file:///.agents/worklog.d/2026-10-10_permanent-circular-markers-and-speech-bubble-popup.md)
+- **Sintesi**:
+  - Eliminata la mutazione morfologica dei marker a seconda dello zoom: adottati stabilmente marker circolari a disco avionico da 26px con glifo geometrico a 4 stati (●, ▲, ✕, ⚡, ○) su tutti i livelli di zoom, preservando leggibilità dell'orografia e touch floor a 46px.
+  - Implementato fumetto a bolla aeronautica (`L.popup`) al tocco sul marker con dettagli spot, quota, stato di volabilità e pulsante per aprire la scheda di dettaglio.
+  - Aggiornato [tests/ui/spotMapView.test.mjs](file:///tests/ui/spotMapView.test.mjs) e registrata la Lezione Appresa #69 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-10 - Selettore Layer Cartografici Multi-Provider (OpenTopoMap, CyclOSM, Satellite, Scuro)
+- **Tipo**: Cartography / Outdoor Tile Providers / Multi-Layer Switching
+- **Dettagli**: [.agents/worklog.d/2026-10-10_minimap-layer-switcher-and-store-synchronization.md](file:///.agents/worklog.d/2026-10-10_minimap-layer-switcher-and-store-synchronization.md)
+- **Sintesi**:
+  - Integrati tile server keyless ad alta affidabilità in [ui/map/mapEngineAdapter.js](file:///ui/map/mapEngineAdapter.js): OpenTopoMap (isoipse 20m, rilievo SRTM, maxNativeZoom 17), CyclOSM (sentieri, tracce Hike & Fly, maxNativeZoom 18), Esri World Imagery (Satellite) ed Esri World Dark Gray Base (Scuro).
+  - Progettato e montato selettore layer sovraimpresso compatto (`.gm-mini-map-layer-select`) in [ui/views/ForecastView.js](file:///ui/views/ForecastView.js) sincronizzato bi-direzionalmente con `store.ui.mapLayer` e con la mappa comprensori [ui/views/SpotMapView.js](file:///ui/views/SpotMapView.js).
+  - Abilitata selezione interattiva dei sub-spot al tocco diretto sui pin di decollo e atterraggio nella mini-mappa.
+  - Registrata la Lezione Appresa #68 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-10 - Mini-Mappa: Centratura Pivot Leaflet, Settore Esposizione Pendio e Fix Scrubber
+- **Tipo**: Bug Fixing / Geometrical Alignment / Aeronautical Vector Calibration
+- **Dettagli**: [.agents/worklog.d/2026-10-10_fix-windsock-scrubber-rotation-and-wind-direction-sync.md](file:///.agents/worklog.d/2026-10-10_fix-windsock-scrubber-rotation-and-wind-direction-sync.md)
+- **Sintesi**:
+  - Risolto disallineamento geometrico di +74px della manica a vento configurando `iconSize: [240, 240]` e `iconAnchor: [120, 120]`, ancorando il centro di scala all'esatta coordinata geografica del decollo.
+  - Integrato settore di esposizione del pendio (`generateTakeoffSectorSvg` a 70° con azimut e freccia di pendio) con codice colore dinamico in base alla direzione del vento.
+  - Risolto bug di mancata rotazione della manica durante lo scrubbing orario causato dal disallineamento della chiave `windDir` vs `windDirection` in `weatherSnapshot` in [core/comprensorio.js](file:///core/comprensorio.js).
+  - Aggiornato `updateWindsockMarker` per rigenerare fluidamente il markup dei 12 segmenti SVG mantenendo attiva la transizione elastica `transition: transform 0.4s`.
+  - Registrate le Lezioni Apprese #66 e #70 in [MEMORY.md](file:///MEMORY.md). 402/402 test superati in 58 suite.
+
 
 
 

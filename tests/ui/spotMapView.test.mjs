@@ -130,21 +130,40 @@ describe('Spot Map View - Controller & Cartography Contracts (UI Layer)', () => 
     assert.ok(typeof view.center.lon === 'number');
   });
 
-  it('should enforce 3-level progressive marker scaling (dot -> aureole -> micro)', () => {
+  it('should always render circular markers across all zoom levels as specified in screenshot', () => {
     spotMapView.mount(mockContainer);
     const engine = spotMapView.mapEngine;
 
-    // Macro Zoom (< 7.5): dot mode
+    // Macro Zoom (< 7.5): circular mode
     spotMapView.handleMapMove({ zoom: 6.5, center: { lat: 45.4, lon: 8.0 } });
-    assert.equal(engine.renderedMode, 'dot', 'Zoom 6.5 must render in compact dot mode');
+    assert.equal(engine.renderedMode, 'circular', 'Zoom 6.5 must render in circular marker mode');
 
-    // Medium Zoom (7.5 - 8.9): aureole mode
+    // Medium Zoom (7.5 - 8.9): circular mode
     spotMapView.handleMapMove({ zoom: 8.0, center: { lat: 45.4, lon: 8.0 } });
-    assert.equal(engine.renderedMode, 'aureole', 'Zoom 8.0 must render in aerological basin aureole mode');
+    assert.equal(engine.renderedMode, 'circular', 'Zoom 8.0 must render in circular marker mode');
 
-    // Micro Zoom (>= 9.0): micro vector mode
+    // Micro Zoom (>= 9.0): circular mode
     spotMapView.handleMapMove({ zoom: 9.5, center: { lat: 45.4, lon: 8.0 } });
-    assert.equal(engine.renderedMode, 'micro', 'Zoom 9.5 must render in high-fidelity micro vector mode');
+    assert.equal(engine.renderedMode, 'circular', 'Zoom 9.5 must render in circular marker mode');
+  });
+
+  it('should support spot selection and opening speech bubble popup on tap', () => {
+    spotMapView.mount(mockContainer);
+    const engine = spotMapView.mapEngine;
+
+    const spots = spotMapView.getEvaluatedSpotsForActiveRegion();
+    assert.ok(spots.length > 0, 'Must have evaluated spots for active region');
+
+    const firstSpot = spots[0];
+    const spotId = firstSpot.id || firstSpot.comprensorio?.id;
+
+    spotMapView.handleSpotFocus(firstSpot);
+    assert.equal(spotMapView.focusedSpotId, spotId);
+    assert.equal(store.getState().selectedSpotId, spotId);
+
+    assert.equal(typeof engine.openSpotPopup, 'function');
+    engine.openSpotPopup(spotId);
+    assert.equal(engine.activePopupSpotId, spotId);
   });
 
   it('should synchronize active hour with store and scrubber slots', () => {

@@ -20,6 +20,7 @@
 import { store } from '../../core/store.js';
 import { router } from '../router.js';
 import { openSheet, closeSheet } from '../sheetManager.js';
+import { createMapEngine } from '../map/mapEngineAdapter.js';
 import {
   DEFAULT_COMPRENSORI,
   evaluateComprensorio,
@@ -243,8 +244,8 @@ export function generateGuidoBriefing(spot, weatherData, dateStr, glider = DEFAU
       badge: evalResult.badge,
       windSpeed: evalResult.weatherSnapshot.windSpeed || 0,
       windGust: evalResult.weatherSnapshot.windGust || 0,
-      windDir: evalResult.weatherSnapshot.windDirection || 0,
-      rain: evalResult.weatherSnapshot.precipitation || 0,
+      windDir: evalResult.weatherSnapshot.windDirection ?? evalResult.weatherSnapshot.windDir ?? 0,
+      rain: evalResult.weatherSnapshot.rain ?? evalResult.weatherSnapshot.precipitation ?? 0,
       cape: evalResult.weatherSnapshot.cape || 0,
       takeoff: evalResult.takeoff
     });
@@ -362,6 +363,9 @@ export class ForecastViewController {
     this.scrollContainerEl = null;
     this.stickyBarEl = null;
     this.boundScrollHandler = this.handleScroll.bind(this);
+
+    // Contextual spot mini-map and vector windsock engine
+    this.miniMapEngine = null;
   }
 
   /**
@@ -706,6 +710,14 @@ export class ForecastViewController {
           this.selectedHour = this._resolveInitialHour(this.activeDate);
           needsWeatherFetch = true;
         }
+        if (nextState.ui && nextState.ui.theme && this.miniMapEngine) {
+          this.miniMapEngine.setTheme(nextState.ui.theme);
+        }
+        if (nextState.ui && nextState.ui.mapLayer && this.miniMapEngine) {
+          if (typeof this.miniMapEngine.setLayer === 'function') {
+            this.miniMapEngine.setLayer(nextState.ui.mapLayer);
+          }
+        }
         this.render();
         if (needsWeatherFetch) {
           this.fetchWeatherDataAsync(this.getCurrentSpot(), this.activeDate);
@@ -745,6 +757,10 @@ export class ForecastViewController {
    * Unmounts the controller and cleans up listeners and store subscriptions.
    */
   unmount() {
+    if (this.miniMapEngine) {
+      this.miniMapEngine.destroy();
+      this.miniMapEngine = null;
+    }
     if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function' && this.boundKeyHandler) {
       window.removeEventListener('keydown', this.boundKeyHandler);
       this.boundKeyHandler = null;
@@ -819,12 +835,66 @@ export class ForecastViewController {
   }
 
   /**
-   * Renders the complete Forecast View HTML into the container.
+   * Renders the complete Forecast View HTML into the container and mounts the mini-map.
    */
   render() {
     if (!this.containerEl) return;
+    if (this.miniMapEngine) {
+      this.miniMapEngine.destroy();
+      this.miniMapEngine = null;
+    }
     this.containerEl.innerHTML = this.renderHtml();
     this.setupScrollListener();
+    this.initMiniMap();
+  }
+
+  /**
+   * Initializes or updates the contextual spot mini-map and vector windsock.
+   */
+  initMiniMap() {
+    if (!this.containerEl || typeof this.containerEl.querySelector !== 'function') return;
+    const miniMapEl = this.containerEl.querySelector('#forecast-mini-map');
+    if (!miniMapEl) return;
+
+    const spot = this.getCurrentSpot();
+    const glider = this.getActiveGlider();
+    const weatherData = this.getWeatherData(spot, this.activeDate);
+    const evaluated = evaluateComprensorio({
+      comprensorio: spot,
+      weatherData,
+      hourIndex: this.selectedHour,
+      glider,
+      targetDate: this.activeDate
+    });
+
+    const state = this.store ? this.store.getState() : {};
+    const currentTheme = (state.ui && state.ui.theme) || 'dark';
+
+    const activeSub = this.resolveActiveSubSpot(spot);
+    const subSpotType = activeSub ? activeSub.spotType : 'overview';
+    const activeLayer = this.getActiveMapLayer();
+
+    this.miniMapEngine = createMapEngine(miniMapEl, {
+      theme: currentTheme,
+      layer: activeLayer,
+      isMiniMap: true
+    });
+
+    if (this.miniMapEngine && typeof this.miniMapEngine.renderSpotMiniMap === 'function') {
+      this.miniMapEngine.renderSpotMiniMap(miniMapEl, {
+        comprensorio: spot,
+        takeoff: evaluated.takeoff,
+        landing: evaluated.landing,
+        subSpotType,
+        activeSubSpot: activeSub,
+        weatherSnapshot: evaluated.weatherSnapshot,
+        glideMetrics: evaluated.glideMetrics,
+        onSelectSubSpot: (subSpotId) => {
+          this.selectedSubSpot = subSpotId;
+          this.render();
+        }
+      });
+    }
   }
 
   /**
@@ -1307,11 +1377,11 @@ export class ForecastViewController {
   }
 
   /**
-   * Renders the Unico Binomio Summary Card for the selected hour.
+   * Renders the internal metrics for the Unico Binomio Summary Card.
    * @param {object} evalData
    * @returns {string}
    */
-  renderSummaryCard(evalData) {
+  renderSummaryMetrics(evalData) {
     const takeoff = evalData.takeoff || {};
     const landing = evalData.landing || {};
     const glide = evalData.glideMetrics || { requiredGlideRatio: '-', isSafe: true };
@@ -1323,64 +1393,184 @@ export class ForecastViewController {
     const landingAlt = landing.altitude ? `${landing.altitude}m` : '-';
 
     const windSpeedStr = weather.windSpeed != null ? `${Math.round(weather.windSpeed)} km/h` : '-';
-    const windDirStr = weather.windDirection != null ? `${getCardinalDirection(weather.windDirection)} (${Math.round(weather.windDirection)}°)` : '';
+    const dirVal = weather.windDirection ?? weather.windDir;
+    const windDirStr = dirVal != null ? `${getCardinalDirection(dirVal)} (${Math.round(dirVal)}°)` : '';
 
+    return `
+      <!-- Top Row: Hour & Status Badge -->
+      <div class="flex items-center justify-between border-b border-[var(--gm-border)] pb-2 mb-2">
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-bold uppercase tracking-wider text-[var(--gm-accent)]">Ore Selezionate</span>
+          <span class="text-sm font-mono font-bold text-[var(--gm-text-primary)]">
+            ${String(this.selectedHour).padStart(2, '0')}:00
+          </span>
+        </div>
+        <span 
+          class="px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider rounded-full border border-current"
+          style="color: ${evalData.badgeColor}; background-color: ${evalData.badgeBg};"
+        >
+          ${evalData.badge}
+        </span>
+      </div>
+
+      <!-- Dual Launch/Landing Info -->
+      <div class="gm-flight-data-grid">
+        <div class="gm-flight-stat-row">
+          <div class="gm-flight-label">
+            <span class="gm-flight-icon">↗</span>
+            <span class="gm-flight-target">${escapeHtml(takeoffName)}</span>
+            <span class="gm-flight-alt">(${takeoffAlt})</span>
+          </div>
+          <div class="gm-flight-data">
+            <span class="gm-flight-wind">${windSpeedStr}</span>
+            ${windDirStr ? `<span class="gm-flight-dir">da ${windDirStr}</span>` : ''}
+          </div>
+        </div>
+
+        <div class="gm-flight-stat-row">
+          <div class="gm-flight-label">
+            <span class="gm-flight-icon">↘</span>
+            <span class="gm-flight-target">${escapeHtml(landingName)}</span>
+            <span class="gm-flight-alt">(${landingAlt})</span>
+          </div>
+          <div class="gm-flight-data">
+            <span class="gm-glide-label">Efficienza</span>
+            <span class="gm-glide-val ${glide.isSafe ? 'text-[var(--gm-status-flyable)]' : 'text-[var(--gm-status-caution)]'}">
+              1:${glide.requiredGlideRatio}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Explainability String -->
+      <div class="gm-spot-explain mt-2 pt-2 border-t border-[var(--gm-border)]">
+        <span class="gm-explain-bullet">●</span>
+        <span>${escapeHtml(evalData.reason)}</span>
+      </div>
+    `;
+  }
+
+  /**
+   * Renders the Unico Binomio Summary Card for the selected hour.
+   * @param {object} evalData
+   * @returns {string}
+  /**
+   * Resolves the active cartographic map layer from state or theme fallback.
+   * @returns {string} Layer ID ('dark' | 'topo' | 'satellite' | 'streets')
+   */
+  getActiveMapLayer() {
+    const state = this.store ? this.store.getState() : {};
+    const theme = (state.ui && state.ui.theme) || 'dark';
+    return (state.ui && state.ui.mapLayer) || (theme === 'light' ? 'topo' : 'dark');
+  }
+
+  /**
+   * Renders the mini-map box container with canvas, layer selector, and expand action button.
+   * @returns {string}
+   */
+  renderMiniMapBox() {
+    const activeLayer = this.getActiveMapLayer();
+    return `
+      <div id="forecast-mini-map-container" class="gm-mini-map-box">
+        <div id="forecast-mini-map" class="gm-mini-map-canvas"></div>
+        <select 
+          id="forecast-minimap-layer-select" 
+          class="gm-mini-map-layer-select" 
+          aria-label="Seleziona layer cartografico" 
+          title="Seleziona layer mappa"
+        >
+          <option value="topo" ${activeLayer === 'topo' ? 'selected' : ''}>OpenTopo</option>
+          <option value="satellite" ${activeLayer === 'satellite' ? 'selected' : ''}>Satellite</option>
+          <option value="dark" ${activeLayer === 'dark' ? 'selected' : ''}>Scuro</option>
+          <option value="streets" ${activeLayer === 'streets' ? 'selected' : ''}>CyclOSM</option>
+        </select>
+        <button 
+          type="button" 
+          class="gm-mini-map-expand-btn" 
+          data-action="open-full-map" 
+          aria-label="Apri mappa comprensori completa" 
+          title="Apri mappa comprensori completa"
+        >
+          ⤢
+        </button>
+      </div>
+    `;
+  }
+
+  /**
+   * Renders the Unico Binomio Summary Card for the selected hour.
+   * @param {object} evalData
+   * @returns {string}
+   */
+  renderSummaryCard(evalData) {
     return `
       <section aria-labelledby="heading-summary-bin" class="gm-summary-section">
         <h2 id="heading-summary-bin" class="sr-only">Sintesi Volabilità Unico Binomio</h2>
-        <article id="forecast-summary-card" class="gm-spot-card">
-          <!-- Top Row: Hour & Status Badge -->
-          <div class="flex items-center justify-between border-b border-[var(--gm-border)] pb-2 mb-2">
-            <div class="flex items-center gap-2">
-              <span class="text-xs font-bold uppercase tracking-wider text-[var(--gm-accent)]">Ore Selezionate</span>
-              <span class="text-sm font-mono font-bold text-[var(--gm-text-primary)]">
-                ${String(this.selectedHour).padStart(2, '0')}:00
-              </span>
-            </div>
-            <span 
-              class="px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider rounded-full border border-current"
-              style="color: ${evalData.badgeColor}; background-color: ${evalData.badgeBg};"
-            >
-              ${evalData.badge}
-            </span>
+        <article id="forecast-summary-card" class="gm-spot-card gm-spot-card-split">
+          <div id="forecast-spot-metrics-container" class="gm-spot-card-metrics">
+            ${this.renderSummaryMetrics(evalData)}
           </div>
-
-          <!-- Dual Launch/Landing Info -->
-          <div class="gm-flight-data-grid">
-            <div class="gm-flight-stat-row">
-              <div class="gm-flight-label">
-                <span class="gm-flight-icon">↗</span>
-                <span class="gm-flight-target">${escapeHtml(takeoffName)}</span>
-                <span class="gm-flight-alt">(${takeoffAlt})</span>
-              </div>
-              <div class="gm-flight-data">
-                <span class="gm-flight-wind">${windSpeedStr}</span>
-                ${windDirStr ? `<span class="gm-flight-dir">da ${windDirStr}</span>` : ''}
-              </div>
-            </div>
-
-            <div class="gm-flight-stat-row">
-              <div class="gm-flight-label">
-                <span class="gm-flight-icon">↘</span>
-                <span class="gm-flight-target">${escapeHtml(landingName)}</span>
-                <span class="gm-flight-alt">(${landingAlt})</span>
-              </div>
-              <div class="gm-flight-data">
-                <span class="gm-glide-label">Efficienza</span>
-                <span class="gm-glide-val ${glide.isSafe ? 'text-[var(--gm-status-flyable)]' : 'text-[var(--gm-status-caution)]'}">
-                  1:${glide.requiredGlideRatio}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Explainability String -->
-          <div class="gm-spot-explain mt-2 pt-2 border-t border-[var(--gm-border)]">
-            <span class="gm-explain-bullet">●</span>
-            <span>${escapeHtml(evalData.reason)}</span>
-          </div>
+          ${this.renderMiniMapBox()}
         </article>
       </section>
+    `;
+  }
+
+  /**
+   * Renders the internal metrics for a specific spot.
+   * @param {object} subSpot
+   * @param {object} evalData
+   * @returns {string}
+   */
+  renderSpecificSpotMetrics(subSpot, evalData) {
+    if (!subSpot) return this.renderSummaryMetrics(evalData);
+    const weather = evalData.weatherSnapshot || {};
+    const isTakeoff = subSpot.spotType === 'takeoff';
+    const icon = isTakeoff ? '↗' : '↘';
+
+    const windSpeedStr = weather.windSpeed != null ? `${Math.round(weather.windSpeed)} km/h` : '-';
+    const dirVal = weather.windDirection ?? weather.windDir;
+    const windDirStr = dirVal != null ? `${getCardinalDirection(dirVal)} (${Math.round(dirVal)}°)` : '';
+
+    return `
+      <div class="flex items-center justify-between border-b border-[var(--gm-border)] pb-2 mb-2">
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-bold text-[var(--gm-accent)]">${icon} ${escapeHtml(subSpot.name)}</span>
+          <span class="text-xs text-[var(--gm-text-muted)] font-mono">(${subSpot.altitude}m)</span>
+        </div>
+        <span class="text-xs font-mono font-bold text-[var(--gm-text-secondary)]">
+          Ore ${String(this.selectedHour).padStart(2, '0')}:00
+        </span>
+      </div>
+
+      <div class="flex flex-col gap-1.5 text-xs text-[var(--gm-text-secondary)]">
+        ${isTakeoff ? `
+          <div class="flex justify-between">
+            <span>Azimut Pendio:</span>
+            <span class="font-bold text-[var(--gm-text-primary)] font-mono">${subSpot.heading}° (${getCardinalDirection(subSpot.heading)})</span>
+          </div>
+        ` : `
+          <div class="flex justify-between">
+            <span>Classificazione:</span>
+            <span class="font-bold text-[var(--gm-text-primary)]">${subSpot.isOfficial ? 'Ufficiale' : 'Alternativo / Emergenza'}</span>
+          </div>
+        `}
+        <div class="flex justify-between">
+          <span>Vento Stimato:</span>
+          <span class="font-bold text-[var(--gm-text-primary)] font-mono">${windSpeedStr} da ${windDirStr}</span>
+        </div>
+        ${subSpot.coordinates ? `
+          <div class="flex justify-between">
+            <span>Coordinate GPS:</span>
+            <span class="font-mono text-[var(--gm-text-muted)]">${escapeHtml(subSpot.coordinates)}</span>
+          </div>
+        ` : ''}
+        ${subSpot.description ? `
+          <p class="mt-1 pt-1 border-t border-[var(--gm-border)] text-xs text-[var(--gm-text-muted)] leading-relaxed">
+            ${escapeHtml(subSpot.description)}
+          </p>
+        ` : ''}
+      </div>
     `;
   }
 
@@ -1392,56 +1582,17 @@ export class ForecastViewController {
    */
   renderSpecificSpotCard(subSpot, evalData) {
     if (!subSpot) return this.renderSummaryCard(evalData);
-    const weather = evalData.weatherSnapshot || {};
     const isTakeoff = subSpot.spotType === 'takeoff';
-    const icon = isTakeoff ? '↗' : '↘';
     const roleLabel = isTakeoff ? 'Decollo' : 'Atterraggio';
-
-    const windSpeedStr = weather.windSpeed != null ? `${Math.round(weather.windSpeed)} km/h` : '-';
-    const windDirStr = weather.windDirection != null ? `${getCardinalDirection(weather.windDirection)} (${Math.round(weather.windDirection)}°)` : '';
 
     return `
       <section aria-labelledby="heading-specific-spot" class="gm-summary-section">
         <h2 id="heading-specific-spot" class="sr-only">Dettaglio ${roleLabel}</h2>
-        <article id="forecast-specific-spot-card" class="gm-spot-card">
-          <div class="flex items-center justify-between border-b border-[var(--gm-border)] pb-2 mb-2">
-            <div class="flex items-center gap-2">
-              <span class="text-sm font-bold text-[var(--gm-accent)]">${icon} ${escapeHtml(subSpot.name)}</span>
-              <span class="text-xs text-[var(--gm-text-muted)] font-mono">(${subSpot.altitude}m)</span>
-            </div>
-            <span class="text-xs font-mono font-bold text-[var(--gm-text-secondary)]">
-              Ore ${String(this.selectedHour).padStart(2, '0')}:00
-            </span>
+        <article id="forecast-specific-spot-card" class="gm-spot-card gm-spot-card-split">
+          <div id="forecast-spot-metrics-container" class="gm-spot-card-metrics">
+            ${this.renderSpecificSpotMetrics(subSpot, evalData)}
           </div>
-
-          <div class="flex flex-col gap-1.5 text-xs text-[var(--gm-text-secondary)]">
-            ${isTakeoff ? `
-              <div class="flex justify-between">
-                <span>Azimut Pendio:</span>
-                <span class="font-bold text-[var(--gm-text-primary)] font-mono">${subSpot.heading}° (${getCardinalDirection(subSpot.heading)})</span>
-              </div>
-            ` : `
-              <div class="flex justify-between">
-                <span>Classificazione:</span>
-                <span class="font-bold text-[var(--gm-text-primary)]">${subSpot.isOfficial ? 'Ufficiale' : 'Alternativo / Emergenza'}</span>
-              </div>
-            `}
-            <div class="flex justify-between">
-              <span>Vento Stimato:</span>
-              <span class="font-bold text-[var(--gm-text-primary)] font-mono">${windSpeedStr} da ${windDirStr}</span>
-            </div>
-            ${subSpot.coordinates ? `
-              <div class="flex justify-between">
-                <span>Coordinate GPS:</span>
-                <span class="font-mono text-[var(--gm-text-muted)]">${escapeHtml(subSpot.coordinates)}</span>
-              </div>
-            ` : ''}
-            ${subSpot.description ? `
-              <p class="mt-1 pt-1 border-t border-[var(--gm-border)] text-xs text-[var(--gm-text-muted)] leading-relaxed">
-                ${escapeHtml(subSpot.description)}
-              </p>
-            ` : ''}
-          </div>
+          ${this.renderMiniMapBox()}
         </article>
       </section>
     `;
@@ -2285,7 +2436,7 @@ export class ForecastViewController {
 
     const weather = evalData.weatherSnapshot || {};
     const takeoffAzimuth = takeoff.heading != null ? takeoff.heading : 180;
-    const windDir = weather.windDirection != null ? weather.windDirection : 180;
+    const windDir = weather.windDirection ?? weather.windDir ?? 180;
     const windSpeed = weather.windSpeed != null ? Math.round(weather.windSpeed) : 0;
     const windGust = weather.windGust != null ? Math.round(weather.windGust) : windSpeed;
 
@@ -3150,12 +3301,13 @@ export class ForecastViewController {
     }
 
     const spotCardContainer = this.containerEl.querySelector('#forecast-spot-card-container');
+    const metricsContainer = this.containerEl.querySelector('#forecast-spot-metrics-container');
     const paramsContainer = this.containerEl.querySelector('#forecast-params-container');
     const windContainer = this.containerEl.querySelector('#forecast-wind-panel-container');
     const soundingContainer = this.containerEl.querySelector('#forecast-sounding-panel-container');
 
-    // If spot card container is missing from DOM, fallback to full render
-    if (!spotCardContainer) {
+    // If both spot card container and metrics container are missing from DOM, fallback to full render
+    if (!spotCardContainer && !metricsContainer) {
       this.render();
       return;
     }
@@ -3185,10 +3337,23 @@ export class ForecastViewController {
       });
     }
 
-    // 2. Update Spot Card container
-    spotCardContainer.innerHTML = this.selectedSubSpot === 'overview'
-      ? this.renderSummaryCard(evaluated)
-      : this.renderSpecificSpotCard(activeSubSpotObj, evaluated);
+    // 2. Update Spot Card metrics container (safeguarding the mini-map from DOM destruction)
+    if (metricsContainer) {
+      metricsContainer.innerHTML = this.selectedSubSpot === 'overview'
+        ? this.renderSummaryMetrics(evaluated)
+        : this.renderSpecificSpotMetrics(activeSubSpotObj, evaluated);
+    } else if (spotCardContainer) {
+      spotCardContainer.innerHTML = this.selectedSubSpot === 'overview'
+        ? this.renderSummaryCard(evaluated)
+        : this.renderSpecificSpotCard(activeSubSpotObj, evaluated);
+    }
+
+    // 2b. Reactively update Windsock Marker and Glide Line in mini-map without touching DOM
+    if (this.miniMapEngine) {
+      const currentTakeoff = activeSubSpotObj?.spotType === 'takeoff' ? activeSubSpotObj : evaluated.takeoff;
+      this.miniMapEngine.updateWindsockMarker(evaluated.weatherSnapshot, this.selectedSubSpot === 'landing', currentTakeoff);
+      this.miniMapEngine.updateGlideLine(evaluated.glideMetrics);
+    }
 
     // 3. Update Parameters or Multi-Trend container in place
     if (paramsContainer) {
@@ -3367,6 +3532,14 @@ export class ForecastViewController {
       if (this.selectedHour < 20) {
         this.setHour(this.selectedHour + 1);
       }
+    } else if (action === 'open-full-map') {
+      const spot = this.getCurrentSpot();
+      if (this.store && spot) {
+        this.store.setState({ selectedSpot: spot });
+      }
+      if (typeof window !== 'undefined' && window.location) {
+        window.location.hash = `#map?spot=${encodeURIComponent(spot?.id || '')}`;
+      }
     } else if (action === 'set-forecast-mode') {
       const mode = actionEl.getAttribute('data-mode');
       if (mode === 'cards' || mode === 'charts') {
@@ -3530,6 +3703,16 @@ export class ForecastViewController {
     } else if (target.id === 'forecast-subspot-select') {
       this.selectedSubSpot = target.value;
       this.render();
+    } else if (target.id === 'forecast-minimap-layer-select') {
+      const newLayer = target.value;
+      if (this.miniMapEngine && typeof this.miniMapEngine.setLayer === 'function') {
+        this.miniMapEngine.setLayer(newLayer);
+      }
+      if (this.store && typeof this.store.setState === 'function') {
+        const state = this.store.getState() || {};
+        const ui = state.ui || {};
+        this.store.setState({ ui: { ...ui, mapLayer: newLayer } });
+      }
     }
   }
 }

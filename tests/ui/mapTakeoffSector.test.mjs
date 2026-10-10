@@ -1,0 +1,105 @@
+/**
+ * GlideMind - Tests for Takeoff Slope Exposure Sector (Mini Map Cartography Layer)
+ */
+
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { generateTakeoffSectorSvg, LeafletMapEngine } from '../../ui/map/mapEngineAdapter.js';
+
+describe('GlideMind Cartography - Takeoff Slope Exposure Sector & Launch Window', () => {
+
+  it('should generate valid SVG with 70° launch sector arc and aspect arrow', () => {
+    const svg = generateTakeoffSectorSvg(170, 180, 1060, { prefix: 'test-to-' });
+
+    assert.ok(svg.includes('<svg'), 'Must produce <svg root element');
+    assert.ok(svg.includes('class="gm-takeoff-sector-svg"'), 'Must have correct CSS class');
+    assert.ok(svg.includes('id="test-to-wedge"'), 'Must render sector arc wedge');
+    assert.ok(svg.includes('id="test-to-line"'), 'Must render slope axis line');
+    assert.ok(svg.includes('id="test-to-arrow"'), 'Must render directional arrowhead');
+    assert.ok(svg.includes('id="test-to-badge"'), 'Must render heading angle badge');
+    assert.ok(svg.includes('170°'), 'Must display 170° heading text');
+    assert.ok(svg.includes('1060m'), 'Must display 1060m altitude text');
+    assert.ok(svg.includes('role="img"'), 'Must be accessible with role="img"');
+    assert.ok(svg.includes('aria-label='), 'Must include accessibility label');
+  });
+
+  it('should color-code sector green (#22c55e) when wind is aligned in front (diff <= 35°)', () => {
+    // Takeoff 180° (South), Wind 190° (diff = 10°) -> Aligned
+    const svg = generateTakeoffSectorSvg(180, 190, 1000, { prefix: 'test-to-' });
+
+    assert.ok(svg.includes('stroke="#22c55e"'), 'Aligned wind must use green stroke');
+    assert.ok(svg.includes('fill="rgba(34, 197, 94, 0.22)"'), 'Aligned wind must use green fill');
+    assert.ok(svg.includes('In Asse'), 'Aria label must state In Asse');
+  });
+
+  it('should color-code sector amber (#f59e0b) when wind is cross (35° < diff <= 75°)', () => {
+    // Takeoff 180° (South), Wind 230° (diff = 50°) -> Crosswind
+    const svg = generateTakeoffSectorSvg(180, 230, 1000, { prefix: 'test-to-' });
+
+    assert.ok(svg.includes('stroke="#f59e0b"'), 'Crosswind must use amber stroke');
+    assert.ok(svg.includes('fill="rgba(245, 158, 11, 0.22)"'), 'Crosswind must use amber fill');
+    assert.ok(svg.includes('Traverso'), 'Aria label must state Traverso');
+  });
+
+  it('should color-code sector red (#ef4444) when wind is tailwind/sottovento (diff > 75°)', () => {
+    // Takeoff 180° (South), Wind 0° (North, diff = 180°) -> Tailwind
+    const svg = generateTakeoffSectorSvg(180, 0, 1000, { prefix: 'test-to-' });
+
+    assert.ok(svg.includes('stroke="#ef4444"'), 'Tailwind must use red stroke');
+    assert.ok(svg.includes('fill="rgba(239, 68, 68, 0.25)"'), 'Tailwind must use red fill');
+    assert.ok(svg.includes('Sottovento'), 'Aria label must state Sottovento');
+  });
+
+  it('should handle wraparound angles across 0° / 360° correctly', () => {
+    // Takeoff 10° (NNE), Wind 350° (NNW) -> diff = 20° (Aligned)
+    const svg = generateTakeoffSectorSvg(10, 350, 1200, { prefix: 'test-to-' });
+
+    assert.ok(svg.includes('stroke="#22c55e"'), '10° vs 350° is 20° diff and must be green');
+    assert.ok(svg.includes('In Asse'), 'Must evaluate to In Asse');
+  });
+
+  it('should update windsock rotation, SVG markup, and takeoff sector when updateWindsockMarker is called', () => {
+    const engine = new LeafletMapEngine();
+    let wrapperTransform = '';
+    let wrapperInnerHtml = '';
+    let sectorInnerHtml = '';
+
+    const mockWrapper = {
+      style: {
+        set transform(val) { wrapperTransform = val; },
+        get transform() { return wrapperTransform; }
+      },
+      set innerHTML(val) { wrapperInnerHtml = val; },
+      get innerHTML() { return wrapperInnerHtml; }
+    };
+
+    const mockWindsockEl = {
+      querySelector(sel) {
+        if (sel === '#miniws-wrapper' || sel === '.gm-windsock-wrapper') return mockWrapper;
+        return null;
+      }
+    };
+
+    const mockSectorEl = {
+      set innerHTML(val) { sectorInnerHtml = val; },
+      get innerHTML() { return sectorInnerHtml; }
+    };
+
+    engine.windsockMarker = { getElement: () => mockWindsockEl };
+    engine.takeoffSectorMarker = { getElement: () => mockSectorEl };
+    engine.activeMiniMapSpotData = { takeoff: { heading: 180, altitude: 1000 } };
+
+    // Test with wind from West (270°) -> windsock points East (90°)
+    engine.updateWindsockMarker({ windSpeed: 15, windGust: 20, windDir: 270, turbulence: 0.1 });
+
+    assert.equal(wrapperTransform, 'rotate(90deg)', 'Windsock must rotate to 90deg for 270deg wind');
+    assert.ok(wrapperInnerHtml.includes('<svg'), 'Must update inner pure SVG');
+    assert.ok(sectorInnerHtml.includes('stroke="#ef4444"'), '270deg wind vs 180deg heading is 90deg cross/tailwind diff -> Red sector');
+
+    // Test with wind from South (180°) -> windsock points North (0°)
+    engine.updateWindsockMarker({ windSpeed: 12, windGust: 16, windDirection: 180, turbulence: 0.05 });
+
+    assert.equal(wrapperTransform, 'rotate(0deg)', 'Windsock must rotate to 0deg for 180deg wind');
+    assert.ok(sectorInnerHtml.includes('stroke="#22c55e"'), '180deg wind vs 180deg heading is 0deg diff -> Green sector');
+  });
+});

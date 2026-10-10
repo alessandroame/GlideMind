@@ -949,5 +949,154 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.ok(soundingChartSvg.includes('stroke-linecap="round"'), 'Sounding chart must render rounded smooth lines');
     assert.ok(!soundingChartSvg.includes('<polyline'), 'Sounding chart must not render jagged polylines');
   });
+
+  it('should render contextual mini-map container, canvas, and expand button in spot card markup', () => {
+    const mockStore = createStore({ selectedSpot: DEFAULT_COMPRENSORI[0] });
+    const controller = new ForecastViewController({ store: mockStore });
+    const html = controller.renderHtml();
+
+    assert.ok(html.includes('id="forecast-mini-map-container"'), 'Must render mini-map container');
+    assert.ok(html.includes('class="gm-mini-map-box"'), 'Must render mini-map box CSS class');
+    assert.ok(html.includes('id="forecast-mini-map"'), 'Must render mini-map canvas element');
+    assert.ok(html.includes('data-action="open-full-map"'), 'Must render 1-tap open full map action button');
+    assert.ok(html.includes('aria-label="Apri mappa comprensori completa"'), 'Must include accessible label for map button');
+    assert.ok(html.includes('id="forecast-spot-metrics-container"'), 'Must render decoupled spot metrics container');
+  });
+
+  it('should initialize miniMapEngine and update windsock in place on setHour without destroying map DOM', () => {
+    const mockStore = createStore({ selectedSpot: DEFAULT_COMPRENSORI[0] });
+    const controller = new ForecastViewController({ store: mockStore });
+
+    let metricsHtml = '';
+    const mockMiniMapEl = { innerHTML: '', style: {} };
+    const mockMetricsContainer = {
+      set innerHTML(val) { metricsHtml = val; },
+      get innerHTML() { return metricsHtml; }
+    };
+    const mockParamsContainer = { innerHTML: '' };
+
+    const mockContainer = {
+      innerHTML: '',
+      addEventListener() {},
+      removeEventListener() {},
+      querySelector(sel) {
+        if (sel === '#forecast-mini-map') return mockMiniMapEl;
+        if (sel === '#forecast-spot-metrics-container') return mockMetricsContainer;
+        if (sel === '#forecast-params-container') return mockParamsContainer;
+        if (sel === '#forecast-timeline-strip') return null;
+        if (sel === '#forecast-wind-panel-container') return null;
+        if (sel === '#forecast-sounding-panel-container') return null;
+        if (sel === '#forecast-scroll-container') return null;
+        return null;
+      }
+    };
+
+    controller.mount(mockContainer);
+
+    assert.ok(controller.miniMapEngine, 'Must initialize miniMapEngine on mount');
+    assert.equal(controller.miniMapEngine.renderedMode, 'minimap', 'Must render in minimap mode');
+    assert.ok(controller.miniMapEngine.activeMiniMapSpotData, 'Must store active spot data');
+
+    // Hourly scrubbing: must update windsock and glide line without re-initializing or wiping map
+    const initialEngine = controller.miniMapEngine;
+    controller.setHour(15);
+
+    assert.equal(controller.selectedHour, 15);
+    assert.equal(controller.miniMapEngine, initialEngine, 'miniMapEngine instance must be preserved across setHour');
+    assert.ok(controller.miniMapEngine.lastWindsockUpdate, 'Must update windsock marker on setHour');
+    assert.ok(controller.miniMapEngine.lastWindsockUpdate.weatherSnapshot.windDirection != null, 'weatherSnapshot must have windDirection');
+    assert.ok(controller.miniMapEngine.lastWindsockUpdate.takeoff, 'Must pass active or evaluated takeoff');
+    assert.ok(controller.miniMapEngine.lastGlideUpdate, 'Must update glide line on setHour');
+    assert.ok(metricsHtml.includes('15:00'), 'Must update metrics text with active hour');
+
+    // Unmount: must cleanly destroy miniMapEngine
+    controller.unmount();
+    assert.equal(controller.miniMapEngine, null, 'miniMapEngine must be cleaned up and set to null on unmount');
+  });
+
+  it('should dynamically update miniMapEngine theme on store theme changes', () => {
+    const mockStore = createStore({
+      selectedSpot: DEFAULT_COMPRENSORI[0],
+      ui: { theme: 'dark' }
+    });
+    const controller = new ForecastViewController({ store: mockStore });
+
+    const mockMiniMapEl = { innerHTML: '', style: {} };
+    const mockContainer = {
+      innerHTML: '',
+      addEventListener() {},
+      removeEventListener() {},
+      querySelector(sel) {
+        if (sel === '#forecast-mini-map') return mockMiniMapEl;
+        return null;
+      }
+    };
+
+    controller.mount(mockContainer);
+    assert.equal(controller.miniMapEngine.theme, 'dark', 'Default theme must be dark');
+
+    // Update theme in store
+    mockStore.setState({ ui: { theme: 'light' } });
+    assert.equal(controller.miniMapEngine.theme, 'light', 'miniMapEngine theme must update reactively to light');
+
+    controller.unmount();
+  });
+
+  it('should render map layer switcher in mini-map box with all available basemap layers', () => {
+    const mockStore = createStore({
+      selectedSpot: DEFAULT_COMPRENSORI[0],
+      ui: { theme: 'dark', mapLayer: 'satellite' }
+    });
+    const controller = new ForecastViewController({ store: mockStore });
+
+    const html = controller.renderHtml();
+    assert.ok(html.includes('id="forecast-minimap-layer-select"'), 'Must render layer selector element');
+    assert.ok(html.includes('value="topo"'), 'Must include topo option');
+    assert.ok(html.includes('>OpenTopo</option>'), 'Must display OpenTopo label');
+    assert.ok(html.includes('value="satellite" selected'), 'Must select satellite option based on store');
+    assert.ok(html.includes('value="dark"'), 'Must include dark option');
+    assert.ok(html.includes('value="streets"'), 'Must include streets option');
+    assert.ok(html.includes('>CyclOSM</option>'), 'Must display CyclOSM label');
+  });
+
+  it('should update miniMapEngine layer and persist to store when layer is switched via select', () => {
+    const mockStore = createStore({
+      selectedSpot: DEFAULT_COMPRENSORI[0],
+      ui: { theme: 'dark', mapLayer: 'dark' }
+    });
+    const controller = new ForecastViewController({ store: mockStore });
+
+    const mockMiniMapEl = { innerHTML: '', style: {} };
+    const mockContainer = {
+      innerHTML: '',
+      addEventListener() {},
+      removeEventListener() {},
+      querySelector(sel) {
+        if (sel === '#forecast-mini-map') return mockMiniMapEl;
+        return null;
+      }
+    };
+
+    controller.mount(mockContainer);
+    assert.equal(controller.miniMapEngine.currentLayerId, 'dark', 'Initial layer must be dark');
+
+    // Simulate change event on forecast-minimap-layer-select
+    controller.handleChange({
+      target: {
+        id: 'forecast-minimap-layer-select',
+        value: 'topo'
+      }
+    });
+
+    assert.equal(controller.miniMapEngine.currentLayerId, 'topo', 'miniMapEngine must update to topo');
+    assert.equal(mockStore.getState().ui.mapLayer, 'topo', 'Store ui.mapLayer must be updated to topo');
+
+    // Simulate store update for mapLayer
+    mockStore.setState({ ui: { ...mockStore.getState().ui, mapLayer: 'satellite' } });
+    assert.equal(controller.miniMapEngine.currentLayerId, 'satellite', 'miniMapEngine must react to store mapLayer change');
+
+    controller.unmount();
+  });
 });
+
 

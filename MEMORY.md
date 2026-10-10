@@ -698,3 +698,131 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
 
 
 
+
+---
+
+## 63. Preservazione del DOM Cartografico nello Scrubbing Temporale ad Alta Frequenza & Igiene di Gate 1
+- **Problema**:
+  1. Durante lo scorrimento continuo dello scrubber orario in `ForecastView.js` (08:00 - 20:00), l'aggiornamento dell'intera scheda spot tramite `spotCardContainer.innerHTML = ...` distrugge e ricrea il nodo DOM del canvas Leaflet a ogni tick (13 volte al secondo), azzerando le istanze di mappa, innescando layout thrashing, provocando flickering visibile dei tile e riducendo il framerate a <10 FPS.
+  2. Nei test di Shift-Left Quality Gate (`tests/ui/shiftLeftGovernance.test.mjs`), la presenza della parola `HTMLElement` all'interno di un commento in un file `core/*.js` fa fallire il Gate 1 (Headless Core) a causa della scansione testuale statica del file.
+  3. L'uso dell'operatore modulo `%` in JavaScript su angoli negativi multipli di 360 (es. `-360 % 360`) restituisce il valore `-0`, che in `node:assert/strict` fallisce contro `0` (`AssertionError: + -0, - 0`).
+- **Causa Radice**:
+  1. Mancata separazione fisica tra i contenitori delle metriche testuali effimere e il contenitore persistente del componente cartografico.
+  2. Scansione statica per stringhe vietate senza parsing AST nel test di governance.
+  3. Comportamento floating-point IEEE 754 con segno sui numeri reali.
+- **Pattern Vincolante**:
+  1. **Disaccoppiamento dei Sub-Contenitori DOM**: La scheda dello spot deve essere strutturata con due sub-container separati: `#forecast-spot-metrics-container` (aggiornato chirurgicamente via `innerHTML` su `setHour`) e `#forecast-mini-map-container` (persistente, non toccato da `setHour`). L'aggiornamento del marker manica a vento avviene esclusivamente a livello di stile/proprietà tramite l'adapter cartografico (`updateWindsockMarker`), mantenendo il canvas Leaflet intatto a 60 FPS.
+  2. **Igiene del Core Headless**: Nei moduli `core/*.js`, evitare categoricamente l'uso di qualsiasi token DOM (`HTMLElement`, `window`, `document`, `querySelector`) persino nei commenti o JSDoc.
+  3. **Normalizzazione Sicura Angoli**: Utilizzare sempre la formula `const a = ((num % 360) + 360) % 360; return a === 0 ? 0 : a;` per garantire che qualsiasi angolo risulti strettamente in `[0, 360)` con valore zero privo di segno.
+
+---
+
+## 64. Deprecazione Accesso Anonimo ai Tile CartoDB/Stadia e Adozione Tile Server Keyless Esri (Dark Gray & World Topo)
+- **Problema**: Le mappe interattive (sia Mini Mappa orografica in Previsioni sia Mappa Decolli globale) mostravano tile con watermark diagonale "API KEY REQUIRED carto.com/basemaps/apikey", degradando la visibilità della cartografia di sfondo e dell'orografia.
+- **Causa Radice**: CARTO ha introdotto l'obbligo di API key sugli endpoint raster `basemaps.cartocdn.com` (`dark_all`, `rastertiles/voyager`), restituendo tile degradate con filigrana per richieste prive di credenziali.
+- **Pattern Vincolante**:
+  1. **Provider Esri ArcGIS Online Keyless**: Adottare i server globali Esri ArcGIS Online ad alta disponibilità distribuiti su CDN Akamai, privi di vincoli di API key per visualizzazione pubblica:
+     - Tema Scuro (Cockpit): `https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}` (`maxZoom: 19`, `maxNativeZoom: 16`).
+     - Tema Chiaro (Sunlight Topo): `https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}` (`maxZoom: 19`, `maxNativeZoom: 19`).
+  2. **Configurazione `maxNativeZoom`**: Per i layer raster la cui risoluzione nativa termina prima del massimo consentito (es. Esri Dark Gray a zoom 16), impostare `maxNativeZoom: 16` con `maxZoom: 19` in Leaflet `L.tileLayer` per abilitare l'auto-scaling vettoriale/CSS trasparente senza richieste a vuoto.
+  3. **Ordine Parametri Tile ArcGIS `{z}/{y}/{x}`**: Nei servizi REST ArcGIS l'ordine dei parametri di path è `{z}/{y}/{x}` (zoom, riga/latitudine Y, colonna/longitudine X), a differenza del formato standard Slippy Map OSM (`{z}/{x}/{y}`).
+  4. **Colore Base Sincrono del Canvas**: Dichiarare `.leaflet-container { background-color: var(--gm-bg-card, #12161f); }` in `css/theme.css` per azzerare sfarfallii o lampi chiari durante il caricamento asincrono iniziale dei tile in modalità scura.
+
+---
+
+## 65. Progressive Disclosure Cartografica a Macro-Zoom, Tracking Beacon dello Spot Attivo e Isolamento Ottico dello Scrubber
+- **Problema**:
+  1. A zoom macro (< 7.5), la mappa nazionale dei comprensori renderizzava per ciascuno dei 135 siti una pillola orizzontale da 120px con etichetta testuale. A livello nazionale, le pillole collassavano l'una sull'altra in un ammasso illeggibile (*pill pileup*), coprendo l'orografia e nascondendo completamente lo spot/comprensorio che il pilota stava osservando (es. Castaldia).
+  2. Al variare dello zoom o al tocco dei marker, non c'era alcuna evidenziazione ottica persistente dello spot selezionato rispetto agli altri spot circostanti.
+  3. Lo scrubber orario dockato in basso soffriva di traslucenza ottica (`backdrop-filter: blur(10px)` con background semitrasparente e `z-index: 500`), lasciando intravedere marker sottostanti ("ca" di "Castaldia") che creavano frammenti testuali sovrapposti al titolo orario; inoltre, mancavano comandi stepper orari diretti e un'indicazione chiara dello stato di volabilità dello spot osservato all'ora selezionata.
+- **Causa Radice**:
+  1. Mancanza di discriminazione tra spot attivo e spot passivi nel livello di zoom macro: tutti gli elementi venivano renderizzati con la medesima etichetta espansa da 120px.
+  2. Assenza di un marcatore avionico a fascio d'attenzione (*beacon*) ad elevato z-index per lo spot attivo.
+  3. Elevazione z-index insufficiente dello scrubber (`500` contro i marker Leaflet che salgono a `600+`) e trasparenza dello sfondo.
+- **Pattern Vincolante**:
+  1. **Progressive Disclosure a Zoom Macro (< 7.5)**:
+     - *Spot Passivi*: dot circolari compatti da 18px (`.gm-map-dot-marker`) con simbolo geometrico semaforico (`●`, `▲`, `✕`, `○`), bordo colorato e sfondo scuro, privi di etichetta testuale.
+     - *Spot Attivo/Osservato (`activeSpotId`)*: anello pulsante avionico (`.gm-focused-beacon-pulse`) con animazione `@keyframes gm-beacon-pulse` a scansione radiale, card fluttuante del nome ad alto contrasto posizionata sopra il dot e `zIndexOffset: 1000`.
+  2. **Isolamento e Rilievo a Zoom Intermedio (7.5 - 8.9)**:
+     - L'aureola di bacino orografico da 8 km viene renderizzata **esclusivamente per lo spot attivo/osservato**, eliminando la saturazione del display causata da decine di cerchi concentrici sovrapposti.
+  3. **Isolamento Ottico e Stepper Scrubber Orario**:
+     - Lo scrubber container adotta `z-index: 600`, sfondo card solido (`var(--gm-bg-card, #12161f)`) e ombra netta (`box-shadow: 0 8px 30px rgba(0,0,0,0.55)`), azzerando qualsiasi sanguinamento ottico dei marker sottostanti.
+     - Header orario dotato di stepper touch $\ge 44\times 44\text{px}$ (`‹` e `›`) per scorrimento rapido dell'ora e pillola contestuale (`#gm-map-scrubber-spot-pill`) con nome del comprensorio osservato e verdetto di volabilità sincrono.
+  4. **Multi-Layer Raster Switcher Keyless**:
+     - Integrazione di `MAP_LAYERS` con 4 profili ad alta disponibilità: Rilievo Topo (Esri World Topo), Foto Satellite (Esri World Imagery), Cockpit Scuro (Esri Dark Gray Canvas) e Stradale (OpenStreetMap).
+
+---
+
+## 66. Centratura Geometrica Pivot Marker SVG (Windsock Leaflet Offset Guard), Cono di Esposizione Pendio ed Eliminazione Ridondanze nei Marker Cartografici
+- **Problema**:
+  1. Nella Mini Mappa di `ForecastView`, la manica a vento risultava invisibile o dislocata fuori coordinate, spuntando con la sola punta dietro l'atterraggio anziché sul decollo.
+  2. Mancava la visualizzazione dell'angolo di esposizione del pendio di decollo (azimut del pendio montano), impedendo al pilota di valutare se il vento fosse frontale, traverso o sottovento rispetto al fronte di decollo.
+  3. I marker nella mini-mappa includevano per esteso i nomi testuali delle località (es. "Ufficiale Suello", "Decollo Risparmio") all'interno di capsule da 120px, ingombrando il canvas di appena 170px e coprendo l'orografia, nonostante il nome fosse già visibile nell'header della scheda subito sopra.
+  4. Al montaggio o selezione di un sub-spot atterraggio, il decollo veniva escluso o tagliato fuori dal bordo superiore della mini-mappa a causa di un'incompleta calibrazione del layout Leaflet (`fitBounds` privo di `invalidateSize`).
+- **Causa Radice**:
+  1. L'icona SVG della manica a vento (generata con viewBox 240x240 scalata con `transform: scale(0.38)` intorno al centro `120, 120`) veniva incapsulata in un `divIcon` Leaflet con `iconSize: [92, 92]` e `iconAnchor: [46, 46]`. L'elemento interno da 240x240 partiva da `(0, 0)` del div e manteneva il suo centro visivo a `(120, 120)`, generando un disallineamento sistematico di `+74px` verso destra e `+74px` verso il basso rispetto alle coordinate geografiche reali.
+  2. Assenza di un layer geometrico dedicato all'orientamento orografico del decollo (`takeoff.heading`).
+  3. Duplicazione d'informazione testuale tra la card contenitore e i marker cartografici interni.
+- **Pattern Vincolante**:
+  1. **Allineamento Geometrico Invariante dei Div Scalati (`iconSize: [240, 240]`, `iconAnchor: [120, 120]`)**: Quando un componente SVG 240x240 viene scalato tramite CSS `transform: scale(S)` con `transform-origin: 120px 120px`, il centro di scala (120, 120) rimane fisso rispetto all'origine del box unscaled. Affinché Leaflet ancori tale centro esattamente alle coordinate geografiche `(lat, lon)`, il `divIcon` DEVE dichiarare `iconSize: [240, 240]` e `iconAnchor: [120, 120]`, con `pointer-events: none` per non ostacolare l'interattività del canvas.
+  2. **Cono di Esposizione del Decollo (`generateTakeoffSectorSvg`)**: Il decollo visualizza un settore di lancio a $70^\circ$ ($\text{heading} \pm 35^\circ$), la freccia dell'asse di pendio, il badge angolare con i gradi (es. `170°`) e il mozzo centrale di decollo con quota `▲ 1060m`. Il colore del settore si aggiorna reattivamente ad ogni tick orario: verde (frontale $\le 35^\circ$), ambra (traverso $36^\circ-75^\circ$), rosso (sottovento $> 75^\circ$).
+  3. **Zero Location Name Clutter (Pin Aeronautici Compatti)**: Eliminare i nomi testuali ridondanti all'interno dei marker della mini-mappa. Utilizzare pin aeronautici compatti ($54\times 22\text{ px}$): `⏚ 260m` per l'atterraggio e `▲ 1060m` per il decollo, preservando il 100% della leggibilità orografica.
+  4. **Preservazione del Binomio di Volo e Layout Invalidation**: Anche quando è selezionato un singolo decollo o atterraggio, la mini-mappa mantiene visibile l'intero binomio di volo (decollo con manica e cono, linea di planata, atterraggio), invocando `map.invalidateSize()` e `fitBounds` con padding di sicurezza di 35px su tick differito (`setTimeout(..., 50)`).
+
+---
+
+## 67. Switcher dei Layer Cartografici Sincronizzato (Mini-Mappa Previsioni & Mappa Comprensori)
+- **Problema**: Nella vista Previsioni (`ForecastView`), la mini-mappa orografica adottava lo stile fisso derivato unicamente dal tema dell'app (dark/light), impedendo al pilota di visualizzare il rilievo topografico (contour orografici) o le foto satellitari ortofoto per studiare ostacoli, linee di cresta e zone d'atterraggio durante la consultazione del meteo.
+- **Causa Radice**: Assenza di un controllo di selezione layer dedicato nella mini-mappa e mancata propagazione reattiva di `store.ui.mapLayer` nel controller `ForecastView`.
+- **Pattern Vincolante**:
+  1. **Layer Select Compatto Sovraimpresso (`.gm-mini-map-layer-select`)**: Posizionare un elemento `<select>` compatto ad alto contrasto con backdrop glassmorphism in `top: 8px; left: 8px; z-index: 10` direttamente sopra il canvas della mini-mappa, con 4 layer keyless: Rilievo Topo (`topo`), Foto Satellite (`satellite`), Cockpit Scuro (`dark`) e Stradale OSM (`streets`).
+  2. **Sincronizzazione Reattiva Bi-Direzionale con lo Store**:
+     - Al cambio di selezione (`change` su `#forecast-minimap-layer-select`), aggiornare immediatamente `miniMapEngine.setLayer(newLayer)` e persistere su `store.setState({ ui: { ...ui, mapLayer: newLayer } })`.
+     - Nel listener di stato del controller (`store.subscribe`), intercettare le mutazioni di `nextState.ui.mapLayer` per allineare sincronicamente l'istanza `miniMapEngine` e il controllo select senza richiedere la distruzione del DOM della vista.
+  3. **Inizializzazione con Fallback Coerente**: Metodo `getActiveMapLayer()` che recupera la preferenza persistita `state.ui.mapLayer` o applica il fallback semantico coerente con il tema attivo (`theme === 'light' ? 'topo' : 'dark'`), passato direttamente come opzione `layer` al factory `createMapEngine`.
+
+---
+
+## 68. Cartografia Outdoor Specialistica per Parapendio: OpenTopoMap, CyclOSM e Gestione maxNativeZoom
+- **Problema**: Le mappe convenzionali (World Topo generica ed OSM standard) mancano del dettaglio orografico indispensabile per il volo libero e l'Hike & Fly: curve di livello ad alta densità (20m), sentieri CAI, rilievo ombreggiato alpino e pendenze. Inoltre, interrogando server topografici a zoom elevati (>17/18), si rischiavano errori HTTP 404 dovuti all'assenza di tile oltre il limite nativo del provider.
+- **Causa Radice**: OpenTopoMap genera tile raster fino a zoom 17, mentre CyclOSM genera fino a zoom 18. Richieste a zoom 18 o 19 senza configurazione di sovracampionamento falliscono sui server pubblici con tile mancanti o errori 404.
+- **Pattern Vincolante**:
+  1. **Layer Topografico Montano (`OpenTopoMap`)**:
+     - Endpoint: `https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png`, subdomains `'abc'`, `maxZoom: 19`, `maxNativeZoom: 17`.
+     - Permette a Leaflet di interpolare (upscale) i tile di zoom 17 a zoom 18 e 19 senza generare richieste 404, fornendo curve di livello a 20m, rilievo SRTM ombreggiato e toponomastica in stile alpino Tabacco/IGM.
+  2. **Layer Escursionistico e Tracce (`CyclOSM`)**:
+     - Endpoint: `https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png`, subdomains `'abc'`, `maxZoom: 19`, `maxNativeZoom: 18`.
+     - Cartografia outdoor con risalto di sentieri, mulattiere, tracce sterrate, rifugi e dislivelli, ideale per pianificazione atterraggi alternativi ed escursioni Hike & Fly.
+  3. **Etichette Selettore Monovocali**: Le opzioni del selettore layer in tutta l'applicazione sono standardizzate in denominazioni brevi e immediate: `OpenTopo`, `Satellite`, `Scuro`, `CyclOSM`.
+  4. **Interattività Touch sui Pin della Mini-Mappa**: I marker di decollo e atterraggio nella mini-mappa sono configurati con handler click `onSelectSubSpot(subSpotId)` per commutare istantaneamente il sub-spot attivo tramite tocco diretto sulla mappa.
+
+
+
+
+
+
+---
+
+## 69. Coerenza Visuale dei Marker su Mappa Cartografica e Fumetto Informativo al Tap (Zero Clutter)
+- **Problema**: La logica a tre livelli di zoom nella mappa comprensori mutava la forma dei marker da punti circolari a rettangoli di aureola (140px) e infine a striscioni micro-vettoriali di decollo e atterraggio (160px). Ciò provocava occlusione della cartografia all'avvicinarsi dello zoom, perdita di riconoscibilità dei comprensori e l'apertura automatica e invasiva della scheda modale (bottom sheet) al tap di qualsiasi punto, coprendo la mappa.
+- **Causa Radice**: Sovraccarico di dettagli informativi innestati direttamente nel canvas cartografico anziché sfruttare la divulgazione progressiva su richiesta dell'utente (fumetto/popup Leaflet).
+- **Pattern Vincolante**:
+  1. **Marker Circolari Semantici Invarianti a Tutti i Livelli di Zoom**: Tutti i comprensori visualizzano stabilmente il marker circolare ad anello avionico (disco visivo da 26px, bordo 2px, sfondo semitrasparente al 32% e glifo geometrico al centro: ● per Volabile verde, ▲ per Cautela ambra, ✕ per Chiuso rosso, ⚡ per Severo, ○ per Dati N/D).
+  2. **Pavimento di Tocco a 46px (Fitts's Law & Outdoor HMI)**: Espansione invisibile dell'area di tocco del marker tramite pseudo-elemento CSS `::before` a `top: -10px; bottom: -10px; left: -10px; right: -10px`, garantendo massima accuratezza tattile outdoor su display da 26px.
+  3. **Apertura Contestuale del Fumetto (`L.popup`) al Tap**: Al tap o click sul marker, non forzare la scomparsa della mappa con la bottom sheet. Aprire un fumetto a bolla aeronautica (`gm-leaflet-popup`) ancorato sopra il marker, contenente:
+     - Nome dello spot in grassetto ad alta visibilità.
+     - Badge di stato volabilità con colore e glifo.
+     - Dati altimetrici e localizzazione/provincia.
+     - Pulsante d'azione discreto ("Scheda Spot ›") per consentire all'utente di aprire la scheda dettagliata solo se desiderato.
+  4. **Stabilità DOM e Preservazione del Fumetto su Pan e Zoom**: Nel metodo `renderOverlays` di `LeafletMapEngine`, verificare la firma dello stato (`signature`) per evitare la distruzione ciclica dei layer e la chiusura involontaria del popup aperto durante il panning o lo zoom dell'utente.
+
+---
+
+## 70. Sincronizzazione Vettoriale della Manica a Vento nello Scrubber Orario e Disallineamento Chiavi `weatherSnapshot`
+- **Problema**: Muovendo lo scrubber orario delle previsioni (08:00 - 20:00), la manica a vento sulla mini-mappa orografica rimaneva immobile sempre orientata verso Sud (180°), e il settore di lancio del decollo manteneva l'orientamento/colorazione per vento da Nord (0°).
+- **Causa Radice**: Disallineamento di contratto: `core/comprensorio.js` esponeva `windDir` ma non `windDirection`. L'adapter cartografico (`updateWindsockMarker` e `renderSpotMiniMap`) leggeva unicamente `weatherSnapshot.windDirection ?? 0`, ricadendo costantemente su `0` e producendo una rotazione fissa `(0 + 180) % 360 = 180°`. Inoltre, l'aggiornamento si limitava a ruotare il wrapper senza aggiornare il markup SVG interno dei 12 segmenti per riflettere le variazioni di intensità del vento.
+- **Pattern Vincolante**:
+  1. **Doppia Esposizione delle Chiavi di Direzione (`windDir` & `windDirection`)**: Sia `core/comprensorio.js` che i consumer UI devono supportare indifferentemente `windDir` e `windDirection` (`const dir = weatherSnapshot.windDirection ?? weatherSnapshot.windDir ?? 0;`), prevenendo regressioni e garantendo piena compatibilità con test e viste preesistenti.
+  2. **Rotazione Elastica + Aggiornamento SVG Segmenti (`updateWindsockMarker`)**: Mantenere intatto l'elemento genitore `#miniws-wrapper` per consentire alla transizione CSS elastica (`transition: transform 0.4s`) di ruotare fluidamente la manica a ogni tocco dello scrubber, aggiornando contestualmente l'interno del wrapper con `generateWindsockSvg(speed, gust, dir, turb, { includeWrapper: false })` per aggiornare lunghezze, sbandieramento e keyframe.
+  3. **Aggiornamento Sincrono del Settore di Lancio (`generateTakeoffSectorSvg`)**: Ricalcolare il settore e la freccia di pendio con la direzione effettiva oraria e passare il decollo attivo (`currentTakeoff`) a `updateWindsockMarker`.
+

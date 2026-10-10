@@ -718,6 +718,8 @@ export function evaluateComprensorio({
         windSpeed: null,
         windGust: null,
         windDir: null,
+        windDirection: null,
+        turbulence: null,
         temp: null,
         cape: null,
         rain: null
@@ -954,6 +956,8 @@ export function evaluateComprensorio({
       windSpeed: Math.round(windSpeed),
       windGust: Math.round(windGust),
       windDir: Math.round(windDir),
+      windDirection: Math.round(windDir),
+      turbulence,
       temp: Math.round(temp),
       cape: Math.round(cape),
       rain

@@ -4391,13 +4391,13 @@ input.gm-input:focus {
   color: var(--gm-text-muted);
 }
 
-/* Bottom Docked Scrubber with >=24px thumb-zone clearance */
+/* Bottom Docked Scrubber with solid backdrop and clear elevation */
 .gm-map-scrubber-container {
   position: absolute;
   bottom: calc(var(--gm-nav-height, 64px) + 24px);
   left: 12px;
   right: 12px;
-  z-index: 500;
+  z-index: 600;
   pointer-events: none;
 }
 
@@ -4406,10 +4406,10 @@ input.gm-input:focus {
   background: var(--gm-bg-card);
   border: 1px solid var(--gm-border);
   border-radius: var(--gm-radius-md);
-  padding: 8px 10px;
-  box-shadow: var(--gm-shadow-md);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  padding: 8px 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   touch-action: pan-x;
 }
 
@@ -4417,31 +4417,107 @@ input.gm-input:focus {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 6px;
+  gap: 8px;
+  margin-bottom: 8px;
   font-size: 0.74rem;
+  color: var(--gm-text-secondary);
+}
+
+.gm-map-scrubber-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.gm-map-scrubber-title {
+  font-weight: 700;
+  color: var(--gm-text-primary);
+  white-space: nowrap;
+}
+
+.gm-map-scrubber-spot-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: var(--gm-radius-full);
+  background: var(--gm-bg-elevated);
+  font-size: 0.70rem;
   font-weight: 600;
   color: var(--gm-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 170px;
+}
+
+.gm-map-scrubber-hour-display {
+  flex-shrink: 0;
+  font-family: var(--gm-font-mono);
+  font-weight: 700;
+  color: var(--gm-accent);
+}
+
+.gm-map-scrubber-stepper-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.gm-map-stepper-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  background: var(--gm-bg-elevated);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-sm);
+  color: var(--gm-text-primary);
+  font-size: 1.25rem;
+  line-height: 1;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  user-select: none;
+  transition: background-color var(--gm-transition-fast), border-color var(--gm-transition-fast);
+}
+
+.gm-map-stepper-btn:hover:not(:disabled) {
+  background: var(--gm-border-focus);
+  border-color: var(--gm-accent);
+}
+
+.gm-map-stepper-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 .gm-map-scrubber-slots {
   display: grid;
   grid-template-columns: repeat(10, 1fr);
   gap: 4px;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
 }
 
 .gm-map-hour-slot {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 4px;
-  min-height: var(--gm-touch-min, 48px);
-  padding: 4px 2px;
+  min-height: 44px;
+  padding: 3px 1px;
   background: transparent;
   border: 1px solid transparent;
   border-radius: var(--gm-radius-sm);
   color: var(--gm-text-secondary);
-  font-size: 0.74rem;
+  font-size: 0.72rem;
   font-family: var(--gm-font-mono);
   cursor: pointer;
   user-select: none;
@@ -4468,34 +4544,220 @@ input.gm-input:focus {
   border: none;
 }
 
+/* Circular Map Markers matching aeronautical glanceability (as in screenshot) */
 .gm-map-dot-marker {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 8px;
-  border-radius: var(--gm-radius-full);
-  background: var(--gm-bg-card);
-  border: 1px solid var(--gm-border);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
-  font-size: 0.76rem;
-  font-weight: 600;
-  color: var(--gm-text-primary);
-  white-space: nowrap;
-  user-select: none;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
   cursor: pointer;
+  user-select: none;
+  position: relative;
+  transition: transform var(--gm-transition-fast), box-shadow var(--gm-transition-fast);
+}
+
+/* 46px touch target floor (Fitts's Law / Outdoor HMI) */
+.gm-map-dot-marker::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  right: -10px;
+  bottom: -10px;
+  border-radius: 50%;
+}
+
+.gm-map-dot-marker:hover {
+  transform: scale(1.22);
+  z-index: 500;
 }
 
 .gm-map-dot-glyph {
-  font-size: 0.85rem;
+  font-size: 0.76rem;
   line-height: 1;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
+.gm-map-dot-marker.gm-status-flyable {
+  border: 2px solid #22c55e;
+  background: rgba(34, 197, 94, 0.32);
+}
 .gm-map-dot-marker.gm-status-flyable .gm-map-dot-glyph { color: #22c55e; }
-.gm-map-dot-marker.gm-status-caution .gm-map-dot-glyph { color: #eab308; }
-.gm-map-dot-marker.gm-status-unflyable .gm-map-dot-glyph { color: #ef4444; }
-.gm-map-dot-marker.gm-status-severe .gm-map-dot-glyph { color: #18181b; }
-.gm-map-dot-marker.gm-status-unavailable .gm-map-dot-glyph { color: #64748b; }
 
+.gm-map-dot-marker.gm-status-caution {
+  border: 2px solid #eab308;
+  background: rgba(234, 179, 8, 0.32);
+}
+.gm-map-dot-marker.gm-status-caution .gm-map-dot-glyph { color: #eab308; }
+
+.gm-map-dot-marker.gm-status-unflyable {
+  border: 2px solid #ef4444;
+  background: rgba(239, 68, 68, 0.32);
+}
+.gm-map-dot-marker.gm-status-unflyable .gm-map-dot-glyph { color: #ef4444; }
+
+.gm-map-dot-marker.gm-status-severe {
+  border: 2px solid #18181b;
+  background: rgba(24, 24, 27, 0.5);
+}
+.gm-map-dot-marker.gm-status-severe .gm-map-dot-glyph { color: #a1a1aa; }
+
+.gm-map-dot-marker.gm-status-unavailable {
+  border: 2px solid #64748b;
+  background: rgba(100, 116, 139, 0.32);
+}
+.gm-map-dot-marker.gm-status-unavailable .gm-map-dot-glyph { color: #94a3b8; }
+
+/* Active / Focused Spot Marker */
+.gm-map-dot-marker.gm-map-dot-focused {
+  border-width: 2.5px;
+  border-color: #ffffff;
+  box-shadow: 0 0 14px var(--gm-accent);
+  transform: scale(1.15);
+  z-index: 1000;
+}
+
+/* Leaflet Popup Styling - Aeronautical Speech Bubble ("Fumetto") */
+.gm-leaflet-popup .leaflet-popup-content-wrapper {
+  background: var(--gm-bg-card, #12161f);
+  color: var(--gm-text-primary, #f8fafc);
+  border: 1px solid var(--gm-border, #1e2638);
+  border-radius: var(--gm-radius-md, 8px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
+  padding: 0;
+  overflow: hidden;
+}
+
+.gm-leaflet-popup .leaflet-popup-content {
+  margin: 10px 12px;
+  line-height: 1.4;
+  min-width: 160px;
+  max-width: 220px;
+}
+
+.gm-leaflet-popup .leaflet-popup-tip {
+  background: var(--gm-bg-card, #12161f);
+  border: 1px solid var(--gm-border, #1e2638);
+  box-shadow: none;
+}
+
+.gm-leaflet-popup a.leaflet-popup-close-button {
+  color: var(--gm-text-secondary, #94a3b8) !important;
+  font-size: 16px !important;
+  top: 6px !important;
+  right: 6px !important;
+  width: 20px !important;
+  height: 20px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-decoration: none !important;
+  transition: color var(--gm-transition-fast);
+}
+
+.gm-leaflet-popup a.leaflet-popup-close-button:hover {
+  color: var(--gm-text-primary, #ffffff) !important;
+}
+
+.gm-map-spot-popup {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.gm-map-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding-right: 14px;
+}
+
+.gm-map-popup-name {
+  font-size: 0.90rem;
+  font-weight: 700;
+  color: var(--gm-text-primary, #f8fafc);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gm-map-popup-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: var(--gm-radius-full, 9999px);
+  white-space: nowrap;
+}
+
+.gm-map-popup-badge.gm-status-flyable {
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+}
+
+.gm-map-popup-badge.gm-status-caution {
+  background: rgba(234, 179, 8, 0.2);
+  color: #eab308;
+}
+
+.gm-map-popup-badge.gm-status-unflyable {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.gm-map-popup-badge.gm-status-severe {
+  background: rgba(24, 24, 27, 0.4);
+  color: #a1a1aa;
+}
+
+.gm-map-popup-badge.gm-status-unavailable {
+  background: rgba(100, 116, 139, 0.2);
+  color: #94a3b8;
+}
+
+.gm-map-popup-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.74rem;
+  color: var(--gm-text-secondary, #94a3b8);
+}
+
+.gm-map-popup-alt {
+  font-family: var(--gm-font-mono, monospace);
+  font-weight: 600;
+}
+
+.gm-map-popup-btn {
+  margin-top: 4px;
+  padding: 5px 8px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--gm-accent, #f59e0b);
+  background: var(--gm-bg-elevated, #1a2234);
+  border: 1px solid var(--gm-border, #1e2638);
+  border-radius: var(--gm-radius-sm, 6px);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  text-decoration: none;
+  transition: background-color var(--gm-transition-fast), border-color var(--gm-transition-fast);
+}
+
+.gm-map-popup-btn:hover {
+  background: var(--gm-bg-hover, #222d44);
+  border-color: var(--gm-accent, #f59e0b);
+}
+
+/* Medium Zoom Aureole Badge */
 .gm-map-aureole-badge {
   display: inline-flex;
   align-items: center;
@@ -4512,6 +4774,13 @@ input.gm-input:focus {
   cursor: pointer;
 }
 
+.gm-aureole-focused {
+  border-color: var(--gm-accent);
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.55);
+  transform: scale(1.1);
+  z-index: 1000;
+}
+
 .gm-aureole-alt {
   font-size: 0.70rem;
   font-family: var(--gm-font-mono);
@@ -4524,6 +4793,12 @@ input.gm-input:focus {
   align-items: center;
   gap: 2px;
   cursor: pointer;
+}
+
+.gm-takeoff-focused .gm-takeoff-badge {
+  border-color: var(--gm-accent);
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.55);
+  transform: scale(1.08);
 }
 
 .gm-takeoff-badge {
@@ -4610,5 +4885,300 @@ input.gm-input:focus {
 [data-theme="light"] .gm-takeoff-badge,
 [data-theme="light"] .gm-map-landing-marker {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="light"] .gm-map-dot-marker.gm-status-flyable .gm-map-dot-glyph {
+  color: #15803d;
+}
+[data-theme="light"] .gm-map-dot-marker.gm-status-caution .gm-map-dot-glyph {
+  color: #b45309;
+}
+[data-theme="light"] .gm-map-dot-marker.gm-status-unflyable .gm-map-dot-glyph {
+  color: #b91c1c;
+}
+
+/* Light Theme overrides for Leaflet Popup */
+[data-theme="light"] .gm-leaflet-popup .leaflet-popup-content-wrapper {
+  background: #ffffff;
+  color: #0f172a;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="light"] .gm-leaflet-popup .leaflet-popup-tip {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+}
+
+[data-theme="light"] .gm-leaflet-popup a.leaflet-popup-close-button {
+  color: #64748b !important;
+}
+
+[data-theme="light"] .gm-leaflet-popup a.leaflet-popup-close-button:hover {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .gm-map-popup-name {
+  color: #0f172a;
+}
+
+[data-theme="light"] .gm-map-popup-meta {
+  color: #475569;
+}
+
+[data-theme="light"] .gm-map-popup-btn {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #b45309;
+}
+
+[data-theme="light"] .gm-map-popup-btn:hover {
+  background: #e2e8f0;
+  border-color: #b45309;
+}
+
+
+/* ==========================================================================
+   GlideMind Phase 5-bis: Forecast Mini Map & Vector Windsock Component
+   ========================================================================== */
+
+.gm-mini-map-box {
+  position: relative;
+  width: 100%;
+  height: 180px;
+  min-height: 180px;
+  border-radius: var(--gm-radius-lg, 12px);
+  overflow: hidden;
+  border: 1px solid var(--gm-border);
+  background-color: var(--gm-bg-card);
+  touch-action: pan-y;
+  box-sizing: border-box;
+}
+
+.gm-mini-map-canvas {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+}
+
+.gm-mini-map-layer-select {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 10;
+  min-height: 36px;
+  height: 36px;
+  padding: 0 28px 0 12px;
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: var(--gm-text-primary, #f8fafc);
+  border: 1px solid var(--gm-border, rgba(255, 255, 255, 0.15));
+  border-radius: var(--gm-radius-full, 9999px);
+  font-family: var(--gm-font-sans, system-ui, sans-serif);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+}
+
+.gm-mini-map-layer-select:hover {
+  background-color: rgba(30, 41, 59, 0.95);
+  border-color: var(--gm-accent, #38bdf8);
+}
+
+.gm-mini-map-layer-select:focus-visible {
+  border-color: var(--gm-accent, #38bdf8);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.35);
+}
+
+.gm-mini-map-expand-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+  min-width: var(--gm-touch-min, 44px);
+  min-height: var(--gm-touch-min, 44px);
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: var(--gm-radius-md, 8px);
+  border: 1px solid var(--gm-border);
+  background: rgba(15, 23, 42, 0.78);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: var(--gm-text-primary);
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.15s ease;
+}
+
+.gm-mini-map-expand-btn:hover {
+  background: rgba(30, 41, 59, 0.9);
+  transform: scale(1.05);
+}
+
+.gm-mini-map-expand-btn:active {
+  transform: scale(0.95);
+}
+
+.gm-windsock-marker-container {
+  pointer-events: none;
+  filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.8));
+}
+
+.gm-windsock-scaler {
+  transform-origin: center center;
+}
+
+.gm-windsock-wrapper {
+  transform-origin: 120px 120px;
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Takeoff Sector SVG Marker Container */
+.gm-takeoff-sector-marker-container {
+  pointer-events: none;
+}
+
+.gm-takeoff-sector-svg {
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.85));
+}
+
+/* Compact Mini Map Aeronautical Pins (Zero Location Name Clutter) */
+.gm-mini-pin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 7px;
+  background-color: var(--gm-bg-card, #12161f);
+  border-radius: 11px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
+  font-family: var(--gm-font-mono, monospace);
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: pointer;
+  user-select: none;
+  transition: transform var(--gm-transition-fast), border-color var(--gm-transition-fast), box-shadow var(--gm-transition-fast);
+}
+
+.gm-mini-pin:hover {
+  transform: scale(1.08);
+}
+
+.gm-mini-pin-landing {
+  border: 1.5px solid var(--gm-status-flyable, #22c55e);
+  color: var(--gm-status-flyable, #22c55e);
+}
+
+.gm-mini-pin-landing .gm-mini-pin-glyph {
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.gm-mini-pin-landing .gm-mini-pin-alt {
+  color: var(--gm-text-primary, #f8fafc);
+}
+
+.gm-mini-pin-takeoff {
+  border: 1.5px solid var(--gm-accent, #38bdf8);
+  color: var(--gm-accent, #38bdf8);
+}
+
+.gm-mini-pin-takeoff .gm-mini-pin-glyph {
+  font-size: 0.70rem;
+}
+
+.gm-mini-pin-takeoff .gm-mini-pin-alt {
+  color: var(--gm-text-primary, #f8fafc);
+}
+
+.gm-mini-pin-focused {
+  box-shadow: 0 0 0 2px var(--gm-accent, #38bdf8), 0 3px 10px rgba(56, 189, 248, 0.45);
+  transform: scale(1.08);
+}
+
+/* Light theme overrides for Mini Map */
+[data-theme="light"] .gm-mini-map-box {
+  border-color: rgba(15, 23, 42, 0.12);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .gm-mini-pin {
+  background-color: #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="light"] .gm-mini-pin .gm-mini-pin-alt {
+  color: #0f172a;
+}
+
+[data-theme="light"] .gm-mini-map-layer-select {
+  background: rgba(255, 255, 255, 0.92);
+  color: #0f172a;
+  border-color: rgba(15, 23, 42, 0.18);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+}
+
+[data-theme="light"] .gm-mini-map-layer-select:hover {
+  background: #ffffff;
+}
+
+[data-theme="light"] .gm-mini-map-expand-btn {
+  background: rgba(255, 255, 255, 0.88);
+  border-color: rgba(15, 23, 42, 0.16);
+  color: #0f172a;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+[data-theme="light"] .gm-mini-map-expand-btn:hover {
+  background: #ffffff;
+}
+
+/* Desktop layout: 2-column split within spot summary card */
+@media (min-width: 768px) and (min-height: 550px) {
+  .gm-spot-card-split {
+    display: flex;
+    flex-direction: row;
+    gap: 16px;
+    align-items: stretch;
+  }
+
+  .gm-spot-card-metrics {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .gm-spot-card-split .gm-mini-map-box {
+    width: 210px;
+    height: auto;
+    min-height: 180px;
+    flex-shrink: 0;
+  }
+}
+
+/* Seamless Leaflet map canvas background adhering to dark cockpit and sunlight themes */
+.leaflet-container {
+  background-color: var(--gm-bg-card, #12161f);
 }
 
