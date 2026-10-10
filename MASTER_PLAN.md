@@ -94,7 +94,7 @@ The new application will deliver:
 ## 4. Phased Implementation Roadmap
 
 ### Phase 0: Workspace Foundation & Governance (Completata)
-- [x] Configure `.agents/skills` with domain knowledge (`outdoor-hmi-touch`, `flyability-evaluator`, `open-meteo-integration`, `ai-briefing-gemini`, `geodesy-webgl-3d`).
+- [x] Configure `.agents/skills` with domain knowledge (`flyability-evaluator`, `open-meteo-integration`, `ai-briefing-gemini`, `geodesy-webgl-3d`) and global plugins (`ux-outdoor-and-field-ergonomics`).
 - [x] Configure `.agents/rules` with architectural constraints (`constraints.md`, `ui_layout_spec.md`, `anti_sycophancy_integrity.md`, `geodesy_webgl_3d_spec.md`, `testing_weather_mock_guard.md`).
 - [x] Configure global Antigravity plugins (`engineering-sobriety`, `engineering-workflow`, `execution-guard`, `laws-of-ux`, `cognitive-persistence`, `proactive-mentorship`).
 - [x] Initialize `package.json`, `.gitignore`, dev server harness (`scripts/serve.js`), and smoke test runner (`node --test`).

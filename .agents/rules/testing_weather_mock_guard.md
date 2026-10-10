@@ -1,7 +1,9 @@
 # Rule: Testing Weather Mocking & Rate Limit Guard
 
 ## 1. Objective & Critical Mandate
-The Open-Meteo live API enforces strict daily request rate limits (HTTP 429 Too Many Requests). When testing UI components, Logbook, 3D Replay, Hangar, Driver.js tours, Settings, Themes, or any other feature not explicitly validating Open-Meteo request schemas, the agent and automated test scripts MUST NOT perform live network requests to Open-Meteo.
+In accordance with [`execution-guard`](file:///c:/github/antigravity-plugins/plugins/execution-guard) (Section 4: External API Mock Guard & Quota Protection), automated test suites, crawlers, and verification scripts MUST NOT perform live network requests to third-party APIs.
+
+The Open-Meteo live API enforces strict daily request rate limits (HTTP 429 Too Many Requests). When testing UI components, Logbook, 3D Replay, Hangar, Settings, Themes, or any other feature not explicitly validating Open-Meteo request schemas, all network requests must be mocked.
 
 ## 2. Mocking Protocol During Testing
 1. **Automated Headless & Crawler Tests (`scripts/*.js`)**:

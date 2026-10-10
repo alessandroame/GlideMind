@@ -50,26 +50,16 @@ GlideMind uses a persistent 5-tab navigation architecture:
 
 ---
 
-## 4. Gate Obbligatorio di Validazione UX Laws (Pre-Design UX Check)
-Prima di redigere markup, stili CSS o implementare viste e componenti UI, l'architettura d'interfaccia deve superare e documentare esplicitamente un audit preliminare contro le leggi ergonomiche:
+## 4. Gate di Validazione UX & Vocabolario Pilota
 
-1. **Occam's Razor & Legge di Prägnanz (Zero Ridondanza)**:
-   - Verificare che nessun controllo, azione di navigazione o pulsante primario sia duplicato.
-   - Se la barra inferiore (`#bottom-nav-bar`) espone già una rotta di primo livello (es. Home), è vietato introdurre pulsanti di ritorno Home o back ridondanti negli header secondari.
-2. **Fitts's Law & Thumb Zone (Ergonomia e Portata)**:
-   - Posizionare i controlli interattivi ad alta frequenza (scrubber orari, trigger primari, switch di vista) nella zona naturale del pollice (parte inferiore dello schermo).
-   - Touch target minimo tassativo di 48×48 px su mobile (con padding trasparente se l'elemento visivo è minore).
-3. **Hick's Law & Miller's Law (Riduzione del Carico Cognitivo)**:
-   - Limitare le scelte primarie concorrenti a 3–5 opzioni.
-   - Suddividere le informazioni complesse in blocchi distinti (chunking).
-   - Zero scroll orizzontale della pagina o di barre temporali primarie (scrubber a slot fissi compressi a colpo d'occhio).
-4. **Jakob's Law & Gerarchia di Navigazione**:
-   - Barra di navigazione fissa inferiore per il livello principale dell'app.
-   - `SheetManager` (bottom sheet swipeabili) per filtri, picker e drill-down contestuali, evitando dialoghi modali popup bloccanti e annidati.
-5. **Doherty Threshold (<400ms)**:
-   - Tutte le interazioni di selezione (ora, data, spot, tab) devono aggiornare lo stato e la vista istantaneamente (<50ms).
-6. **Audit Terminologico & Anti-Gergo (Novice Pilot Spec & WCAG Understandable)**:
-   - Censimento preventivo di tutti i testi, etichette e unità di misura prima di definire il markup o il design della vista.
-   - Traduzione obbligatoria di ogni grandezza aerologica nell'effetto pratico di sicurezza per il pilota (es. *Rischio Temporali* anziché *Energia CAPE*, *Base Nubi* anziché *LCL*, *Turbolenza* anziché *EDR*).
-   - Gerarchia visiva: stato qualitativo semantico in primo piano con color-coding chiaro, metrica numerica specialistica subordinata come informazione secondaria/tooltip per piloti esperti.
+1. **Laws of UX & Ergonomia Mobile**:
+   - I requisiti ergonomici generali (Occam's razor, Fitts's law $\ge 48\text{px}$, Hick/Miller chunking, Jakob's law, Doherty threshold $< 400\text{ms}$) sono governati centralmente da [`laws-of-ux`](file:///c:/github/antigravity-plugins/plugins/laws-of-ux) e dalla skill `ux-outdoor-and-field-ergonomics`.
+2. **Audit Terminologico & Traduzione Fenomenologica (Novice Pilot Spec)**:
+   - Censimento preventivo di tutte le etichette, unità di misura e grandezze meteo prima di definire il markup o il design della vista.
+   - Traduzione obbligatoria di ogni grandezza aerologica nell'effetto pratico di sicurezza per il pilota principiante ([`novice_pilot_spec.md`](file:///c:/github/GlideMind/.agents/rules/novice_pilot_spec.md)):
+     - *Rischio Temporali / Instabilità* anziché *Energia CAPE* isolata.
+     - *Base Nubi stimata* anziché acronimo accademico *LCL*.
+     - *Turbolenza in Termica* anziché grandezza *EDR*.
+   - Gerarchia visiva: stato qualitativo semantico in primo piano con color-coding chiaro; metrica numerica specialistica subordinata come informazione secondaria o tooltip.
+
 

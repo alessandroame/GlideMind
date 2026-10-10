@@ -1,12 +1,11 @@
 # GlideMind Architecture & Engineering Constraints
 
 ## 1. Structural Architecture: Decoupled Core vs UI Shell
+
 1. **Headless Domain Core (`core/`)**:
-   - Must contain pure computational algorithms, mathematical transformations, data parsers, and API fetch wrappers.
-   - **Zero DOM Dependencies**: Files in `core/` must NEVER directly reference `window`, `document`, `localStorage`, or CSS selectors. They must be 100% executable and testable in pure Node.js test runners without JSDOM.
-   - **Injectable Storage Adapter**: Persistence mechanisms used by `core/store.js` must operate via an injectable `storageAdapter` interface, defaulting to an in-memory map under Node.js and binding to `localStorage`/`IndexedDB` only when mounted in the browser shell.
+   - Strictly governed by [`engineering-workflow`](file:///c:/github/antigravity-plugins/plugins/engineering-workflow) (Section 4): zero DOM references, 100% testable in pure Node.js without JSDOM, and injectable `storageAdapter` interface (in-memory for Node.js, `localStorage`/`IndexedDB` for browser).
 2. **Modular Component-Driven UI (`ui/`)**:
-   - The UI is composed of self-contained components or views (e.g. `HomeDashboardView`, `ForecastView`, `SpotMapView`, `LogbookView`, `SettingsView`).
+   - The UI is composed of self-contained views (`HomeDashboardView`, `ForecastView`, `SpotMapView`, `LogbookView`, `SettingsView`).
    - Monolithic files (>1,000 lines of mixed UI and state) are strictly forbidden.
    - `index.html` is an ultralight application shell (<200 lines) with designated mounting targets.
 3. **Single Source of Truth (SSOT) & Reactive State (`core/store.js`)**:
@@ -15,29 +14,24 @@
 
 ---
 
-## 2. Coding Standards
-- **Strict English in Source Code**:
-  - All source code must be exclusively in English: identifiers (variables, constants, functions, classes, methods, filenames), comments (`//`, `/* */`), JSDoc docstrings, automated tests (`describe`, `it`, `test`), internal console/error logs, and Git commit messages.
-  - **UI Strings Exception**: User-facing copy and localized UI text in the application interface follow product requirements (Italian for GlideMind UI strings). Dictionary keys and surrounding code remain in English.
-- **Single Responsibility Principle (SRP)**:
-  - Each module handles one cohesive domain (e.g., `igcParser.js` parses files; `flightTelemetry.js` calculates kinematics).
-- **Zero Workarounds & Anti-Hack Policy**:
-  - Banned: Arbitrary `setTimeout` hacks to mask race conditions, `!important` cascades to fix broken layouts, monkey-patching, and ad-hoc global variables.
-  - Mandatory root-cause resolution for every bug.
+## 2. Coding Standards & Governance
+
+- **Language & Conventions**: Governed centrally by [`engineering-workflow`](file:///c:/github/antigravity-plugins/plugins/engineering-workflow) (Section 3): strict English in all identifiers, comments, tests, and logs.
+  - **GlideMind UI Exception**: User-facing copy in the application interface is localized in Italian according to product specs. Dictionary keys remain in English.
+- **Anti-Hack & Zero Workarounds**: Governed centrally by [`engineering-sobriety`](file:///c:/github/antigravity-plugins/plugins/engineering-sobriety): mandatory root-cause resolution for every bug.
 
 ---
 
 ## 3. UI & Ergonomic Constraints (Outdoor Mobile Interface)
-- **Dual High-Contrast Theme Engine (Outdoor Sunlight Resilient)**: Default glare-resistant dark cockpit theme and high-luminance sunlight light mode (`data-theme="light"`), strictly governed via CSS custom properties (`var(--gm-bg-base)`, `var(--gm-bg-card)`, etc.) with verified WCAG 2.1 AA contrast ratios ($\ge 4.5:1$).
-- **Zero Horizontal Scrollbar**: The application must never trigger horizontal scrolling.
-- **Controlled Viewport & Scrolling**: Document/dashboard views adopt natural vertical scrolling; full-viewport map and 3D replay views manage their own canvas containers (`height: 100dvh`, `touch-action: none` / cooperative gesture handling).
-- **Touch Target Floor**: Every clickable/tappable element must strictly provide $\ge 44 \times 44\text{ px}$ effective touch area (with $\ge 48\text{px}$ preferred where layout permits).
-- **Dynamic Viewport (`100dvh`)**: Mobile layout must compute against `100dvh` to eliminate iOS Safari / Android Chrome toolbar clipping.
-- **Zero Icon Clutter**: Icons are restricted to functional, actionable controls or safety markers. No decorative icons in section titles.
+
+- **General Outdoor HMI**: Governed centrally by [`laws-of-ux`](file:///c:/github/antigravity-plugins/plugins/laws-of-ux) (Section 8) and skill `ux-outdoor-and-field-ergonomics` (touch target floor $\ge 44\text{px}$/$\ge 48\text{px}$, single-row `pan-x` carousels, dynamic `100dvh`, zero icon clutter).
+- **GlideMind Theme Custom Properties**: Dual theme engine (dark cockpit + `[data-theme="light"]` sunlight mode) strictly governed via CSS custom properties (`var(--gm-bg-base)`, `var(--gm-touch-min)`, `var(--gm-text-primary)` in `css/theme.css`) with WCAG 2.1 AA contrast $\ge 4.5:1$.
+- **Controlled Viewport & Gestures**: Dashboard views adopt vertical scrolling; full-viewport map and 3D replay manage their canvas containers (`height: 100dvh`, cooperative gestures / `touch-action: pan-y`).
 
 ---
 
 ## 4. Progressive Web App (PWA) & Offline-First
+
 - Service worker (`sw.js`) with cache-first strategy for static assets and pass-through mode for `open-meteo.com` (delegating meteorological caching to `core/openMeteoApi.js`).
-- Web App Manifest (`manifest.json`) compliant with PWA installability criteria.
+- Web App Manifest (`manifest.webmanifest`) compliant with PWA installability criteria.
 - Local persistence via `LocalStorage` (app preferences) and `IndexedDB` (flight log tracks and binary blobs).
