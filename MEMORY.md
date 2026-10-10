@@ -826,3 +826,18 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
   2. **Rotazione Elastica + Aggiornamento SVG Segmenti (`updateWindsockMarker`)**: Mantenere intatto l'elemento genitore `#miniws-wrapper` per consentire alla transizione CSS elastica (`transition: transform 0.4s`) di ruotare fluidamente la manica a ogni tocco dello scrubber, aggiornando contestualmente l'interno del wrapper con `generateWindsockSvg(speed, gust, dir, turb, { includeWrapper: false })` per aggiornare lunghezze, sbandieramento e keyframe.
   3. **Aggiornamento Sincrono del Settore di Lancio (`generateTakeoffSectorSvg`)**: Ricalcolare il settore e la freccia di pendio con la direzione effettiva oraria e passare il decollo attivo (`currentTakeoff`) a `updateWindsockMarker`.
 
+---
+
+## 71. Comandi Mappa Non Invasivi con Sfumatura Radiale (Zero Invasiveness & High Legibility)
+- **Problema**: L'applicazione di card o pill rettangolari con sfondo scuro solido, filtri blur e bordi netti sopra la cartografia orografica compatta (come la mini-mappa da 180px in ForecastView) occlude ampie porzioni di creste montane, orografia e linee di planata, risultando eccessivamente invasiva alla vista del pilota.
+- **Causa Radice**: Sovrapposizione di controlli UI a geometria chiusa (rettangoli, pill con bordo) anziché elementi minimi (pura scritta e pura icona) dotati di sfumatura di contrasto integrata.
+- **Pattern Vincolante**:
+  1. **Assenza di Bordi e Box Rigidi (`border: none; box-shadow: none`)**: I comandi sovrapposti alla cartografia devono visualizzarsi come testo puro ("scritta" per il layer) o icona pura ("icona" SVG per l'espansione a schermo intero), eliminando qualsiasi cornice o sfondo squadrato coprente.
+  2. **Vignettatura a Sfumatura Radiale (`radial-gradient`)**:
+     - Sotto la scritta: `radial-gradient(ellipse at center, rgba(15, 23, 42, 0.76) 0%, rgba(15, 23, 42, 0.42) 55%, rgba(15, 23, 42, 0) 82%)`. L'ellisse si adatta fluidamente alla lunghezza della parola e sfuma a trasparenza zero verso i bordi senza linee di discontinuità.
+     - Sotto l'icona: `radial-gradient(circle at center, rgba(15, 23, 42, 0.76) 0%, rgba(15, 23, 42, 0.42) 55%, rgba(15, 23, 42, 0) 82%)`.
+     - Doppio text-shadow / drop-shadow vettoriale per garantire contrasto WCAG AA su qualsiasi sfondo (neve bianca, roccia grigia, boschi scuri).
+  3. **Pavimento Tattile Ergonomico Invisibile (Fitts's Law)**: Il contenitore interattivo preserva un'area di tocco $\ge 40\text{px}$/$\ge 44\text{px}$, ma l'impatto visivo sul paesaggio montano è ridotto al solo testo/icona galleggiante.
+  4. **Adattamento Dinamico al Layer Attivo (`data-map-layer`)**: Nei temi chiari (`[data-theme="light"]`), se il layer attivo è fotografico (satellite) o scuro, i comandi mantengono la sfumatura scura e testo bianco; sui layer chiari (OpenTopo, CyclOSM) la sfumatura commuta su toni chiari con testo scuro.
+
+

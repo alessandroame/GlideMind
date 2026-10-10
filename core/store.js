@@ -106,7 +106,8 @@ export const DEFAULT_INITIAL_STATE = Object.freeze({
     activeSheet: null,
     drawerOpen: false,
     highContrast: true,
-    theme: 'dark'
+    theme: 'dark',
+    mapLayer: 'dark'
   })
 });
 
@@ -206,6 +207,12 @@ export function createStore(initialStateOverrides = {}, customStorageAdapter = n
         'martiniana-po-valle-po-cn-cn',
         'monte-cavallaria-calea-to-to'
       ];
+    }
+    if (loadedSlice.ui && typeof loadedSlice.ui === 'object') {
+      loadedSlice.ui = {
+        ...deepClone(DEFAULT_INITIAL_STATE.ui),
+        ...loadedSlice.ui
+      };
     }
     if (Object.keys(loadedSlice).length > 0) {
       setState(loadedSlice);

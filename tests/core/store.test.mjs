@@ -136,7 +136,8 @@ describe('GlideMind Reactive Store - Architecture & Contracts', () => {
     store1.setState({
       pinnedSpots: [{ id: 'spot-99', name: 'Col Rodella' }],
       units: { speed: 'knots', altitude: 'ft', temperature: 'F', vario: 'fpm' },
-      activeGlider: { category: 'EN-C', name: 'Sport (EN-C)', vTrim: 40, glideRatio: 9.8 }
+      activeGlider: { category: 'EN-C', name: 'Sport (EN-C)', vTrim: 40, glideRatio: 9.8 },
+      ui: { theme: 'light', mapLayer: 'satellite' }
     });
 
     // Create a new store instance sharing the same storage adapter
@@ -149,6 +150,8 @@ describe('GlideMind Reactive Store - Architecture & Contracts', () => {
     assert.equal(state2.pinnedSpots[0].name, 'Col Rodella');
     assert.equal(state2.units.speed, 'knots');
     assert.equal(state2.activeGlider.category, 'EN-C');
+    assert.equal(state2.ui.theme, 'light');
+    assert.equal(state2.ui.mapLayer, 'satellite', 'ui.mapLayer must be persisted and restored');
   });
 
   it('should reset state back to defaults or custom defaults', () => {

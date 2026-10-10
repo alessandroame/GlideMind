@@ -1,5 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { createStore } from '../../core/store.js';
 import {
   ForecastViewController,
@@ -1096,6 +1097,26 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.equal(controller.miniMapEngine.currentLayerId, 'satellite', 'miniMapEngine must react to store mapLayer change');
 
     controller.unmount();
+  });
+
+  it('should render unobtrusive mini-map controls with SVG expand icon and radial-gradient vignette styles', () => {
+    const mockStore = createStore({
+      selectedSpot: DEFAULT_COMPRENSORI[0],
+      ui: { theme: 'dark', mapLayer: 'satellite' }
+    });
+    const controller = new ForecastViewController({ store: mockStore });
+    const html = controller.renderHtml();
+
+    assert.ok(html.includes('data-map-layer="satellite"'), 'Mini-map container must declare data-map-layer attribute');
+    assert.ok(html.includes('<svg width="18" height="18" viewBox="0 0 24 24"'), 'Expand button must contain clean SVG icon');
+    assert.ok(!html.includes('class="gm-mini-map-expand-btn">\n          ⤢'), 'Must not use raw unicode glyph ⤢');
+
+    // Verify CSS styles in theme.css for radial gradient and non-invasive layout
+    const themeCss = readFileSync(new URL('../../css/theme.css', import.meta.url), 'utf-8');
+    assert.ok(themeCss.includes('.gm-mini-map-layer-select {'), 'Must define .gm-mini-map-layer-select');
+    assert.ok(themeCss.includes('radial-gradient(ellipse at center,'), 'Must use elliptical radial gradient behind layer select text');
+    assert.ok(themeCss.includes('.gm-mini-map-expand-btn {'), 'Must define .gm-mini-map-expand-btn');
+    assert.ok(themeCss.includes('radial-gradient(circle at center,'), 'Must use circular radial gradient behind expand icon');
   });
 });
 

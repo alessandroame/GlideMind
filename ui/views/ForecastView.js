@@ -1471,7 +1471,7 @@ export class ForecastViewController {
   renderMiniMapBox() {
     const activeLayer = this.getActiveMapLayer();
     return `
-      <div id="forecast-mini-map-container" class="gm-mini-map-box">
+      <div id="forecast-mini-map-container" class="gm-mini-map-box" data-map-layer="${activeLayer}">
         <div id="forecast-mini-map" class="gm-mini-map-canvas"></div>
         <select 
           id="forecast-minimap-layer-select" 
@@ -1491,7 +1491,12 @@ export class ForecastViewController {
           aria-label="Apri mappa comprensori completa" 
           title="Apri mappa comprensori completa"
         >
-          ⤢
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="15 3 21 3 21 9"></polyline>
+            <polyline points="9 21 3 21 3 15"></polyline>
+            <line x1="21" y1="3" x2="14" y2="10"></line>
+            <line x1="3" y1="21" x2="10" y2="14"></line>
+          </svg>
         </button>
       </div>
     `;
@@ -3705,6 +3710,10 @@ export class ForecastViewController {
       this.render();
     } else if (target.id === 'forecast-minimap-layer-select') {
       const newLayer = target.value;
+      const miniMapContainer = this.container?.querySelector?.('#forecast-mini-map-container');
+      if (miniMapContainer) {
+        miniMapContainer.setAttribute('data-map-layer', newLayer);
+      }
       if (this.miniMapEngine && typeof this.miniMapEngine.setLayer === 'function') {
         this.miniMapEngine.setLayer(newLayer);
       }
