@@ -11,6 +11,7 @@ import { forecastView } from './views/ForecastView.js';
 import { spotMapView } from './views/SpotMapView.js';
 import { settingsView } from './views/SettingsView.js';
 import { logbookView } from './views/LogbookView.js';
+import { flightReplayView } from './views/FlightReplayView.js';
 import { openFlightDetailSheet } from './views/FlightDetailSheet.js';
 import { logbookManager, createIndexedDbAdapter } from '../core/logbookDb.js';
 import { normalizeLocationsCatalog, DEFAULT_COMPRENSORI } from '../core/comprensorio.js';
@@ -136,6 +137,7 @@ export function bootstrapApp() {
   router.registerView('map', spotMapView);
   router.registerView('logbook', logbookView);
   router.registerView('settings', settingsView);
+  router.registerView('replay', flightReplayView);
 
   // Initialize sheet manager
   initSheetManager();
@@ -156,6 +158,7 @@ export function bootstrapApp() {
       router,
       logbookManager,
       logbookView,
+      flightReplayView,
       openFlightDetailSheet,
       loadLocationsCatalog,
       applyTheme,
