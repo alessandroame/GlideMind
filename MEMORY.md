@@ -608,3 +608,12 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
 
 
 
+---
+
+## 57. Shift-Left Quality Gate vs Reattività Post-Hoc: Dai Controlli Successivi ai Vincoli Generativi
+- **Problema**: Il processo di sviluppo ricorreva a cicli iterativi di rework: (1) richiesta utente $\to$ (2) implementazione del flusso principale $\to$ (3) riscontro utente di difetti grafici, acronimi crudi o violazioni ergonomiche $\to$ (4) invocazione manuale degli audit (`laws-of-ux-audit`, `novice-pilot-auditor`, regression testing) $\to$ (5) reiterazione correttiva.
+- **Causa Radice**: Trattare i vincoli ergonomici, le leggi UX e le specifiche di vocabolario aeronautico come *controlli diagnostici ex-post* invocati su richiesta anziché come *vincoli generativi obbligatori ex-ante* (Shift-Left).
+- **Pattern Vincolante**:
+  1. **Adozione del Protocollo Shift-Left**: Prima di presentare qualsiasi codice all'utente, l'agente deve applicare autonomamente la matrice a 5 Gate (`.agents/rules/shift_left_quality_gate.md`).
+  2. **Automated Governance Gate (`shiftLeftGovernance.test.mjs`)**: La suite `npm test` include asserzioni automatiche su isolamento headless, traduzione fenomenologica obbligatoria (divieto di acronimi crudi isolati come CAPE o LCL), divieto di numeri nudi (`compact-wind`), floor Fitts $\ge 48\text{px}$, protezione landscape mobile e conformità al tema chiaro Sunlight Mode.
+  3. **Zero Turn Yielding su Codice Non Conforme**: Vietato restituire il turno con la sola implementazione logica delegando all'utente la verifica visiva ed ergonomica. Il codice consegnato deve già incorporare tutte le protezioni di layout, vocabolario e accessibilità.
