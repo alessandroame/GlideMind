@@ -917,6 +917,17 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Aggiunti test di regressione dedicati in `tests/ui/spotMapView.test.mjs` e `tests/ui/forecastView.test.mjs`.
   - 446 test passati con successo su 61 test suite (`npm test`) con zero regressioni.
 
+---
+
+## 2026-10-10 - Fase 5: Ancoraggio Inferiore ed Esternalizzazione della Timeline Scrubber dalla Mappa
+- **Tipo**: Cartografia / UI Shell / Ergonomia Touch Mobile / Layout Refactoring
+- **Dettagli**: [.agents/worklog.d/2026-10-10_external-bottom-anchored-timeline-scrubber.md](file:///.agents/worklog.d/2026-10-10_external-bottom-anchored-timeline-scrubber.md)
+- **Sintesi**:
+  - Estratto il contenitore della timeline scrubber (`.gm-map-scrubber-container`) dall'interno di `.gm-map-canvas-wrapper`, collocandolo come elemento di piede esterno (`footer`) ancorato in basso in `.gm-map-view`.
+  - Riconfigurato il canvas della mappa affinché occupi in modo pulito e continuo il 100% dell'altezza disponibile tra la top bar rigida (50px) e la barra oraria inferiore, eliminando qualsiasi sovrapposizione opaca sui marker e sui popup inferiori.
+  - Convertito lo stile CSS da card flottante assoluta (`position: absolute; bottom: 16px;`) a barra inferiore solida ancorata (`position: relative; flex-shrink: 0; background: var(--gm-bg-surface); border-top: 1px solid var(--gm-border)`), con supporto per tema scuro e `[data-theme="light"]`.
+  - Aggiunta guardia automatizzata in `tests/ui/spotMapView.test.mjs` che valida `canvasWrapper.contains(scrubberContainer) === false`.
+  - 447 test passati con successo su 61 test suite (`npm test`).
 
 
 
@@ -940,3 +951,18 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
 
 
 
+
+
+
+---
+
+## 2026-10-10 - Fase 5: Correzione Cambio Layer Cartografico e Disaccoppiamento Tema
+- **Tipo**: Bug Fix / Cartografia / State Management / UI Shell
+- **Dettagli**: [.agents/worklog.d/2026-10-10_map-layer-switch-and-theme-guard-fix.md](file:///.agents/worklog.d/2026-10-10_map-layer-switch-and-theme-guard-fix.md)
+- **Sintesi**:
+  - Diagnosticata e risolta la mancata commutazione visiva delle tile cartografiche al cambio del layer nel selettore `#gm-map-layer-select`: l'aggiornamento di `ui.mapLayer` nello store innescava il subscriber di vista che invocava incondizionatamente `mapEngine.setTheme('dark')`, reimpostando istantaneamente il layer predefinito `dark` ed eludendo la guardia del subscriber.
+  - Implementata la guardia di invarianza del tema (`if (this.theme === newTheme && this.tileLayer) return;`) in `LeafletMapEngine` e `HeadlessMockMapEngine`, prevenendo il reset forzato del layer esplicitamente scelto dall'utente.
+  - Introdotta la guardia di cambio effettivo (`s.ui.theme !== this.activeTheme`) nei subscriber di `SpotMapView.js` e `ForecastView.js`.
+  - Verificato con successo il caricamento effettivo di tutti i 4 layer su browser reale Headless Chrome: OpenTopo (curve di livello), Satellite (ortofoto Esri), CyclOSM (outdoor/sentieri) e Scuro.
+  - Aggiunto test di regressione in `tests/ui/spotMapView.test.mjs`; 447/447 test passanti senza errori.
+  - Registrata la Lezione Appresa #85 in [MEMORY.md](file:///MEMORY.md).

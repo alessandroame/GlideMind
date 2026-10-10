@@ -1032,3 +1032,29 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
      - Gruppo titolo: `<span class="gm-map-scrubber-title">Timeline Volabilità</span>` affiancato dalla pillola spot (`.gm-map-scrubber-spot-pill`) con colore e badge reattivi alla volabilità oraria calcolata.
      - Display orario: `<div class="gm-map-scrubber-hour-display"><span class="gm-flight-alt">Ore XX:00</span></div>`.
 
+
+
+---
+
+## 85. Disaccoppiamento tra Tema Visivo e Layer Cartografico Reattivo (Anti-Reset del Layer Mappa)
+- **Problema**: Alla selezione di un layer cartografico alternativo (es. OpenTopo, Satellite, CyclOSM) dal selettore a tendina su mappa, l'aggiornamento dello store (`store.setState({ ui: { ...ui, mapLayer: newLayer } })`) innescava il subscriber di vista che invocava incondizionatamente `mapEngine.setTheme(store.theme)`. `setTheme` reimpostava forzatamente il layer predefinito del tema (es. CartoDB Dark per tema scuro), sovrascrivendo la scelta dell'utente e lasciando il selettore disallineato rispetto alle tile renderizzate.
+- **Causa Radice**:
+  1. Assenza di una guardia sullo stato del tema corrente (`s.ui.theme !== this.activeTheme`), causando l'esecuzione di `setTheme()` a fronte di QUALSIASI mutazione dello store.
+  2. Implementazione cieca di `setTheme(theme)` in `LeafletMapEngine` e `HeadlessMockMapEngine` priva di controllo sull'invarianza del tema (`if (this.theme === newTheme) return;`), che forzava la riassegnazione di `this.setLayer(theme === 'light' ? 'topo' : 'dark')`.
+- **Pattern Vincolante**:
+  1. **Guardia sull'Invarianza del Tema nei Subscriber**: Non invocare mai `mapEngine.setTheme()` a meno che `s.ui.theme` non sia effettivamente cambiato rispetto a `this.activeTheme`.
+  2. **Idempotenza di `setTheme` nel Map Adapter**: `setTheme(newTheme)` deve verificare se `this.theme === newTheme` e uscire immediatamente se il tema è immutato, preservando il layer cartografico esplicitamente scelto dall'utente (`this.currentLayerId`).
+  3. **Sincronizzazione Bidirezionale**: All'effettivo cambio di tema applicativo (dark <-> light), riallineare sia il layer del motore di mappa sia il valore del `<select id="gm-map-layer-select">` e la proprietà `this.activeLayer`.
+
+---
+
+## 86. Disaccoppiamento Fisico tra Canvas Cartografico e Controlli Temporali (External Bottom-Anchored Scrubber)
+- **Problema**: L'annidamento del selettore temporale come elemento assoluto (`position: absolute`) sovrapposto al canvas cartografico causava l'occlusione visiva dei marker e dei comprensori situati nella porzione meridionale del viewport. Inoltre, i gesti di pan e zoom della mappa rischiavano collisioni di evento con lo swipe continuo dello scrubber orario.
+- **Causa Radice**: Trattamento dello scrubber come card fluttuante sovrimpressa anziché come componente strutturale dell'interfaccia a 3 bande (`top-bar` -> `canvas` -> `bottom-bar`).
+- **Pattern Vincolante**:
+  1. **Architettura a 3 Bande di Vista Mappa**: La vista cartografica (`.gm-map-view`) deve articolarsi in un flex layout a colonna con 3 figli diretti non sovrapposti:
+     - `header.gm-map-top-bar`: altezza fissa 50px, comandi territoriali esterni.
+     - `div.gm-map-canvas-wrapper`: `flex: 1 1 0%; min-height: 0;`, canvas interamente visibile e privo di elementi fluttuanti che coprono i punti cardinali inferiori.
+     - `footer.gm-map-scrubber-container`: `position: relative; flex-shrink: 0;`, barra solida ancorata in basso con `border-top` ed elevazione discreta, contenente la timeline oraria.
+  2. **Zero Occlusioni Cartografiche**: L'ingombro del canvas Leaflet calcola l'`invalidateSize()` sull'effettiva altezza utile tra le due barre, garantendo che centratura, bounds ed estensione dei comprensori restino sempre al 100% visibili.
+

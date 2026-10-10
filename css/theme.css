@@ -4408,34 +4408,35 @@ input.gm-input:focus {
 
 
 
-/* Bottom Docked Scrubber with solid backdrop and clear elevation */
+/* Bottom External Timeline Scrubber (Anchored below map canvas, single solid bar) */
 .gm-map-scrubber-container {
-  position: absolute;
-  bottom: 16px;
-  left: 12px;
-  right: 12px;
-  z-index: 600;
-  pointer-events: none;
+  position: relative;
+  width: 100%;
+  flex-shrink: 0;
+  z-index: 500;
+  background: var(--gm-bg-surface);
+  border-top: 1px solid var(--gm-border);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.35);
+  padding: 6px 12px 8px;
+  box-sizing: border-box;
+}
+
+[data-theme="light"] .gm-map-scrubber-container {
+  background: #ffffff;
+  border-top: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
 }
 
 @media (min-width: 768px) and (min-height: 550px) {
   .gm-map-scrubber-container {
-    max-width: 580px;
-    left: 50%;
-    right: auto;
-    transform: translateX(-50%);
+    padding: 8px 24px 10px;
   }
 }
 
 .gm-map-scrubber-inner {
-  pointer-events: auto;
-  background: var(--gm-bg-card);
-  border: 1px solid var(--gm-border);
-  border-radius: var(--gm-radius-md);
-  padding: 6px 8px 8px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  width: 100%;
+  max-width: 680px;
+  margin: 0 auto;
   touch-action: none;
 }
 

@@ -565,26 +565,26 @@ export class SpotMapView {
               </div>
             </div>
           </div>
-
-          <!-- Bottom Docked Timeline Scrubber (Thumb Zone, Clearance >=24px) -->
-          <div class="gm-map-scrubber-container" role="region" aria-label="Selettore orario volabilità">
-            <div class="gm-map-scrubber-inner">
-              <div class="gm-map-scrubber-header">
-                <div class="gm-map-scrubber-title-group">
-                  <span class="gm-map-scrubber-title">Timeline Volabilità</span>
-                  <span id="gm-map-scrubber-spot-pill" class="gm-map-scrubber-spot-pill" title="Tocca per aprire la scheda spot" style="color: ${this.getFocusedSpotStatusColor()};">
-                    ${this.getFocusedSpotTitle()}
-                  </span>
-                </div>
-                <div class="gm-map-scrubber-hour-display">
-                  <span id="gm-map-active-hour-label" class="gm-flight-alt">Ore ${String(this.activeHour).padStart(2, '0')}:00</span>
-                </div>
-              </div>
-
-              ${this.renderTimelineGrid(initialSpot, initialWeather, activeGlider, 'map-timeline-strip')}
-            </div>
-          </div>
         </div>
+
+        <!-- Bottom External Timeline Scrubber (Anchored below and strictly outside map canvas) -->
+        <footer class="gm-map-scrubber-container" role="region" aria-label="Selettore orario volabilità">
+          <div class="gm-map-scrubber-inner">
+            <div class="gm-map-scrubber-header">
+              <div class="gm-map-scrubber-title-group">
+                <span class="gm-map-scrubber-title">Timeline Volabilità</span>
+                <span id="gm-map-scrubber-spot-pill" class="gm-map-scrubber-spot-pill" title="Tocca per aprire la scheda spot" style="color: ${this.getFocusedSpotStatusColor()};">
+                  ${this.getFocusedSpotTitle()}
+                </span>
+              </div>
+              <div class="gm-map-scrubber-hour-display">
+                <span id="gm-map-active-hour-label" class="gm-flight-alt">Ore ${String(this.activeHour).padStart(2, '0')}:00</span>
+              </div>
+            </div>
+
+            ${this.renderTimelineGrid(initialSpot, initialWeather, activeGlider, 'map-timeline-strip')}
+          </div>
+        </footer>
       </section>
     `;
 

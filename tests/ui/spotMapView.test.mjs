@@ -168,6 +168,17 @@ describe('Spot Map View - Controller & Cartography Contracts (UI Layer)', () => 
     assert.ok(mockContainer.innerHTML.includes('id="gm-map-spot-select"'), 'Must contain locality / spot selector');
     assert.ok(mockContainer.innerHTML.includes('id="gm-map-top-spot-btn"'), 'Must contain 1-tap top spot recommendation button');
     assert.ok(mockContainer.innerHTML.includes('gm-map-scrubber-slots'), 'Must contain hourly scrubber container');
+
+    // Verify timeline scrubber is external to map canvas wrapper
+    const canvasWrapper = mockContainer.querySelector('.gm-map-canvas-wrapper');
+    const scrubberContainer = mockContainer.querySelector('.gm-map-scrubber-container');
+    assert.ok(canvasWrapper, 'Must contain canvas wrapper');
+    assert.ok(scrubberContainer, 'Must contain scrubber container');
+    assert.equal(
+      canvasWrapper.contains(scrubberContainer),
+      false,
+      'Timeline scrubber must be strictly external to the map canvas wrapper'
+    );
   });
 
   it('should render unified floating map canvas controls matching fullscreen overlay', () => {
@@ -281,6 +292,29 @@ describe('Spot Map View - Controller & Cartography Contracts (UI Layer)', () => 
 
     store.setState({ ui: { theme: 'dark' } });
     assert.equal(spotMapView.mapEngine.theme, 'dark');
+  });
+
+  it('should switch map layer and keep engine and store in sync without theme revert', () => {
+    store.setState({ ui: { theme: 'dark', mapLayer: 'dark' } });
+    spotMapView.mount(mockContainer);
+
+    assert.equal(spotMapView.activeLayer, 'dark');
+    assert.equal(spotMapView.mapEngine.currentLayerId, 'dark');
+
+    // Simulate selecting OpenTopo
+    const layerSelect = mockContainer.querySelector('#gm-map-layer-select');
+    assert.ok(layerSelect, 'Must have #gm-map-layer-select');
+    layerSelect.value = 'topo';
+    layerSelect.dispatchEvent({ type: 'change', target: layerSelect });
+
+    assert.equal(spotMapView.activeLayer, 'topo');
+    assert.equal(spotMapView.mapEngine.currentLayerId, 'topo', 'Engine must remain topo and not revert to dark');
+    assert.equal(store.getState().ui.mapLayer, 'topo');
+
+    // Simulate external store change to satellite
+    store.setState({ ui: { theme: 'dark', mapLayer: 'satellite' } });
+    assert.equal(spotMapView.activeLayer, 'satellite');
+    assert.equal(spotMapView.mapEngine.currentLayerId, 'satellite');
   });
 
   it('should update active macro-region and recenter map', () => {
