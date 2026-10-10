@@ -15,16 +15,27 @@ import {
   DEFAULT_COMPRENSORI,
   evaluateComprensorio,
   sortEvaluatedComprensori,
-  parseCoordinates
+  parseCoordinates,
+  isSpotPinned
 } from '../../core/comprensorio.js';
 import {
   DEFAULT_GLIDER,
+  GLIDER_CLASSES,
   calculateDailyFlyabilitySummary,
   getCardinalDirection
 } from '../../core/flyability.js';
 import {
+  PARAGLIDER_BRANDS,
+  POPULAR_GLIDERS,
+  searchGliders,
+  getGliderById,
+  createCustomGlider,
+  getGliderClassDefaults
+} from '../../core/gliders.js';
+import {
   generateSyntheticWeather,
-  enrichWeatherData
+  enrichWeatherData,
+  fetchBatchComprensoriWeather
 } from '../../core/openMeteoApi.js';
 import {
   calculatePilotPeriodMetrics,
@@ -70,9 +81,96 @@ export class HomeDashboardViewController {
     this.boundSearchInputHandler = this.handleSearchInput.bind(this);
     
     this.searchQuery = '';
+    this.gliderSearchQuery = '';
+    this.gliderSelectedBrand = '';
     this.comprensoriCatalog = options.comprensoriCatalog || (this.store && typeof this.store.getState === 'function' ? this.store.getState().locationsCatalog : null) || [...DEFAULT_COMPRENSORI];
     this.isLoading = false;
     this.pilotPeriod = 'month';
+    this.networkStatus = 'offline'; // 'live' | 'loading' | 'offline'
+    this.cachedWeatherMap = new Map(); // key: spotId -> weatherPayload
+    this._customFetchFn = options.fetchFn || null;
+  }
+
+  /**
+   * Renders the discrete network status badge for Home Dashboard.
+   * @returns {string}
+   */
+  renderLiveWeatherBadge() {
+    if (this.networkStatus === 'loading') {
+      return `
+        <span id="gm-home-live-badge" class="gm-live-badge loading" title="Aggiornamento dati meteo in corso da Open-Meteo">
+          <span class="gm-live-badge-dot" aria-hidden="true"></span>
+          <span>Aggiornamento...</span>
+        </span>
+      `;
+    }
+    if (this.networkStatus === 'live') {
+      return `
+        <span id="gm-home-live-badge" class="gm-live-badge live" title="Previsioni reali Open-Meteo attive">
+          <span class="gm-live-badge-dot" aria-hidden="true"></span>
+          <span>Live Open-Meteo</span>
+        </span>
+      `;
+    }
+    return `
+      <span id="gm-home-live-badge" class="gm-live-badge offline" title="Dati meteorologici simulati o offline">
+        <span class="gm-live-badge-dot" aria-hidden="true"></span>
+        <span>Offline / Stima</span>
+      </span>
+    `;
+  }
+
+  /**
+   * In-place update of the live status badge in DOM to avoid jank.
+   */
+  updateLiveStatusBadgeInDom() {
+    if (!this.containerEl) return;
+    const badgeEl = this.containerEl.querySelector('#gm-home-live-badge');
+    if (badgeEl) {
+      badgeEl.outerHTML = this.renderLiveWeatherBadge();
+    }
+  }
+
+  /**
+   * Asynchronously fetches batch weather data for catalog comprensori in background.
+   * Safe for browser environment; completely no-op in headless Node.js tests unless customFetch is provided.
+   * @returns {Promise<Map<string, object>|null>}
+   */
+  async fetchBatchWeatherAsync() {
+    const hasFetch = typeof window !== 'undefined' && typeof window.fetch === 'function';
+    if (!hasFetch && !this._customFetchFn) {
+      return null;
+    }
+
+    const state = this.store ? this.store.getState() : {};
+    const targetDate = state.activeDate || formatDateIso(new Date());
+
+    this.networkStatus = 'loading';
+    this.updateLiveStatusBadgeInDom();
+
+    try {
+      const pinnedIds = state.pinnedSpotIds || [];
+      const favorites = this.comprensoriCatalog.filter(c => isSpotPinned(c, pinnedIds));
+      const targetSpots = favorites.length > 0 ? favorites : this.comprensoriCatalog.slice(0, 30);
+      const batchMap = await fetchBatchComprensoriWeather(targetSpots, {
+        targetDate,
+        weatherModel: 'best_match',
+        fetchFn: this._customFetchFn || (typeof window !== 'undefined' ? window.fetch.bind(window) : globalThis.fetch)
+      });
+
+      if (batchMap && batchMap.size > 0) {
+        for (const [id, payload] of batchMap.entries()) {
+          this.cachedWeatherMap.set(id, payload);
+        }
+        this.networkStatus = 'live';
+        this.render();
+        return batchMap;
+      }
+    } catch (_) {
+      this.networkStatus = 'offline';
+      this.updateLiveStatusBadgeInDom();
+    }
+    return null;
   }
 
   /**
@@ -91,7 +189,7 @@ export class HomeDashboardViewController {
       const listContainer = this.containerEl.querySelector('section[aria-labelledby="heading-comprensori"]');
       if (listContainer) {
         const evaluatedList = this.getEvaluatedComprensori();
-        const countBadge = listContainer.querySelector('.flex.items-center.justify-between.text-xs span:last-child');
+        const countBadge = listContainer.querySelector('#home-spots-count') || listContainer.querySelector('.flex.items-center.justify-between.text-xs span:last-child');
         if (countBadge) countBadge.textContent = `${evaluatedList.length} siti`;
         const existingList = listContainer.querySelector('#home-spots-list') || listContainer.querySelector('.flex.flex-col.gap-2');
         if (existingList) {
@@ -119,7 +217,10 @@ export class HomeDashboardViewController {
           !prev ||
           state.weatherData !== prev.weatherData ||
           state.activeDate !== prev.activeDate ||
-          state.locationsCatalog !== prev.locationsCatalog
+          state.locationsCatalog !== prev.locationsCatalog ||
+          state.pinnedSpotIds !== prev.pinnedSpotIds ||
+          state.activeGlider !== prev.activeGlider ||
+          state.glider !== prev.glider
         ) {
           if (state.locationsCatalog && state.locationsCatalog !== this.comprensoriCatalog) {
             this.setComprensoriCatalog(state.locationsCatalog);
@@ -131,6 +232,9 @@ export class HomeDashboardViewController {
     }
 
     this.render();
+
+    // Trigger asynchronous background batch fetch if in browser or customFetch is provided
+    this.fetchBatchWeatherAsync();
 
     // Attach delegated events if in browser/DOM environment
     if (this.containerEl && typeof this.containerEl.addEventListener === 'function') {
@@ -186,6 +290,10 @@ export class HomeDashboardViewController {
     const state = this.store ? this.store.getState() : {};
     const weatherData = state.weatherData || null;
     const activeGlider = state.activeGlider || DEFAULT_GLIDER;
+    const pinnedIds = state.pinnedSpotIds || [];
+
+    // Filter catalog to include ONLY spots pinned as favorites from Forecast view
+    const favoriteComprensori = this.comprensoriCatalog.filter(c => isSpotPinned(c, pinnedIds));
 
     const query = this.searchQuery.trim().toLowerCase();
     const sourceComprensori = query
@@ -196,15 +304,23 @@ export class HomeDashboardViewController {
           const matchRegion = (c.region || '').toLowerCase().includes(query);
           return matchName || matchProv || matchLoc || matchRegion;
         })
-      : this.comprensoriCatalog;
+      : favoriteComprensori;
 
     const evaluated = [];
 
     for (const comprensorio of sourceComprensori) {
+      let spotWeather = null;
+      if (this.cachedWeatherMap.has(comprensorio.id)) {
+        spotWeather = this.cachedWeatherMap.get(comprensorio.id);
+      } else if (weatherData && state.selectedSpot && state.selectedSpot.id === comprensorio.id) {
+        spotWeather = weatherData;
+      }
+
       const result = evaluateComprensorio({
         comprensorio,
-        weatherData,
-        glider: activeGlider
+        weatherData: spotWeather,
+        glider: activeGlider,
+        targetDate: state.activeDate
       });
 
       evaluated.push(result);
@@ -245,7 +361,10 @@ export class HomeDashboardViewController {
         <section aria-labelledby="heading-comprensori" class="flex flex-col gap-2 pt-1 border-t border-[var(--gm-border)]">
           <div class="flex items-center justify-between text-xs text-[var(--gm-text-muted)] font-bold uppercase tracking-wider px-0.5">
             <h2 id="heading-comprensori">Volabilità</h2>
-            <span>${evaluatedList.length} siti</span>
+            <div class="flex items-center gap-2">
+              ${this.renderLiveWeatherBadge()}
+              <span id="home-spots-count">${evaluatedList.length} siti</span>
+            </div>
           </div>
 
           <!-- Smart Date Selector for Comprensori Flyability (Weekend & Quick Presets) -->
@@ -281,7 +400,10 @@ export class HomeDashboardViewController {
    * @returns {Array<object>}
    */
   getMultiDayFlyability(spot = null, days = 14) {
-    const targetSpot = spot || this.comprensoriCatalog[0] || DEFAULT_COMPRENSORI[0];
+    const state = this.store ? this.store.getState() : {};
+    const pinnedIds = state.pinnedSpotIds || [];
+    const favorites = this.comprensoriCatalog.filter(c => isSpotPinned(c, pinnedIds));
+    const targetSpot = spot || favorites[0] || this.comprensoriCatalog[0] || DEFAULT_COMPRENSORI[0];
     if (!targetSpot) return [];
 
     const today = new Date();
@@ -294,8 +416,6 @@ export class HomeDashboardViewController {
 
     const takeoff = (targetSpot.takeoffs && targetSpot.takeoffs[0]) ? targetSpot.takeoffs[0] : { altitude: 1000, heading: 180 };
     const coords = parseCoordinates(takeoff.coordinates) || { lat: 45.833, lon: 9.302 };
-
-    const state = this.store ? this.store.getState() : {};
     let payload = null;
 
     if (state.weatherData && state.weatherData.hourly?.time?.length >= 24 * days) {
@@ -370,7 +490,11 @@ export class HomeDashboardViewController {
       </div>
       ${smartData.activeHorizon && smartData.activeHorizon.isSynoptic ? `
         <div class="gm-horizon-notice mb-1" role="status">
-          <span class="gm-horizon-icon" aria-hidden="true">ℹ️</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="gm-horizon-icon" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+          </svg>
           <span><strong>Tendenza sinottica:</strong> previsione oltre 7 giorni a carattere indicativo.</span>
         </div>
       ` : ''}
@@ -394,14 +518,33 @@ export class HomeDashboardViewController {
     }
 
     if (evaluatedList.length === 0) {
-      return `
-        <div id="home-spots-list" class="gm-spot-card text-center py-4 px-3 flex flex-col items-center gap-1">
-          <div class="text-xs font-semibold text-[var(--gm-text-primary)]">
-            Nessun sito trovato per "${escapeHtml(this.searchQuery)}"
+      if (this.searchQuery) {
+        return `
+          <div id="home-spots-list" class="gm-spot-card text-center py-4 px-3 flex flex-col items-center gap-1">
+            <div class="text-xs font-semibold text-[var(--gm-text-primary)]">
+              Nessun sito preferito trovato per "${escapeHtml(this.searchQuery)}"
+            </div>
+            <p class="text-xs text-[var(--gm-text-muted)]">
+              Verifica il nome inserito o cancella il filtro di ricerca.
+            </p>
           </div>
-          <p class="text-xs text-[var(--gm-text-muted)]">
-            Verifica il nome inserito o cancella il filtro di ricerca.
+        `;
+      }
+      return `
+        <div id="home-spots-list" class="gm-spot-card text-center py-6 px-4 flex flex-col items-center gap-2">
+          <div class="text-sm font-semibold text-[var(--gm-text-primary)]">
+            Nessuna località tra i preferiti
+          </div>
+          <p class="text-xs text-[var(--gm-text-muted)] max-w-xs">
+            Seleziona le tue località preferite dalla pagina Previsioni toccando l'icona della stella (★).
           </p>
+          <button 
+            type="button" 
+            class="gm-btn-compact-primary mt-1" 
+            data-action="go-to-forecast"
+          >
+            Vai a Previsioni
+          </button>
         </div>
       `;
     }
@@ -507,6 +650,7 @@ export class HomeDashboardViewController {
       period: this.pilotPeriod,
       referenceDate: activeDate
     });
+    const activeGlider = state.activeGlider || state.glider || DEFAULT_GLIDER;
 
     const isMonth = this.pilotPeriod === 'month';
     const badgeClass = metrics.isCurrent ? 'gm-badge-flyable' : 'gm-badge-caution';
@@ -543,6 +687,28 @@ export class HomeDashboardViewController {
               Anno
             </button>
           </div>
+        </div>
+
+        <!-- Active Glider Selector Row -->
+        <div class="gm-pilot-glider-row">
+          <span class="gm-glider-row-label">Vela Attiva</span>
+          <button 
+            type="button" 
+            id="btn-home-select-glider"
+            class="gm-glider-pill" 
+            data-action="open-glider-sheet" 
+            aria-label="Cambia classe vela attiva, attualmente ${escapeHtml(activeGlider.name || activeGlider.category)}"
+          >
+            <span class="gm-glider-pill-badge ${escapeHtml(activeGlider.category ? activeGlider.category.toLowerCase() : 'en-a')}">
+              ${escapeHtml(activeGlider.category || 'EN-A')}
+            </span>
+            <span class="gm-glider-pill-name">
+              ${escapeHtml(activeGlider.name || 'Standard')}
+            </span>
+            <svg class="gm-glider-pill-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </button>
         </div>
 
         <!-- 3-Column KPI Micro Grid (Ultra-Clean 2-line Value + Label) -->
@@ -737,10 +903,27 @@ export class HomeDashboardViewController {
           });
         }
 
-        // Cancel button
+        let isDirty = false;
+        const markDirty = () => { isDirty = true; };
+        const dateInputEl = document.getElementById('flight-date-input');
+        const siteSelectEl = document.getElementById('flight-site-select');
+        const notesInputEl = document.getElementById('flight-notes-input');
+        if (dateInputEl) dateInputEl.addEventListener('change', markDirty);
+        if (siteSelectEl) siteSelectEl.addEventListener('change', markDirty);
+        if (durationInput) durationInput.addEventListener('input', markDirty);
+        if (notesInputEl) notesInputEl.addEventListener('input', markDirty);
+
+        // Cancel button with dirty state guard
         const cancelBtn = document.getElementById('btn-cancel-flight-log');
         if (cancelBtn) {
-          cancelBtn.addEventListener('click', () => closeSheet());
+          cancelBtn.addEventListener('click', () => {
+            if (isDirty && typeof window !== 'undefined' && typeof window.confirm === 'function') {
+              if (!window.confirm('Ci sono modifiche non salvate nel log di volo. Chiudere comunque?')) {
+                return;
+              }
+            }
+            closeSheet();
+          });
         }
 
         // Form submit - automatically deduces activities (thermals & exercises)
@@ -768,6 +951,201 @@ export class HomeDashboardViewController {
           closeSheet();
           this.render();
         });
+      }
+    });
+  }
+
+  /**
+   * Generates HTML for the paraglider model cards list based on current search & brand filters.
+   * @param {object} currentGlider
+   * @returns {string}
+   */
+  renderGliderModelsList(currentGlider = {}) {
+    const models = searchGliders({
+      query: this.gliderSearchQuery,
+      brand: this.gliderSelectedBrand
+    });
+
+    if (models.length === 0) {
+      return `
+        <div class="gm-glider-empty text-center py-4 px-3 text-xs text-[var(--gm-text-muted)]">
+          Nessuna vela trovata per "${escapeHtml(this.gliderSearchQuery || this.gliderSelectedBrand)}". Prova a cercare un'altra marca o modello.
+        </div>
+      `;
+    }
+
+    return models.map(glider => {
+      const isSelected = (currentGlider.id && currentGlider.id === glider.id) ||
+        (currentGlider.brand && currentGlider.model && currentGlider.brand === glider.brand && currentGlider.model === glider.model);
+      const catClass = (glider.category || 'en-a').toLowerCase().replace(/[^a-z0-9]/g, '-');
+
+      return `
+        <button 
+          type="button" 
+          class="gm-glider-option-card ${isSelected ? 'active' : ''}" 
+          data-action="select-glider-model" 
+          data-glider-id="${escapeHtml(glider.id)}"
+          role="radio"
+          aria-checked="${isSelected}"
+        >
+          <div class="flex items-center justify-between w-full">
+            <div class="flex items-center gap-3">
+              <span class="gm-glider-badge ${catClass}">${escapeHtml(glider.category)}</span>
+              <div class="flex flex-col text-left">
+                <span class="font-bold text-sm text-[var(--gm-text)]">${escapeHtml(glider.brand)} ${escapeHtml(glider.model)}</span>
+                <span class="text-xs text-[var(--gm-text-muted)]">Trim: ${glider.vTrim} km/h • Max: ${glider.vMax} km/h • Efficienza: 1:${glider.glideRatio} • AR: ${glider.ar}</span>
+              </div>
+            </div>
+            <span class="gm-glider-check ${isSelected ? 'selected' : ''}" aria-hidden="true">${isSelected ? '✓' : ''}</span>
+          </div>
+        </button>
+      `;
+    }).join('');
+  }
+
+  /**
+   * Opens the accessible bottom sheet to select the active glider / wing brand and model.
+   */
+  openGliderSheet() {
+    const state = this.store ? this.store.getState() : {};
+    const currentGlider = state.activeGlider || state.glider || DEFAULT_GLIDER;
+    const currentCategory = currentGlider.category || 'EN-A';
+    const classes = Object.values(GLIDER_CLASSES);
+
+    const contentHtml = `
+      <div class="gm-glider-sheet flex flex-col gap-3">
+        <p class="text-xs text-[var(--gm-text-muted)] leading-relaxed">
+          Seleziona la tua vela per marca e modello o per classe di omologazione. Le velocità di trim, accelerata e l'efficienza limite di rientro verso l'atterraggio sicuro vengono personalizzate per il tuo inviluppo di volo.
+        </p>
+
+        <!-- Brand & Model Fast Search -->
+        <div class="gm-glider-search-wrap">
+          <input 
+            type="text" 
+            id="glider-search-input" 
+            class="gm-glider-search" 
+            placeholder="Cerca marca o modello (es. Buzz, Mentor, Iota, Hook...)"
+            value="${escapeHtml(this.gliderSearchQuery || '')}"
+            autocomplete="off"
+            aria-label="Cerca vela per marca o modello"
+          />
+        </div>
+
+        <!-- Quick Brand Filter Chips -->
+        <div class="gm-glider-brand-chips" role="group" aria-label="Filtro per costruttore">
+          <button 
+            type="button" 
+            class="gm-glider-brand-chip ${!this.gliderSelectedBrand ? 'active' : ''}" 
+            data-action="filter-glider-brand" 
+            data-brand=""
+          >
+            Tutte (${POPULAR_GLIDERS.length})
+          </button>
+          ${PARAGLIDER_BRANDS.map(brand => `
+            <button 
+              type="button" 
+              class="gm-glider-brand-chip ${this.gliderSelectedBrand === brand ? 'active' : ''}" 
+              data-action="filter-glider-brand" 
+              data-brand="${escapeHtml(brand)}"
+            >
+              ${escapeHtml(brand)}
+            </button>
+          `).join('')}
+        </div>
+
+        <!-- Filtered Models Catalog List -->
+        <div id="glider-models-list" class="gm-glider-models-list flex flex-col gap-2" role="radiogroup" aria-label="Modelli a catalogo">
+          ${this.renderGliderModelsList(currentGlider)}
+        </div>
+
+        <!-- Generic Profile Baseline Selection (EN-A to EN-D) -->
+        <div class="gm-glider-section-divider">
+          <span class="text-xs font-bold uppercase tracking-wider text-[var(--gm-text-muted)]">Oppure Profilo Generico</span>
+        </div>
+        <div class="flex flex-col gap-2" role="radiogroup" aria-label="Classe generica vela">
+          ${classes.map(cls => {
+            const isSelected = cls.category === currentCategory && !currentGlider.brand;
+            return `
+              <button 
+                type="button" 
+                class="gm-glider-option-card ${isSelected ? 'active' : ''}" 
+                data-action="select-glider" 
+                data-category="${cls.category}"
+                role="radio"
+                aria-checked="${isSelected}"
+              >
+                <div class="flex items-center justify-between w-full">
+                  <div class="flex items-center gap-3">
+                    <span class="gm-glider-badge ${cls.category.toLowerCase()}">${cls.category}</span>
+                    <div class="flex flex-col text-left">
+                      <span class="font-bold text-sm text-[var(--gm-text)]">${escapeHtml(cls.name)}</span>
+                      <span class="text-xs text-[var(--gm-text-muted)]">Trim: ${cls.vTrim} km/h • Max: ${cls.vMax} km/h • Efficienza: 1:${cls.glideRatio}</span>
+                    </div>
+                  </div>
+                  <span class="gm-glider-check ${isSelected ? 'selected' : ''}" aria-hidden="true">${isSelected ? '✓' : ''}</span>
+                </div>
+              </button>
+            `;
+          }).join('')}
+        </div>
+
+        <!-- Custom Glider Manual Configuration Form (Tesler's & Postel's Law) -->
+        <details class="gm-glider-custom-details">
+          <summary class="text-xs font-semibold text-[var(--gm-text-muted)] cursor-pointer py-1">
+            + Configura vela personalizzata non a catalogo
+          </summary>
+          <div class="gm-glider-custom-form flex flex-col gap-2 mt-2 pt-2 border-t border-[var(--gm-border)]">
+            <div class="flex gap-2">
+              <input 
+                type="text" 
+                id="custom-glider-brand" 
+                class="gm-form-control flex-1 text-xs" 
+                placeholder="Marca (es. Swing)" 
+              />
+              <input 
+                type="text" 
+                id="custom-glider-model" 
+                class="gm-form-control flex-1 text-xs" 
+                placeholder="Modello (es. Nyos 2 RS)" 
+              />
+            </div>
+            <div class="flex items-center gap-2">
+              <select id="custom-glider-category" class="gm-form-control text-xs flex-1">
+                <option value="EN-A">EN-A (Scuola)</option>
+                <option value="EN-B" selected>EN-B (Intermedio)</option>
+                <option value="EN-C">EN-C (Sport)</option>
+                <option value="EN-D">EN-D / CCC (Competizione)</option>
+              </select>
+              <button 
+                type="button" 
+                class="gm-btn-compact-primary" 
+                data-action="save-custom-glider"
+              >
+                Salva Vela
+              </button>
+            </div>
+          </div>
+        </details>
+      </div>
+    `;
+
+    openSheet({
+      id: 'select-glider-sheet',
+      title: 'Vela Attiva: Marca e Modello',
+      content: contentHtml,
+      onOpen: () => {
+        if (typeof document !== 'undefined') {
+          const searchInput = document.getElementById('glider-search-input');
+          if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+              this.gliderSearchQuery = e.target.value || '';
+              const listContainer = document.getElementById('glider-models-list');
+              if (listContainer) {
+                listContainer.innerHTML = this.renderGliderModelsList(this.store ? this.store.getState().activeGlider : {});
+              }
+            });
+          }
+        }
       }
     });
   }
@@ -896,6 +1274,7 @@ export class HomeDashboardViewController {
       if (dateAttr && this.store) {
         this.store.setState({ activeDate: dateAttr });
         this.render();
+        this.fetchBatchWeatherAsync();
       }
     } else if (action === 'open-date-picker-sheet') {
       this.openDatePickerSheet();
@@ -905,6 +1284,7 @@ export class HomeDashboardViewController {
         this.store.setState({ activeDate: input.value });
         closeSheet();
         this.render();
+        this.fetchBatchWeatherAsync();
       }
     } else if (action === 'pick-calendar-date') {
       const dateAttr = actionEl.getAttribute('data-date');
@@ -912,6 +1292,7 @@ export class HomeDashboardViewController {
         this.store.setState({ activeDate: dateAttr });
         closeSheet();
         this.render();
+        this.fetchBatchWeatherAsync();
       }
     } else if (action === 'set-pilot-period') {
       const period = actionEl.getAttribute('data-period');
@@ -924,8 +1305,72 @@ export class HomeDashboardViewController {
       }
     } else if (action === 'open-add-flight-sheet') {
       this.openAddFlightSheet();
+    } else if (action === 'open-glider-sheet') {
+      this.openGliderSheet();
+    } else if (action === 'filter-glider-brand') {
+      const brand = actionEl.getAttribute('data-brand') || '';
+      this.gliderSelectedBrand = brand;
+      if (typeof document !== 'undefined') {
+        const chips = document.querySelectorAll('.gm-glider-brand-chip');
+        chips.forEach(c => {
+          c.classList.toggle('active', c.getAttribute('data-brand') === brand);
+        });
+        const listContainer = document.getElementById('glider-models-list');
+        if (listContainer) {
+          listContainer.innerHTML = this.renderGliderModelsList(this.store ? this.store.getState().activeGlider : {});
+        }
+      }
+    } else if (action === 'select-glider-model') {
+      const gliderId = actionEl.getAttribute('data-glider-id');
+      const targetGlider = getGliderById(gliderId);
+      if (targetGlider && this.store) {
+        this.store.setState({
+          activeGlider: targetGlider,
+          glider: targetGlider
+        });
+      }
+      closeSheet();
+      this.render();
+    } else if (action === 'save-custom-glider') {
+      let brand = actionEl.getAttribute('data-brand') || '';
+      let model = actionEl.getAttribute('data-model') || '';
+      let category = actionEl.getAttribute('data-category') || 'EN-B';
+      if (typeof document !== 'undefined') {
+        const brandInput = document.getElementById('custom-glider-brand');
+        const modelInput = document.getElementById('custom-glider-model');
+        const catSelect = document.getElementById('custom-glider-category');
+        if (brandInput && brandInput.value) brand = brandInput.value;
+        if (modelInput && modelInput.value) model = modelInput.value;
+        if (catSelect && catSelect.value) category = catSelect.value;
+      }
+      if (brand && model) {
+        const customGlider = createCustomGlider({ brand, model, category });
+        if (this.store) {
+          this.store.setState({
+            activeGlider: customGlider,
+            glider: customGlider
+          });
+        }
+        closeSheet();
+        this.render();
+      }
+    } else if (action === 'select-glider') {
+      const category = actionEl.getAttribute('data-category');
+      const targetGlider = Object.values(GLIDER_CLASSES).find(c => c.category === category) || GLIDER_CLASSES.EN_A;
+      if (this.store) {
+        this.store.setState({
+          activeGlider: targetGlider,
+          glider: targetGlider
+        });
+      }
+      closeSheet();
+      this.render();
+    } else if (action === 'go-to-forecast') {
+      if (this.router && typeof this.router.navigateTo === 'function') {
+        this.router.navigateTo('forecast');
+      }
     } else if (action === 'view-forecast') {
-      const comprensorio = this.comprensoriCatalog.find(c => c.id === id);
+      const comprensorio = this.comprensoriCatalog.find(c => c.id === id || (c.name && id && c.name.toLowerCase() === id.toLowerCase()));
       if (this.store && comprensorio) {
         this.store.setState({ selectedSpot: comprensorio });
       }

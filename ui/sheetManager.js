@@ -73,6 +73,9 @@ export function initSheetManager(container = null, customStore = null) {
  * @param {() => void} [options.onClose] - Callback invoked when closed.
  */
 export function openSheet({ id = 'default', title, content, onOpen = null, onClose = null }) {
+  if (typeof globalThis !== 'undefined' && typeof globalThis.__mockOpenSheet === 'function') {
+    globalThis.__mockOpenSheet({ id, title, content, onOpen, onClose });
+  }
   if (!containerEl) {
     initSheetManager();
   }

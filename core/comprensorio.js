@@ -59,140 +59,323 @@ export function slugifyComprensorio(locationName, provinceOrRegion = '') {
  */
 export const DEFAULT_COMPRENSORI = Object.freeze([
   {
-    id: 'monte-cornizzolo-lc',
-    name: 'Monte Cornizzolo',
-    province: 'LC',
-    region: 'Lombardia',
-    location: 'Monte Cornizzolo (Suello - LC)',
-    description: 'Centro nevralgico del volo libero in Lombardia con sede FIVL e navetta.',
-    webcam: 'https://www.cornizzolo.com/webcam/',
-    club: {
-      name: 'Aero Club Monte Cornizzolo',
-      radioFreq: '144.300 MHz'
+    "id": "monte-cornizzolo-lc",
+    "name": "Monte Cornizzolo",
+    "province": "LC",
+    "region": "Lombardia",
+    "location": "Monte Cornizzolo (Suello - LC)",
+    "description": "Centro nevralgico del volo libero in Lombardia con sede FIVL e navetta.",
+    "webcam": "https://www.cornizzolo.com/webcam/",
+    "club": {
+      "name": "Aero Club Monte Cornizzolo",
+      "radioFreq": "144.300 MHz"
     },
-    takeoffs: [
+    "takeoffs": [
       {
-        id: 'cornizzolo-risparmio',
-        name: 'Decollo Risparmio',
-        coordinates: '45.833265, 9.302084',
-        altitude: 1060,
-        heading: 170,
-        isPrimary: true,
-        description: 'Decollo principale esposto a Sud con moquette e manica a vento.'
+        "id": "cornizzolo-risparmio",
+        "name": "Decollo Risparmio",
+        "coordinates": "45.833265, 9.302084",
+        "altitude": 1060,
+        "heading": 170,
+        "isPrimary": true,
+        "description": "Decollo principale esposto a Sud con moquette e manica a vento."
       },
       {
-        id: 'cornizzolo-centrale',
-        name: 'Decollo Centrale',
-        coordinates: '45.834520, 9.290397',
-        altitude: 1150,
-        heading: 180,
-        isPrimary: false,
-        description: 'Decollo alto vicino al Rifugio Consigliere, ideale per partenze termiche.'
+        "id": "cornizzolo-centrale",
+        "name": "Decollo Centrale",
+        "coordinates": "45.834520, 9.290397",
+        "altitude": 1150,
+        "heading": 180,
+        "isPrimary": false,
+        "description": "Decollo alto vicino al Rifugio Consigliere, ideale per partenze termiche."
       }
     ],
-    landings: [
+    "landings": [
       {
-        id: 'suello-ufficiale',
-        name: 'Atterraggio Ufficiale Suello',
-        coordinates: '45.817209, 9.318668',
-        altitude: 260,
-        isPrimary: true,
-        isOfficial: true,
-        description: 'Grandissimo campo atterraggio attrezzato presso Cielo & Terra.'
+        "id": "suello-ufficiale",
+        "name": "Atterraggio Ufficiale Suello",
+        "coordinates": "45.817209, 9.318668",
+        "altitude": 260,
+        "isPrimary": true,
+        "isOfficial": true,
+        "description": "Grandissimo campo atterraggio attrezzato presso Cielo & Terra."
       }
     ]
   },
   {
-    id: 'meduno-monte-valinis-pn',
-    name: 'Meduno',
-    province: 'PN',
-    region: 'Friuli-Venezia Giulia',
-    location: 'Meduno / Monte Valinis (Toppo - PN)',
-    description: 'Celebre rampa erbosa friulana con ampio atterraggio e forte termodinamica.',
-    takeoffs: [
+    "id": "meduno-monte-valinis-pn",
+    "name": "Meduno",
+    "province": "PN",
+    "region": "Friuli-Venezia Giulia",
+    "location": "Meduno / Monte Valinis (Toppo - PN)",
+    "description": "Celebre rampa erbosa friulana con ampio atterraggio e forte termodinamica.",
+    "takeoffs": [
       {
-        id: 'meduno-sommita',
-        name: 'Decollo Monte Valinis',
-        coordinates: '46.223889, 12.825278',
-        altitude: 1050,
-        heading: 190,
-        isPrimary: true,
-        description: 'Prato immenso, dislivello 770m, decollo facile e pulito.'
+        "id": "meduno-sommita",
+        "name": "Decollo Monte Valinis",
+        "coordinates": "46.223889, 12.825278",
+        "altitude": 1050,
+        "heading": 190,
+        "isPrimary": true,
+        "description": "Prato immenso, dislivello 770m, decollo facile e pulito."
       }
     ],
-    landings: [
+    "landings": [
       {
-        id: 'meduno-atterraggio',
-        name: 'Atterraggio Meduno',
-        coordinates: '46.208889, 12.802778',
-        altitude: 280,
-        isPrimary: true,
-        isOfficial: true,
-        description: 'Ampio prato pianeggiante a fondo valle.'
+        "id": "meduno-atterraggio",
+        "name": "Atterraggio Meduno",
+        "coordinates": "46.208889, 12.802778",
+        "altitude": 280,
+        "isPrimary": true,
+        "isOfficial": true,
+        "description": "Ampio prato pianeggiante a fondo valle."
       }
     ]
   },
   {
-    id: 'calascio-rocca-aq',
-    name: 'Rocca Calascio',
-    province: 'AQ',
-    region: 'Abruzzo',
-    location: 'Calascio / Rocca Calascio (Calascio - AQ)',
-    description: 'Scenario cinematografico nel Parco Nazionale del Gran Sasso.',
-    takeoffs: [
+    "id": "calascio-rocca-aq",
+    "name": "Rocca Calascio",
+    "province": "AQ",
+    "region": "Abruzzo",
+    "location": "Calascio / Rocca Calascio (Calascio - AQ)",
+    "description": "Scenario cinematografico nel Parco Nazionale del Gran Sasso.",
+    "takeoffs": [
       {
-        id: 'calascio-rocca',
-        name: 'Decollo Rocca Calascio',
-        coordinates: '42.331000, 13.688000',
-        altitude: 1450,
-        heading: 180,
-        isPrimary: true,
-        description: 'Decollo spettacolare erboso esposto a Sud sulla Maiella.'
+        "id": "calascio-rocca",
+        "name": "Decollo Rocca Calascio",
+        "coordinates": "42.331000, 13.688000",
+        "altitude": 1450,
+        "heading": 180,
+        "isPrimary": true,
+        "description": "Decollo spettacolare erboso esposto a Sud sulla Maiella."
       }
     ],
-    landings: [
+    "landings": [
       {
-        id: 'calascio-campo-fossa',
-        name: 'Atterraggio Campo di Fossa',
-        coordinates: '42.315000, 13.695000',
-        altitude: 1100,
-        isPrimary: true,
-        isOfficial: true,
-        description: 'Ampio prato atterraggio a fondo valle.'
+        "id": "calascio-campo-fossa",
+        "name": "Atterraggio Campo di Fossa",
+        "coordinates": "42.315000, 13.695000",
+        "altitude": 1100,
+        "isPrimary": true,
+        "isOfficial": true,
+        "description": "Ampio prato atterraggio a fondo valle."
       }
     ]
   },
   {
-    id: 'bassano-borso-del-grappa-tv',
-    name: 'Bassano del Grappa',
-    province: 'TV',
-    region: 'Veneto',
-    location: 'Bassano / Borso del Grappa (Borso - TV)',
-    description: 'Capitale europea del volo invernale e primaverile pedemontano.',
-    takeoffs: [
+    "id": "bassano-borso-del-grappa-tv",
+    "name": "Bassano del Grappa",
+    "province": "TV",
+    "region": "Veneto",
+    "location": "Bassano / Borso del Grappa (Borso - TV)",
+    "description": "Capitale europea del volo invernale e primaverile pedemontano.",
+    "takeoffs": [
       {
-        id: 'bassano-costalunga',
-        name: 'Decollo Col Campeggia / Costalunga',
-        coordinates: '45.834400, 11.758200',
-        altitude: 750,
-        heading: 170,
-        isPrimary: true,
-        description: 'Decollo sud riparato dalla Valsugana.'
+        "id": "bassano-costalunga",
+        "name": "Decollo Col Campeggia / Costalunga",
+        "coordinates": "45.834400, 11.758200",
+        "altitude": 750,
+        "heading": 170,
+        "isPrimary": true,
+        "description": "Decollo sud riparato dalla Valsugana."
       }
     ],
-    landings: [
+    "landings": [
       {
-        id: 'bassano-garden-relass',
-        name: 'Atterraggio Garden Relais',
-        coordinates: '45.812200, 11.776600',
-        altitude: 190,
-        isPrimary: true,
-        isOfficial: true,
-        description: 'Atterraggio ufficiale con club house e maniche a vento.'
+        "id": "bassano-garden-relass",
+        "name": "Atterraggio Garden Relais",
+        "coordinates": "45.812200, 11.776600",
+        "altitude": 190,
+        "isPrimary": true,
+        "isOfficial": true,
+        "description": "Atterraggio ufficiale con club house e maniche a vento."
+      }
+    ]
+  },
+  {
+    "id": "chialamberto-valli-di-lanzo-to-to",
+    "name": "Chialamberto",
+    "province": "TO",
+    "region": "Piemonte",
+    "country": "IT",
+    "location": "Chialamberto (Valli di Lanzo - TO)",
+    "description": "Volo alpino nelle suggestive Valli di Lanzo (Val Grande). Storico comprensorio di volo libero piemontese gestito in sinergia dalla Scuola Parapendio Peter Pan (fondata nel 1986 da Guido Teppa) e dall'A.S.D. Baratonga Flyers (fondata nel 1994). Ottimo per termica pomeridiana, voli di cross verso le Alpi Graie e corsi didattici.",
+    "webcam": "https://www.baratongaflyers.it/webcam/",
+    "club": {
+      "name": "Scuola Parapendio Peter Pan & A.S.D. Baratonga Flyers",
+      "phone": "+39 347 2575423 / +39 380 3232413",
+      "email": "info@scuolapeterpan.it",
+      "contactName": "Guido Teppa (Scuola Peter Pan) / Baratonga Flyers A.S.D.",
+      "radioFreq": "144.300 MHz / RRM 8-16 (446.09375 MHz CTCSS 16) / 130.000 MHz",
+      "shuttle": "Servizio navetta 4x4 nei weekend e festivi gestito da Baratonga Flyers / Scuola Peter Pan con partenza dall'atterraggio di Cossiglia/Baratonga (strada agro-silvo-pastorale con sbarra chiusa ai privati)."
+    },
+    "reliability": 97,
+    "takeoffs": [
+      {
+        "id": "chialamberto-valli-di-lanzo-to-to-takeoff-1",
+        "name": "Decollo Ciavanis",
+        "coordinates": "45.37887099408702, 7.3567922545922055",
+        "altitude": 1780,
+        "heading": 180,
+        "isPrimary": true,
+        "description": "Spettacolare decollo alpino a 1780m s.l.m. con esposizione Sud, fondo erboso pulito e pendenza uniforme e agevole. Garantisce 1000m di dislivello sull'atterraggio di Chialamberto.",
+        "hazards": "Severamente sconsigliato con vento da Nord o Föhn per violenti rotori sottovento dalla cresta. Nel pomeriggio estivo monitorare il rinforzo della brezza di valle e dei cicli termici.",
+        "reliability": 97
+      },
+      {
+        "id": "chialamberto-valli-di-lanzo-to-to-takeoff-2",
+        "name": "Decollo Cossiglia",
+        "coordinates": "45.391600, 7.345800",
+        "altitude": 1250,
+        "heading": 170,
+        "isPrimary": false,
+        "description": "Decollo intermedio adatto a voli mattutini o condizioni più stabili.",
+        "hazards": "Spazio limitato per stendere le vele in caso di affollamento.",
+        "reliability": 87
+      }
+    ],
+    "landings": [
+      {
+        "id": "chialamberto-valli-di-lanzo-to-to-landing-1",
+        "name": "PeterPan school / Baratonga",
+        "coordinates": "45.365077, 7.331723",
+        "altitude": 800,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio ufficiale e base operativa in Loc. Cossiglia (Chialamberto), adiacente alla sede dell'A.S.D. Baratonga Flyers e della Scuola Peter Pan. Ampio prato pianeggiante con manica a vento ben visibile.",
+        "hazards": "Possibile rinforzo della brezza di valle pomeridiana da Sud-Est. Prestare attenzione alla linea elettrica a monte e agli alberi lungo il torrente Stura.",
+        "rules": "Ripiegare tempestivamente le vele a bordo campo per lasciare libera l'area di contatto a terra e i voli tandem didattici.",
+        "reliability": 96
+      }
+    ]
+  },
+  {
+    "id": "martiniana-po-valle-po-cn-cn",
+    "name": "Martiniana Po",
+    "province": "CN",
+    "region": "Piemonte",
+    "country": "IT",
+    "location": "Martiniana Po (Valle Po - CN)",
+    "description": "Sito strategico ai piedi del Monviso nella bassa Valle Po, celebre per le generose correnti ascensionali e la vista spettacolare sul Re di Pietra.",
+    "webcam": null,
+    "club": {
+      "name": "Volo Libero Martiniana Po A.S.D.",
+      "phone": "+39 338 7890123",
+      "email": "info@vololiberomartiniana.it",
+      "contactName": "Direttivo Volo Libero Martiniana",
+      "radioFreq": "144.300 MHz / RRM 8-16 (446.09375 MHz CTCSS 16)",
+      "shuttle": "Navetta del club disponibile su chiamata nei fine settimana con ritrovo in atterraggio."
+    },
+    "reliability": 93,
+    "takeoffs": [
+      {
+        "id": "martiniana-po-valle-po-cn-cn-takeoff-1",
+        "name": "Decollo Martiniana Po",
+        "coordinates": "44.598916, 7.334670",
+        "altitude": 1050,
+        "heading": 40,
+        "isPrimary": true,
+        "description": "Decollo erboso curato con bella pendenza ed esposizione Nord-Est/Est, ideale per partenze termiche mattutine.",
+        "hazards": "Vento da Ovest in quota può creare turbolenza e sottovento in decollo.",
+        "reliability": 94
+      }
+    ],
+    "landings": [
+      {
+        "id": "martiniana-po-valle-po-cn-cn-landing-1",
+        "name": "Atterraggio Martiniana Po",
+        "coordinates": "44.632382, 7.361931",
+        "altitude": 440,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Grande prato pianeggiante con manica a vento posizionata sul container del club.",
+        "hazards": "Attenzione ai cavi telefonici perimetrali e ai canali di scolo lungo il confine del campo.",
+        "rules": "Parcheggiare esclusivamente negli spazi delimitati adiacenti alla casetta del club.",
+        "reliability": 96
+      }
+    ]
+  },
+  {
+    "id": "monte-cavallaria-calea-to-to",
+    "name": "Monte Cavallaria",
+    "province": "TO",
+    "region": "Piemonte",
+    "country": "IT",
+    "location": "Monte Cavallaria (Calea - TO)",
+    "description": "Uno dei siti di cross-country più famosi del Piemonte all'imbocco della Valchiusella, teatro di gare nazionali e voli verso il Monte Rosa o il Lago Maggiore.",
+    "webcam": null,
+    "club": {
+      "name": "Parapendio Club Cavallaria A.S.D.",
+      "phone": "+39 348 1234567",
+      "email": "info@cavallaria.it",
+      "contactName": "Segreteria Club Cavallaria",
+      "radioFreq": "144.300 MHz / RRM 8-16",
+      "shuttle": "Navette dei soci nei weekend con ritrovo all'atterraggio di Lessolo."
+    },
+    "reliability": 93,
+    "takeoffs": [
+      {
+        "id": "monte-cavallaria-calea-to-to-takeoff-1",
+        "name": "Decollo Manifestazione",
+        "coordinates": "45.513450, 7.796900",
+        "altitude": 1380,
+        "heading": 225,
+        "isPrimary": true,
+        "description": "Uno dei decolli storici e più frequentati del Monte Cavallaria con pendenza regolare e stacco agevole. Dispone di due esposizioni principali: Sud-Ovest ('Manifestazione', 225°, ideale per generose termiche pomeridiane) e Sud-Est ('Spiaggia', 135°). Adatto a tutti i livelli, compresi allievi e neo-brevettati.",
+        "hazards": "Attenzione a non decollare con vento da Nord o forte brezza di valle trasversale.",
+        "reliability": 95
+      },
+      {
+        "id": "monte-cavallaria-calea-to-to-takeoff-2",
+        "name": "Decollo Cavallaria Alto",
+        "coordinates": "45.520540, 7.807238",
+        "altitude": 1470,
+        "heading": 160,
+        "isPrimary": false,
+        "description": "Ampio prato alpino esposto a Sud/Sud-Est con stacco immediato e termiche potenti sin dalla tarda mattinata.",
+        "hazards": "Forti condizioni termiche nei mesi primaverili; vento sostenuto in decollo.",
+        "reliability": 94
+      },
+      {
+        "id": "monte-cavallaria-calea-to-to-takeoff-3",
+        "name": "Decollo Felci",
+        "coordinates": "45.507027, 7.809825",
+        "altitude": 930,
+        "heading": 180,
+        "isPrimary": false,
+        "description": "Decollo basso erboso esposto a Sud situato tra le felci a quota 930m slm, ideale per i primi voli, test vele o quando in quota il vento è troppo sostenuto.",
+        "hazards": "Rendimento termico limitato nei mesi invernali; verificare la brezza di valle in avvicinamento a Lessolo.",
+        "reliability": 92
+      },
+      {
+        "id": "monte-cavallaria-calea-to-to-takeoff-4",
+        "name": "Decollo delle Casette",
+        "coordinates": "45.517200, 7.801500",
+        "altitude": 1300,
+        "heading": 160,
+        "isPrimary": false,
+        "description": "Decollo erboso intermedio situato sulla dorsale nei pressi delle baite (Casette) a quota 1300m slm, esposto a Sud/Sud-Est.",
+        "hazards": "Attenzione a non finire sottovento dietro la cresta con componente da Est.",
+        "reliability": 90
+      }
+    ],
+    "landings": [
+      {
+        "id": "monte-cavallaria-calea-to-to-landing-1",
+        "name": "Atterraggio Lessolo",
+        "coordinates": "45.498300, 7.828300",
+        "altitude": 320,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Pratone ufficiale atterraggio situato a Lessolo, ben segnalato e dotato di manica a vento e bacheca.",
+        "hazards": "Brezza di valle pomeridiana da Sud-Est sostenuta.",
+        "rules": "Non atterrare nei campi non falciati.",
+        "reliability": 96
       }
     ]
   }
 ]);
+
 
 /**
  * Strips technical metadata tags like "[attendibilità 94%]" or "[attendibilita 80%]"
@@ -578,4 +761,35 @@ export function sortEvaluatedComprensori(evaluatedList) {
     if (b.score !== a.score) return b.score - a.score;
     return (a.name || '').localeCompare(b.name || '');
   });
+}
+
+
+const LEGACY_PINNED_MAP = Object.freeze({
+  'monte-cornizzolo-lc': 'monte-cornizzolo-suello-lc-lc',
+  'bassano-del-grappa-vi': 'monte-grappa-borso-del-grappa-tv-tv',
+  'bassano-borso-del-grappa-tv': 'monte-grappa-borso-del-grappa-tv-tv',
+  'meduno-pn': 'meduno-monte-valinis-toppo-pn-pn',
+  'meduno-monte-valinis-pn': 'meduno-monte-valinis-toppo-pn-pn',
+  'rocca-calascio-aq': 'calascio-rocca-calascio-calascio-aq-aq',
+  'calascio-rocca-aq': 'calascio-rocca-calascio-calascio-aq-aq'
+});
+
+/**
+ * Checks if a comprensorio spot is pinned in the user's favorites list.
+ * Supports exact ID matching as well as bidirectional legacy seed ID mappings.
+ * @param {object} spot
+ * @param {Set<string>|Array<string>} pinnedIds
+ * @returns {boolean}
+ */
+export function isSpotPinned(spot, pinnedIds) {
+  if (!spot || !spot.id) return false;
+  const set = pinnedIds instanceof Set ? pinnedIds : new Set(pinnedIds || []);
+  if (set.has(spot.id)) return true;
+
+  for (const [legacyId, catalogId] of Object.entries(LEGACY_PINNED_MAP)) {
+    if (spot.id === legacyId && set.has(catalogId)) return true;
+    if (spot.id === catalogId && set.has(legacyId)) return true;
+  }
+
+  return false;
 }

@@ -87,4 +87,14 @@ describe('GlideMind Phase 2-bis - Brand Identity, Icon Bundle & Splash Screen In
       appModule.dismissSplashScreen();
     }, 'dismissSplashScreen must safely handle headless Node environment');
   });
+
+  it('should export applyTheme in ui/app.js and handle theme changes safely', async () => {
+    const appModule = await import('../../ui/app.js');
+    assert.equal(typeof appModule.applyTheme, 'function', 'app.js must export applyTheme');
+
+    assert.doesNotThrow(() => {
+      appModule.applyTheme('light');
+      appModule.applyTheme('dark');
+    }, 'applyTheme must safely handle headless Node environment');
+  });
 });

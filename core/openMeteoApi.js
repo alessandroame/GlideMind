@@ -326,7 +326,14 @@ export function normalizeCoordinates(coords) {
     if (!coords) throw new Error('Coordinate input is null or undefined.');
     let lat, lon, elev = null;
 
-    if (Array.isArray(coords)) {
+    if (typeof coords === 'string') {
+        const parts = coords.split(',').map(s => Number(s.trim()));
+        if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+            lat = parts[0];
+            lon = parts[1];
+            if (parts.length > 2 && !isNaN(parts[2])) elev = parts[2];
+        }
+    } else if (Array.isArray(coords)) {
         lat = Number(coords[0]);
         lon = Number(coords[1]);
         if (coords.length > 2) elev = Number(coords[2]);
@@ -1282,3 +1289,150 @@ export async function fetchReverseGeocode(lat, lon, options = {}) {
 
     return null;
 }
+
+/**
+ * Fetches batch weather data for multiple comprensori in single/chunked HTTP request(s).
+ * Optimizes network traffic for HomeDashboardView and SpotMapView to evaluate regional flyability
+ * without hitting rate limits (1 request per 35 spots instead of 35 requests).
+ * 
+ * @param {Array<object>} comprensori - Array of comprensorio objects
+ * @param {Object} [options]
+ * @param {string} [options.targetDate] - Reference date (YYYY-MM-DD, defaults to today)
+ * @param {string} [options.weatherModel='best_match'] - Numerical model
+ * @param {number} [options.maxSpots=35] - Max spots per batch request
+ * @param {boolean} [options.forceRefresh=false] - Bypass cache
+ * @param {InMemoryCache} [options.cache=defaultWeatherCache] - Cache adapter
+ * @param {Function} [options.fetchFn=globalThis.fetch] - Fetch function
+ * @param {number} [options.timeoutMs=8000] - Request timeout in ms
+ * @param {boolean} [options.mock=false] - Return mock data
+ * @returns {Promise<Map<string, object>>} Map of comprensorioId -> weatherPayload
+ */
+export async function fetchBatchComprensoriWeather(comprensori, options = {}) {
+    const resultMap = new Map();
+    if (!Array.isArray(comprensori) || comprensori.length === 0) {
+        return resultMap;
+    }
+
+    const targetDate = options.targetDate || new Date().toISOString().split('T')[0];
+    const activeModel = (options.weatherModel && SUPPORTED_WEATHER_MODELS.includes(options.weatherModel))
+        ? options.weatherModel
+        : 'best_match';
+    const cache = options.cache || defaultWeatherCache;
+    const fetchFn = options.fetchFn || globalThis.fetch;
+    const timeoutMs = Number(options.timeoutMs) || 8000;
+    const maxSpots = Math.max(1, Math.min(50, Number(options.maxSpots) || 35));
+
+    // 1. Prepare valid spots with coordinates
+    const normalizedSpots = [];
+    for (const spot of comprensori) {
+        if (!spot || !spot.id) continue;
+        const takeoff = (spot.takeoffs && spot.takeoffs[0]) ? spot.takeoffs[0] : null;
+        if (!takeoff || !takeoff.coordinates) continue;
+
+        let coords = null;
+        try {
+            coords = normalizeCoordinates(takeoff.coordinates);
+        } catch (_) {
+            continue;
+        }
+
+        normalizedSpots.push({
+            spot,
+            coords,
+            takeoff
+        });
+    }
+
+    if (normalizedSpots.length === 0) {
+        return resultMap;
+    }
+
+    // 2. Identify cached vs uncached spots
+    const uncachedSpots = [];
+    for (const item of normalizedSpots) {
+        const cacheKey = generateWeatherCacheKey(item.coords.lat, item.coords.lon, targetDate, activeModel);
+        if (!options.forceRefresh && cache.has(cacheKey)) {
+            const cachedVal = cache.get(cacheKey);
+            if (cachedVal) {
+                resultMap.set(item.spot.id, cachedVal);
+                continue;
+            }
+        }
+        uncachedSpots.push(item);
+    }
+
+    // If mock, generate synthetic payload immediately
+    if (options.mock === true) {
+        for (const item of uncachedSpots) {
+            const synth = generateSyntheticWeather(item.coords, {
+                targetDate,
+                weatherModel: activeModel,
+                takeoffAzimuth: item.takeoff.heading
+            });
+            const enriched = enrichWeatherData(synth, targetDate, Date.now(), {
+                customHeading: item.takeoff.heading
+            });
+            const cacheKey = generateWeatherCacheKey(item.coords.lat, item.coords.lon, targetDate, activeModel);
+            cache.set(cacheKey, enriched);
+            resultMap.set(item.spot.id, enriched);
+        }
+        return resultMap;
+    }
+
+    if (uncachedSpots.length === 0) {
+        return resultMap;
+    }
+
+    // 3. Batch uncached spots in chunks of maxSpots
+    const limitedSpots = uncachedSpots.slice(0, maxSpots);
+    const lats = limitedSpots.map(s => s.coords.lat.toFixed(4)).join(',');
+    const lons = limitedSpots.map(s => s.coords.lon.toFixed(4)).join(',');
+
+    const baseUrl = OPEN_METEO_FORECAST_URL;
+    const url = new URL(baseUrl);
+    url.searchParams.append('latitude', lats);
+    url.searchParams.append('longitude', lons);
+    url.searchParams.append('timezone', 'auto');
+    url.searchParams.append('forecast_days', '2');
+    url.searchParams.append('hourly', 'temperature_2m,dewpoint_2m,windspeed_10m,winddirection_10m,windgusts_10m,cape,precipitation');
+    url.searchParams.append('daily', 'sunrise,sunset');
+
+    if (activeModel && activeModel !== 'best_match' && SUPPORTED_WEATHER_MODELS.includes(activeModel)) {
+        url.searchParams.append('models', activeModel);
+    }
+
+    try {
+        const res = await fetchWithTimeout(url, {}, timeoutMs, fetchFn);
+        if (res.ok) {
+            const json = await res.json();
+            const dataArray = Array.isArray(json) ? json : [json];
+
+            dataArray.forEach((rawPayload, idx) => {
+                const item = limitedSpots[idx];
+                if (!item) return;
+
+                rawPayload.weather_model = activeModel;
+                rawPayload.targetDate = targetDate;
+                rawPayload.fetchTimestamp = Date.now();
+                rawPayload.takeoff_azimuth = item.takeoff.heading || 180;
+                rawPayload._isSynthetic = false;
+
+                const cacheKey = generateWeatherCacheKey(item.coords.lat, item.coords.lon, targetDate, activeModel);
+                cache.set(cacheKey, rawPayload);
+                resultMap.set(item.spot.id, rawPayload);
+            });
+        }
+    } catch (_) {
+        // Soft fail: fallback to stale cached data if available
+        for (const item of limitedSpots) {
+            const cacheKey = generateWeatherCacheKey(item.coords.lat, item.coords.lon, targetDate, activeModel);
+            const staleEntry = cache.getEntry(cacheKey);
+            if (staleEntry && staleEntry.value) {
+                resultMap.set(item.spot.id, staleEntry.value);
+            }
+        }
+    }
+
+    return resultMap;
+}
+

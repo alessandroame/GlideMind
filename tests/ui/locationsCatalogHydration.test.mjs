@@ -105,7 +105,7 @@ describe('Master Locations Catalog Hydration & Runtime Integration', () => {
     ];
 
     homeController.setComprensoriCatalog(customCatalog);
-    assert.equal(homeController.comprensoriCatalog.length, 5);
+    assert.equal(homeController.comprensoriCatalog.length, customCatalog.length);
 
     homeController.searchQuery = 'Feltre';
     const results = homeController.getEvaluatedComprensori();
@@ -143,7 +143,7 @@ describe('Master Locations Catalog Hydration & Runtime Integration', () => {
     const fullCatalog = normalizeLocationsCatalog(rawLocations);
 
     const forecastController = new ForecastViewController({
-      store,
+      store: createStore(),
       comprensoriCatalog: fullCatalog
     });
 
@@ -155,12 +155,11 @@ describe('Master Locations Catalog Hydration & Runtime Integration', () => {
 
     // Test empty search returns Preferiti and Altri Comprensori
     const defaultHtml = forecastController.renderPickerSections('');
-    assert.ok(defaultHtml.includes('Preferiti (4)'), 'Must render 4 real default preferiti');
-    assert.ok(defaultHtml.includes('Monte Cornizzolo'));
-    assert.ok(defaultHtml.includes('Monte Grappa'));
-    assert.ok(defaultHtml.includes('Calascio / Rocca Calascio'));
-    assert.ok(defaultHtml.includes('Meduno / Monte Valinis'));
-    assert.ok(defaultHtml.includes('Altri Comprensori (131)'), 'Must render 131 non-pinned spots');
+    assert.ok(defaultHtml.includes('Preferiti (3)'), 'Must render 3 real default preferiti');
+    assert.ok(defaultHtml.includes('Chialamberto'));
+    assert.ok(defaultHtml.includes('Martiniana Po'));
+    assert.ok(defaultHtml.includes('Monte Cavallaria'));
+    assert.ok(defaultHtml.includes('Altri Comprensori (132)'), 'Must render 132 non-pinned spots');
   });
 
   it('should select spot from picker sheet and update store when sheet click is triggered', () => {

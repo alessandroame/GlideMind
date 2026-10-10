@@ -42,11 +42,37 @@ export async function loadLocationsCatalog() {
 }
 
 /**
+ * Applies the visual theme (dark or light) to the root document.
+ * @param {string} [theme='dark']
+ */
+export function applyTheme(theme = 'dark') {
+  if (typeof document === 'undefined') return;
+  const validTheme = theme === 'light' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', validTheme);
+  const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+  if (metaThemeColor) {
+    metaThemeColor.setAttribute('content', validTheme === 'light' ? '#f8fafc' : '#0b0d12');
+  }
+}
+
+/**
  * Initializes the GlideMind client application shell.
  */
 export function bootstrapApp() {
   // Load persisted user preferences and cached spots
   store.loadPersistedState();
+
+  // Synchronize visual theme
+  const currentTheme = (store.getState().ui && store.getState().ui.theme) || 'dark';
+  applyTheme(currentTheme);
+
+  if (typeof store.subscribeSlice === 'function') {
+    store.subscribeSlice('ui', (uiState) => {
+      if (uiState && uiState.theme) {
+        applyTheme(uiState.theme);
+      }
+    });
+  }
 
   // Register view controllers
   router.registerView('home', homeDashboardView);
@@ -70,6 +96,7 @@ export function bootstrapApp() {
       store,
       router,
       loadLocationsCatalog,
+      applyTheme,
       version: APP_VERSION,
       build: APP_BUILD
     };

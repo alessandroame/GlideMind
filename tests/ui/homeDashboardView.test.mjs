@@ -2,6 +2,8 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { HomeDashboardViewController } from '../../ui/views/HomeDashboardView.js';
 import { createStore } from '../../core/store.js';
+import { GLIDER_CLASSES, DEFAULT_GLIDER } from '../../core/flyability.js';
+import { initSheetManager } from '../../ui/sheetManager.js';
 
 describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN/Favorites)', () => {
   it('should initialize and implement view controller lifecycle contract', () => {
@@ -20,7 +22,7 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
 
     // Block 1: Volabilità SITI
     assert.ok(html.includes('Volabilità</h2>'), 'Must include clean Volabilità section heading');
-    assert.ok(html.includes('Monte Cornizzolo'), 'Must render reference spot name');
+    assert.ok(html.includes('Chialamberto'), 'Must render default favorite spot name');
     assert.ok(html.includes('gm-spot-flight-row'), 'Must show flight metrics row');
     assert.ok(html.includes('gm-spot-explain'), 'Must include Explainability callout');
 
@@ -81,15 +83,15 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     const takeoffMatches = html.match(/class="gm-flight-icon">↗<\/span>/g);
     const landingMatches = html.match(/class="gm-flight-icon">↘<\/span>/g);
 
-    assert.equal(takeoffMatches ? takeoffMatches.length : 0, 4, 'Must have exactly 4 takeoff indicators (1 per card)');
-    assert.equal(landingMatches ? landingMatches.length : 0, 4, 'Must have exactly 4 landing indicators (1 per card)');
+    assert.equal(takeoffMatches ? takeoffMatches.length : 0, 3, 'Must have exactly 3 takeoff indicators (1 per card)');
+    assert.equal(landingMatches ? landingMatches.length : 0, 3, 'Must have exactly 3 landing indicators (1 per card)');
 
     // Verify explicit names are rendered (not cryptic symbols or just "Decollo")
-    assert.ok(html.includes('Costalunga'), 'Bassano takeoff name must be explicit');
-    assert.ok(html.includes('Garden Relais'), 'Bassano landing name must be explicit');
-    assert.ok(html.includes('Monte Valinis'), 'Meduno takeoff name must be explicit');
-    assert.ok(html.includes('Risparmio'), 'Cornizzolo takeoff name must be explicit');
-    assert.ok(html.includes('Rocca Calascio'), 'Calascio takeoff name must be explicit');
+    assert.ok(html.includes('Ciavanis') || html.includes('Cossiglia'), 'Chialamberto takeoff name must be explicit');
+    assert.ok(html.includes('Baratonga') || html.includes('PeterPan'), 'Chialamberto landing name must be explicit');
+    assert.ok(html.includes('Martiniana'), 'Martiniana takeoff/landing name must be explicit');
+    assert.ok(html.includes('Manifestazione') || html.includes('Cavallaria'), 'Cavallaria takeoff name must be explicit');
+    assert.ok(html.includes('Lessolo'), 'Cavallaria landing name must be explicit');
 
     // Verify glide efficiency label and ratio format
     assert.ok(html.includes('gm-glide-label">Efficienza</span>'), 'Landing glide efficiency label must exist');
@@ -100,9 +102,9 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     const mockStore = createStore();
     const controller = new HomeDashboardViewController({ store: mockStore });
 
-    // Initial check: all 4 default spots present
+    // Initial check: all 3 default favorite spots present
     let list = controller.getEvaluatedComprensori();
-    assert.equal(list.length, 4);
+    assert.equal(list.length, 3);
 
     // Apply search filter
     controller.searchQuery = 'cornizzolo';
@@ -119,7 +121,7 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     // Clear filter
     controller.searchQuery = '';
     list = controller.getEvaluatedComprensori();
-    assert.equal(list.length, 4);
+    assert.equal(list.length, 3);
   });
 
   it('should sort comprensori dynamically by flyability descending (Flyable -> Caution -> Unflyable)', () => {
@@ -358,5 +360,266 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     assert.ok(capturedHtml.includes('Cautela'));
     assert.ok(capturedHtml.includes('Chiuso'));
     assert.ok(capturedHtml.includes('Severo'));
+  });
+
+  it('should display only favorite spots and react to store pinnedSpotIds changes', () => {
+    const mockStore = createStore();
+    const controller = new HomeDashboardViewController({ store: mockStore });
+
+    // Initially 3 defaults
+    assert.deepEqual(
+      controller.getEvaluatedComprensori().map(s => s.name).sort(),
+      ['Chialamberto', 'Martiniana Po', 'Monte Cavallaria'].sort()
+    );
+
+    // Change favorites in store to Monte Cornizzolo and Bassano del Grappa
+    mockStore.setState({
+      pinnedSpotIds: ['monte-cornizzolo-lc', 'bassano-borso-del-grappa-tv']
+    });
+
+    assert.deepEqual(
+      controller.getEvaluatedComprensori().map(s => s.name).sort(),
+      ['Bassano del Grappa', 'Monte Cornizzolo'].sort()
+    );
+
+    // Clear all favorites -> empty list
+    mockStore.setState({ pinnedSpotIds: [] });
+    assert.equal(controller.getEvaluatedComprensori().length, 0);
+
+    const emptyHtml = controller.renderHtml();
+    assert.ok(emptyHtml.includes('Nessuna località tra i preferiti'));
+    assert.ok(emptyHtml.includes('data-action="go-to-forecast"'));
+  });
+
+  it('should render the active glider pill in Pilot Currency section', () => {
+    const mockStore = createStore();
+    const controller = new HomeDashboardViewController({ store: mockStore });
+    const html = controller.renderHtml();
+
+    assert.ok(html.includes('gm-pilot-glider-row'), 'Must contain glider selector row');
+    assert.ok(html.includes('Vela Attiva'), 'Must contain Vela Attiva label');
+    assert.ok(html.includes('btn-home-select-glider'), 'Must contain select glider button');
+    assert.ok(html.includes('EN-A'), 'Default glider class badge must be EN-A');
+  });
+
+  it('should open glider selection sheet and display all 4 certification classes (EN-A to EN-D)', async () => {
+    const { initSheetManager } = await import('../../ui/sheetManager.js');
+    let capturedHtml = '';
+    const mockContainer = {
+      innerHTML: '',
+      querySelector(sel) {
+        if (sel === '#sheet-backdrop') return { addEventListener() {} };
+        if (sel === '.gm-sheet') return { addEventListener() {}, setAttribute() {} };
+        if (sel === '.gm-sheet-title') return { textContent: '' };
+        if (sel === '.gm-sheet-content') return {
+          get innerHTML() { return capturedHtml; },
+          set innerHTML(val) { capturedHtml = val; },
+          appendChild() {}
+        };
+        if (sel === '.gm-sheet-close-btn') return { addEventListener() {}, focus() {} };
+        return null;
+      },
+      classList: { add() {}, remove() {}, contains() { return false; } },
+      setAttribute() {}
+    };
+
+    initSheetManager(mockContainer);
+    const mockStore = createStore();
+    const controller = new HomeDashboardViewController({ store: mockStore });
+
+    controller.openGliderSheet();
+
+    assert.ok(capturedHtml.includes('gm-glider-sheet'), 'Must render glider selection sheet');
+    assert.ok(capturedHtml.includes('EN-A'), 'Must list EN-A class');
+    assert.ok(capturedHtml.includes('EN-B'), 'Must list EN-B class');
+    assert.ok(capturedHtml.includes('EN-C'), 'Must list EN-C class');
+    assert.ok(capturedHtml.includes('EN-D'), 'Must list EN-D class');
+    assert.ok(capturedHtml.includes('data-action="select-glider"'), 'Must have select-glider actions');
+  });
+
+  it('should update active glider in store and trigger dynamic re-evaluation on selection', () => {
+    const mockStore = createStore();
+    const controller = new HomeDashboardViewController({ store: mockStore });
+
+    // Simulate clicking on EN-C class in glider sheet
+    const mockClickEvent = {
+      target: {
+        closest(sel) {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute(attr) {
+                if (attr === 'data-action') return 'select-glider';
+                if (attr === 'data-category') return 'EN-C';
+                return null;
+              }
+            };
+          }
+          return null;
+        }
+      }
+    };
+
+    controller.handleClick(mockClickEvent);
+
+    const updatedState = mockStore.getState();
+    assert.equal(updatedState.activeGlider.category, 'EN-C');
+    assert.equal(updatedState.glider.category, 'EN-C');
+
+    // UI render must now reflect the new EN-C glider class in the pill
+    const html = controller.renderHtml();
+    assert.ok(html.includes('EN-C'), 'Must reflect EN-C in glider pill');
+    assert.ok(html.includes(GLIDER_CLASSES.EN_C.name), 'Must reflect EN-C full name');
+  });
+
+  it('should render paraglider brand chips, search input, and popular models in glider sheet', () => {
+    let capturedHtml = '';
+    const mockContainer = {
+      innerHTML: '',
+      querySelector(sel) {
+        if (sel === '#sheet-backdrop') return { addEventListener() {} };
+        if (sel === '.gm-sheet') return { addEventListener() {}, setAttribute() {} };
+        if (sel === '.gm-sheet-title') return { textContent: '' };
+        if (sel === '.gm-sheet-content') return {
+          get innerHTML() { return capturedHtml; },
+          set innerHTML(val) { capturedHtml = val; },
+          appendChild() {}
+        };
+        if (sel === '.gm-sheet-close-btn') return { addEventListener() {}, focus() {} };
+        return null;
+      },
+      classList: { add() {}, remove() {}, contains() { return false; } },
+      setAttribute() {}
+    };
+
+    initSheetManager(mockContainer);
+    const mockStore = createStore();
+    const controller = new HomeDashboardViewController({ store: mockStore });
+
+    controller.openGliderSheet();
+
+    // Verify search bar and brand filter chips
+    assert.ok(capturedHtml.includes('id="glider-search-input"'), 'Must render glider search input');
+    assert.ok(capturedHtml.includes('gm-glider-brand-chips'), 'Must render brand filter chips container');
+    assert.ok(capturedHtml.includes('data-brand="Ozone"'), 'Must include Ozone brand chip');
+    assert.ok(capturedHtml.includes('data-brand="Advance"'), 'Must include Advance brand chip');
+    assert.ok(capturedHtml.includes('data-brand="Axis"'), 'Must include Axis brand chip');
+    assert.ok(capturedHtml.includes('data-brand="Niviuk"'), 'Must include Niviuk brand chip');
+
+    // Verify model cards list
+    assert.ok(capturedHtml.includes('id="glider-models-list"'), 'Must render glider models list');
+    assert.ok(capturedHtml.includes('data-action="select-glider-model"'), 'Must have select-glider-model actions');
+    assert.ok(capturedHtml.includes('Buzz Z7') || capturedHtml.includes('Mojo 6'), 'Must include popular Ozone models');
+
+    // Verify custom glider section
+    assert.ok(capturedHtml.includes('gm-glider-custom-details'), 'Must include custom glider configuration details');
+    assert.ok(capturedHtml.includes('data-action="save-custom-glider"'), 'Must include save-custom-glider action');
+  });
+
+  it('should filter glider models by brand chip and search query including Axis wings', () => {
+    const mockStore = createStore();
+    const controller = new HomeDashboardViewController({ store: mockStore });
+
+    // Filter by brand Advance
+    controller.gliderSelectedBrand = 'Advance';
+    let modelsHtml = controller.renderGliderModelsList();
+    assert.ok(modelsHtml.includes('Alpha 7'), 'Must include Advance Alpha 7');
+    assert.ok(modelsHtml.includes('Iota DLS'), 'Must include Advance Iota DLS');
+    assert.equal(modelsHtml.includes('Ozone Buzz'), false, 'Must not include Ozone when Advance is selected');
+
+    // Filter by brand Axis
+    controller.gliderSelectedBrand = 'Axis';
+    modelsHtml = controller.renderGliderModelsList();
+    assert.ok(modelsHtml.includes('Compact 4'), 'Must include Axis Compact 4');
+    assert.ok(modelsHtml.includes('Pluto 4'), 'Must include Axis Pluto 4');
+    assert.ok(modelsHtml.includes('Vega 6'), 'Must include Axis Vega 6');
+    assert.ok(modelsHtml.includes('Venus 4'), 'Must include Axis Venus 4');
+    assert.equal(modelsHtml.includes('Alpha 7'), false, 'Must not include Advance when Axis is selected');
+
+    // Filter by text search "mentor"
+    controller.gliderSelectedBrand = '';
+    controller.gliderSearchQuery = 'mentor';
+    modelsHtml = controller.renderGliderModelsList();
+    assert.ok(modelsHtml.includes('Mentor 7'), 'Must include Nova Mentor 7');
+    assert.equal(modelsHtml.includes('Alpha 7'), false, 'Must not include Alpha 7 in mentor search');
+
+    // Filter by text search "pluto"
+    controller.gliderSearchQuery = 'pluto';
+    modelsHtml = controller.renderGliderModelsList();
+    assert.ok(modelsHtml.includes('Pluto 4'), 'Must find Axis Pluto 4 by text search');
+    assert.ok(modelsHtml.includes('Axis'), 'Must show Axis brand');
+  });
+
+  it('should select certified model from catalog and update active glider with full aerodynamic specs', () => {
+    const mockStore = createStore();
+    const controller = new HomeDashboardViewController({ store: mockStore });
+
+    const mockClickEvent = {
+      target: {
+        closest(sel) {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute(attr) {
+                if (attr === 'data-action') return 'select-glider-model';
+                if (attr === 'data-glider-id') return 'ozone-buzz-z7';
+                return null;
+              }
+            };
+          }
+          return null;
+        }
+      }
+    };
+
+    controller.handleClick(mockClickEvent);
+
+    const updatedState = mockStore.getState();
+    assert.equal(updatedState.activeGlider.id, 'ozone-buzz-z7');
+    assert.equal(updatedState.activeGlider.brand, 'Ozone');
+    assert.equal(updatedState.activeGlider.model, 'Buzz Z7');
+    assert.equal(updatedState.activeGlider.category, 'EN-B');
+    assert.equal(updatedState.activeGlider.vTrim, 38);
+    assert.equal(updatedState.activeGlider.glideRatio, 8.8);
+
+    // Dashboard UI must now display the exact brand and model in the pill
+    const html = controller.renderHtml();
+    assert.ok(html.includes('Ozone Buzz Z7'), 'Must display Ozone Buzz Z7 in glider pill');
+    assert.ok(html.includes('EN-B'), 'Must display EN-B badge in glider pill');
+  });
+
+  it('should support custom glider creation and automated aerodynamic deduction', () => {
+    const mockStore = createStore();
+    const controller = new HomeDashboardViewController({ store: mockStore });
+
+    const mockClickEvent = {
+      target: {
+        closest(sel) {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute(attr) {
+                if (attr === 'data-action') return 'save-custom-glider';
+                if (attr === 'data-brand') return 'Swing';
+                if (attr === 'data-model') return 'Nyos 2 RS';
+                if (attr === 'data-category') return 'EN-B';
+                return null;
+              }
+            };
+          }
+          return null;
+        }
+      }
+    };
+
+    controller.handleClick(mockClickEvent);
+
+    const updatedState = mockStore.getState();
+    assert.equal(updatedState.activeGlider.brand, 'Swing');
+    assert.equal(updatedState.activeGlider.model, 'Nyos 2 RS');
+    assert.equal(updatedState.activeGlider.category, 'EN-B');
+    assert.equal(updatedState.activeGlider.vTrim, 38); // Deduced from EN-B defaults
+    assert.equal(updatedState.activeGlider.isCustom, true);
+
+    // Dashboard UI must now display Swing Nyos 2 RS
+    const html = controller.renderHtml();
+    assert.ok(html.includes('Swing Nyos 2 RS'), 'Must display Swing Nyos 2 RS in glider pill');
   });
 });

@@ -284,6 +284,46 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.equal(rendered, true);
   });
 
+  it('should advance and decrement hour using stepper buttons', () => {
+    const mockStore = createStore();
+    const controller = new ForecastViewController({ store: mockStore });
+    controller.selectedHour = 12;
+
+    const createActionClick = (actionName) => ({
+      target: {
+        closest(sel) {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute(attr) {
+                if (attr === 'data-action') return actionName;
+                return null;
+              }
+            };
+          }
+          return null;
+        }
+      }
+    });
+
+    // Step next
+    controller.handleClick(createActionClick('next-hour'));
+    assert.equal(controller.selectedHour, 13);
+
+    // Step prev
+    controller.handleClick(createActionClick('prev-hour'));
+    assert.equal(controller.selectedHour, 12);
+
+    // Bounds: test min boundary
+    controller.selectedHour = 8;
+    controller.handleClick(createActionClick('prev-hour'));
+    assert.equal(controller.selectedHour, 8, 'Must not decrement below 8:00');
+
+    // Bounds: test max boundary
+    controller.selectedHour = 20;
+    controller.handleClick(createActionClick('next-hour'));
+    assert.equal(controller.selectedHour, 20, 'Must not advance above 20:00');
+  });
+
   it('should support continuous pointer scrubbing/slide selection across timeline hours', () => {
     const mockStore = createStore();
     const controller = new ForecastViewController({ store: mockStore });

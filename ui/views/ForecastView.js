@@ -24,7 +24,8 @@ import {
   DEFAULT_COMPRENSORI,
   evaluateComprensorio,
   slugifyComprensorio,
-  parseCoordinates
+  parseCoordinates,
+  isSpotPinned
 } from '../../core/comprensorio.js';
 import {
   DEFAULT_GLIDER,
@@ -41,7 +42,8 @@ import {
 import {
   generateSyntheticWeather,
   enrichWeatherData,
-  fetchWeatherData
+  fetchWeatherData,
+  getCachedWeatherData
 } from '../../core/openMeteoApi.js';
 import {
   getSmartDatePresets,
@@ -213,14 +215,14 @@ export function generateGuidoBriefing(spot, weatherData, dateStr, glider = DEFAU
     hazards.push('Gradiente anemometrico regolare, assenza di rotori sinottici o raffiche pericolose.');
   }
 
-  // 3. Recommended pilot level
+  // 3. Recommended flight envelope based on glider class
   let pilotLevel = '';
   if (flyableSlots.length >= 3 && maxGust <= 18 && maxCape < 500 && !hasRain) {
-    pilotLevel = 'Consigliato a tutti i livelli (Allievi, Brevettati, Vele EN-A / EN-B). Mattinata adatta a voli didattici di ambientamento.';
+    pilotLevel = 'Condizioni ideali per vele ricreative EN-A / EN-B. Finestra termica dolce idonea a voli didattici di ambientamento.';
   } else if (flyableSlots.length > 0 && maxWind <= 22 && maxGust <= 28) {
-    pilotLevel = 'Riservato a piloti brevettati autonomi con buona padronanza del decollo e gestione delle termiche alpine (Vele EN-A/B/C).';
+    pilotLevel = 'Condizioni termiche vive per vele intermedie ed avanzate (EN-B / EN-C). Richiesta gestione attiva della turbolenza.';
   } else {
-    pilotLevel = 'Condizioni severe o non volabili per allievi e piloti ricreativi. Solo osservazione o decollo sconsigliato.';
+    pilotLevel = 'Condizioni severe o margine di planata insufficiente per vele EN-A. Decollo sconsigliato per attività ricreativa.';
   }
 
   const hazardsFormatted = hazards.map(h => `• ${h}`).join('\n');
@@ -273,6 +275,10 @@ export class ForecastViewController {
     this.activeDate = storeState.activeDate || formatDateIso(now);
     this.cachedWeatherMap = new Map(); // key: spotId_date -> weatherPayload
     this.isLoadingWeather = false;
+    this.networkStatus = 'offline'; // 'live' | 'loading' | 'offline'
+    this._networkFailed = false;
+    this.activeFetchPromise = null;
+    this._customFetchFn = options.fetchFn || null;
 
     // View state for dual-mode panels
     this.windPanelView = 'summary'; // 'summary' | 'chart'
@@ -323,11 +329,139 @@ export class ForecastViewController {
    */
   getActiveGlider() {
     const state = this.store ? this.store.getState() : {};
-    return state.glider || DEFAULT_GLIDER || GLIDER_CLASSES.EN_A;
+    return state.activeGlider || state.glider || DEFAULT_GLIDER || GLIDER_CLASSES.EN_A;
+  }
+
+  /**
+   * Renders the discrete network status badge (Live, Loading, Offline/Synthetic).
+   * @returns {string}
+   */
+  renderLiveWeatherBadge() {
+    if (this.networkStatus === 'loading') {
+      return `
+        <span id="gm-forecast-live-badge" class="gm-live-badge loading" title="Aggiornamento dati meteo in corso da Open-Meteo">
+          <span class="gm-live-badge-dot" aria-hidden="true"></span>
+          <span>Aggiornamento...</span>
+        </span>
+      `;
+    }
+    if (this.networkStatus === 'live') {
+      return `
+        <span id="gm-forecast-live-badge" class="gm-live-badge live" title="Previsioni reali Open-Meteo attive">
+          <span class="gm-live-badge-dot" aria-hidden="true"></span>
+          <span>Live Open-Meteo</span>
+        </span>
+      `;
+    }
+    return `
+      <span id="gm-forecast-live-badge" class="gm-live-badge offline" title="Dati meteorologici simulati o offline">
+        <span class="gm-live-badge-dot" aria-hidden="true"></span>
+        <span>Offline / Stima</span>
+      </span>
+    `;
+  }
+
+  /**
+   * In-place update of the live status badge in DOM to avoid jank.
+   */
+  updateLiveStatusBadgeInDom() {
+    if (!this.containerEl) return;
+    const badgeEl = this.containerEl.querySelector('#gm-forecast-live-badge');
+    if (badgeEl) {
+      badgeEl.outerHTML = this.renderLiveWeatherBadge();
+    }
+  }
+
+  /**
+   * Asynchronously fetches real Open-Meteo weather data in background (Stale-While-Revalidate).
+   * Safe for browser environment; completely no-op in headless Node.js tests unless customFetch is provided.
+   * 
+   * @param {object} spot
+   * @param {string} dateStr
+   * @param {boolean} [forceRefresh=false]
+   * @returns {Promise<object|null>}
+   */
+  async fetchWeatherDataAsync(spot, dateStr, forceRefresh = false) {
+    if (!spot || !spot.id) return null;
+    const key = `${spot.id}_${dateStr}`;
+
+    const hasFetch = typeof window !== 'undefined' && typeof window.fetch === 'function';
+    if (!hasFetch && !this._customFetchFn) {
+      return null;
+    }
+
+    if (!forceRefresh && this.cachedWeatherMap.has(key)) {
+      const existing = this.cachedWeatherMap.get(key);
+      if (existing && !existing._isSynthetic && !existing.isStale) {
+        this.networkStatus = 'live';
+        this.updateLiveStatusBadgeInDom();
+        return existing;
+      }
+    }
+
+    this.networkStatus = 'loading';
+    this.updateLiveStatusBadgeInDom();
+
+    const takeoff = (spot.takeoffs && spot.takeoffs[0]) ? spot.takeoffs[0] : { altitude: 1000, heading: 180 };
+    const coords = parseCoordinates(takeoff.coordinates) || { lat: 45.833, lon: 9.302 };
+
+    const fetchPromise = (async () => {
+      try {
+        const enriched = await fetchWeatherData(
+          coords,
+          {
+            targetDate: dateStr,
+            weatherModel: 'best_match',
+            includeSounding: true,
+            forceRefresh,
+            fetchFn: this._customFetchFn || (typeof window !== 'undefined' ? window.fetch.bind(window) : globalThis.fetch)
+          }
+        );
+
+        if (enriched) {
+          if (enriched.isStaleOfflineFallback) {
+            this.networkStatus = 'offline';
+            this._networkFailed = true;
+          } else {
+            enriched._isSynthetic = false;
+            this.networkStatus = 'live';
+            this._networkFailed = false;
+          }
+          this.cachedWeatherMap.set(key, enriched);
+
+          // Clear multi-day summary cache so it recalculates with real weather
+          const todayIso = formatDateIso(new Date());
+          this.cachedWeatherMap.delete(`fly_multi_${spot.id}_${todayIso}_14`);
+
+          if (this.store && typeof this.store.setState === 'function') {
+            this.store.setState({
+              weatherData: enriched,
+              selectedSpot: spot,
+              activeDate: dateStr
+            });
+          }
+
+          this.render();
+          return enriched;
+        }
+      } catch (err) {
+        this.networkStatus = 'offline';
+        this._networkFailed = true;
+        this.updateLiveStatusBadgeInDom();
+      } finally {
+        this.activeFetchPromise = null;
+      }
+      return null;
+    })();
+
+    this.activeFetchPromise = fetchPromise;
+    return fetchPromise;
   }
 
   /**
    * Retrieves weather payload for the current spot and active date.
+   * Implements 0ms optimistic render from cache or synthetic fallback.
+   * 
    * @param {object} spot
    * @param {string} dateStr
    * @returns {object}
@@ -335,19 +469,36 @@ export class ForecastViewController {
   getWeatherData(spot, dateStr) {
     const key = `${spot.id}_${dateStr}`;
     if (this.cachedWeatherMap.has(key)) {
-      return this.cachedWeatherMap.get(key);
+      const data = this.cachedWeatherMap.get(key);
+      if (data && !data._isSynthetic && !data.isStaleOfflineFallback && !this._networkFailed) {
+        this.networkStatus = 'live';
+      }
+      return data;
     }
 
     // Check store global weatherData if matching spot
     const state = this.store ? this.store.getState() : {};
     if (state.weatherData && state.selectedSpot && state.selectedSpot.id === spot.id) {
       this.cachedWeatherMap.set(key, state.weatherData);
+      if (!state.weatherData._isSynthetic && !state.weatherData.isStaleOfflineFallback && !this._networkFailed) {
+        this.networkStatus = 'live';
+      }
       return state.weatherData;
     }
 
-    // Generate deterministic synthetic day for immediate offline rendering
+    // Check defaultWeatherCache
     const takeoff = (spot.takeoffs && spot.takeoffs[0]) ? spot.takeoffs[0] : { altitude: 1000, heading: 180 };
     const coords = parseCoordinates(takeoff.coordinates) || { lat: 45.833, lon: 9.302 };
+    const cached = getCachedWeatherData(coords, dateStr, { weatherModel: 'best_match' });
+    if (cached && !cached.isStale) {
+      this.cachedWeatherMap.set(key, cached);
+      if (!cached._isSynthetic && !cached.isStaleOfflineFallback && !this._networkFailed) {
+        this.networkStatus = 'live';
+      }
+      return cached;
+    }
+
+    // Generate deterministic synthetic day for immediate 0ms offline rendering
     const synthetic = generateSyntheticWeather(
       coords,
       {
@@ -424,6 +575,9 @@ export class ForecastViewController {
     }
 
     if (this.containerEl) {
+      if (this.containerEl.classList) {
+        this.containerEl.classList.add('gm-view-forecast');
+      }
       this.containerEl.addEventListener('click', this.boundClickHandler);
       this.containerEl.addEventListener('change', this.boundChangeHandler);
       this.containerEl.addEventListener('pointerdown', this.boundPointerDown);
@@ -449,13 +603,37 @@ export class ForecastViewController {
     }
 
     this.render();
+
+    // Keyboard listener for accessible popovers (Escape to close)
+    this.boundKeyHandler = (e) => {
+      if (e.key === 'Escape' && this.isSubSpotMenuOpen) {
+        this.isSubSpotMenuOpen = false;
+        this.render();
+        const trigger = this.containerEl ? this.containerEl.querySelector('.gm-subspot-trigger') : null;
+        if (trigger && typeof trigger.focus === 'function') trigger.focus();
+      }
+    };
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      window.addEventListener('keydown', this.boundKeyHandler);
+    }
+
+    // Trigger asynchronous background revalidation if in browser or if custom fetch provided
+    const currentSpot = this.getCurrentSpot();
+    this.fetchWeatherDataAsync(currentSpot, this.activeDate);
   }
 
   /**
    * Unmounts the controller and cleans up listeners and store subscriptions.
    */
   unmount() {
+    if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function' && this.boundKeyHandler) {
+      window.removeEventListener('keydown', this.boundKeyHandler);
+      this.boundKeyHandler = null;
+    }
     if (this.containerEl) {
+      if (this.containerEl.classList) {
+        this.containerEl.classList.remove('gm-view-forecast');
+      }
       this.containerEl.removeEventListener('click', this.boundClickHandler);
       this.containerEl.removeEventListener('change', this.boundChangeHandler);
       this.containerEl.removeEventListener('pointerdown', this.boundPointerDown);
@@ -496,7 +674,8 @@ export class ForecastViewController {
       comprensorio: spot,
       weatherData,
       hourIndex: this.selectedHour,
-      glider
+      glider,
+      targetDate: this.activeDate
     });
 
     // Check if a specific spot is selected in level-2 dropdown
@@ -506,31 +685,34 @@ export class ForecastViewController {
     const briefing = generateGuidoBriefing(spot, weatherData, this.activeDate, glider);
 
     return `
-      <div id="forecast-view" class="gm-forecast-view flex flex-col gap-4 pb-48 max-w-lg mx-auto w-full">
-        <!-- 1. Header: Comprensorio Bar + Picker Trigger -->
-        ${this.renderHeader(spot)}
+      <div id="forecast-view" class="gm-forecast-view flex flex-col h-full w-full">
+        <!-- Scrollable cards container (occupies only the usable height above the scrubber) -->
+        <div id="forecast-scroll-container" class="gm-forecast-scroll-container flex-1 min-h-0 overflow-y-auto flex flex-col gap-4 p-4 max-w-lg mx-auto w-full">
+          <!-- 1. Header: Comprensorio Bar + Picker Trigger -->
+          ${this.renderHeader(spot)}
 
-        <!-- 2. Spot Card: Dual Unico Binomio or Focused Sub-Spot Detail -->
-        <div id="forecast-spot-card-container">
-          ${this.selectedSubSpot === 'overview' 
-            ? this.renderSummaryCard(evaluated) 
-            : this.renderSpecificSpotCard(activeSubSpotObj, evaluated)}
+          <!-- 2. Spot Card: Dual Unico Binomio or Focused Sub-Spot Detail -->
+          <div id="forecast-spot-card-container">
+            ${this.selectedSubSpot === 'overview' 
+              ? this.renderSummaryCard(evaluated) 
+              : this.renderSpecificSpotCard(activeSubSpotObj, evaluated)}
+          </div>
+
+          <!-- 3. Dual-State Wind & Orientation Panel (Sintetico / Grafico) -->
+          <div id="forecast-wind-panel-container">
+            ${this.renderWindPanel(evaluated, weatherData, spot, activeSubSpotObj)}
+          </div>
+
+          <!-- 4. Dual-State Sounding & Thermals Panel (Sintetico / Grafico) -->
+          <div id="forecast-sounding-panel-container">
+            ${this.renderSoundingPanel(evaluated, weatherData, spot, activeSubSpotObj)}
+          </div>
+
+          <!-- 5. AI Flight Briefing (Guido Persona) -->
+          ${this.renderBriefingCard(briefing, spot)}
         </div>
 
-        <!-- 3. Dual-State Wind & Orientation Panel (Sintetico / Grafico) -->
-        <div id="forecast-wind-panel-container">
-          ${this.renderWindPanel(evaluated, weatherData, spot, activeSubSpotObj)}
-        </div>
-
-        <!-- 4. Dual-State Sounding & Thermals Panel (Sintetico / Grafico) -->
-        <div id="forecast-sounding-panel-container">
-          ${this.renderSoundingPanel(evaluated, weatherData, spot, activeSubSpotObj)}
-        </div>
-
-        <!-- 5. AI Flight Briefing (Guido Persona) -->
-        ${this.renderBriefingCard(briefing, spot)}
-
-        <!-- 6. Bottom Sticky Scrubber: 13-slot timeline accessible to thumb -->
+        <!-- 6. Bottom Docked Scrubber: 13-slot timeline accessible to thumb -->
         ${this.renderStickyScrubber(spot, weatherData, glider)}
       </div>
     `;
@@ -617,9 +799,12 @@ export class ForecastViewController {
               <span class="gm-comprensorio-name">
                 ${escapeHtml(currentSpot.name)} (${escapeHtml(currentSpot.province)})
               </span>
-              <span class="gm-comprensorio-sub">
-                Tocca per cambiare comprensorio
-              </span>
+              <div class="flex items-center gap-2 mt-0.5">
+                <span class="gm-comprensorio-sub">
+                  Tocca per cambiare comprensorio
+                </span>
+                ${this.renderLiveWeatherBadge()}
+              </div>
             </div>
           </div>
           <span class="gm-comprensorio-chevron" aria-hidden="true">›</span>
@@ -820,7 +1005,11 @@ export class ForecastViewController {
 
         ${smartData.activeHorizon && smartData.activeHorizon.isSynoptic ? `
           <div class="gm-horizon-notice" role="status">
-            <span class="gm-horizon-icon" aria-hidden="true">ℹ️</span>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="gm-horizon-icon" aria-hidden="true">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
             <span><strong>Tendenza a lungo raggio:</strong> oltre 7 giorni le previsioni sono soggette a variazioni sinottiche.</span>
           </div>
         ` : ''}
@@ -1023,7 +1212,7 @@ export class ForecastViewController {
               data-action="set-wind-view"
               data-view="chart"
             >
-              Grafico 📈
+              Grafico
             </button>
           </div>
         </div>
@@ -1160,8 +1349,10 @@ export class ForecastViewController {
       let speed = 12;
       let gust = 16;
       if (idx !== -1) {
-        if (hourlyData.wind_speed_10m && hourlyData.wind_speed_10m[idx] != null) speed = Number(hourlyData.wind_speed_10m[idx]);
-        if (hourlyData.wind_gusts_10m && hourlyData.wind_gusts_10m[idx] != null) gust = Number(hourlyData.wind_gusts_10m[idx]);
+        const rawSpeed = hourlyData.windspeed_10m ?? hourlyData.wind_speed_10m;
+        const rawGust = hourlyData.windgusts_10m ?? hourlyData.wind_gusts_10m;
+        if (rawSpeed && rawSpeed[idx] != null) speed = Number(rawSpeed[idx]);
+        if (rawGust && rawGust[idx] != null) gust = Number(rawGust[idx]);
       }
       hours.push({ hour: h, speed, gust });
     }
@@ -1300,7 +1491,7 @@ export class ForecastViewController {
               data-action="set-sounding-view"
               data-view="chart"
             >
-              Grafico 📈
+              Grafico
             </button>
           </div>
         </div>
@@ -1357,7 +1548,8 @@ export class ForecastViewController {
       let dew = 13;
       if (idx !== -1) {
         if (hourlyData.temperature_2m && hourlyData.temperature_2m[idx] != null) temp = Number(hourlyData.temperature_2m[idx]);
-        if (hourlyData.dew_point_2m && hourlyData.dew_point_2m[idx] != null) dew = Number(hourlyData.dew_point_2m[idx]);
+        const rawDew = hourlyData.dewpoint_2m ?? hourlyData.dew_point_2m;
+        if (rawDew && rawDew[idx] != null) dew = Number(rawDew[idx]);
       }
       const lcl = calculateLCL(temp, dew, takeoffAlt);
       const lclMsl = lcl ? lcl.lclMsl : (takeoffAlt + 800);
@@ -1444,7 +1636,11 @@ export class ForecastViewController {
         <article id="forecast-briefing-box" class="gm-briefing-card">
           <div class="gm-briefing-header">
             <div class="flex items-center gap-2">
-              <span class="text-xl" aria-hidden="true">🎙️</span>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--gm-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                <line x1="12" y1="19" x2="12" y2="22"></line>
+              </svg>
               <div>
                 <h3 class="gm-briefing-title">Briefing di Volo (Guido)</h3>
                 <span class="text-xs text-[var(--gm-text-muted)]">Istruttore FIVL • Analisi di Sicurezza</span>
@@ -1501,7 +1697,8 @@ export class ForecastViewController {
         comprensorio: spot,
         weatherData,
         hourIndex: h,
-        glider
+        glider,
+        targetDate: this.activeDate
       });
       hours.push({
         hour: h,
@@ -1517,12 +1714,38 @@ export class ForecastViewController {
         aria-label="Scrubber orario ancorato"
       >
         <div class="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-[var(--gm-text-muted)] mb-1.5 px-0.5">
-          <span class="flex items-center gap-1.5">
-            <span class="text-amber-400">⏱️</span> Scrubber Orario
+          <span class="flex items-center gap-1.5 font-bold">
+            <span>Scrubber Orario</span>
           </span>
-          <span id="forecast-scrubber-hour-display" class="text-[var(--gm-accent)] font-mono font-bold">
-            Ore selezionate: ${String(this.selectedHour).padStart(2, '0')}:00
-          </span>
+          <div class="flex items-center gap-1.5">
+            <button 
+              type="button" 
+              class="gm-stepper-btn" 
+              data-action="prev-hour" 
+              aria-label="Ora precedente" 
+              title="Ora precedente"
+              ${this.selectedHour <= 8 ? 'disabled' : ''}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+            </button>
+            <span id="forecast-scrubber-hour-display" class="text-[var(--gm-accent)] font-mono font-bold">
+              Ore selezionate: ${String(this.selectedHour).padStart(2, '0')}:00
+            </span>
+            <button 
+              type="button" 
+              class="gm-stepper-btn" 
+              data-action="next-hour" 
+              aria-label="Ora successiva" 
+              title="Ora successiva"
+              ${this.selectedHour >= 20 ? 'disabled' : ''}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div id="forecast-timeline-strip" class="gm-timeline-grid-13" role="tablist" aria-label="Scrubber orario">
@@ -1571,16 +1794,7 @@ export class ForecastViewController {
    * @returns {boolean}
    */
   isSpotPinned(spot, pinnedIds) {
-    if (!spot || !spot.id) return false;
-    const set = pinnedIds instanceof Set ? pinnedIds : new Set(pinnedIds || []);
-    if (set.has(spot.id)) return true;
-    const nameLower = (spot.name || '').toLowerCase();
-    const idLower = (spot.id || '').toLowerCase();
-    if (set.has('monte-cornizzolo-lc') && (idLower.includes('cornizzolo') || nameLower.includes('cornizzolo'))) return true;
-    if (set.has('bassano-del-grappa-vi') && (idLower.includes('grappa') || nameLower.includes('grappa'))) return true;
-    if (set.has('meduno-pn') && (idLower.includes('meduno') || nameLower.includes('meduno'))) return true;
-    if (set.has('rocca-calascio-aq') && (idLower.includes('calascio') || nameLower.includes('calascio'))) return true;
-    return false;
+    return isSpotPinned(spot, pinnedIds);
   }
 
   /**
@@ -1876,6 +2090,11 @@ export class ForecastViewController {
       hourDisplay.textContent = `Ore selezionate: ${String(this.selectedHour).padStart(2, '0')}:00`;
     }
 
+    const prevBtn = this.containerEl.querySelector('[data-action="prev-hour"]');
+    const nextBtn = this.containerEl.querySelector('[data-action="next-hour"]');
+    if (prevBtn) prevBtn.disabled = this.selectedHour <= 8;
+    if (nextBtn) nextBtn.disabled = this.selectedHour >= 20;
+
     const strip = this.containerEl.querySelector('#forecast-timeline-strip');
     if (strip) {
       const cols = strip.querySelectorAll('.gm-timeline-col-compact');
@@ -2022,6 +2241,14 @@ export class ForecastViewController {
           this.setHour(hour);
         }
       }
+    } else if (action === 'prev-hour') {
+      if (this.selectedHour > 8) {
+        this.setHour(this.selectedHour - 1);
+      }
+    } else if (action === 'next-hour') {
+      if (this.selectedHour < 20) {
+        this.setHour(this.selectedHour + 1);
+      }
     } else if (action === 'select-date') {
       const dateAttr = actionEl.getAttribute('data-date');
       if (dateAttr) {
@@ -2030,6 +2257,7 @@ export class ForecastViewController {
           this.store.setState({ activeDate: dateAttr });
         }
         this.render();
+        this.fetchWeatherDataAsync(this.getCurrentSpot(), this.activeDate);
       }
     } else if (action === 'open-date-picker-sheet') {
       this.openDatePickerSheet();
@@ -2042,6 +2270,7 @@ export class ForecastViewController {
         }
         closeSheet();
         this.render();
+        this.fetchWeatherDataAsync(this.getCurrentSpot(), this.activeDate);
       }
     } else if (action === 'pick-calendar-date') {
       const dateAttr = actionEl.getAttribute('data-date');
@@ -2052,6 +2281,7 @@ export class ForecastViewController {
         }
         closeSheet();
         this.render();
+        this.fetchWeatherDataAsync(this.getCurrentSpot(), this.activeDate);
       }
     } else if (action === 'back-to-home') {
       if (this.router) {
@@ -2088,6 +2318,7 @@ export class ForecastViewController {
         }
         closeSheet();
         this.render();
+        this.fetchWeatherDataAsync(spot, this.activeDate);
       }
     } else if (action === 'toggle-pin-spot') {
       const spotId = actionEl.getAttribute('data-spot-id');
@@ -2103,10 +2334,21 @@ export class ForecastViewController {
           if (spot) {
             const nameLower = (spot.name || '').toLowerCase();
             const idLower = (spot.id || '').toLowerCase();
-            if (idLower.includes('cornizzolo') || nameLower.includes('cornizzolo')) pinned.delete('monte-cornizzolo-lc');
-            if (idLower.includes('grappa') || nameLower.includes('grappa')) pinned.delete('bassano-del-grappa-vi');
-            if (idLower.includes('meduno') || nameLower.includes('meduno')) pinned.delete('meduno-pn');
-            if (idLower.includes('calascio') || nameLower.includes('calascio')) pinned.delete('rocca-calascio-aq');
+            for (const pid of Array.from(pinned)) {
+              const p = pid.toLowerCase();
+              if (
+                p === idLower ||
+                (idLower.includes('chialamberto') && p.includes('chialamberto')) ||
+                (idLower.includes('martiniana') && p.includes('martiniana')) ||
+                (idLower.includes('cavallaria') && p.includes('cavallaria')) ||
+                (idLower.includes('cornizzolo') && p.includes('cornizzolo')) ||
+                (idLower.includes('grappa') && p.includes('grappa')) ||
+                (idLower.includes('meduno') && p.includes('meduno')) ||
+                (idLower.includes('calascio') && p.includes('calascio'))
+              ) {
+                pinned.delete(pid);
+              }
+            }
           }
         } else {
           pinned.add(spotId);

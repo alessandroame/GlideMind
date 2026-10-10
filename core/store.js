@@ -74,6 +74,7 @@ export function createLocalStorageAdapter(storage = null) {
 }
 
 import { DEFAULT_SEED_FLIGHTS } from './logbook.js';
+import { DEFAULT_GLIDER } from './flyability.js';
 
 /**
  * Default initial state for GlideMind application.
@@ -84,12 +85,12 @@ export const DEFAULT_INITIAL_STATE = Object.freeze({
   activeDate: new Date().toISOString().split('T')[0],
   weatherData: null,
   locationsCatalog: null,
+  activeGlider: DEFAULT_GLIDER,
   pinnedSpots: Object.freeze([]),
   pinnedSpotIds: Object.freeze([
-    'monte-cornizzolo-suello-lc-lc',
-    'monte-grappa-borso-del-grappa-tv-tv',
-    'calascio-rocca-calascio-calascio-aq-aq',
-    'meduno-monte-valinis-toppo-pn-pn'
+    'chialamberto-valli-di-lanzo-to-to',
+    'martiniana-po-valle-po-cn-cn',
+    'monte-cavallaria-calea-to-to'
   ]),
   recentSpotIds: Object.freeze([]),
   flights: DEFAULT_SEED_FLIGHTS,
@@ -135,7 +136,7 @@ function deepClone(obj) {
  */
 export function createStore(initialStateOverrides = {}, customStorageAdapter = null) {
   const storageAdapter = customStorageAdapter || createInMemoryStorageAdapter();
-  let persistedKeys = new Set(['pinnedSpots', 'pinnedSpotIds', 'recentSpotIds', 'units', 'selectedSpot', 'flights', 'pilotPeriod']);
+  let persistedKeys = new Set(['pinnedSpots', 'pinnedSpotIds', 'recentSpotIds', 'units', 'selectedSpot', 'flights', 'pilotPeriod', 'activeGlider', 'glider', 'ui']);
   const STORAGE_PREFIX = 'glidemind_store_';
 
   // Deep clone defaults and apply overrides
@@ -186,6 +187,24 @@ export function createStore(initialStateOverrides = {}, customStorageAdapter = n
       } catch {
         // Discard corrupted persisted records
       }
+    }
+            // Seamless migration from legacy 4-spot seeds to default favorites (Chialamberto, Martiniana, Cavallaria)
+    const LEGACY_DEFAULT_PINNED_IDS = [
+      'monte-cornizzolo-suello-lc-lc',
+      'monte-grappa-borso-del-grappa-tv-tv',
+      'calascio-rocca-calascio-calascio-aq-aq',
+      'meduno-monte-valinis-toppo-pn-pn'
+    ];
+    if (
+      Array.isArray(loadedSlice.pinnedSpotIds) &&
+      loadedSlice.pinnedSpotIds.length === 4 &&
+      loadedSlice.pinnedSpotIds.every(id => LEGACY_DEFAULT_PINNED_IDS.includes(id))
+    ) {
+      loadedSlice.pinnedSpotIds = [
+        'chialamberto-valli-di-lanzo-to-to',
+        'martiniana-po-valle-po-cn-cn',
+        'monte-cavallaria-calea-to-to'
+      ];
     }
     if (Object.keys(loadedSlice).length > 0) {
       setState(loadedSlice);

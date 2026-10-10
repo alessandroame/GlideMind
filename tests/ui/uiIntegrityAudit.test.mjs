@@ -44,4 +44,30 @@ describe('UI Integrity, Progressive Disclosure & Anti-Naked Data Audit', () => {
       'ForecastView must provide practical plain-language context for LCL'
     );
   });
+
+  it('enforces presence of discrete stepper buttons in sticky scrubber for outdoor gloves ergonomics', () => {
+    assert.ok(
+      forecastViewSrc.includes('data-action="prev-hour"'),
+      'ForecastView must include prev-hour stepper button'
+    );
+    assert.ok(
+      forecastViewSrc.includes('data-action="next-hour"'),
+      'ForecastView must include next-hour stepper button'
+    );
+  });
+
+  it('enforces absence of banned decorative emojis in titles and toggle buttons (Prägnanz & Sobriety)', () => {
+    assert.ok(!forecastViewSrc.includes('Grafico 📈'), 'ForecastView must not contain Grafico 📈 emoji');
+    assert.ok(!forecastViewSrc.includes('🎙️'), 'ForecastView must not contain 🎙️ emoji');
+    assert.ok(!forecastViewSrc.includes('⏱️'), 'ForecastView must not contain ⏱️ emoji');
+    assert.ok(!homeViewSrc.includes('ℹ️'), 'HomeDashboardView must not contain ℹ️ emoji');
+    assert.ok(!forecastViewSrc.includes('ℹ️'), 'ForecastView must not contain ℹ️ emoji');
+  });
+
+  it('enforces sunlight light theme token declarations and touch-action pan-y in theme.css', () => {
+    const themeCss = readFileSync(resolve('css/theme.css'), 'utf-8');
+    assert.ok(themeCss.includes('[data-theme="light"]'), 'theme.css must declare [data-theme="light"] theme tokens');
+    assert.ok(themeCss.includes('.gm-stepper-btn'), 'theme.css must declare .gm-stepper-btn styles');
+    assert.ok(themeCss.includes('touch-action: pan-y;'), 'theme.css must declare touch-action: pan-y on SVG charts');
+  });
 });

@@ -69,6 +69,87 @@
 }
 
 /* -------------------------------------------------------------
+ * High-Luminance Sunlight-Resistant Light Theme (Outdoor HMI)
+ * High-contrast WCAG AAA palette against alpine direct glare
+ * ------------------------------------------------------------- */
+[data-theme="light"] {
+  --gm-bg-base: #f8fafc;
+  --gm-bg-card: #ffffff;
+  --gm-bg-elevated: #f1f5f9;
+  --gm-bg-surface: #e2e8f0;
+  --gm-bg-hover: #cbd5e1;
+
+  /* Typography Colors (High Contrast >= 7:1) */
+  --gm-text-primary: #09090b;
+  --gm-text-secondary: #334155;
+  --gm-text-muted: #64748b;
+  --gm-text-inverse: #ffffff;
+
+  /* Accent & Aeronautical Palette (Deep Warm Amber) */
+  --gm-accent: #d97706;
+  --gm-accent-glow: rgba(217, 119, 6, 0.2);
+  --gm-accent-strong: #b45309;
+
+  /* Flyability Status Codes (Adjusted for high luminance) */
+  --gm-status-flyable: #15803d;
+  --gm-status-flyable-bg: rgba(21, 128, 61, 0.12);
+  --gm-status-caution: #b45309;
+  --gm-status-caution-bg: rgba(180, 83, 9, 0.14);
+  --gm-status-unflyable: #b91c1c;
+  --gm-status-unflyable-bg: rgba(185, 28, 28, 0.12);
+  --gm-status-severe: #450a0a;
+  --gm-status-severe-text: #991b1b;
+  --gm-status-severe-bg: rgba(254, 226, 226, 0.9);
+  --gm-status-severe-border: #b91c1c;
+  --gm-status-alert: #c2410c;
+  --gm-status-alert-bg: rgba(194, 65, 12, 0.12);
+
+  /* Borders & Dividers */
+  --gm-border: rgba(0, 0, 0, 0.1);
+  --gm-border-strong: rgba(0, 0, 0, 0.2);
+  --gm-border-focus: #d97706;
+
+  /* Shadows for light mode */
+  --gm-shadow-card: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --gm-shadow-elevated: 0 4px 16px rgba(0, 0, 0, 0.12);
+  --gm-shadow-glow: 0 0 12px var(--gm-accent-glow);
+}
+
+[data-theme="light"] .gm-pilot-glider-row {
+  border-top-color: rgba(0, 0, 0, 0.08);
+  border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .gm-glider-pill-badge.en-a,
+[data-theme="light"] .gm-glider-badge.en-a {
+  background: rgba(22, 163, 74, 0.15);
+  color: #15803d;
+}
+
+[data-theme="light"] .gm-glider-pill-badge.en-b,
+[data-theme="light"] .gm-glider-badge.en-b {
+  background: rgba(37, 99, 235, 0.15);
+  color: #1d4ed8;
+}
+
+[data-theme="light"] .gm-glider-pill-badge.en-c,
+[data-theme="light"] .gm-glider-badge.en-c {
+  background: rgba(217, 119, 6, 0.15);
+  color: #b45309;
+}
+
+[data-theme="light"] .gm-glider-pill-badge.en-d,
+[data-theme="light"] .gm-glider-badge.en-d {
+  background: rgba(220, 38, 38, 0.15);
+  color: #b91c1c;
+}
+
+[data-theme="light"] .gm-glider-option-card.active {
+  background: rgba(37, 99, 235, 0.08);
+  border-color: #2563eb;
+}
+
+/* -------------------------------------------------------------
  * 1. Global Resets & Viewport Boundaries (100dvh, zero overflow-x)
  * ------------------------------------------------------------- */
 *, *::before, *::after {
@@ -81,7 +162,7 @@ html, body {
   max-height: 100dvh;
   margin: 0;
   padding: 0;
-  overflow-x: hidden;
+  overflow: hidden;
   background-color: var(--gm-bg-base);
   color: var(--gm-text-primary);
   font-family: var(--gm-font-sans);
@@ -111,7 +192,7 @@ button, input, select, textarea {
   width: 100%;
   height: 100dvh;
   max-height: 100dvh;
-  overflow: hidden;
+  overflow: clip;
   position: relative;
 }
 
@@ -134,14 +215,22 @@ button, input, select, textarea {
 
 /* Main scrollable view container */
 #main-view {
-  flex: 1;
+  flex: 1 1 0%;
+  min-height: 0;
   width: 100%;
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   padding: 16px;
   padding-top: calc(16px + env(safe-area-inset-top, 0px));
-  padding-bottom: calc(var(--gm-nav-height-mobile) + env(safe-area-inset-bottom, 16px) + 16px);
+  padding-bottom: 16px;
+  position: relative;
+}
+
+#main-view.gm-view-forecast,
+#main-view:has(.gm-forecast-view) {
+  padding: 0;
+  overflow: hidden;
 }
 
 @media (min-width: 768px) and (min-height: 550px) {
@@ -150,6 +239,12 @@ button, input, select, textarea {
     padding-bottom: 32px;
     max-width: 1400px;
     margin: 0 auto;
+  }
+
+  #main-view.gm-view-forecast,
+  #main-view:has(.gm-forecast-view) {
+    padding: 0;
+    max-width: 100%;
   }
 }
 
@@ -237,10 +332,9 @@ button, input, select, textarea {
 /* Mobile Bottom Navigation Bar */
 #bottom-nav-bar {
   display: flex;
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  position: relative;
+  flex-shrink: 0;
+  width: 100%;
   height: calc(var(--gm-nav-height-mobile) + env(safe-area-inset-bottom, 0px));
   padding-bottom: env(safe-area-inset-bottom, 0px);
   background-color: var(--gm-bg-card);
@@ -455,6 +549,69 @@ button, input, select, textarea {
   border: 1px dashed var(--gm-border);
 }
 
+/* Network Freshness & Live Weather Indicator Badge */
+.gm-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  border-radius: var(--gm-radius-full);
+  font-size: 0.70rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  background: var(--gm-surface-2);
+  border: 1px solid var(--gm-border);
+  color: var(--gm-text-muted);
+  user-select: none;
+  white-space: nowrap;
+}
+
+.gm-live-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.gm-live-badge.live {
+  color: var(--gm-status-flyable);
+  border-color: rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.gm-live-badge.live .gm-live-badge-dot {
+  background-color: var(--gm-status-flyable);
+  box-shadow: 0 0 5px var(--gm-status-flyable);
+}
+
+.gm-live-badge.loading {
+  color: var(--gm-status-caution);
+  border-color: rgba(234, 179, 8, 0.35);
+  background: rgba(234, 179, 8, 0.08);
+}
+
+.gm-live-badge.loading .gm-live-badge-dot {
+  background-color: var(--gm-status-caution);
+  animation: gm-live-pulse 1.2s infinite ease-in-out;
+}
+
+.gm-live-badge.offline {
+  color: var(--gm-text-muted);
+  border-color: var(--gm-border);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.gm-live-badge.offline .gm-live-badge-dot {
+  background-color: var(--gm-text-muted);
+}
+
+@keyframes gm-live-pulse {
+  0%, 100% { opacity: 0.35; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
 /* -------------------------------------------------------------
  * 7. Sheet & Drawer Overlay System (Zero Nested Modals)
  * ------------------------------------------------------------- */
@@ -467,6 +624,7 @@ button, input, select, textarea {
   justify-content: center;
   pointer-events: none;
   visibility: hidden;
+  overflow: hidden;
   transition: visibility var(--gm-transition-normal);
 }
 
@@ -1288,6 +1446,252 @@ button, input, select, textarea {
   background-color: var(--gm-accent);
   color: var(--gm-text-inverse);
   font-weight: 700;
+}
+
+/* Active Glider Selector Row */
+.gm-pilot-glider-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.gm-glider-row-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--gm-text-muted);
+}
+
+.gm-glider-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--gm-bg-surface);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-full);
+  padding: 4px 12px;
+  min-height: 38px;
+  color: var(--gm-text-primary);
+  cursor: pointer;
+  font-size: 0.8125rem;
+  transition: background-color var(--gm-transition-fast), border-color var(--gm-transition-fast), transform 0.1s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.gm-glider-pill:hover {
+  background-color: var(--gm-bg-hover);
+  border-color: var(--gm-border-strong);
+}
+
+.gm-glider-pill:active {
+  transform: scale(0.98);
+}
+
+.gm-glider-pill-badge {
+  font-size: 0.6875rem;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+}
+
+.gm-glider-pill-badge.en-a {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+}
+
+.gm-glider-pill-badge.en-b {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+}
+
+.gm-glider-pill-badge.en-c {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+}
+
+.gm-glider-pill-badge.en-d {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+
+.gm-glider-pill-name {
+  font-weight: 600;
+  max-width: 170px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gm-glider-pill-chevron {
+  color: var(--gm-text-muted);
+  flex-shrink: 0;
+}
+
+/* Glider Selection Sheet Cards */
+.gm-glider-option-card {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--gm-radius-md);
+  background: var(--gm-bg-surface);
+  border: 1px solid var(--gm-border);
+  cursor: pointer;
+  min-height: 52px;
+  text-align: left;
+  transition: background-color var(--gm-transition-fast), border-color var(--gm-transition-fast), transform 0.1s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.gm-glider-option-card:hover {
+  background-color: var(--gm-bg-hover);
+  border-color: var(--gm-border-strong);
+}
+
+.gm-glider-option-card.active {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: var(--gm-accent);
+}
+
+.gm-glider-badge {
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 4px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.05em;
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+}
+
+.gm-glider-badge.en-a {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+}
+
+.gm-glider-badge.en-b {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+}
+
+.gm-glider-badge.en-c {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+}
+
+.gm-glider-badge.en-d {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+
+.gm-glider-check {
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: var(--gm-accent);
+  margin-left: 8px;
+  width: 20px;
+  text-align: center;
+}
+
+/* Glider Search & Brand Chips */
+.gm-glider-search-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.gm-glider-search {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: var(--gm-radius-md);
+  background: var(--gm-bg-surface);
+  border: 1px solid var(--gm-border);
+  color: var(--gm-text);
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color var(--gm-transition-fast);
+}
+
+.gm-glider-search:focus {
+  border-color: var(--gm-accent);
+}
+
+.gm-glider-brand-chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.gm-glider-brand-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.gm-glider-brand-chip {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border-radius: 9999px;
+  background: var(--gm-bg-surface);
+  border: 1px solid var(--gm-border);
+  color: var(--gm-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--gm-transition-fast);
+  white-space: nowrap;
+}
+
+.gm-glider-brand-chip:hover {
+  border-color: var(--gm-border-strong);
+  color: var(--gm-text);
+}
+
+.gm-glider-brand-chip.active {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: var(--gm-accent);
+  color: #60a5fa;
+  font-weight: 700;
+}
+
+.gm-glider-models-list {
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 2px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.gm-glider-section-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+}
+
+.gm-glider-section-divider::before,
+.gm-glider-section-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--gm-border);
+}
+
+.gm-glider-custom-details summary {
+  list-style: none;
+  user-select: none;
+}
+
+.gm-glider-custom-details summary::-webkit-details-marker {
+  display: none;
 }
 
 /* 3-Column KPI Micro Grid */
@@ -2155,31 +2559,100 @@ input.gm-input:focus {
 }
 
 /* -------------------------------------------------------------
- * 16. Forecast Scrubber Sticky Bottom & Interactive Charts
+ * 16. Forecast Scrubber Docked Bottom & Interactive Charts
  * ------------------------------------------------------------- */
-.gm-timeline-scrubber-sticky {
-  position: fixed;
-  bottom: calc(var(--gm-nav-height-mobile, 64px) + env(safe-area-inset-bottom, 0px));
-  left: 0;
-  right: 0;
-  z-index: 90;
-  background-color: rgba(27, 32, 44, 0.96);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-top: 1px solid var(--gm-border-strong);
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
-  padding: 8px 12px 10px;
+.gm-forecast-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   width: 100%;
+  overflow: hidden;
+}
+
+.gm-forecast-scroll-container {
+  flex: 1 1 0%;
+  min-height: 0;
+  width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px;
+  padding-top: calc(16px + env(safe-area-inset-top, 0px));
+  box-sizing: border-box;
+}
+
+@media (min-width: 768px) and (min-height: 550px) {
+  .gm-forecast-scroll-container {
+    padding: 24px 32px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+}
+
+.gm-timeline-scrubber-sticky {
+  position: relative;
+  flex-shrink: 0;
+  width: 100%;
+  z-index: 90;
+  background-color: var(--gm-bg-card);
+  border-top: 1px solid var(--gm-border-strong);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.3);
+  padding: 8px 12px 10px;
   box-sizing: border-box;
   touch-action: none;
   -webkit-user-select: none;
   user-select: none;
 }
 
+/* Stepper Stepping Controls for Discrete Hourly Navigation (Outdoor HMI) */
+.gm-stepper-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+  background-color: var(--gm-bg-elevated);
+  border: 1px solid var(--gm-border-strong);
+  border-radius: var(--gm-radius-xs);
+  color: var(--gm-text-primary);
+  cursor: pointer;
+  touch-action: manipulation;
+  position: relative;
+  transition: background-color var(--gm-transition-fast), border-color var(--gm-transition-fast), transform var(--gm-transition-fast);
+}
+
+/* Expand touchable target area to >= 44x44px for gloved fingers (Fitts's Law) */
+.gm-stepper-btn::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  bottom: -8px;
+  left: -8px;
+  right: -8px;
+}
+
+.gm-stepper-btn:hover:not(:disabled) {
+  background-color: var(--gm-bg-hover);
+  border-color: var(--gm-accent);
+  color: var(--gm-accent);
+}
+
+.gm-stepper-btn:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+.gm-stepper-btn:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
 @media (min-width: 768px) and (min-height: 550px) {
   .gm-timeline-scrubber-sticky {
-    position: sticky;
-    bottom: 0;
+    position: relative;
+    bottom: auto;
     width: 100%;
     max-width: 512px;
     margin: 0 auto;
@@ -2303,6 +2776,7 @@ input.gm-input:focus {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  touch-action: pan-y;
 }
 
 .gm-chart-svg {
@@ -2310,6 +2784,11 @@ input.gm-input:focus {
   height: auto;
   display: block;
   user-select: none;
+  touch-action: pan-y;
+}
+
+.gm-compass-svg {
+  touch-action: pan-y;
 }
 
 /* Level 2 Sub-Spot Dropdown & Custom Bounded Popover */
