@@ -4750,8 +4750,8 @@ input.gm-input:focus {
 .gm-leaflet-popup .leaflet-popup-content {
   margin: 10px 12px;
   line-height: 1.4;
-  min-width: 160px;
-  max-width: 220px;
+  min-width: 180px;
+  max-width: 240px;
 }
 
 .gm-leaflet-popup .leaflet-popup-tip {
@@ -4847,27 +4847,55 @@ input.gm-input:focus {
   font-weight: 600;
 }
 
+.gm-map-popup-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
 .gm-map-popup-btn {
-  margin-top: 4px;
-  padding: 5px 8px;
+  flex: 1;
+  padding: 6px 8px;
   font-size: 0.76rem;
   font-weight: 700;
-  color: var(--gm-accent, #f59e0b);
-  background: var(--gm-bg-elevated, #1a2234);
-  border: 1px solid var(--gm-border, #1e2638);
   border-radius: var(--gm-radius-sm, 6px);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 28px;
+  min-height: 32px;
   text-decoration: none;
-  transition: background-color var(--gm-transition-fast), border-color var(--gm-transition-fast);
+  transition: background-color var(--gm-transition-fast), border-color var(--gm-transition-fast), transform var(--gm-transition-fast);
+  white-space: nowrap;
 }
 
-.gm-map-popup-btn:hover {
+.gm-map-popup-btn:active {
+  transform: scale(0.97);
+}
+
+.gm-map-popup-btn-primary {
+  background: var(--gm-accent, #f59e0b);
+  color: #0f172a;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.gm-map-popup-btn-primary:hover {
+  background: #fbbf24;
+  border-color: #fbbf24;
+  color: #0f172a;
+}
+
+.gm-popup-sheet-btn {
+  background: var(--gm-bg-elevated, #1a2234);
+  color: var(--gm-text-secondary, #94a3b8);
+  border: 1px solid var(--gm-border, #1e2638);
+}
+
+.gm-popup-sheet-btn:hover {
   background: var(--gm-bg-hover, #222d44);
-  border-color: var(--gm-accent, #f59e0b);
+  color: var(--gm-text-primary, #f8fafc);
+  border-color: var(--gm-border-strong, #334155);
 }
 
 /* Medium Zoom Aureole Badge */
@@ -5050,15 +5078,28 @@ input.gm-input:focus {
   color: #475569;
 }
 
-[data-theme="light"] .gm-map-popup-btn {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
-  color: #b45309;
+[data-theme="light"] .gm-map-popup-btn-primary {
+  background: var(--gm-accent, #f59e0b);
+  color: #0f172a;
+  border-color: rgba(217, 119, 6, 0.5);
 }
 
-[data-theme="light"] .gm-map-popup-btn:hover {
+[data-theme="light"] .gm-map-popup-btn-primary:hover {
+  background: #d97706;
+  border-color: #d97706;
+  color: #ffffff;
+}
+
+[data-theme="light"] .gm-popup-sheet-btn {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #475569;
+}
+
+[data-theme="light"] .gm-popup-sheet-btn:hover {
   background: #e2e8f0;
-  border-color: #b45309;
+  border-color: #94a3b8;
+  color: #0f172a;
 }
 
 

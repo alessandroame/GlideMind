@@ -1330,3 +1330,17 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
 
 
 
+  4. **Ponte di Navigazione Mappa-Previsioni (Cross-View Bridge)**: Il fumetto del marker cartografico deve includere un'azione primaria prominente per aprire le previsioni dettagliate dello spot (`Previsioni ›`) affiancata all'azione secondaria (`Scheda Spot`). Al tap su `Previsioni ›`, il controller deve sincronizzare nello store non solo `selectedSpotId` e `selectedSpot`, ma anche l'orario attivo dello scrubber (`activeHourIndex`) e la data selezionata (`activeDate`), consentendo a `ForecastView` di atterrare direttamente sul punto temporale esaminato senza attrito cognitivo.
+
+---
+
+## 108. Riduzione della Frizione nei Picker di Selezione (Direct Tap-to-View & Zero Pulsanti di Conferma Ridondanti)
+- **Problema**: Negli sheet di selezione comprensorio (`openPickerSheet`), la presenza di un pulsante di conferma esplicito (`Visualizza Previsioni ›`) per i comprensori a decolli multipli creava una disomogeneità operativa rispetto ai siti a decollo singolo (che si aprono al singolo tap), imponendo un secondo tap superfluo e ritardando la visualizzazione dei dati meteo.
+- **Causa Radice**: Adozione di un pattern "seleziona chip e poi applica con pulsante secondario" anziché "tap diretto per selezionare e visualizzare all'istante" (Doherty Threshold & Fitts's Law).
+- **Pattern Vincolante**:
+  1. **Tap Diretto per Comprensorio e Decollo/Atterraggio**: Eliminare i pulsanti di conferma/applicazione (`.gm-picker-apply-btn`). Assegnare `data-action="pick-spot"` all'intera card `.gm-picker-item` per azzerare dead zone.
+  2. **Unificazione dell'Azione di Selezione**:
+     - Il tap sulla card o sul titolo comprensorio apre immediatamente le previsioni per quel sito con il decollo e l'atterraggio attivi o primari.
+     - Il tap su un chip di decollo specifico (`data-action="pick-spot-takeoff"`) o di atterraggio (`data-action="pick-spot-landing"`) seleziona istantaneamente il sub-spot associato, chiude lo sheet e renderizza la schermata previsioni senza passaggi intermedi.
+     - Il pulsante stella preferiti (`data-action="toggle-pin-spot"`) rimane isolato e preserva l'apertura dello sheet.
+  3. **Risoluzione Deterministica di `spotId`**: Il controller deve risolvere `spotId` primariamente dal target attivo (`actionEl.getAttribute('data-spot-id')`) con fallback trasparente sulla card padre (`card.getAttribute('data-spot-id')`).

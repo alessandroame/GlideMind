@@ -742,7 +742,13 @@ export class ForecastViewController {
     const state = this.store ? this.store.getState() : {};
     if (state.activeDate) {
       this.activeDate = state.activeDate;
-      this.selectedHour = this._resolveInitialHour(this.activeDate);
+      if (typeof state.activeHourIndex === 'number' && state.activeHourIndex >= 8 && state.activeHourIndex <= 20) {
+        this.selectedHour = state.activeHourIndex;
+      } else if (typeof state.selectedHour === 'number' && state.selectedHour >= 8 && state.selectedHour <= 20) {
+        this.selectedHour = state.selectedHour;
+      } else {
+        this.selectedHour = this._resolveInitialHour(this.activeDate);
+      }
     }
     if (state.activeTakeoffId) {
       this.activeTakeoffId = state.activeTakeoffId;
@@ -3433,6 +3439,7 @@ export class ForecastViewController {
         <div 
           class="gm-picker-item ${isActive ? 'active' : ''}" 
           id="gm-picker-item-${escapeHtml(s.id)}"
+          data-action="pick-spot"
           data-spot-id="${escapeHtml(s.id)}"
           data-takeoff-id="${escapeHtml(activeTId || '')}"
           data-landing-id="${escapeHtml(activeLId || '')}"
@@ -3502,17 +3509,6 @@ export class ForecastViewController {
                     </div>
                   </div>
                 ` : ''}
-
-                <div class="gm-picker-apply-row flex justify-end mt-1">
-                  <button
-                    type="button"
-                    class="gm-picker-apply-btn"
-                    data-action="pick-spot-apply"
-                    data-spot-id="${escapeHtml(s.id)}"
-                  >
-                    Visualizza Previsioni ›
-                  </button>
-                </div>
               </div>
             ` : ''}
           </div>
@@ -4257,11 +4253,23 @@ export class ForecastViewController {
       }
     } else if (action === 'refresh-briefing') {
       this.render();
-    } else if (action === 'pick-spot' || action === 'pick-spot-apply') {
-      const spotId = actionEl.getAttribute('data-spot-id');
+    } else if (action === 'pick-spot' || action === 'pick-spot-apply' || action === 'pick-spot-takeoff' || action === 'pick-spot-landing') {
       const card = (actionEl.classList && actionEl.classList.contains('gm-picker-item')) ? actionEl : (actionEl.closest ? actionEl.closest('.gm-picker-item') : null);
-      const takeoffId = (card && card.getAttribute('data-takeoff-id')) || actionEl.getAttribute('data-takeoff-id');
-      const landingId = (card && card.getAttribute('data-landing-id')) || actionEl.getAttribute('data-landing-id');
+      const spotId = actionEl.getAttribute('data-spot-id') || (card && card.getAttribute('data-spot-id'));
+      const takeoffId = (action === 'pick-spot-takeoff')
+        ? actionEl.getAttribute('data-takeoff-id')
+        : ((card && card.getAttribute('data-takeoff-id')) || actionEl.getAttribute('data-takeoff-id'));
+      const landingId = (action === 'pick-spot-landing')
+        ? actionEl.getAttribute('data-landing-id')
+        : ((card && card.getAttribute('data-landing-id')) || actionEl.getAttribute('data-landing-id'));
+
+      if (card && takeoffId && typeof card.setAttribute === 'function') {
+        card.setAttribute('data-takeoff-id', takeoffId);
+      }
+      if (card && landingId && typeof card.setAttribute === 'function') {
+        card.setAttribute('data-landing-id', landingId);
+      }
+
       const spot = this.comprensoriCatalog.find(c => 
         c.id === spotId || 
         (spotId && c.name && slugifyComprensorio(c.name) === spotId)
@@ -4284,54 +4292,6 @@ export class ForecastViewController {
         closeSheet();
         this.render({ resetScroll: true });
         this.fetchWeatherDataAsync(spot, this.activeDate);
-      }
-    } else if (action === 'pick-spot-takeoff') {
-      const takeoffId = actionEl.getAttribute('data-takeoff-id');
-      const spotId = actionEl.getAttribute('data-spot-id');
-      const card = actionEl.closest ? actionEl.closest('.gm-picker-item') : null;
-      if (card && takeoffId) {
-        card.setAttribute('data-takeoff-id', takeoffId);
-        const buttons = card.querySelectorAll ? card.querySelectorAll('[data-action="pick-spot-takeoff"]') : [];
-        buttons.forEach(btn => {
-          const isMatch = btn.getAttribute('data-takeoff-id') === takeoffId;
-          if (btn.classList && typeof btn.classList.toggle === 'function') {
-            btn.classList.toggle('active', isMatch);
-          }
-          if (typeof btn.setAttribute === 'function') {
-            btn.setAttribute('aria-checked', isMatch ? 'true' : 'false');
-          }
-        });
-      }
-      const currentSpot = this.getCurrentSpot();
-      if ((currentSpot && currentSpot.id === spotId) || (card && card.classList && card.classList.contains('active'))) {
-        this.activeTakeoffId = takeoffId;
-        if (this.store) {
-          this.store.setState({ activeTakeoffId: takeoffId });
-        }
-      }
-    } else if (action === 'pick-spot-landing') {
-      const landingId = actionEl.getAttribute('data-landing-id');
-      const spotId = actionEl.getAttribute('data-spot-id');
-      const card = actionEl.closest ? actionEl.closest('.gm-picker-item') : null;
-      if (card && landingId) {
-        card.setAttribute('data-landing-id', landingId);
-        const buttons = card.querySelectorAll ? card.querySelectorAll('[data-action="pick-spot-landing"]') : [];
-        buttons.forEach(btn => {
-          const isMatch = btn.getAttribute('data-landing-id') === landingId;
-          if (btn.classList && typeof btn.classList.toggle === 'function') {
-            btn.classList.toggle('active', isMatch);
-          }
-          if (typeof btn.setAttribute === 'function') {
-            btn.setAttribute('aria-checked', isMatch ? 'true' : 'false');
-          }
-        });
-      }
-      const currentSpot = this.getCurrentSpot();
-      if ((currentSpot && currentSpot.id === spotId) || (card && card.classList && card.classList.contains('active'))) {
-        this.activeLandingId = landingId;
-        if (this.store) {
-          this.store.setState({ activeLandingId: landingId });
-        }
       }
     } else if (action === 'toggle-pin-spot') {
       const spotId = actionEl.getAttribute('data-spot-id');

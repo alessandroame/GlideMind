@@ -1664,7 +1664,9 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.ok(pickerHtml.includes('Decollo Basso'), 'Must render takeoff 2 name');
     assert.ok(pickerHtml.includes('Atterraggio Prato'), 'Must render landing 1 name');
     assert.ok(pickerHtml.includes('Atterraggio Lago'), 'Must render landing 2 name');
-    assert.ok(pickerHtml.includes('data-action="pick-spot-apply"'), 'Must render visualizza previsioni apply button');
+    assert.ok(!pickerHtml.includes('data-action="pick-spot-apply"'), 'Must not render visualizza previsioni apply button');
+    assert.ok(!pickerHtml.includes('Visualizza Previsioni'), 'Must not render visualizza previsioni text');
+    assert.ok(pickerHtml.includes('data-action="pick-spot"'), 'Must render pick-spot action on card for direct tap');
 
     // Single-spot assertions
     assert.ok(pickerHtml.includes('data-spot-id="spot-single-test"'), 'Must render single-spot card');
@@ -1744,6 +1746,9 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     };
     controller.handleClick(takeoffChipEvt);
     assert.equal(mockCard.getAttribute('data-takeoff-id'), 'to-2', 'Card data-takeoff-id must be updated to to-2');
+    assert.equal(mockStore.getState().activeTakeoffId, 'to-2', 'Store activeTakeoffId must be set immediately on takeoff chip tap');
+    assert.equal(controller.activeTakeoffId, 'to-2', 'Controller activeTakeoffId must be set immediately on takeoff chip tap');
+    assert.equal(rendered, true, 'Tapping takeoff chip must trigger immediate forecast render');
 
     // 2. Simulate clicking landing chip for 'ld-2'
     const landingChipEvt = {
@@ -1927,7 +1932,8 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     const pickerHtml = controller.renderPickerSections();
     assert.ok(pickerHtml.includes('data-action="pick-spot-takeoff"'));
     assert.ok(pickerHtml.includes('data-action="pick-spot-landing"'));
-    assert.ok(pickerHtml.includes('data-action="pick-spot-apply"'));
+    assert.ok(!pickerHtml.includes('data-action="pick-spot-apply"'));
+    assert.ok(pickerHtml.includes('data-action="pick-spot"'));
 
     // Simulate clicking takeoff chip 'corn-est' on the active spot item
     const mockCard = {

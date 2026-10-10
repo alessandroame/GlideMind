@@ -577,6 +577,7 @@ describe('Spot Map View - Controller & Cartography Contracts (UI Layer)', () => 
     };
 
     let capturedDivIcons = [];
+    let capturedPopups = [];
     const originalWindow = globalThis.window;
     const mockMap = {
       getZoom: () => 8,
@@ -595,7 +596,7 @@ describe('Spot Map View - Controller & Cartography Contracts (UI Layer)', () => 
         marker: (coords, options) => ({
           ...options,
           coords,
-          bindPopup() {},
+          bindPopup(html) { capturedPopups.push(html); },
           on() {}
         }),
         divIcon: (options) => {
@@ -625,6 +626,13 @@ describe('Spot Map View - Controller & Cartography Contracts (UI Layer)', () => 
       assert.ok(capturedDivIcons[0].html.includes('Caprie / Condove'), 'Title attribute must contain spot name');
       assert.deepEqual(capturedDivIcons[0].iconSize, [28, 28]);
 
+      // Verify Popup HTML contents
+      assert.ok(capturedPopups.length > 0, 'Must bind Leaflet popup');
+      assert.ok(capturedPopups[0].includes('gm-popup-forecast-btn'), 'Popup must include forecast button');
+      assert.ok(capturedPopups[0].includes('Previsioni'), 'Popup must display Previsioni label');
+      assert.ok(capturedPopups[0].includes('gm-popup-sheet-btn'), 'Popup must include spot sheet button');
+      assert.ok(capturedPopups[0].includes('Scheda Spot'), 'Popup must display Scheda Spot label');
+
       // 2. Detailed Zoom (>= 9.5, e.g. zoom 10-11 as in screenshot)
       capturedDivIcons = [];
       engine.renderOverlays(mockSpots, 10.5, null, 'spot-1');
@@ -638,6 +646,45 @@ describe('Spot Map View - Controller & Cartography Contracts (UI Layer)', () => 
     } finally {
       globalThis.window = originalWindow;
     }
+  });
+
+  it('should navigate to forecast view with synchronized spot, date, and hour on handleOpenForecast', () => {
+    let navigatedRoute = null;
+    spotMapView.router = {
+      navigate: (route) => { navigatedRoute = route; }
+    };
+    spotMapView.mount(mockContainer);
+
+    const testSpot = DEFAULT_COMPRENSORI[0];
+    spotMapView.setActiveHour(15);
+    spotMapView.activeDate = '2026-10-15';
+
+    spotMapView.handleOpenForecast(testSpot);
+
+    const state = store.getState();
+    assert.equal(navigatedRoute, 'forecast', 'Must navigate to forecast route');
+    assert.equal(state.selectedSpotId, testSpot.id, 'Must update selectedSpotId in store');
+    assert.equal(state.selectedSpot?.id, testSpot.id, 'Must update selectedSpot in store');
+    assert.equal(state.activeHourIndex, 15, 'Must synchronize activeHourIndex in store');
+    assert.equal(state.activeDate, '2026-10-15', 'Must synchronize activeDate in store');
+  });
+
+  it('should handle open-forecast and open-spot-sheet actions in delegated handleClick', () => {
+    let navigatedRoute = null;
+    spotMapView.router = {
+      navigate: (route) => { navigatedRoute = route; }
+    };
+    spotMapView.mount(mockContainer);
+
+    const testSpot = DEFAULT_COMPRENSORI[1];
+    const mockForecastActionEl = createMockElement('button', {
+      'data-action': 'open-forecast',
+      'data-spot-id': testSpot.id
+    });
+
+    spotMapView.handleClick({ target: mockForecastActionEl });
+    assert.equal(navigatedRoute, 'forecast', 'Delegated click on open-forecast must navigate to forecast');
+    assert.equal(store.getState().selectedSpotId, testSpot.id);
   });
 
   it('should clean up on unmount without memory leaks', () => {

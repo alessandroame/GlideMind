@@ -57,6 +57,7 @@ export class SpotMapView {
     this.container = null;
     this.mapContainer = null;
     this.mapEngine = null;
+    this.router = router;
     this.comprensoriCatalog = [...DEFAULT_COMPRENSORI];
     this.cachedWeatherMap = new Map(); // spotId -> { fetchedAt: number, weatherData: object }
     this.activeMacroRegion = DEFAULT_MACRO_REGION;
@@ -625,6 +626,7 @@ export class SpotMapView {
       theme: currentTheme,
       layer: this.activeLayer,
       onSpotSelect: (spot) => this.handleSpotFocus(spot),
+      onSpotOpenForecast: (spot) => this.handleOpenForecast(spot),
       onSpotOpenSheet: (spot) => this.handleSpotClick(spot),
       onMoveEnd: (view) => this.handleMapMove(view)
     });
@@ -1356,6 +1358,36 @@ export class SpotMapView {
   }
 
   /**
+   * Opens the ForecastView for the given spot with state synchronization.
+   * @param {object} spotEval
+   */
+  handleOpenForecast(spotEval) {
+    if (!spotEval) return;
+    const spot = spotEval.comprensorio || spotEval;
+    const spotId = spot.id || spotEval.id;
+    if (!spotId) return;
+
+    const fullSpot = this.comprensoriCatalog.find(s => s.id === spotId) || spot;
+
+    if (typeof store.setState === 'function') {
+      store.setState({
+        selectedSpot: fullSpot,
+        selectedSpotId: spotId,
+        activeHourIndex: this.activeHour,
+        activeDate: this.activeDate
+      });
+    }
+
+    if (typeof this.router?.navigate === 'function') {
+      this.router.navigate('forecast');
+    } else if (typeof this.router?.navigateTo === 'function') {
+      this.router.navigateTo('forecast');
+    } else if (typeof router?.navigate === 'function') {
+      router.navigate('forecast');
+    }
+  }
+
+  /**
    * Opens the contextual Bottom Sheet drawer upon clicking any spot marker.
    * @param {object} spotEval
    */
@@ -1451,13 +1483,7 @@ export class SpotMapView {
       if (ctaBtn) {
         ctaBtn.addEventListener('click', () => {
           closeSheet();
-          if (typeof store.setState === 'function') {
-            store.setState({
-              selectedSpotId: spot.id,
-              activeHourIndex: this.activeHour
-            });
-          }
-          router.navigate('forecast');
+          this.handleOpenForecast(spot);
         });
       }
     }, 50);
@@ -1700,6 +1726,18 @@ export class SpotMapView {
       if (dateAttr) {
         this.handleDateChange(dateAttr);
         closeSheet();
+      }
+    } else if (action === 'open-forecast') {
+      const spotId = actionEl.getAttribute('data-spot-id');
+      const spot = this.comprensoriCatalog.find(s => s.id === spotId);
+      if (spot) {
+        this.handleOpenForecast(spot);
+      }
+    } else if (action === 'open-spot-sheet') {
+      const spotId = actionEl.getAttribute('data-spot-id');
+      const spot = this.comprensoriCatalog.find(s => s.id === spotId);
+      if (spot) {
+        this.handleSpotClick(spot);
       }
     }
   }
