@@ -4685,31 +4685,6 @@ input.gm-input:focus {
   z-index: 1000;
 }
 
-/* Floating Focused Spot Name Tag */
-.gm-map-focused-name-tag {
-  display: none;
-  position: absolute;
-  bottom: calc(100% + 7px);
-  left: 50%;
-  transform: translateX(-50%);
-  white-space: nowrap;
-  font-family: var(--gm-font-sans, system-ui);
-  font-size: 0.75rem;
-  font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 6px;
-  background: rgba(15, 23, 42, 0.94);
-  color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.55);
-  pointer-events: none;
-  z-index: 1001;
-}
-
-.gm-map-dot-marker.gm-map-dot-focused .gm-map-focused-name-tag {
-  display: block;
-}
-
 /* Cluster Marker Styling (<7.5 zoom) */
 .gm-map-cluster-div-icon {
   background: transparent !important;
@@ -6827,6 +6802,83 @@ input.gm-input:focus {
   width: 100%;
   min-width: 0;
   overflow: hidden;
+}
+
+/* Mixed Dual-Axis Chart Legend */
+.gm-mixed-chart-legend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.gm-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gm-legend-bar-swatch {
+  width: 12px;
+  height: 10px;
+  border-radius: 2px;
+  background-color: var(--gm-accent);
+  opacity: 0.85;
+}
+
+.gm-legend-line-swatch {
+  width: 14px;
+  height: 2px;
+  border-radius: 1px;
+  background-color: #38bdf8;
+  position: relative;
+  display: inline-block;
+}
+
+.gm-legend-line-swatch::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #38bdf8;
+  border: 1px solid var(--gm-bg-card, #13161f);
+}
+
+/* Donut Distribution Cards */
+.gm-donut-card {
+  background: var(--gm-bg-card);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-md);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.gm-donut-svg-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.gm-donut-svg {
+  width: 120px;
+  height: 120px;
+  display: block;
+}
+
+.gm-donut-bullet {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .gm-stats-grid {

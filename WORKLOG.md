@@ -1034,3 +1034,18 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Implementata la doppia salvaguardia di scorrimento nel metodo `render({ resetScroll = false } = {})`, rilevando e ripristinando `prevScrollTop` sul contenitore di scorrimento, con reset a 0 controllato solo in caso di cambio radicale del comprensorio.
   - Introdotti 2 test unitari dedicati in `tests/ui/forecastView.test.mjs`, con suite completa al 100% verde (499 test in 73 suite).
   - Registrata la Lezione Appresa #98 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-10 - Fase 6: Ristrutturazione Tripartita Logbook, Grafico Misto e Donut Chart SVG
+- **Tipo**: Refactoring UI / Ergonomia / Data Visualization Outdoor
+- **Dettagli**: [.agents/worklog.d/2026-10-10_logbook-stats-dual-axis-chart-and-donut-distributions.md](file:///.agents/worklog.d/2026-10-10_logbook-stats-dual-axis-chart-and-donut-distributions.md)
+- **Sintesi**:
+  - Riorganizzata la pagina del Libretto di Volo (`LogbookView.js`) con architettura tripartita e segmented control sub-navigazione (`Voli` vs `Statistiche & Valuta`).
+  - Ottimizzate le card di volo nel feed: `#NumeroVolo` in primissimo piano, 3 metriche glanceable ad alto contrasto, sparkline SVG e Card-as-Target verso `FlightDetailSheet`.
+  - Esternalizzata l'ingestione IGC e backup in un modal drawer dedicato (`ImportFlightSheet.js`).
+  - Nel cruscotto `LogbookStatsView.js`, implementato il grafico misto SVG a doppio asse Y sui 12 mesi solari (istogramma ore di volo + curva spezzata per il numero di voli) con legenda sdoppiata.
+  - Implementate le diagrammature a ciambella (Donut Chart) SVG per la distribuzione dei decolli più frequentati e delle vele utilizzate, con raggruppamento Top 5 + Altri, foro centrale per KPI totale voli e lista graduata affiancata.
+  - Verificato il superamento al 100% di tutti i 546 test su 87 suite native (`npm test`).
+  - Registrate le Lezioni Apprese #103, #105 e #106 in [MEMORY.md](file:///MEMORY.md).
+

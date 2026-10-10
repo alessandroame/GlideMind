@@ -267,10 +267,12 @@ describe('Spot Map View - Controller & Cartography Contracts (UI Layer)', () => 
     spotMapView.handleSpotFocus(firstSpot);
     assert.equal(spotMapView.focusedSpotId, spotId);
     assert.equal(store.getState().selectedSpotId, spotId);
+    assert.equal(engine.activeSpotId, spotId, 'Map engine must synchronize activeSpotId on handleSpotFocus');
 
     assert.equal(typeof engine.openSpotPopup, 'function');
     engine.openSpotPopup(spotId);
     assert.equal(engine.activePopupSpotId, spotId);
+    assert.equal(engine.activeSpotId, spotId, 'Map engine must synchronize activeSpotId on openSpotPopup');
   });
 
   it('should synchronize active hour with store and scrubber slots', () => {
@@ -619,8 +621,8 @@ describe('Spot Map View - Controller & Cartography Contracts (UI Layer)', () => 
       assert.ok(capturedDivIcons[0].html.includes('gm-map-dot-marker'));
       assert.ok(capturedDivIcons[0].html.includes('gm-status-flyable'));
       assert.ok(capturedDivIcons[0].html.includes('gm-map-dot-focused'));
-      assert.ok(capturedDivIcons[0].html.includes('gm-map-focused-name-tag'));
-      assert.ok(capturedDivIcons[0].html.includes('Caprie / Condove'));
+      assert.ok(!capturedDivIcons[0].html.includes('gm-map-focused-name-tag'), 'Must NOT render duplicate floating tag that collides with Leaflet popup');
+      assert.ok(capturedDivIcons[0].html.includes('Caprie / Condove'), 'Title attribute must contain spot name');
       assert.deepEqual(capturedDivIcons[0].iconSize, [28, 28]);
 
       // 2. Detailed Zoom (>= 9.5, e.g. zoom 10-11 as in screenshot)
@@ -629,6 +631,10 @@ describe('Spot Map View - Controller & Cartography Contracts (UI Layer)', () => 
       assert.equal(capturedDivIcons.length, 2);
       assert.ok(capturedDivIcons[0].html.includes('gm-map-dot-detailed'), 'Must include gm-map-dot-detailed at zoom >= 9.5');
       assert.deepEqual(capturedDivIcons[0].iconSize, [34, 34], 'Must scale to 34px at zoom >= 9.5 for outdoor glanceability');
+
+      // 3. Dynamic active spot switching without desynchronization
+      engine.setActiveSpotId('spot-2');
+      assert.equal(engine.activeSpotId, 'spot-2');
     } finally {
       globalThis.window = originalWindow;
     }

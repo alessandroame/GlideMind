@@ -261,30 +261,19 @@ describe('LogbookView Controller & Outdoor Ergonomics (UI Layer)', () => {
     assert.ok(html.includes('Volo Più Lungo'));
     assert.ok(html.includes('70 min'), 'Must show max duration');
 
-    // Top Sites and Gliders
+    // Top Sites and Gliders Donut Cards
     assert.ok(html.includes('Decolli Più Frequentati'));
     assert.ok(html.includes('Vele Utilizzate'));
+    assert.ok(html.includes('gm-donut-card'));
+    assert.ok(html.includes('gm-donut-svg'));
 
-    // Monthly Activity SVG Chart
+    // Mixed Monthly Activity SVG Chart (Dual-Axis Hours + Flights)
     assert.ok(html.includes('Attività Mensile'));
     assert.ok(html.includes('gm-chart-card'));
     assert.ok(html.includes('gm-chart-svg'));
-    assert.ok(html.includes('data-action="toggle-stats-metric"'));
-
-    // Toggle metric to flights
-    const fakeToggleBtn = {
-      getAttribute(attr) {
-        if (attr === 'data-action') return 'toggle-stats-metric';
-        if (attr === 'data-metric') return 'flights';
-        return null;
-      },
-      closest(sel) {
-        return (sel && sel.includes('data-action')) ? this : null;
-      }
-    };
-    await controller.handleClick({ target: fakeToggleBtn });
-    assert.equal(controller.statsMetric, 'flights');
-    assert.ok(container.innerHTML.includes('voli negli ultimi 12 mesi'));
+    assert.ok(html.includes('gm-mixed-chart-legend'));
+    assert.ok(html.includes('Ore di Volo'));
+    assert.ok(html.includes('Numero Voli'));
   });
 
   it('should adhere to Laws of UX (Von Restorff, Fitts >= 48px, WAI-ARIA and no banned emojis)', async () => {

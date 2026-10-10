@@ -1289,7 +1289,7 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
      - *Macro Zoom ($< 7.5$)*: cluster circolari solidi numerati da 38px.
      - *Standard Zoom ($7.5 - 9.4$)*: dot semaforici ad alto contrasto da 28px.
      - *Detailed Zoom ($\ge 9.5$)*: dot maggiorati da 34px (`.gm-map-dot-detailed`) con glifo a $0.95\text{rem}$ per visione rapida a colpo d'occhio.
-  4. **Focalizzazione dello Spot Attivo**: Lo spot osservato riceve un tag testuale fluttuante con il nome (`.gm-map-focused-name-tag`) e una corona beacon luminosa a doppio anello.
+  4. **Focalizzazione dello Spot Attivo**: Lo spot osservato riceve una corona beacon luminosa a doppio anello (`.gm-map-dot-focused`) e il popup descrittivo contestuale Leaflet (`.gm-map-spot-popup`), evitando rigorosamente l'iniezione di tag testuali fluttuanti statici nel marker per non generare duplicati grafici.
   5. **Nessun Indebolimento nel Tema Chiaro**: Evitare di depotenziare le ombre dei marker in `[data-theme="light"]`, poiché la basemap raster ha le proprie luminanze indipendenti dal tema dell'applicazione.
 
 ---
@@ -1301,4 +1301,32 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
   1. **Generazione Matematica SVG a Zero Allocazione GPU**: L'istogramma mensile (12 mesi) viene generato come markup SVG inline leggero con coordinate normalizzate (`viewBox="0 0 360 148"`), griglia di riferimento a 3 quote con linee tratteggiate discrete, tick a baseline per i mesi a zero attività e indicatore solare primario sul mese corrente.
   2. **Aggregazione Headless Core (`calculateMonthlyFlightActivity`)**: La logica temporale risiede nel core puramente matematico, calcolando max, scale ceiling adattivo (2, 4, 6, 10 o multipli di 5) e label brevi localizzate in italiano (`Gen`, `Feb`, ..., `Dic`), tollerando formati data ISO e stringhe parziali.
   3. **Toggle Ergonomico Ore / Voli**: Consentire il cambio metrica rapido tramite bottoni dedicati con touch target minimo $\ge 32\text{px} \times 44\text{px}$ e feedback semantico `aria-pressed`, senza mai nascondere le metriche assolute.
+
+---
+
+## 106. Grafici Misti a Doppio Asse e Donut Chart Matematiche SVG per la Dashboard Statistiche Logbook
+- **Problema**: L'uso di toggle separati per passare tra ore di volo e numero di voli nasconde la correlazione tra le due grandezze (es. mesi con pochi voli ma ore elevate indicano voli di cross e termica, mentre mesi con molti voli ma poche ore indicano voli didattici, scuola o veleggiata locale). Inoltre, le tabelle di testo con sole barre di progresso per decolli e vele non offrono la percezione immediata della quota di mercato personale sul totale dei voli.
+- **Causa Radice**: Limitazione dei layout univariati e assenza di visualizzazioni di proporzione radiale a colpo d'occhio.
+- **Pattern Vincolante**:
+  1. **Grafico Misto a Doppio Asse Y SVG**: Mantenere la linea temporale dei 12 mesi solari su un unico grafico compatto (`viewBox="0 0 360 160"`), combinando le barre verticali per le ore di volo (asse Y sinistro) e una spezzata polilinea (`<polyline>`) con nodi a punto ed etichette per il numero di voli (asse Y destro in ciano avionico `#38bdf8`). Legenda esplicita sdoppiata in testata.
+  2. **Donut Chart SVG Parametriche**: Costruire la ciambella matematica con archi `<circle>` tramite `stroke-dasharray` e `stroke-dashoffset` ($r = 44$, $C \approx 276.46$, rotazione $-90^\circ$). Evitare il disordine visivo aggregando le voci minori oltre la 5ª posizione in uno spicchio residuale "Altri" (`#64748b`), con foro centrale contenente il conteggio totale assoluto dei voli.
+  3. **Zero Librerie Esterne**: Conservare sempre la renderizzazione SVG pura via stringhe template per garantire 0ms di latenza, zero bundle bloat e piena reattività sia in dark cockpit che in sunlight light mode.
+
+---
+
+## 107. Single Source of Truth per Fumetti Cartografici e Sincronizzazione 1:1 del Focus Marker
+- **Problema**: All'attivazione di uno spot sulla mappa compaiono due etichette/fumetti sovrapposti per lo stesso nome, e cambiando spot dalla tendina o toccando un marker l'alone luminoso (.gm-map-dot-focused) rimane ancorato al vecchio spot pur aprendosi il popup sul nuovo.
+- **Causa Radice**:
+  1. *Fumetti doppi*: Coesistenza di un elemento statico nel marker (`<span class="gm-map-focused-name-tag">`) con il popup nativo di Leaflet (`.gm-map-spot-popup`), entrambi agganciati alla medesima coordinata superiore del marker.
+  2. *Desincronizzazione stato/marker*: `SpotMapView` memorizzava `focusedSpotId` prima di notificare lo store, provocando il bypass del subscriber reattivo. Inoltre il cambio spot da dropdown muoveva la vista (`flyTo`) e apriva il popup ma non invocava un metodo esplicito sul motore per trasferire la classe CSS `.gm-map-dot-focused` tra i layer DOM.
+- **Pattern Vincolante**:
+  1. **Unico Fumetto Ammesso (SSOT)**: Il popup interattivo di Leaflet è l'unica etichetta consentita sopra il marker. Nessun elemento di testo ausiliario deve essere innestato permanentemente nel DOM del marker HTML (`L.divIcon`).
+  2. **Metodo Esplicito `mapEngine.setActiveSpotId(spotId)`**: Il motore cartografico deve esporre un metodo atomico `setActiveSpotId` che rimuove la classe di focus dal vecchio marker e la applica al nuovo in un unico passaggio (sia per marker DOM che per marker Canvas).
+  3. **Hooking Bidirezionale Completo**: `setActiveSpotId(spotId)` deve essere invocato obbligatoriamente da:
+     - Apertura popup (`openSpotPopup` e evento `popupopen`).
+     - Click diretto sul marker (`marker.on('click')`).
+     - Cambio selezione dal dropdown (`#gm-map-spot-select`).
+     - Gestore centralizzato `handleSpotFocus(spotEval)`.
+
+
 

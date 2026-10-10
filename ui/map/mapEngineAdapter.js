@@ -176,9 +176,30 @@ export class HeadlessMockMapEngine {
     this.isCanvasRendered = Boolean(this.options.preferCanvas || (evaluatedSpots && evaluatedSpots.length > 50));
   }
 
+  setActiveSpotId(spotId) {
+    this.activeSpotId = spotId;
+  }
+
   openSpotPopup(spotId) {
+    this.activeSpotId = spotId;
     this.activePopupSpotId = spotId;
     return true;
+  }
+
+  triggerSpotForecast(spotId) {
+    this.activeSpotId = spotId;
+    const spot = { id: spotId };
+    if (typeof this.options.onSpotOpenForecast === 'function') {
+      this.options.onSpotOpenForecast(spot);
+    }
+  }
+
+  triggerSpotOpenSheet(spotId) {
+    this.activeSpotId = spotId;
+    const spot = { id: spotId };
+    if (typeof this.options.onSpotOpenSheet === 'function') {
+      this.options.onSpotOpenSheet(spot);
+    }
   }
 
   closeSpotPopup() {
@@ -612,25 +633,7 @@ export class LeafletMapEngine {
     // If identical dataset is already mounted, avoid destroying DOM markers and closing active popups
     if (this.lastRenderedSignature === signature && this.overlayLayerGroup.getLayers().length > 0) {
       if (this.activeSpotId !== activeSpotId) {
-        if (this.activeSpotId && this.markersMap?.has(this.activeSpotId)) {
-          const m = this.markersMap.get(this.activeSpotId);
-          if (m && typeof m.setStyle === 'function') {
-            m.setStyle({ color: '#ffffff', weight: 2.5, radius: isDetailedZoom ? 11 : 9 });
-          } else {
-            const el = m?.getElement?.();
-            el?.querySelector('.gm-map-dot-marker')?.classList.remove('gm-map-dot-focused');
-          }
-        }
-        if (activeSpotId && this.markersMap?.has(activeSpotId)) {
-          const m = this.markersMap.get(activeSpotId);
-          if (m && typeof m.setStyle === 'function') {
-            m.setStyle({ color: '#ffffff', weight: 3.5, radius: isDetailedZoom ? 15 : 13 });
-          } else {
-            const el = m?.getElement?.();
-            el?.querySelector('.gm-map-dot-marker')?.classList.add('gm-map-dot-focused');
-          }
-        }
-        this.activeSpotId = activeSpotId;
+        this.setActiveSpotId(activeSpotId);
       }
       return;
     }
@@ -725,7 +728,6 @@ export class LeafletMapEngine {
         const iconHtml = `
           <div class="gm-map-dot-marker gm-status-${item.status || 'unavailable'} ${isDetailedZoom ? 'gm-map-dot-detailed' : ''} ${isFocused ? 'gm-map-dot-focused' : ''}" title="${escapeHtml(spotName)} - ${statusStyle.badge}">
             <span class="gm-map-dot-glyph">${statusStyle.icon}</span>
-            <span class="gm-map-focused-name-tag">${escapeHtml(spotName)}</span>
           </div>
         `;
 
@@ -759,8 +761,23 @@ export class LeafletMapEngine {
             </div>
           ` : ''}
           <div class="gm-map-popup-actions">
-            <button type="button" class="gm-map-popup-btn gm-popup-sheet-btn" data-spot-id="${escapeHtml(spotId || '')}">
-              Scheda Spot ›
+            <button
+              type="button"
+              class="gm-map-popup-btn gm-map-popup-btn-primary gm-popup-forecast-btn"
+              data-action="open-forecast"
+              data-spot-id="${escapeHtml(spotId || '')}"
+              aria-label="Apri previsioni per ${escapeHtml(spotName)}"
+            >
+              Previsioni ›
+            </button>
+            <button
+              type="button"
+              class="gm-map-popup-btn gm-popup-sheet-btn"
+              data-action="open-spot-sheet"
+              data-spot-id="${escapeHtml(spotId || '')}"
+              aria-label="Scheda spot per ${escapeHtml(spotName)}"
+            >
+              Scheda Spot
             </button>
           </div>
         </div>
@@ -774,17 +791,33 @@ export class LeafletMapEngine {
       });
 
       marker.on('click', () => {
+        if (spotId) {
+          this.setActiveSpotId(spotId);
+        }
         if (typeof this.options.onSpotSelect === 'function') {
           this.options.onSpotSelect(item);
         }
       });
 
       marker.on('popupopen', (e) => {
+        if (spotId) {
+          this.setActiveSpotId(spotId);
+        }
         const popupEl = e.popup?.getElement();
         if (popupEl) {
-          const btn = popupEl.querySelector('.gm-popup-sheet-btn');
-          if (btn) {
-            btn.onclick = (evt) => {
+          const forecastBtn = popupEl.querySelector('.gm-popup-forecast-btn');
+          if (forecastBtn) {
+            forecastBtn.onclick = (evt) => {
+              evt.preventDefault();
+              evt.stopPropagation();
+              if (typeof this.options.onSpotOpenForecast === 'function') {
+                this.options.onSpotOpenForecast(item);
+              }
+            };
+          }
+          const sheetBtn = popupEl.querySelector('.gm-popup-sheet-btn');
+          if (sheetBtn) {
+            sheetBtn.onclick = (evt) => {
               evt.preventDefault();
               evt.stopPropagation();
               if (typeof this.options.onSpotOpenSheet === 'function') {
@@ -802,7 +835,41 @@ export class LeafletMapEngine {
     }
   }
 
+  setActiveSpotId(activeSpotId) {
+    if (this.activeSpotId === activeSpotId) return;
+    const oldSpotId = this.activeSpotId;
+    this.activeSpotId = activeSpotId;
+
+    const isDetailedZoom = (this.map?.getZoom() || 7) >= 9.5;
+
+    // Remove focus from old spot marker
+    if (oldSpotId && this.markersMap?.has(oldSpotId)) {
+      const m = this.markersMap.get(oldSpotId);
+      if (m && typeof m.setStyle === 'function') {
+        m.setStyle({ color: '#ffffff', weight: 2.5, radius: isDetailedZoom ? 11 : 9 });
+      } else {
+        const el = m?.getElement?.();
+        const dot = el?.querySelector?.('.gm-map-dot-marker') || (el?.classList?.contains('gm-map-dot-marker') ? el : null);
+        dot?.classList?.remove('gm-map-dot-focused');
+      }
+    }
+
+    // Add focus to new spot marker
+    if (activeSpotId && this.markersMap?.has(activeSpotId)) {
+      const m = this.markersMap.get(activeSpotId);
+      if (m && typeof m.setStyle === 'function') {
+        m.setStyle({ color: '#ffffff', weight: 3.5, radius: isDetailedZoom ? 15 : 13 });
+      } else {
+        const el = m?.getElement?.();
+        const dot = el?.querySelector?.('.gm-map-dot-marker') || (el?.classList?.contains('gm-map-dot-marker') ? el : null);
+        dot?.classList?.add('gm-map-dot-focused');
+      }
+    }
+  }
+
   openSpotPopup(spotId) {
+    if (!spotId) return false;
+    this.setActiveSpotId(spotId);
     if (!this.markersMap) return false;
     const marker = this.markersMap.get(spotId);
     if (marker && typeof marker.openPopup === 'function') {

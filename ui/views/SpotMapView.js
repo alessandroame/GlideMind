@@ -772,6 +772,9 @@ export class SpotMapView {
         const spotId = e.target.value;
         if (!spotId) {
           this.focusedSpotId = null;
+          if (this.mapEngine && typeof this.mapEngine.setActiveSpotId === 'function') {
+            this.mapEngine.setActiveSpotId(null);
+          }
           const regionConfig = Object.values(MACRO_REGIONS).find(r => r.id === this.activeMacroRegion) || MACRO_REGIONS.ALL;
           if (this.mapEngine) {
             this.mapEngine.setView(regionConfig.defaultCenter, regionConfig.defaultZoom);
@@ -782,11 +785,10 @@ export class SpotMapView {
 
         const spot = this.comprensoriCatalog.find(s => s.id === spotId);
         if (spot) {
-          this.focusedSpotId = spot.id;
+          this.handleSpotFocus(spot);
           const coords = getComprensorioCoordinates(spot);
           if (coords && this.mapEngine) {
             this.mapEngine.flyTo(coords, 12);
-            this.handleSpotFocus(spot);
             if (typeof this.mapEngine.openSpotPopup === 'function') {
               setTimeout(() => {
                 this.mapEngine.openSpotPopup(spot.id);
@@ -1162,8 +1164,9 @@ export class SpotMapView {
    * @param {object} spotEvaluation
    */
   updateScrubberBars(spotEvaluation) {
-    if (!this.container || !spotEvaluation || !spotEvaluation.comprensorio) return;
-    const spot = spotEvaluation.comprensorio;
+    if (!this.container || !spotEvaluation) return;
+    const spot = spotEvaluation.comprensorio || spotEvaluation;
+    if (!spot || !spot.id) return;
     let weather = this.cachedWeatherMap.get(spot.id)?.weatherData;
     if (!weather) {
       const coords = getComprensorioCoordinates(spot);
@@ -1312,6 +1315,9 @@ export class SpotMapView {
     const spotId = spot.id || spotEval.id;
     if (spotId) {
       this.focusedSpotId = spotId;
+      if (this.mapEngine && typeof this.mapEngine.setActiveSpotId === 'function') {
+        this.mapEngine.setActiveSpotId(spotId);
+      }
       if (typeof store.setState === 'function') {
         if (store.getState().selectedSpotId !== spotId) {
           store.setState({ selectedSpotId: spotId });
@@ -1323,8 +1329,30 @@ export class SpotMapView {
       if (spotSelect && spotId && spotSelect.value !== spotId) {
         spotSelect.value = spotId;
       }
+      const topNameEl = this.container.querySelector('#gm-top-spot-name');
+      if (topNameEl) {
+        topNameEl.textContent = spot.name || 'Spot';
+      }
     }
-    this.updateScrubberBars(spotEval);
+    let evalToUse = spotEval;
+    if (!evalToUse.status || !evalToUse.comprensorio) {
+      let weather = this.cachedWeatherMap.get(spot.id)?.weatherData;
+      if (!weather) {
+        const coords = getComprensorioCoordinates(spot);
+        if (coords) {
+          weather = generateSyntheticWeather({ lat: coords.lat, lon: coords.lon }, { days: 1, targetDate: this.activeDate });
+        }
+      }
+      evalToUse = evaluateComprensorio({
+        comprensorio: spot,
+        weatherData: weather,
+        hourIndex: this.activeHour,
+        glider: store.getState().activeGlider,
+        allowSynthetic: true,
+        targetDate: this.activeDate
+      });
+    }
+    this.updateScrubberBars(evalToUse);
   }
 
   /**
