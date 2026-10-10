@@ -56,6 +56,7 @@ export class LogbookViewController {
     // Ingestion progress state
     this.isIngesting = false;
     this.ingestionProgress = 0;
+    this.importSummaryBanner = null;
 
     // Bound event handlers
     this.boundHandleClick = this.handleClick.bind(this);
@@ -188,6 +189,7 @@ export class LogbookViewController {
       <section class="gm-logbook-view" aria-label="Libretto di Volo e Telemetria">
         ${this.renderStorageWarningBanner()}
         ${this.renderUndoBanner()}
+        ${this.renderImportSummaryBanner()}
 
         <!-- Career KPIs Glanceable Grid -->
         <header aria-labelledby="heading-career-kpis">
@@ -217,7 +219,7 @@ export class LogbookViewController {
           <input
             type="file"
             id="gm-logbook-file-input"
-            accept=".igc"
+            accept=".igc,.json,application/json"
             multiple
             style="display: none;"
             aria-hidden="true"
@@ -226,14 +228,14 @@ export class LogbookViewController {
             type="button"
             class="gm-btn gm-btn-primary"
             data-action="trigger-file-select"
-            aria-label="Importa traccia IGC"
+            aria-label="Importa traccia IGC o backup ParaMeteo"
             style="min-height: var(--gm-touch-min, 48px); min-width: 200px;"
           >
-            + Importa Traccia IGC
+            + Importa Traccia IGC / Backup
           </button>
-          <div class="gm-logbook-dropzone-title">Trascina qui i tuoi file di volo .IGC</div>
+          <div class="gm-logbook-dropzone-title">Trascina qui i tuoi file .IGC o export ParaMeteo .JSON</div>
           <div class="gm-logbook-dropzone-hint">
-            Compatibile con Flymaster, Syride, XCSoar, XContest, smartphone e strumenti conformi FAI.
+            Compatibile con Flymaster, Syride, XCSoar, XContest, smartphone e backup completi ParaMeteo.
           </div>
 
           <div
@@ -323,6 +325,31 @@ export class LogbookViewController {
   }
 
   /**
+   * Renders the import completion notification banner.
+   * @returns {string}
+   */
+  renderImportSummaryBanner() {
+    if (!this.importSummaryBanner) return '';
+
+    return `
+      <div class="gm-import-summary-banner" role="status" aria-live="polite">
+        <div class="text-sm">
+          <strong>${escapeHtml(this.importSummaryBanner.title)}:</strong> ${escapeHtml(this.importSummaryBanner.message)}
+        </div>
+        <button
+          type="button"
+          class="gm-btn gm-btn-ghost text-xs"
+          data-action="dismiss-import-summary"
+          aria-label="Chiudi notifica importazione"
+          style="min-height: 36px; padding: 4px 10px; flex-shrink: 0;"
+        >
+          OK
+        </button>
+      </div>
+    `;
+  }
+
+  /**
    * Renders the empty state when no flights have been uploaded yet.
    * @returns {string}
    */
@@ -345,9 +372,13 @@ export class LogbookViewController {
    * @returns {string}
    */
   renderFlightList(flights) {
+    const totalCount = Array.isArray(flights) ? flights.length : 0;
     return `
       <div class="gm-flight-list" role="list" aria-label="Elenco dei voli">
-        ${flights.map((flight) => this.renderFlightCard(flight)).join('')}
+        ${flights.map((flight, index) => {
+          const flightNum = flight.flightNumber || (totalCount - index);
+          return this.renderFlightCard(flight, flightNum);
+        }).join('')}
       </div>
     `;
   }
@@ -355,9 +386,10 @@ export class LogbookViewController {
   /**
    * Renders a single flight card with altimetric sparkline, metrics, and actions.
    * @param {Object} flight
+   * @param {number|string} [flightNumber=null] - Progressive flight number
    * @returns {string}
    */
-  renderFlightCard(flight) {
+  renderFlightCard(flight, flightNumber = null) {
     const flightId = flight.id;
     const title = flight.siteName || flight.site || 'Volo da IGC';
     const dateFormatted = flight.date || 'Data N/D';
@@ -381,15 +413,18 @@ export class LogbookViewController {
       <article class="gm-flight-card" role="listitem" aria-labelledby="fl-title-${escapeHtml(flightId)}">
         <!-- Flight Header (Clickable for detail sheet) -->
         <div class="gm-flight-card-header cursor-pointer" role="button" tabindex="0" data-action="open-flight-detail" data-flight-id="${escapeHtml(flightId)}">
-          <div class="flex flex-col min-w-0 flex-1">
-            <h4 id="fl-title-${escapeHtml(flightId)}" class="gm-flight-site-title">
-              ${escapeHtml(title)}
-            </h4>
-            <div class="gm-flight-card-sub">
-              ${siteArea ? `<span>${escapeHtml(siteArea)}</span><span>•</span>` : ''}
-              <span>${escapeHtml(dateFormatted)}</span>
-              ${takeoffTime ? `<span>•</span><span>${escapeHtml(takeoffTime)}</span>` : ''}
-              ${duration ? `<span>•</span><span>${escapeHtml(duration)}</span>` : ''}
+          <div class="flex items-start gap-2.5 min-w-0 flex-1">
+            ${flightNumber != null ? `<span class="gm-flight-number-badge" aria-label="Volo numero ${flightNumber}">#${escapeHtml(flightNumber)}</span>` : ''}
+            <div class="flex flex-col min-w-0 flex-1">
+              <h4 id="fl-title-${escapeHtml(flightId)}" class="gm-flight-site-title">
+                ${escapeHtml(title)}
+              </h4>
+              <div class="gm-flight-card-sub">
+                ${siteArea ? `<span>${escapeHtml(siteArea)}</span><span>•</span>` : ''}
+                <span>${escapeHtml(dateFormatted)}</span>
+                ${takeoffTime ? `<span>•</span><span>${escapeHtml(takeoffTime)}</span>` : ''}
+                ${duration ? `<span>•</span><span>${escapeHtml(duration)}</span>` : ''}
+              </div>
             </div>
           </div>
 
@@ -531,6 +566,11 @@ export class LogbookViewController {
         this.render();
         break;
       }
+      case 'dismiss-import-summary': {
+        this.importSummaryBanner = null;
+        this.render();
+        break;
+      }
     }
   }
 
@@ -543,7 +583,7 @@ export class LogbookViewController {
     if (!input || !input.files || input.files.length === 0) return;
 
     const files = Array.from(input.files);
-    await this.processIgcFiles(files);
+    await this.processUploadedFiles(files);
     input.value = ''; // Reset input so same file can be re-selected
   }
 
@@ -574,7 +614,7 @@ export class LogbookViewController {
   }
 
   /**
-   * Drop listener handling drag & drop IGC files.
+   * Drop listener handling drag & drop IGC and ParaMeteo JSON files.
    * @param {DragEvent} e
    */
   async handleDrop(e) {
@@ -585,21 +625,25 @@ export class LogbookViewController {
     }
 
     if (!e.dataTransfer || !e.dataTransfer.files || e.dataTransfer.files.length === 0) return;
-    const files = Array.from(e.dataTransfer.files).filter((f) => f.name.toLowerCase().endsWith('.igc'));
+    const files = Array.from(e.dataTransfer.files).filter((f) => {
+      const n = f.name.toLowerCase();
+      return n.endsWith('.igc') || n.endsWith('.json');
+    });
     if (files.length > 0) {
-      await this.processIgcFiles(files);
+      await this.processUploadedFiles(files);
     }
   }
 
   /**
-   * Processes a list of IGC files sequentially with progress reporting.
+   * Processes a list of IGC or ParaMeteo JSON files sequentially with progress reporting.
    * @param {Array<File>} files
    */
-  async processIgcFiles(files) {
+  async processUploadedFiles(files) {
     if (!files || files.length === 0) return;
 
     this.isIngesting = true;
     this.ingestionProgress = 0;
+    this.importSummaryBanner = null;
     this.render();
 
     const progressWrap = this.containerEl?.querySelector('#gm-logbook-progress-wrap');
@@ -609,17 +653,36 @@ export class LogbookViewController {
 
     const totalFiles = files.length;
     let completedFiles = 0;
+    let totalImportedFlights = 0;
+    let totalImportedTracks = 0;
 
     for (const file of files) {
+      const fileNameLower = file.name.toLowerCase();
       try {
         const text = await file.text();
-        await this.logbookManager.importIgcTrack(text, {
-          fileName: file.name,
-          onProgress: (pct) => {
-            const overallPct = Math.round(((completedFiles + pct / 100) / totalFiles) * 100);
-            if (progressBar) progressBar.style.width = `${overallPct}%`;
+        if (fileNameLower.endsWith('.json') || text.trim().startsWith('{') || text.trim().startsWith('[')) {
+          // ParaMeteo JSON export or backup package
+          const res = await this.logbookManager.importParaMeteoBackup(text, {
+            onProgress: (pct) => {
+              const overallPct = Math.round(((completedFiles + pct / 100) / totalFiles) * 100);
+              if (progressBar) progressBar.style.width = `${overallPct}%`;
+            }
+          });
+          if (res && res.success) {
+            totalImportedFlights += (res.importedFlightsCount || 0);
+            totalImportedTracks += (res.tracksImportedCount || 0);
           }
-        });
+        } else {
+          // Standard FAI IGC file
+          await this.logbookManager.importIgcTrack(text, {
+            fileName: file.name,
+            onProgress: (pct) => {
+              const overallPct = Math.round(((completedFiles + pct / 100) / totalFiles) * 100);
+              if (progressBar) progressBar.style.width = `${overallPct}%`;
+            }
+          });
+          totalImportedFlights += 1;
+        }
       } catch (err) {
         console.error(`[LogbookView] Errore importazione file ${file.name}:`, err);
       }
@@ -629,7 +692,22 @@ export class LogbookViewController {
     }
 
     this.isIngesting = false;
+    if (totalImportedFlights > 0) {
+      const tracksMsg = totalImportedTracks > 0 ? ` (${totalImportedTracks} con traccia GPS)` : '';
+      this.importSummaryBanner = {
+        title: 'Importazione completata',
+        message: `${totalImportedFlights} ${totalImportedFlights === 1 ? 'volo importato' : 'voli importati'}${tracksMsg}.`
+      };
+    }
     this.render();
+  }
+
+  /**
+   * Backward-compatible alias for processUploadedFiles.
+   * @param {Array<File>} files
+   */
+  async processIgcFiles(files) {
+    return this.processUploadedFiles(files);
   }
 
   /**

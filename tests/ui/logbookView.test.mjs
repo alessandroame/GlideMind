@@ -131,6 +131,14 @@ describe('LogbookView Controller & Outdoor Ergonomics (UI Layer)', () => {
       },
       async deleteFlight(id) {
         return mockDb.deleteFlight(id);
+      },
+      async importParaMeteoBackup(jsonContent, options = {}) {
+        return {
+          success: true,
+          importedFlightsCount: 2,
+          tracksImportedCount: 1,
+          newFlightsCount: 2
+        };
       }
     };
 
@@ -290,5 +298,40 @@ describe('LogbookView Controller & Outdoor Ergonomics (UI Layer)', () => {
     controller.unmount();
     assert.equal(controller.containerEl, null);
     assert.equal(controller.pendingDeleteInterval, null);
+  });
+
+  it('should process uploaded ParaMeteo JSON backups and render notification banner', async () => {
+    await controller.mount(container);
+
+    const mockFile = {
+      name: 'parameteo_backup_2026-04-15_1200.json',
+      async text() {
+        return JSON.stringify({ app: 'ParaMeteo', version: 2, database: { flights: [] } });
+      }
+    };
+
+    await controller.processUploadedFiles([mockFile]);
+
+    // Check banner was rendered
+    assert.ok(container.innerHTML.includes('gm-import-summary-banner'));
+    assert.ok(container.innerHTML.includes('Importazione completata'));
+    assert.ok(container.innerHTML.includes('2 voli importati (1 con traccia GPS)'));
+
+    // Dismiss banner
+    const dismissBtn = {
+      target: {
+        closest: (sel) => {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute: (attr) => (attr === 'data-action' ? 'dismiss-import-summary' : null)
+            };
+          }
+          return null;
+        }
+      }
+    };
+
+    await controller.handleClick(dismissBtn);
+    assert.ok(!container.innerHTML.includes('gm-import-summary-banner'));
   });
 });

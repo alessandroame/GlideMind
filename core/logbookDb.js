@@ -638,21 +638,9 @@ class LogbookManager {
 
   /**
    * Imports and processes an authentic FAI IGC text tracklog.
-   * Execution pipeline:
-   *  1. Chunked scan & yield to main thread (Doherty Threshold <400ms).
-   *  2. Deterministic FNV-1a fingerprinting from date, first & last B-records.
-   *  3. Standard IGC parsing & 1Hz telemetry kinematics calculation.
-   *  4. Downstream LTTB decimation (60 pts for sparkline, 1,500 pts for 3D Replay).
-   *  5. Atomically persists FlightMeta to 'flights_meta' and FlightRawRecord to 'flights_raw'.
-   *  6. Synchronizes reactive state with store.setState({ flights: updatedMetas }).
-   * 
+   * Deterministic FNV-1a fingerprinting, telemetry analysis, LTTB decimation, and dual-tier persistence.
    * @param {string} rawIgcText - Raw ASCII text of the IGC file.
    * @param {Object} [options={}]
-   * @param {string} [options.fileName='track.igc'] - Original filename.
-   * @param {Array<Object>} [options.spotsCatalog=[]] - Catalog of locations for takeoff/landing detection.
-   * @param {Object|string} [options.activeGlider=null] - Pilot active glider profile.
-   * @param {(pct: number) => void} [options.onProgress] - Optional progress callback [0..100].
-   * @param {number} [options.chunkSize=2000] - Number of lines to process per event loop tick.
    * @returns {Promise<{ meta: Object, raw: Object, isNew: boolean, wasUpdated: boolean }>}
    */
   async importIgcTrack(rawIgcText, options = {}) {
@@ -974,6 +962,18 @@ class LogbookManager {
   }
 
   /**
+   * Imports flights and tracks from a ParaMeteo JSON export (V1, V2, or bare array).
+   * @param {string|Object} jsonContent - JSON string or parsed object.
+   * @param {Object} [options={}] - Options (mode: 'merge'|'overwrite', onProgress).
+   * @returns {Promise<Object>} Import execution summary.
+   */
+  async importParaMeteoBackup(jsonContent, options = {}) {
+    await this.init();
+    const { importParaMeteoData } = await import('./parameteoImporter.js');
+    return importParaMeteoData(jsonContent, this, options);
+  }
+
+  /**
    * Clears all flights from storage and synchronizes state.
    */
   async clearAll() {
@@ -990,3 +990,5 @@ class LogbookManager {
  * Singleton LogbookManager instance.
  */
 export const logbookManager = new LogbookManager();
+
+export { parseParaMeteoBackup, convertParaMeteoFlight, importParaMeteoData } from './parameteoImporter.js';

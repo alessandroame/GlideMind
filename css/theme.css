@@ -6337,6 +6337,29 @@ input.gm-input:focus {
   flex-wrap: wrap;
 }
 
+.gm-flight-number-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--gm-font-mono, monospace);
+  font-weight: 800;
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: var(--gm-radius-sm);
+  background: rgba(56, 189, 248, 0.12);
+  color: var(--gm-accent-sky, #38bdf8);
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+[data-theme="light"] .gm-flight-number-badge {
+  background: rgba(2, 132, 199, 0.1);
+  color: #0369a1;
+  border-color: rgba(2, 132, 199, 0.3);
+}
+
 .gm-flight-site-title {
   font-weight: 700;
   font-size: 0.95rem;
@@ -6449,6 +6472,19 @@ input.gm-input:focus {
   border: 1px solid rgba(245, 158, 11, 0.35);
   border-radius: var(--gm-radius-md);
   font-size: 0.8rem;
+  color: var(--gm-text-primary);
+}
+
+.gm-import-summary-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  border-radius: var(--gm-radius-md);
+  font-size: 0.85rem;
   color: var(--gm-text-primary);
 }
 
