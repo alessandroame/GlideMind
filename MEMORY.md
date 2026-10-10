@@ -1107,4 +1107,16 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
   1. Il Service Worker deve applicare una strategia `Network-Only` (pass-through trasparente non intercettato) per tutti i domini di tile cartografiche esterne (OpenTopoMap, Esri Satellite, CyclOSM, OpenStreetMap, DEM Terrarium).
   2. Solo gli asset statici locali dell'applicazione (`index.html`, bundle CSS, icone, file JS e catalogo JSON delle località) possono risiedere nella Cache Storage con strategia `Cache-First`.
 
+---
+
+## 92. Parità Dati Cartografici tra Mini-Mappa e Vista Schermo Intero (Settore Decollo & Linea di Planata)
+- **Problema**: L'ispezione della mappa comprensorio a schermo intero (`renderComprensorioFlightMap`) ometteva il settore di esposizione del decollo e la linea geodesica di planata con codice colore di sicurezza, provocando asimmetria informativa rispetto alla mini-mappa contestuale e disorientando il pilota.
+- **Causa Radice**: Mancata unificazione dei layer cartografici informativi tra la vista riassuntiva (`renderSpotMiniMap`) e l'overlay a schermo intero (`renderComprensorioFlightMap`).
+- **Pattern Vincolante**:
+  1. **Settore di Esposizione Decollo Unificato**: Sostituire il generico pin rettangolare con il marker SVG integrato (`generateTakeoffSectorSvg`) che fonde hub centrale quota, freccia azimutale del pendio, cono di apertura a 70° e badge numerico dei gradi orientati.
+  2. **Tracciamento Geodesico di Planata**: Rendere sempre visibile la polilinea geodesica tratteggiata (`dashArray: '5, 7'`, peso 3px, opacità 0.85-0.9) tra decollo e atterraggio, colorata in base alla volabilità dell'efficienza (`isSafe`, `severity`).
+  3. **Aggiornamento Reattivo In-Place allo Scrubbing**: In `updateFlightProcedures()`, aggiornare sia la manica a vento sia il settore di decollo (`fl-to-sector-`) e il colore della linea di planata senza ricreare il layer né provocare flicker o distruzione del DOM Leaflet.
+
+
+
 

@@ -979,3 +979,18 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Sincronizzata la matrice [DESIDERATA.md](file:///DESIDERATA.md).
   - Formalizzate le Lezioni Apprese e Vincoli #87-#91 in [MEMORY.md](file:///MEMORY.md).
 
+---
+
+## 2026-10-10 - Fase 4: Parità Dati Cartografici tra Mini-Mappa e Vista Schermo Intero
+- **Tipo**: Feature / Cartografia / Analisi Volo
+- **Dettagli**: [.agents/worklog.d/2026-10-10_fullscreen-map-takeoff-slope-exposure-and-glide-line.md](file:///.agents/worklog.d/2026-10-10_fullscreen-map-takeoff-slope-exposure-and-glide-line.md)
+- **Sintesi**:
+  - Risolta l'asimmetria informativa tra la mini-mappa contestuale di `ForecastView` e l'overlay a schermo intero (`renderComprensorioFlightMap`).
+  - Integrato nel modulo cartografico a schermo intero il settore di esposizione al decollo a 70° (`generateTakeoffSectorSvg`) con hub altimetrico `▲ [Quota]m`, freccia azimutale e badge gradi, arricchito dalla manica a vento al suolo reattiva.
+  - Implementata la linea geodesica di planata tratteggiata tra decollo e atterraggio, dotata di colorazione dinamica in base all'efficienza e alla volabilità (`isSafe`, `severity`).
+  - Aggiornato `updateFlightProcedures` per ricalcolare in tempo reale il settore di esposizione e l'efficienza della linea di planata durante lo scorrimento della timeline oraria nello scrubber.
+  - Test suite aggiornata con 448 test passati al 100% in 61 suite (`npm test`).
+  - Registrata la Lezione Appresa #92 in [MEMORY.md](file:///MEMORY.md).
+
+
+
