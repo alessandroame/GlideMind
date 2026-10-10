@@ -94,6 +94,7 @@ export class HomeDashboardViewController {
     this.boundKeyDownHandler = this.handleKeyDown.bind(this);
     this.boundFileInputHandler = this.handleFileInput.bind(this);
     this.boundSearchInputHandler = this.handleSearchInput.bind(this);
+    this.boundInputHandler = this.handleInput.bind(this);
     
     this.searchQuery = '';
     this.gliderSearchQuery = '';
@@ -269,19 +270,13 @@ export class HomeDashboardViewController {
     if (this.containerEl && typeof this.containerEl.addEventListener === 'function') {
       this.containerEl.addEventListener('click', this.boundClickHandler);
       this.containerEl.addEventListener('keydown', this.boundKeyDownHandler);
+      this.containerEl.addEventListener('input', this.boundInputHandler);
 
       const fileInput = typeof this.containerEl.querySelector === 'function'
         ? this.containerEl.querySelector('#home-igc-file-input')
         : null;
       if (fileInput && typeof fileInput.addEventListener === 'function') {
         fileInput.addEventListener('change', this.boundFileInputHandler);
-      }
-
-      const searchInput = typeof this.containerEl.querySelector === 'function'
-        ? this.containerEl.querySelector('#home-spot-search')
-        : null;
-      if (searchInput && typeof searchInput.addEventListener === 'function') {
-        searchInput.addEventListener('input', this.boundSearchInputHandler);
       }
     }
 
@@ -304,6 +299,7 @@ export class HomeDashboardViewController {
     if (this.containerEl && typeof this.containerEl.removeEventListener === 'function') {
       this.containerEl.removeEventListener('click', this.boundClickHandler);
       this.containerEl.removeEventListener('keydown', this.boundKeyDownHandler);
+      this.containerEl.removeEventListener('input', this.boundInputHandler);
     }
     if (this.sheetContainerEl && typeof this.sheetContainerEl.removeEventListener === 'function') {
       this.sheetContainerEl.removeEventListener('click', this.boundClickHandler);
@@ -333,7 +329,9 @@ export class HomeDashboardViewController {
           const matchProv = normalizeSearchText(c.province).includes(query);
           const matchLoc = normalizeSearchText(c.location).includes(query);
           const matchRegion = normalizeSearchText(c.region).includes(query);
-          return matchName || matchProv || matchLoc || matchRegion;
+          const matchTakeoffs = Array.isArray(c.takeoffs) && c.takeoffs.some(t => normalizeSearchText(t.name).includes(query));
+          const matchLandings = Array.isArray(c.landings) && c.landings.some(l => normalizeSearchText(l.name).includes(query));
+          return matchName || matchProv || matchLoc || matchRegion || matchTakeoffs || matchLandings;
         })
       : favoriteComprensori;
 
@@ -1495,6 +1493,18 @@ export class HomeDashboardViewController {
       } else {
         this.navigateTo('logbook');
       }
+    }
+  }
+
+  /**
+   * Delegated input event handler on container element.
+   * @param {Event} evt
+   */
+  handleInput(evt) {
+    const target = evt ? evt.target : null;
+    if (!target) return;
+    if (target.id === 'home-spot-search') {
+      this.handleSearchInput(evt);
     }
   }
 

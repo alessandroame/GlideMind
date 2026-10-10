@@ -840,5 +840,76 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     // Check light theme contrast overrides
     assert.ok(cssContent.includes('[data-theme="light"] .gm-spot-flight-row'), 'Must declare light mode .gm-spot-flight-row override');
     assert.ok(cssContent.includes('[data-theme="light"] .gm-spot-prov'), 'Must declare light mode .gm-spot-prov override');
+
+    // Check suppression of native browser search cancel button to prevent duplicate X
+    assert.ok(
+      cssContent.includes('::-webkit-search-cancel-button'),
+      'Must suppress ::-webkit-search-cancel-button to prevent duplicate native clear button'
+    );
+  });
+
+  it('should delegate input events on containerEl and preserve search functionality across re-renders', () => {
+    const mockStore = createStore();
+    const controller = new HomeDashboardViewController({ store: mockStore });
+
+    let inputDispatched = null;
+    const listeners = new Map();
+    const mockContainer = {
+      innerHTML: '',
+      addEventListener(type, fn) {
+        listeners.set(type, fn);
+      },
+      removeEventListener(type) {
+        listeners.delete(type);
+      },
+      querySelector(selector) {
+        if (selector === '#home-search-clear-btn') {
+          return { classList: { toggle() {}, add() {}, remove() {} } };
+        }
+        if (selector === 'section[aria-labelledby="heading-comprensori"]') {
+          return {
+            querySelector(s) {
+              if (s === '#home-spots-count') return { textContent: '' };
+              if (s === '#home-spots-list') return { outerHTML: '' };
+              return null;
+            }
+          };
+        }
+        return null;
+      }
+    };
+
+    controller.mount(mockContainer);
+    assert.ok(listeners.has('input'), 'Container element must have delegated input listener attached');
+
+    // Simulate input event bubbling to container
+    const mockInputEvent = {
+      target: {
+        id: 'home-spot-search',
+        value: 'cornizzolo'
+      }
+    };
+    listeners.get('input')(mockInputEvent);
+    assert.equal(controller.searchQuery, 'cornizzolo', 'Controller searchQuery must update via delegated input');
+
+    // Simulate re-render
+    controller.render();
+
+    // Verify search query matching takeoff name
+    const mockTakeoffInputEvent = {
+      target: {
+        id: 'home-spot-search',
+        value: 'suello'
+      }
+    };
+    listeners.get('input')(mockTakeoffInputEvent);
+    assert.equal(controller.searchQuery, 'suello');
+    const matched = controller.getEvaluatedComprensori();
+    assert.ok(matched.length >= 1, 'Search query matching landing (Suello) must find Monte Cornizzolo');
+    assert.equal(matched[0].name, 'Monte Cornizzolo');
+
+    controller.unmount();
+    assert.equal(listeners.has('input'), false, 'Container input listener must be cleaned up on unmount');
   });
 });
+

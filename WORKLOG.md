@@ -507,12 +507,13 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
 - **Dettagli**: [.agents/worklog.d/2026-10-10_home-ux-laws-remediation.md](file:///.agents/worklog.d/2026-10-10_home-ux-laws-remediation.md)
 - **Sintesi**:
   - Eseguito audit e risolute le criticità UX Laws nella Home Dashboard (esclusa la sezione attività di volo/currency per direttiva esplicita).
-  - **Postel's Law (Robustezza)**: Normalizzazione caratteri accentati e diacritici Unicode nella ricerca dei comprensori (`normalizeSearchText`), garantendo matching esatto su variazioni ortografiche.
-  - **Fitts's Law & Touch Target Floor ($\ge 44\text{px}$)**: Aumentata altezza minima del campo di ricerca `.gm-search-input` a 44px; inserito pulsante rapido di azzeramento ricerca `.gm-search-clear` ($44\times 44\text{px}$); portati i pulsanti compatti a 44px di altezza minima.
+  - **Postel's Law (Robustezza)**: Normalizzazione caratteri accentati e diacritici Unicode nella ricerca dei comprensori (`normalizeSearchText`), con estensione della ricerca anche ai nomi dei singoli decolli e atterraggi del comprensorio.
+  - **Fitts's Law & Touch Target Floor ($\ge 44\text{px}$)**: Aumentata altezza minima del campo di ricerca `.gm-search-input` a 44px; inserito pulsante rapido di azzeramento ricerca `.gm-search-clear` ($44\times 44\text{px}$); soppressa l'icona nativa browser `::-webkit-search-cancel-button` per evitare la duplicazione del tasto "X"; delegato l'evento `input` sul `containerEl` per rendere la ricerca immune ai re-render asincroni; portati i pulsanti compatti a 44px di altezza minima.
   - **Jakob's Law & WCAG POUR**: Card comprensorio dotate di `role="button"`, `tabindex="0"`, chevron indicatore (`.gm-spot-chevron`) e gestione da tastiera (`Enter` e `Space` per navigare a `ForecastView`).
   - **NN/G #9 & Cheap Takeover**: Aggiunto pulsante 1-tap "Azzera ricerca" nello stato di lista vuota e supporto al tasto `Escape`.
   - **WCAG POUR & Sunlight High-Contrast**: `aria-live="polite"` sul conteggio risultati, `aria-controls` sull'input, selettori `:focus-visible` ad alto contrasto e token CSS per tema luce ad alta luminanza solare.
-  - Convalidati 330 test su 46 suite (+5 test unitari dedicati in [tests/ui/homeDashboardView.test.mjs](file:///tests/ui/homeDashboardView.test.mjs)).
+  - Convalidati 331 test su 46 suite (+6 test unitari dedicati in [tests/ui/homeDashboardView.test.mjs](file:///tests/ui/homeDashboardView.test.mjs)) e verifica visiva completata via DevTools browser live.
   - Registrata la Lezione Appresa #50 in [MEMORY.md](file:///MEMORY.md).
+
 
 

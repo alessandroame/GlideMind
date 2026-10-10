@@ -24,6 +24,9 @@ Criticità riscontrate:
 2. **Fitts's Law & Touch Targets Outdoor**:
    - `css/theme.css`: `.gm-search-input` impostato con `min-height: 44px;` e padding ergonomico.
    - Aggiunto il pulsante `#home-search-clear-btn` (`.gm-search-clear`) con target touch $44\times 44\text{px}$, posizionato a destra all'interno del wrapper di ricerca, visibile solo con input popolato.
+   - Soppressione tramite CSS dei controlli nativi WebKit (`::-webkit-search-cancel-button`, `::-webkit-search-decoration`) per evitare la duplicazione dell'icona "X" nei browser Chromium/WebKit.
+   - Delegazione dell'evento `'input'` sul persistent `containerEl` (`this.containerEl.addEventListener('input', this.boundInputHandler)`): garantisce che la ricerca istantanea rimanga sempre attiva anche a valle di re-render asincroni del DOM indotti dal caricamento del catalogo o del meteo.
+   - Esteso il filtro di ricerca a decolli e atterraggi secondari del comprensorio oltre al nome, provincia e regione.
    - Portati `.gm-btn-compact-primary` e `.gm-btn-compact-accent` a `min-height: 44px;`.
 3. **Jakob's Law, Keyboard Operable & Affordance**:
    - Inseriti `role="button"` e `tabindex="0"` su ogni `.gm-spot-card`, corredata di chevron SVG `.gm-spot-chevron` per chiarire la natura interattiva e di navigazione verso `ForecastView`.
@@ -40,9 +43,15 @@ Criticità riscontrate:
 ---
 
 ## 3. Verifica & Test
-- Esecuzione `npm test`: 330 test passati su 46 suite, 0 fallimenti.
-- 5 nuovi test in `tests/ui/homeDashboardView.test.mjs` che validano:
+- Esecuzione `npm test`: 331 test passati su 46 suite, 0 fallimenti.
+- Test visivo e funzionale convalidato su browser live (Chrome headless / DevTools MCP) con screenshot di verifica:
+  - Presenza di un singolo pulsante "X" accessibile da $44\times 44\text{px}$.
+  - Risposta in tempo reale alla digitazione con filtraggio istantaneo della lista (es. "monte" -> 60 comprensori, "ciavanis" -> decollo Chialamberto).
+  - Ripristino corretto della lista completa su click dell'icona "X" o del pulsante "Azzera ricerca".
+- 6 nuovi test in `tests/ui/homeDashboardView.test.mjs` che validano:
   - Attributi di accessibilità e attivazione da tastiera (`Enter`/`Space`) sulle card.
   - Comportamento ed ergonomia del pulsante "Azzera ricerca" e del tasto `Escape`.
-  - Tolleranza ortografica e diacritica della ricerca (Postel's Law).
-  - Target touch $\ge 44\text{px}$ e stati `:focus-visible` dichiarati in `css/theme.css`.
+  - Tolleranza ortografica e diacritica della ricerca (Postel's Law) estesa a decolli e atterraggi.
+  - Delegazione dell'evento input su `containerEl` a prova di re-render.
+  - Soppressione `::-webkit-search-cancel-button` e target touch $\ge 44\text{px}$ in `css/theme.css`.
+
