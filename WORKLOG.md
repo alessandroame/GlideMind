@@ -735,7 +735,29 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Integrato settore di esposizione del pendio (`generateTakeoffSectorSvg` a 70° con azimut e freccia di pendio) con codice colore dinamico in base alla direzione del vento.
   - Risolto bug di mancata rotazione della manica durante lo scrubbing orario causato dal disallineamento della chiave `windDir` vs `windDirection` in `weatherSnapshot` in [core/comprensorio.js](file:///core/comprensorio.js).
   - Aggiornato `updateWindsockMarker` per rigenerare fluidamente il markup dei 12 segmenti SVG mantenendo attiva la transizione elastica `transition: transform 0.4s`.
-  - Registrate le Lezioni Apprese #66 e #70 in [MEMORY.md](file:///MEMORY.md). 402/402 test superati in 58 suite.
+---
+
+## 2026-10-10 - Comandi Mini Mappa Non Invasivi con Sfumatura Radiale (Zero Invasiveness & High Legibility)
+- **Tipo**: UI/UX Refinement / Ergonomics & Visual Contrast
+- **Dettagli**: [.agents/worklog.d/2026-10-10_unobtrusive-minimap-controls-radial-gradient.md](file:///.agents/worklog.d/2026-10-10_unobtrusive-minimap-controls-radial-gradient.md)
+- **Sintesi**:
+  - Eliminati i blocchi rettangolari/pill con sfondi rigidi, filtri blur e bordi marcati che occludevano le creste montane e il terreno nella mini-mappa da 180px in [ui/views/ForecastView.js](file:///ui/views/ForecastView.js).
+  - Convertito il selettore layer in un testo pulito ("scritta") con freccia discreta ed ellisse a sfumatura radiale (`radial-gradient`), mantenendo piena accessibilità touch ($\ge 40\text{px}$).
+  - Convertito il pulsante di espansione a tutta mappa in icona SVG vettoriale pulita ("icona") con cerchio a sfumatura radiale (`radial-gradient`) e pavimento tattile Fitts circolare da 44x44px.
+  - Sostituito il glifo unicode grezzo `⤢` con una composizione SVG a 4 frecce diagonali ad alta definizione.
+  - Introdotto attributo reattivo `data-map-layer` per preservare il contrasto elevato nei temi chiari con layer fotografici scuri.
+---
+
+## 2026-10-10 - Fase 5-ter: Piano Architetturale Analisi Volo Comprensorio & Procedure
+- **Tipo**: Architecture / Plan / Flight Procedures & Local Conventions
+- **Dettagli**: [.agents/worklog.d/2026-10-10_comprensorio-flight-analysis-plan.md](file:///.agents/worklog.d/2026-10-10_comprensorio-flight-analysis-plan.md) / [docs/COMPRENSORIO_FLIGHT_ANALYSIS_PLAN.md](file:///docs/COMPRENSORIO_FLIGHT_ANALYSIS_PLAN.md)
+- **Sintesi**:
+  - Ridefinita la specifica dell'ingrandimento della mappa nella vista Previsioni (`ForecastView.js`): dismesso il redirect alla vista globale `#map`, progettato l'overlay a schermo intero `gm-flight-analysis-overlay` (100dvh) dedicato all'ispezione analitica del comprensorio.
+  - Pianificato il modulo headless `core/flightProcedures.js` per il calcolo geometrico e geodetico dei circuiti di atterraggio (attacco a C e attacco a 8) orientati controvento in funzione dell'ora, con indicazione di sottovento, base, finale e area di smaltimento quota.
+  - Progettata l'estensione dell'adapter cartografico per la doppia manica a vento (quota decollo e suolo atterraggio) e il layer ostacoli/convenzioni locali.
+  - Aggiornata la matrice di stato `DESIDERATA.md` marcando la Fase 5-ter come prioritaria (`🔴 Prioritario`).
+
+
 
 
 
