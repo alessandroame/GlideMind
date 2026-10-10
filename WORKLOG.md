@@ -992,5 +992,19 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Test suite aggiornata con 448 test passati al 100% in 61 suite (`npm test`).
   - Registrata la Lezione Appresa #92 in [MEMORY.md](file:///MEMORY.md).
 
+---
+
+## 2026-10-10 - Fase 6: Consolidamento Piano Architetturale Logbook & Audit Tracciati Duali
+- **Tipo**: Architettura / Audit / ADR / Planning
+- **Dettagli**: [.agents/worklog.d/2026-10-10_phase-6-plan-consolidation-and-dual-track-audit.md](file:///.agents/worklog.d/2026-10-10_phase-6-plan-consolidation-and-dual-track-audit.md)
+- **Sintesi**:
+  - Eseguito audit pre-esecuzione per la Fase 6 (Logbook di Volo) evidenziando il falso amico algoritmico della decimazione LTTB prima delle manovre: la cinematica (`analyzeFlightTelemetry`) opera sulla sequenza 1Hz, mentre LTTB è applicato a valle per sparkline SVG e Replay 3D.
+  - Formalizzata la doppia conservazione in `flights_raw`: testo IGC originale non modificato (`rawIgc`) per omologazioni FAI/G-record ed export fedele, abbinato a `decimatedPoints` (1.500 campioni LTTB) per avvio del Replay 3D in <10ms senza ricalcolo su mobile.
+  - Adottato algoritmo di hash deterministico sincrono in JS puro (FNV-1a 64-bit) senza `crypto.subtle`, garantendo funzionamento universale anche su LAN/HTTP non sicuri.
+  - Sancito IndexedDB come unica sorgente di verità persistente, con `store.flights` come cache reattiva in RAM sincronizzata con il database.
+  - Consolidato il documento formale in [docs/plans/phase-6-flight-logbook-and-telemetry.md](file:///docs/plans/phase-6-flight-logbook-and-telemetry.md).
+  - Registrata la Lezione Appresa #93 in [MEMORY.md](file:///MEMORY.md).
+
+
 
 

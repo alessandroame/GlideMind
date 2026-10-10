@@ -1117,6 +1117,24 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
   2. **Tracciamento Geodesico di Planata**: Rendere sempre visibile la polilinea geodesica tratteggiata (`dashArray: '5, 7'`, peso 3px, opacità 0.85-0.9) tra decollo e atterraggio, colorata in base alla volabilità dell'efficienza (`isSafe`, `severity`).
   3. **Aggiornamento Reattivo In-Place allo Scrubbing**: In `updateFlightProcedures()`, aggiornare sia la manica a vento sia il settore di decollo (`fl-to-sector-`) e il colore della linea di planata senza ricreare il layer né provocare flicker o distruzione del DOM Leaflet.
 
+---
+
+## 93. Architettura Storage a Due Livelli per Tracciati IGC: Duale Raw/Decimato e Timing della Decimazione LTTB
+- **Problema**:
+  1. Eseguire la decimazione LTTB prima di invocare il rilevamento manovre e virate (`detectThermals`, `detectFlightManeuvers`) altera e distrugge i delta angolari orizzontali a quota costante (i punti a quota costante hanno area altimetrica quasi nulla e vengono scartati da LTTB), azzerando la rilevazione di 360°, virate e termiche.
+  2. Memorizzare unicamente la versione decimata impedisce l'esportazione di file IGC originali validi per omologazioni FAI (perdita della firma digitale G-record e dei record H completi).
+  3. Al contrario, ricalcolare LTTB da capo ogni volta che l'utente apre il Replay 3D genera latenze di 100-300ms e battery drain su smartphone.
+- **Causa Radice**: Confusione tra il momento computazionale della cinematica di volo (che richiede campioni sequenziali a 1Hz) e la visualizzazione grafica, unitamente alla mancata segregazione tra archivio di autenticità (raw) e cache di rendering (decimated).
+- **Pattern Vincolante**:
+  1. **Timing della Decimazione LTTB a Valle**: Eseguire l'analisi telemetrica, cinematica e il rilevamento termiche (`analyzeFlightTelemetry`) esclusivamente sulla sequenza continua a 1Hz dopo il trimming dei punti a terra. LTTB viene invocato a valle esclusivamente per: (a) `sparklineSvgPoints` (60-80 campioni) in `flights_meta`, (b) `decimatedPoints` (1.500 campioni) in `flights_raw`.
+  2. **Duale Raw/Decimato in `flights_raw`**: Lo store `flights_raw` memorizza contestualmente sia il testo ASCII originale bit-for-bit `rawIgc` sia l'array pre-calcolato `decimatedPoints`. In questo modo:
+     - L'esportazione e il backup scaricano il file IGC autentico con firma FAI integra.
+     - L'avvio del Replay 3D (Fase 7) o della canvas 2D recupera direttamente i 1.500 punti pronti all'uso in <10ms senza ricalcolo su mobile.
+  3. **Fingerprinting Deterministico Sincrono (FNV-1a 64-bit)**: Calcolare l'hash univoco del volo con algoritmo matematico puro in JS sincrono (senza `crypto.subtle`), garantendo funzionamento universale a 0ms anche su LAN/HTTP non protetti.
+  4. **IndexedDB come SSOT & Store Reattivo in RAM**: IndexedDB è l'unica sorgente di verità persistente. `store.flights` risiede in RAM e non serializza su `localStorage`, prevenendo `QuotaExceededError`.
+
+
+
 
 
 
