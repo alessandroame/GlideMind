@@ -72,4 +72,36 @@ describe('GlideMind Phase 2 - Shell & Design System Integrity', () => {
       '.sr-only must have position: absolute'
     );
   });
+
+  it('should enforce modal sheet visibility and desktop scale/opacity transition safeguards', () => {
+    const cssPath = path.join(projectRoot, 'css/theme.css');
+    const cssContent = fs.readFileSync(cssPath, 'utf-8');
+
+    // Base active sheet must guarantee opacity: 1
+    assert.ok(
+      /#sheet-container\.active\s+\.gm-sheet\s*\{[^}]*opacity:\s*1;/m.test(cssContent),
+      'Base #sheet-container.active .gm-sheet must specify opacity: 1'
+    );
+
+    // Desktop media query must explicitly declare scale(1) and opacity: 1 for active sheet
+    const desktopMediaQueryRegex = /@media\s*\([^)]*min-width:\s*768px[^)]*\)\s*and\s*\([^)]*min-height:\s*550px[^)]*\)\s*\{([\s\S]*?)(?=\n\/\*|\n@media|$)/g;
+    let match;
+    let foundDesktopSheetActive = false;
+    while ((match = desktopMediaQueryRegex.exec(cssContent)) !== null) {
+      const block = match[1];
+      if (
+        block.includes('#sheet-container.active .gm-sheet') &&
+        block.includes('transform: scale(1)') &&
+        block.includes('opacity: 1')
+      ) {
+        foundDesktopSheetActive = true;
+        break;
+      }
+    }
+
+    assert.ok(
+      foundDesktopSheetActive,
+      'Desktop media query must define #sheet-container.active .gm-sheet with transform: scale(1) and opacity: 1'
+    );
+  });
 });

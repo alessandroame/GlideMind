@@ -544,5 +544,18 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
   3. **High-Contrast Dark Text su Sfondo Chiaro Ambra**: In `[data-theme="light"]`, gli elementi con classe `.active` su sfondo `--gm-accent` devono adottare colore scuro `#09090b`, garantendo un rapporto di contrasto $\ge 8.5:1$ conforme a WCAG AA/AAA.
   4. **Single Source of Truth nei Click Handler**: Quando un click handler commuta lo stato applicativo tramite `store.setState`, la vista deve delegare l'aggiornamento visuale e il recupero dati al listener reattivo dello store, evitando duplicazioni di rendering e traffico di rete ridondante.
 
+---
+
+## 53. Visibilità dei Modal Sheet e Coerenza di Transizione Scale/Opacity in Modalità Desktop
+- **Problema**: In modalità desktop (`min-width: 768px` e `min-height: 550px`), cliccando sul pulsante del date picker (o su qualsiasi altro drawer/sheet gestito da `openSheet()`, come il selettore comprensori o il selettore delle vele), lo schermo si oscurava con il backdrop, ma la finestra modale non appariva, risultando completamente invisibile.
+- **Causa Radice**:
+  1. Nella media query desktop, `.gm-sheet` è configurato come dialogo modale centrato a transizione di scala (`transform: scale(0.95); opacity: 0;`).
+  2. All'attivazione dello sheet (aggiunta della classe `.active` a `#sheet-container`), la regola CSS base a livello globale impostava solo `transform: translateY(0);` senza specificare `opacity: 1;`.
+  3. Nella media query desktop mancava la dichiarazione per `#sheet-container.active .gm-sheet`, lasciando l'opacità bloccata a zero (`opacity: 0`). Di conseguenza, il pannello veniva renderizzato a schermo ma con il 100% di trasparenza.
+- **Pattern Vincolante**:
+  1. **Garanzia di Opacità Attiva**: Qualsiasi stato attivo di un contenitore di overlay deve forzare esplicitamente `opacity: 1;` sia nella dichiarazione di default mobile (`#sheet-container.active .gm-sheet { transform: translateY(0); opacity: 1; }`) sia nelle varianti desktop centrate (`#sheet-container.active .gm-sheet { transform: scale(1); opacity: 1; }`).
+  2. **Soppressione Controlli Touch Mobile su Desktop**: Nelle viste modali desktop, nascondere sempre elementi di trascinamento touch concepiti esclusivamente per smartphone (`.gm-sheet-handle-bar { display: none; }`).
+  3. **Test di Integrità Architetturale CSS**: Includere nella suite di test (`tests/ui/shellIntegrity.test.mjs`) asserzioni che verifichino la presenza contemporanea di `transform: scale(1)` e `opacity: 1` nelle media query desktop per prevenire regressioni visive silenti.
+
 
 

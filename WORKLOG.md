@@ -544,6 +544,29 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Aggiunti test in [tests/ui/homeDashboardView.test.mjs](file:///tests/ui/homeDashboardView.test.mjs) e [tests/ui/forecastView.test.mjs](file:///tests/ui/forecastView.test.mjs) (338/338 test superati).
   - Registrata la Lezione Appresa #52 in [MEMORY.md](file:///MEMORY.md).
 
+---
+
+## 2026-10-10 - Ripristino Visibilità Modal Sheet e Date Picker in Modalità Desktop
+- **Tipo**: Fix / Visual Regression / Ergonomia Desktop
+- **Dettagli**: [.agents/worklog.d/2026-10-10_desktop-sheet-modal-visibility-fix.md](file:///.agents/worklog.d/2026-10-10_desktop-sheet-modal-visibility-fix.md)
+- **Sintesi**:
+  - Diagnosticata e risolta la mancata visibilità dei pannelli modali (`openSheet()`, es. date picker calendario, selettore comprensori, selettore vele) su schermi desktop (`min-width: 768px` e `min-height: 550px`).
+  - Causa radice: la classe `.gm-sheet` dichiarava `opacity: 0; transform: scale(0.95);` nella media query desktop, ma al subentro della classe `.active` mancava la regola `#sheet-container.active .gm-sheet`, lasciando `opacity: 0` inalterata e rendendo il pannello modale 100% trasparente su sfondo oscurato.
+  - Aggiornato [css/theme.css](file:///css/theme.css) introducendo `opacity: 1;` sia nella dichiarazione base attiva sia nella media query desktop con transizione `transform: scale(1);` ed eliminazione della barra di trascinamento touch `.gm-sheet-handle-bar`.
+  - Aggiunto test di salvaguardia in [tests/ui/shellIntegrity.test.mjs](file:///tests/ui/shellIntegrity.test.mjs) (339/339 test superati).
+
+---
+
+## 2026-10-10 - Rimozione Badge Shortkey dalla Barra di Navigazione Desktop
+- **Tipo**: UI Polish / De-cluttering
+- **Dettagli**: [.agents/worklog.d/2026-10-10_remove-desktop-navbar-shortkey-badges.md](file:///.agents/worklog.d/2026-10-10_remove-desktop-navbar-shortkey-badges.md)
+- **Sintesi**:
+  - Rimossi i badge visivi delle scorciatoie (`[H]`, `[F]`, `[M]`, `[L]`, `[S]`) dai link della barra di navigazione desktop in [index.html](file:///index.html).
+  - Rimossa la classe CSS non più utilizzata `.gm-kbd-badge` da [css/theme.css](file:///css/theme.css).
+  - Test verificati con successo: 339/339 superati.
+
+
+
 
 
 
