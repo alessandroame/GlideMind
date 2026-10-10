@@ -593,6 +593,19 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Aggiunti test di verifica in [tests/ui/forecastView.test.mjs](file:///tests/ui/forecastView.test.mjs) (340/340 test superati).
   - Registrata la Lezione Appresa #55 in [MEMORY.md](file:///MEMORY.md).
 
+---
+
+## 2026-10-10 - Refactoring Indicatori Semantici di Volabilità a 4 Stati e Layout Anti-Truncation
+- **Tipo**: UX Architecture / Domain Modeling / Visual Ergonomics
+- **Dettagli**: [.agents/worklog.d/2026-10-10_home-volabilita-4-state-indicators-glider-ssot.md](file:///.agents/worklog.d/2026-10-10_home-volabilita-4-state-indicators-glider-ssot.md)
+- **Sintesi**:
+  - Eliminati numeri grezzi primari (km/h, gradi, rapporto 1:X) dalla vista mobile della Home Dashboard, sostituendoli con indicatori semaforici minimali a 4 stati (verde, giallo, rosso, nero) calcolati nel Core (`core/comprensorio.js`) in base alle caratteristiche aerodinamiche della vela attiva (`activeGlider`).
+  - Bonificato il layout flexbox in [css/theme.css](file:///css/theme.css) rimuovendo riquadri pesanti e bordi (`background: transparent; border: none; padding: 0;`), introducendo dot luminosi da 6.5px (`.gm-ind-dot`) e proteggendo i nomi di decollo e atterraggio dal troncamento (`.gm-flight-label` con `flex: 1 1 auto;`, `.gm-flight-target` con `flex: 0 1 auto; text-overflow: ellipsis;`, `.gm-flight-alt` con `flex-shrink: 0;`).
+  - Applicata la progressive disclosure: numeri grezzi delegati a tooltip `title` per l'ispezione al tocco/hover e classe `.gm-ind-micro` nascosta su mobile (`display: none;`).
+  - Risolta la compatibilità con payload orari parziali tramite risoluzione deterministica dell'ora esatta (`YYYY-MM-DDTHH:`).
+  - Aggiunti test di regressione e governance CSS in [tests/ui/offlineWeatherUX.test.mjs](file:///tests/ui/offlineWeatherUX.test.mjs) e [tests/core/comprensorio.test.mjs](file:///tests/core/comprensorio.test.mjs) (353/353 test superati).
+  - Registrata la Lezione Appresa #56 in [MEMORY.md](file:///MEMORY.md) e aggiornata la matrice [DESIDERATA.md](file:///DESIDERATA.md).
+
 
 
 

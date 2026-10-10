@@ -822,8 +822,7 @@ export class HomeDashboardViewController {
               <span class="gm-flight-alt">(${takeoffAlt})</span>
             </div>
             <div class="gm-flight-data">
-              <span class="gm-flight-wind">${windSpeedStr}</span>
-              ${windDirStr ? `<span class="gm-flight-dir">da ${windDirStr}</span>` : ''}
+              ${this.renderWindIndicator(item)}
             </div>
           </div>
 
@@ -834,10 +833,7 @@ export class HomeDashboardViewController {
               <span class="gm-flight-alt">(${landingAlt})</span>
             </div>
             <div class="gm-flight-data">
-              <span class="gm-glide-label">Efficienza</span>
-              <span class="gm-glide-val ${isUnavailable ? 'text-[var(--gm-text-muted)]' : (glide.isSafe ? 'text-[var(--gm-status-flyable)]' : 'text-[var(--gm-status-caution)]')}">
-                1:${glide.requiredGlideRatio}
-              </span>
+              ${this.renderGlideIndicator(item)}
             </div>
           </div>
         </div>
@@ -848,6 +844,73 @@ export class HomeDashboardViewController {
           <span>${escapeHtml(item.reason)}</span>
         </div>
       </article>
+    `;
+  }
+
+  /**
+   * Maps numerical indicator severity to CSS state suffix.
+   * @param {number} severity
+   * @returns {string}
+   */
+  getSeverityClass(severity) {
+    if (severity === 0) return 'flyable';
+    if (severity === 1) return 'caution';
+    if (severity === 2) return 'unflyable';
+    if (severity === 3) return 'severe';
+    return 'neutral';
+  }
+
+  /**
+   * Renders the minimal traffic-light wind indicator with progressive disclosure.
+   * @param {object} item
+   * @returns {string}
+   */
+  renderWindIndicator(item) {
+    const ind = item.indicators?.wind;
+    if (!ind || ind.severity === -1) {
+      return `
+        <span class="gm-ind-pill gm-ind-neutral" title="Previsione non disponibile offline">
+          <span class="gm-ind-dot" aria-hidden="true"></span>
+          <span>Dati N/D</span>
+          <span class="gm-ind-micro">-- km/h</span>
+        </span>
+      `;
+    }
+    const sevClass = this.getSeverityClass(ind.severity);
+    return `
+      <span class="gm-ind-pill gm-ind-${sevClass}" title="${escapeHtml(ind.desc || ind.fullText || '')}">
+        <span class="gm-ind-dot" aria-hidden="true"></span>
+        <span>${escapeHtml(ind.label)}</span>
+        <span class="gm-ind-micro">${escapeHtml(ind.speedStr)}</span>
+      </span>
+    `;
+  }
+
+  /**
+   * Renders the minimal traffic-light glide indicator with progressive disclosure.
+   * @param {object} item
+   * @returns {string}
+   */
+  renderGlideIndicator(item) {
+    const ind = item.indicators?.glide;
+    if (!ind || ind.severity === -1) {
+      return `
+        <span class="gm-ind-pill gm-ind-neutral" title="Efficienza non calcolabile">
+          <span class="gm-glide-label">Efficienza</span>
+          <span class="gm-ind-dot" aria-hidden="true"></span>
+          <span>Dati N/D</span>
+          <span class="gm-ind-micro">1:-</span>
+        </span>
+      `;
+    }
+    const sevClass = this.getSeverityClass(ind.severity);
+    return `
+      <span class="gm-ind-pill gm-ind-${sevClass}" title="Rapporto planata richiesto: 1:${ind.requiredGlideRatio} (limite sicuro: 1:${ind.safeLimit})">
+        <span class="gm-glide-label">Efficienza</span>
+        <span class="gm-ind-dot" aria-hidden="true"></span>
+        <span>${escapeHtml(ind.label)}</span>
+        <span class="gm-ind-micro">1:${escapeHtml(String(ind.requiredGlideRatio))}</span>
+      </span>
     `;
   }
 

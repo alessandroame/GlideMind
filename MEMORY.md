@@ -586,6 +586,24 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
   3. **Blur Deterministico al Pointer Interaction**: Invocare `document.activeElement.blur()` su `handlePointerDown` e `handlePointerUp` se il focus risiede all'interno del container della timeline.
   4. **Guardia Anti-Trailing Click**: Tracciare lo spostamento orizzontale durante il pointer move (`hasDraggedPointer = true` se $\Delta x > 4\text{px}$) e sopprimere l'azione `select-hour` nei gestori di `click` sintetici successivi.
 
+---
+
+## 56. Indicatori Qualitativi a 4 Stati (Verde, Giallo, Rosso, Nero) nella Triage Home e Prevenzione Starvation Flexbox nei Nomi dei Decolli
+- **Problema**: Includere numeri grezzi (km/h, gradi, rapporto 1:X) incapsulati in capsule pesanti con sfondi colorati e bordi (`.gm-ind-pill`) nella riga decollo/atterraggio della Home Dashboard creava un sovraccarico visivo anti-Gestalt (violazione della **Legge di Prägnanz** con badge multipli in competizione nella stessa card). Inoltre, la larghezza combinata delle due capsule a destra (>240px) affamava il contenitore flessibile di sinistra, provocando il troncamento severo del nome del decollo (es. `Ciavanis` troncato in `(1780`).
+- **Causa Radice**:
+  1. Utilizzo improprio di contenitori stile badge (`border`, `background`, `padding`) per indicatori semaforici secondari all'interno di una card che possiede già un badge primario di verdetto (`VOLABILE`).
+  2. Violazione del principio di progressive disclosure: esposizione obbligatoria dei numeri fisici inline invece di delegarli a tooltip/progressive disclosure o schermi larghi.
+  3. Gestione flexbox asimmetrica: `.gm-flight-data` aveva `white-space: nowrap; flex-shrink: 0;` mentre `.gm-flight-target` veniva compresso a larghezza zero prima dell'altitudine.
+- **Pattern Vincolante**:
+  1. **Indicatori Semaforici Senza Bordo e Senza Sfondo (`background: transparent; border: none; padding: 0;`)**: I sub-indicatori di riga devono consistere unicamente in un dot circolare semaforico da 6.5px (`.gm-ind-dot`) con bagliore coerente allo stato e label testuale ad alta leggibilità (`0.72rem`, `font-weight: 600`).
+  2. **Quattro Stati Aereonautici Vincolati al Calcolo di Dominio (SSOT Vela)**:
+     - 0 (Verde / Volabile / Ottimale): `Vento OK`, `In asse`, `Rientro agevole`.
+     - 1 (Giallo / Cautela / Marginale): `Sostenuto`/`Raffiche mod.`, `Traverso`, `Nel cono`.
+     - 2 (Rosso / Non Volabile / Critico): `Vento forte`/`Raffiche forti`, `In coda`, `Rientro critico`.
+     - 3 (Nero / Pericoloso / NO FLY): `NO FLY`, `Sottovento`, `Fuori cono`. (In dark mode: dot nero bordato in rosso pericolo `1.5px solid #ef4444`).
+  3. **Progressive Disclosure dei Numeri Fisici**: I numeri di dettaglio (`15 km/h`, `da SW 212°`, `1:2.5`) risiedono nell'attributo `title` per l'ispezione/hover e in una classe `.gm-ind-micro` nascosta di default su mobile (`display: none`), preservando il budget di larghezza degli indicatori a $\le 110\text{px}$.
+  4. **Protezione Layout Flexbox con Altitudine Inviolabile**: Nel contenitore `.gm-flight-label`, impostare `min-width: 0; flex: 1 1 auto;`, su `.gm-flight-target` impostare `min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis;` e su `.gm-flight-alt` impostare tassativamente `flex-shrink: 0;`. Ciò garantisce che i nomi dei decolli/atterraggi dispongano sempre di oltre 180px di respiro, eliminando ogni rischio di troncamento.
+
 
 
 

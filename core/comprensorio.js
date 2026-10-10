@@ -12,7 +12,7 @@
  * ZERO DOM DEPENDENCIES: 100% testable in Node.js runtime.
  */
 
-import { getFlyabilityScore, DEFAULT_GLIDER } from './flyability.js';
+import { getFlyabilityScore, getCardinalDirection, DEFAULT_GLIDER } from './flyability.js';
 import { computeDistanceKm } from './geoSpatialMath.js';
 
 /**
@@ -480,12 +480,23 @@ export function calculateGlideToLanding(takeoff, landing, glider = null) {
   const tCoord = parseCoordinates(takeoff.coordinates);
   const lCoord = parseCoordinates(landing.coordinates);
 
+  // Safe conservative glide limit based on glider class (proxy for pilot envelope)
+  // EN-A: safe limit 5.5:1; EN-B: 6.5:1; EN-C: 7.5:1; EN-D: 8.5:1
+  let safeLimit = 6.0;
+  if (activeGlider.category === 'EN-A') safeLimit = 5.5;
+  else if (activeGlider.category === 'EN-B') safeLimit = 6.5;
+  else if (activeGlider.category === 'EN-C') safeLimit = 7.5;
+  else if (activeGlider.category === 'EN-D') safeLimit = 8.5;
+
   if (!tCoord || !lCoord) {
     return {
       distanceMeters: 0,
       deltaAltitudeMeters: Math.max(1, (takeoff.altitude || 1000) - (landing.altitude || 300)),
       requiredGlideRatio: 5.0,
-      isSafe: true
+      safeLimit,
+      isSafe: true,
+      severity: 0,
+      statusText: 'Rientro agevole'
     };
   }
 
@@ -496,24 +507,75 @@ export function calculateGlideToLanding(takeoff, landing, glider = null) {
   const deltaAltitudeMeters = Math.max(10, tAlt - lAlt);
 
   const requiredGlideRatio = Math.round((distanceMeters / deltaAltitudeMeters) * 10) / 10;
-
-  // Safe conservative glide limit based on glider class (proxy for pilot envelope)
-  // EN-A: safe limit 5.5:1; EN-B: 6.5:1; EN-C: 7.5:1; EN-D: 8.5:1
-  let safeLimit = 6.0;
-  if (activeGlider.category === 'EN-A') safeLimit = 5.5;
-  else if (activeGlider.category === 'EN-B') safeLimit = 6.5;
-  else if (activeGlider.category === 'EN-C') safeLimit = 7.5;
-  else if (activeGlider.category === 'EN-D') safeLimit = 8.5;
-
   const isSafe = requiredGlideRatio <= safeLimit;
+
+  // 4-level aeronautical safety envelope (0=Green, 1=Yellow, 2=Red, 3=Black)
+  let severity = 0;
+  let statusText = 'Rientro agevole';
+  const greenThreshold = Math.round(safeLimit * 0.75 * 10) / 10;
+  const redThreshold = Math.round(safeLimit * 1.25 * 10) / 10;
+
+  if (requiredGlideRatio <= greenThreshold) {
+    severity = 0;
+    statusText = 'Rientro agevole';
+  } else if (requiredGlideRatio <= safeLimit) {
+    severity = 1;
+    statusText = 'Nel cono';
+  } else if (requiredGlideRatio <= redThreshold) {
+    severity = 2;
+    statusText = 'Rientro critico';
+  } else {
+    severity = 3;
+    statusText = 'Fuori cono';
+  }
 
   return {
     distanceMeters,
     deltaAltitudeMeters,
     requiredGlideRatio,
     safeLimit,
-    isSafe
+    isSafe,
+    severity,
+    statusText
   };
+}
+
+/**
+ * Formats a short semantic label for wind flyability suitable for outdoor glanceability.
+ * @param {object|null} windEval
+ * @returns {string}
+ */
+export function formatShortWindLabel(windEval) {
+  if (!windEval) return 'Vento OK';
+  const text = windEval.text || '';
+  if (windEval.severity === 3) {
+    return text.includes('Raffiche') ? 'NO FLY Raffiche' : 'NO FLY Vento';
+  }
+  if (windEval.severity === 2) {
+    return text.includes('Raffiche') ? 'Raffiche forti' : 'Vento forte';
+  }
+  if (windEval.severity === 1) {
+    return text.includes('Raffiche') ? 'Raffiche mod.' : 'Vento sostenuto';
+  }
+  return 'Vento OK';
+}
+
+/**
+ * Formats a short semantic label for takeoff directional exposure.
+ * @param {object|null} dirEval
+ * @returns {string}
+ */
+export function formatShortDirLabel(dirEval) {
+  if (!dirEval) return 'In asse';
+  const text = dirEval.text || '';
+  if (dirEval.severity === 3) return 'Sottovento';
+  if (dirEval.severity === 2) {
+    return text.includes('Dietro') ? 'Vento da dietro' : 'Traverso marcato';
+  }
+  if (dirEval.severity === 1) {
+    return text.includes('Dietro') ? 'Coda debole' : 'Traverso';
+  }
+  return 'In asse';
 }
 
 /**
@@ -546,16 +608,22 @@ export function evaluateComprensorio({
   if (hasValidWeather) {
     const h = weatherData.hourly;
     if (targetDate && Array.isArray(h.time) && h.time.length > 0) {
-      const targetPrefix = `${targetDate}T`;
-      const matchIdx = h.time.findIndex(t => typeof t === 'string' && t.startsWith(targetPrefix));
-      if (matchIdx !== -1) {
-        idx = Math.min(matchIdx + Math.max(0, Math.min(hourIndex, 23)), h.time.length - 1);
-      } else if (h.time.length <= 24) {
-        // Single-day payload or test fixture: use hourIndex directly
-        idx = Math.min(Math.max(0, hourIndex), h.time.length - 1);
+      const exactHourPrefix = `${targetDate}T${String(Math.max(0, Math.min(hourIndex, 23))).padStart(2, '0')}:`;
+      const exactIdx = h.time.findIndex(t => typeof t === 'string' && t.startsWith(exactHourPrefix));
+      if (exactIdx !== -1) {
+        idx = exactIdx;
       } else {
-        // Multi-day payload that does not contain targetDate
-        hasValidWeather = false;
+        const targetPrefix = `${targetDate}T`;
+        const matchIdx = h.time.findIndex(t => typeof t === 'string' && t.startsWith(targetPrefix));
+        if (matchIdx !== -1) {
+          idx = Math.min(matchIdx + Math.max(0, Math.min(hourIndex, 23)), h.time.length - 1);
+        } else if (h.time.length <= 24) {
+          // Single-day payload or test fixture: use hourIndex directly
+          idx = Math.min(Math.max(0, hourIndex), h.time.length - 1);
+        } else {
+          // Multi-day payload that does not contain targetDate
+          hasValidWeather = false;
+        }
       }
     } else {
       idx = Math.min(Math.max(0, hourIndex), (h.time?.length || 1) - 1);
@@ -625,6 +693,34 @@ export function evaluateComprensorio({
         temp: null,
         cape: null,
         rain: null
+      },
+      indicators: {
+        wind: {
+          severity: -1,
+          label: 'Dati N/D',
+          fullText: 'Previsione non disponibile offline',
+          speed: null,
+          gust: null,
+          speedStr: '-- km/h',
+          desc: 'Previsione non disponibile offline'
+        },
+        direction: {
+          severity: -1,
+          label: 'Dati N/D',
+          fullText: 'Previsione non disponibile offline',
+          degrees: null,
+          cardinal: '',
+          heading: primaryTakeoff?.heading ?? null,
+          diffDegrees: null,
+          desc: 'Previsione non disponibile offline'
+        },
+        glide: {
+          severity: glideMetrics?.severity ?? -1,
+          label: glideMetrics?.statusText ?? 'Dati N/D',
+          requiredGlideRatio: glideMetrics?.requiredGlideRatio ?? '-',
+          safeLimit: glideMetrics?.safeLimit ?? 5.5,
+          isSafe: Boolean(glideMetrics?.isSafe)
+        }
       }
     };
   }
@@ -823,6 +919,34 @@ export function evaluateComprensorio({
       temp: Math.round(temp),
       cape: Math.round(cape),
       rain
+    },
+    indicators: {
+      wind: {
+        severity: selectedTakeoffEval?.flyScore?.details?.wind ? selectedTakeoffEval.flyScore.details.wind.severity : 0,
+        label: formatShortWindLabel(selectedTakeoffEval?.flyScore?.details?.wind),
+        fullText: selectedTakeoffEval?.flyScore?.details?.wind?.text || 'Vento regolare',
+        speed: Math.round(windSpeed),
+        gust: Math.round(windGust),
+        speedStr: `${Math.round(windSpeed)} km/h`,
+        desc: selectedTakeoffEval?.flyScore?.details?.wind?.desc || ''
+      },
+      direction: {
+        severity: selectedTakeoffEval?.flyScore?.details?.direction ? selectedTakeoffEval.flyScore.details.direction.severity : 0,
+        label: formatShortDirLabel(selectedTakeoffEval?.flyScore?.details?.direction),
+        fullText: selectedTakeoffEval?.flyScore?.details?.direction?.text || 'In asse',
+        degrees: Math.round(windDir),
+        cardinal: getCardinalDirection(windDir),
+        heading: selectedTakeoff?.heading ?? null,
+        diffDegrees: selectedTakeoffEval?.flyScore?.details?.direction?.diffFromFront ?? null,
+        desc: selectedTakeoffEval?.flyScore?.details?.direction?.desc || ''
+      },
+      glide: {
+        severity: typeof glideMetrics?.severity === 'number' ? glideMetrics.severity : (glideMetrics?.isSafe ? 0 : 2),
+        label: glideMetrics?.statusText || (glideMetrics?.isSafe ? 'Rientro agevole' : 'Rientro critico'),
+        requiredGlideRatio: glideMetrics?.requiredGlideRatio ?? '-',
+        safeLimit: glideMetrics?.safeLimit ?? 5.5,
+        isSafe: Boolean(glideMetrics?.isSafe)
+      }
     }
   };
 }

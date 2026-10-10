@@ -10,7 +10,9 @@ import {
   normalizeLocationsCatalog,
   calculateGlideToLanding,
   evaluateComprensorio,
-  sortEvaluatedComprensori
+  sortEvaluatedComprensori,
+  formatShortWindLabel,
+  formatShortDirLabel
 } from '../../core/comprensorio.js';
 import { GLIDER_CLASSES } from '../../core/flyability.js';
 
@@ -505,6 +507,92 @@ describe('GlideMind Comprensorio Locality & Dual Launch/Landing Evaluator', () =
       assert.equal(evalResult.badge, 'Volabile');
       assert.equal(evalResult.glideMetrics.isSafe, true);
       assert.equal(evalResult.glideMetrics.requiredGlideRatio, 0);
+    });
+  });
+
+  describe('4-State Semantic Indicators & Glider-Dependent Limits', () => {
+    it('should compute 4-level glide severity varying by glider certification class', () => {
+      // 1000m takeoff to 300m landing (delta H = 700m), distance = 4200m -> ratio = 6.0:1
+      const takeoff = { coordinates: '45.833265, 9.302084', altitude: 1000 };
+      const landing = { coordinates: '45.800000, 9.302084', altitude: 300 };
+
+      // EN-A safeLimit is 5.5. Ratio 5.3 is yellow (Nel cono: > 4.1 and <= 5.5)
+      const glideEnA = calculateGlideToLanding(takeoff, landing, GLIDER_CLASSES.EN_A);
+      assert.equal(glideEnA.safeLimit, 5.5);
+      assert.equal(glideEnA.severity, 1, 'Required glide ratio 5.3 is caution/yellow (Nel cono) for EN-A');
+      assert.equal(glideEnA.statusText, 'Nel cono');
+
+      // EN-D safeLimit is 8.5. For EN-D, safeLimit * 0.75 = 6.4, so ratio 5.3 is green (Rientro agevole)!
+      const glideEnD = calculateGlideToLanding(takeoff, landing, GLIDER_CLASSES.EN_D);
+      assert.equal(glideEnD.safeLimit, 8.5);
+      assert.equal(glideEnD.severity, 0, 'For EN-D wing, ratio 5.3 is well within green threshold');
+      assert.equal(glideEnD.statusText, 'Rientro agevole');
+
+      // Critical landing beyond safeLimit for EN-A:
+      const farLanding = { coordinates: '45.780000, 9.302084', altitude: 300 }; // ~5.9 km -> ratio ~8.4
+      const glideFarEnA = calculateGlideToLanding(farLanding, landing, GLIDER_CLASSES.EN_A);
+      assert.ok(glideFarEnA.severity >= 2, 'Far landing must be red or black for EN-A');
+    });
+
+    it('should correctly format short semantic labels for wind and direction', () => {
+      assert.equal(formatShortWindLabel({ severity: 0, text: 'Vento Calmo/Ottimale' }), 'Vento OK');
+      assert.equal(formatShortWindLabel({ severity: 1, text: 'Vento Moderato' }), 'Vento sostenuto');
+      assert.equal(formatShortWindLabel({ severity: 1, text: 'Raffiche Moderate' }), 'Raffiche mod.');
+      assert.equal(formatShortWindLabel({ severity: 2, text: 'Raffiche Forti' }), 'Raffiche forti');
+      assert.equal(formatShortWindLabel({ severity: 3, text: 'NO FLY: Raffiche Estreme' }), 'NO FLY Raffiche');
+
+      assert.equal(formatShortDirLabel({ severity: 0, text: 'Vento Frontale' }), 'In asse');
+      assert.equal(formatShortDirLabel({ severity: 1, text: 'Vento Traverso' }), 'Traverso');
+      assert.equal(formatShortDirLabel({ severity: 2, text: 'Vento da Dietro' }), 'Vento da dietro');
+      assert.equal(formatShortDirLabel({ severity: 3, text: 'NO FLY: Sottovento Sostenuto' }), 'Sottovento');
+    });
+
+    it('should expose structured indicators in evaluateComprensorio with weather', () => {
+      const spot = DEFAULT_COMPRENSORI[0];
+      const mockWeather = {
+        hourly: {
+          time: ['2026-10-10T14:00'],
+          wind_speed_10m: [14.0],
+          wind_gusts_10m: [18.0],
+          wind_direction_10m: [170],
+          cape: [80],
+          precipitation: [0],
+          turbulence_edr: [0.10],
+          temperature_2m: [21]
+        }
+      };
+
+      const result = evaluateComprensorio({
+        comprensorio: spot,
+        weatherData: mockWeather,
+        glider: GLIDER_CLASSES.EN_A
+      });
+
+      assert.ok(result.indicators, 'Result must include structured indicators');
+      assert.ok(typeof result.indicators.wind.severity === 'number');
+      assert.ok(typeof result.indicators.direction.severity === 'number');
+      assert.ok(typeof result.indicators.glide.severity === 'number');
+      assert.equal(result.indicators.wind.speed, 14);
+      assert.equal(result.indicators.wind.speedStr, '14 km/h');
+      assert.ok(result.indicators.direction.cardinal.length > 0);
+      assert.ok(result.indicators.glide.requiredGlideRatio !== '-');
+    });
+
+    it('should expose neutral N/D indicators in evaluateComprensorio when offline', () => {
+      const spot = DEFAULT_COMPRENSORI[0];
+      const result = evaluateComprensorio({
+        comprensorio: spot,
+        weatherData: null,
+        allowSynthetic: false,
+        glider: GLIDER_CLASSES.EN_A
+      });
+
+      assert.ok(result.indicators, 'Result must include indicators even when offline');
+      assert.equal(result.indicators.wind.severity, -1);
+      assert.equal(result.indicators.wind.label, 'Dati N/D');
+      assert.equal(result.indicators.wind.speedStr, '-- km/h');
+      assert.equal(result.indicators.direction.severity, -1);
+      assert.equal(result.indicators.direction.label, 'Dati N/D');
     });
   });
 });
