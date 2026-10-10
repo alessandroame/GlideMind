@@ -128,6 +128,8 @@ export function computeBearing(lat1, lon1, lat2, lon2) {
     return (b + 360) % 360;
 }
 
+export const calculateBearing = computeBearing;
+
 /**
  * Computes shortest angular difference between two compass bearings in degrees [0, 180].
  * 
@@ -687,3 +689,92 @@ export function applyAltitudeGradientOffset(points, takeoffDemElev, landingDemEl
         isValid: true
     };
 }
+
+/**
+ * Calculates aerodynamic glide ratio required between two points accounting for wind vector:
+ * E_required_ground = Distance / (Delta_Altitude) * (v_trim / v_ground)
+ * 
+ * @param {number} distanceMeters Horizontal distance in meters
+ * @param {number} deltaAltitudeMeters Positive elevation drop in meters (takeoff - landing)
+ * @param {number} [windSpeedKmh=0] Wind speed in km/h
+ * @param {number} [windDirDegrees=0] Wind direction in degrees (blowing FROM)
+ * @param {number} [trackBearingDegrees=0] Heading from takeoff to landing in degrees [0, 360)
+ * @param {object} [gliderParams=null] Active glider parameters
+ * @returns {{
+ *   distanceMeters: number,
+ *   deltaAltitudeMeters: number,
+ *   requiredGlideRatioStill: number,
+ *   requiredGlideRatioWind: number,
+ *   effectiveGroundSpeedKmh: number,
+ *   headwindKmh: number,
+ *   safeLimit: number,
+ *   isSafe: boolean,
+ *   severity: number,
+ *   statusText: string
+ * }}
+ */
+export function calculateWindCorrectedGlideRatio(
+    distanceMeters,
+    deltaAltitudeMeters,
+    windSpeedKmh = 0,
+    windDirDegrees = 0,
+    trackBearingDegrees = 0,
+    gliderParams = null
+) {
+    const dist = Math.max(0, Number(distanceMeters) || 0);
+    const drop = Math.max(1, Number(deltaAltitudeMeters) || 1);
+    const speed = Math.max(0, Number(windSpeedKmh) || 0);
+    const wDir = (Number(windDirDegrees) || 0) % 360;
+    const bearing = (Number(trackBearingDegrees) || 0) % 360;
+
+    const vTrim = (gliderParams && Number(gliderParams.trimSpeedKmh)) || 38;
+    const category = (gliderParams && gliderParams.category) || 'EN-A';
+
+    let safeLimit = 5.5;
+    if (category === 'EN-B') safeLimit = 6.5;
+    else if (category === 'EN-C') safeLimit = 7.5;
+    else if (category === 'EN-D') safeLimit = 8.5;
+
+    const { headwind } = computeWindComponents(speed, wDir, bearing);
+    const effectiveGroundSpeedKmh = Math.max(5, Math.round((vTrim - headwind) * 10) / 10);
+
+    const requiredGlideRatioStill = Math.round((dist / drop) * 10) / 10;
+    const windFactor = vTrim / effectiveGroundSpeedKmh;
+    const requiredGlideRatioWind = Math.round((requiredGlideRatioStill * windFactor) * 10) / 10;
+
+    const isSafe = requiredGlideRatioWind <= safeLimit;
+
+    const greenThreshold = Math.round(safeLimit * 0.75 * 10) / 10;
+    const redThreshold = Math.round(safeLimit * 1.25 * 10) / 10;
+
+    let severity = 0;
+    let statusText = 'Rientro agevole';
+
+    if (requiredGlideRatioWind <= greenThreshold) {
+        severity = 0;
+        statusText = 'Rientro agevole';
+    } else if (requiredGlideRatioWind <= safeLimit) {
+        severity = 1;
+        statusText = 'Nel cono';
+    } else if (requiredGlideRatioWind <= redThreshold) {
+        severity = 2;
+        statusText = 'Rientro critico';
+    } else {
+        severity = 3;
+        statusText = 'Fuori cono';
+    }
+
+    return {
+        distanceMeters: dist,
+        deltaAltitudeMeters: drop,
+        requiredGlideRatioStill,
+        requiredGlideRatioWind,
+        effectiveGroundSpeedKmh,
+        headwindKmh: headwind,
+        safeLimit,
+        isSafe,
+        severity,
+        statusText
+    };
+}
+

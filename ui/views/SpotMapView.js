@@ -1,0 +1,579 @@
+/**
+ * GlideMind - Spot Map View Controller (UI Layer - Phase 5)
+ * 
+ * Implements the interactive paragliding aerological map:
+ * - 3-level progressive marker scaling (dot 14px -> aureole 8-10km -> micro vectors)
+ * - 1-tap "Top Spot" auto-focus recommendation
+ * - True takeoff altitude wind vectoring and wind-corrected glide cone
+ * - Thumb-Zone docked hourly scrubber (09:00 - 18:00) with >=24px navbar clearance
+ * - Macro-region partitioning to eliminate HTTP 414 / HTTP 429 errors
+ * - Reactive integration with centralized store and SheetManager
+ */
+
+import { store } from '../../core/store.js';
+import { router } from '../router.js';
+import { openSheet, closeSheet } from '../sheetManager.js';
+import {
+  DEFAULT_COMPRENSORI,
+  evaluateComprensorio,
+  parseCoordinates,
+  cleanUserText
+} from '../../core/comprensorio.js';
+import {
+  MACRO_REGIONS,
+  DEFAULT_MACRO_REGION,
+  filterComprensoriByMacroRegion,
+  getMissingSpots,
+  findTopFlyableSpot,
+  getComprensorioCoordinates
+} from '../../core/mapDataPartition.js';
+import { createMapEngine, STATUS_COLORS } from '../map/mapEngineAdapter.js';
+import { formatDateIso } from '../../core/datePresets.js';
+import { fetchBatchComprensoriWeather, generateSyntheticWeather } from '../../core/openMeteoApi.js';
+
+export class SpotMapView {
+  constructor() {
+    this.container = null;
+    this.mapContainer = null;
+    this.mapEngine = null;
+    this.comprensoriCatalog = [...DEFAULT_COMPRENSORI];
+    this.cachedWeatherMap = new Map(); // spotId -> { fetchedAt: number, weatherData: object }
+    this.activeMacroRegion = DEFAULT_MACRO_REGION;
+    this.activeHour = 12;
+    this.activeDate = formatDateIso(new Date());
+    this.topSpot = null;
+    this.isFetchingWeather = false;
+    this.storeUnsub = null;
+    this.hoursRange = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
+  }
+
+  /**
+   * Updates the master locations catalog.
+   * @param {Array<object>} catalog
+   */
+  setComprensoriCatalog(catalog) {
+    if (Array.isArray(catalog) && catalog.length > 0) {
+      this.comprensoriCatalog = catalog;
+      if (this.container) {
+        this.renderMapContent();
+      }
+    }
+  }
+
+  /**
+   * Mounts the Spot Map view into the specified container element.
+   * @param {HTMLElement} containerEl
+   * @param {object} [params]
+   */
+  mount(containerEl, params = {}) {
+    this.container = containerEl;
+    if (!this.container) return;
+
+    // Synchronize initial state from store
+    const state = store.getState();
+    this.activeDate = state.activeDate || formatDateIso(new Date());
+    if (typeof state.activeHourIndex === 'number' && state.activeHourIndex >= 9 && state.activeHourIndex <= 18) {
+      this.activeHour = state.activeHourIndex;
+    } else {
+      this.activeHour = 12;
+    }
+
+    if (params && params.macroRegion) {
+      this.activeMacroRegion = params.macroRegion;
+    }
+
+    // Build DOM structure
+    this.container.innerHTML = `
+      <section class="gm-map-view" aria-label="Mappa Comprensori e Volabilità">
+        <!-- Map Canvas Mount Target -->
+        <div id="gm-map-canvas" class="gm-map-canvas-container" role="application" aria-label="Cartografia interattiva decolli e comprensori"></div>
+
+        <!-- Top Floating Controls Bar -->
+        <header class="gm-map-top-bar" role="toolbar" aria-label="Filtri mappa">
+          <div class="gm-map-controls-row">
+            <div class="gm-map-group-left">
+              <!-- Macro-Region Dropdown Button -->
+              <select id="gm-map-macro-region-select" class="gm-map-pill-btn" aria-label="Seleziona macro-regione">
+                ${Object.values(MACRO_REGIONS).map(r => `
+                  <option value="${r.id}" ${r.id === this.activeMacroRegion ? 'selected' : ''}>
+                    ${r.name}
+                  </option>
+                `).join('')}
+              </select>
+
+              <!-- Date Badge Indicator -->
+              <div class="gm-map-pill-btn" id="gm-map-date-chip" aria-label="Data visualizzata: ${this.activeDate}">
+                <span>📅</span>
+                <span class="gm-map-date-text">${this.formatDateDisplay(this.activeDate)}</span>
+              </div>
+            </div>
+
+            <div class="gm-map-group-right">
+              <!-- Live Data Freshness Badge -->
+              <span id="gm-map-network-badge" class="gm-badge gm-badge-flyable" style="font-size: 0.72rem; padding: 4px 8px;">
+                🟢 Live Open-Meteo
+              </span>
+
+              <!-- 1-Tap Top Spot Focus Recommendation Pill -->
+              <button type="button" id="gm-map-top-spot-btn" class="gm-map-top-spot-btn" aria-label="Centra sullo spot migliore">
+                <span class="gm-top-spot-dot">●</span>
+                <span class="gm-top-spot-title" id="gm-top-spot-name">Top Spot...</span>
+                <span class="gm-top-spot-focus" aria-hidden="true">🎯</span>
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <!-- Bottom Docked Timeline Scrubber (Thumb Zone, Clearance >=24px) -->
+        <div class="gm-map-scrubber-container" role="region" aria-label="Selettore orario">
+          <div class="gm-map-scrubber-inner">
+            <div class="gm-map-scrubber-header">
+              <span>Timeline Volabilità (09:00 - 18:00)</span>
+              <span id="gm-map-active-hour-label" class="gm-flight-alt">Ore ${this.activeHour}:00</span>
+            </div>
+            <div class="gm-map-scrubber-slots" role="radiogroup" aria-label="Ore disponibili">
+              ${this.hoursRange.map(h => `
+                <button
+                  type="button"
+                  class="gm-map-hour-slot ${h === this.activeHour ? 'active' : ''}"
+                  data-hour="${h}"
+                  role="radio"
+                  aria-checked="${h === this.activeHour ? 'true' : 'false'}"
+                  aria-label="Ore ${h}:00"
+                >
+                  <span class="gm-hour-text">${h}</span>
+                  <span class="gm-hour-fly-bar" data-slot-hour="${h}"></span>
+                </button>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      </section>
+    `;
+
+    // Initialize Map Engine Adapter
+    this.mapContainer = this.container.querySelector('#gm-map-canvas');
+    const regionConfig = MACRO_REGIONS[Object.keys(MACRO_REGIONS).find(k => MACRO_REGIONS[k].id === this.activeMacroRegion)] || MACRO_REGIONS.NORTH_WEST;
+    const currentTheme = (state.ui && state.ui.theme) || 'dark';
+
+    this.mapEngine = createMapEngine(this.mapContainer, {
+      center: regionConfig.defaultCenter,
+      zoom: regionConfig.defaultZoom,
+      theme: currentTheme,
+      onSpotSelect: (spot) => this.handleSpotClick(spot),
+      onMoveEnd: (view) => this.handleMapMove(view)
+    });
+
+    // Bind UI Event Listeners
+    this.bindEvents();
+
+    // Subscribe to store updates
+    if (typeof store.subscribe === 'function') {
+      this.storeUnsub = store.subscribe(() => {
+        const s = store.getState();
+        // Check theme change
+        if (s.ui && s.ui.theme && this.mapEngine) {
+          this.mapEngine.setTheme(s.ui.theme);
+        }
+        // Check date change
+        if (s.activeDate && s.activeDate !== this.activeDate) {
+          this.activeDate = s.activeDate;
+          const dateLabel = this.container?.querySelector('.gm-map-date-text');
+          if (dateLabel) dateLabel.textContent = this.formatDateDisplay(this.activeDate);
+          this.renderMapContent();
+        }
+        // Check hour change
+        if (typeof s.activeHourIndex === 'number' && s.activeHourIndex !== this.activeHour && s.activeHourIndex >= 9 && s.activeHourIndex <= 18) {
+          this.setActiveHour(s.activeHourIndex, false);
+        }
+      });
+    }
+
+    // Trigger initial rendering and background network sync
+    this.renderMapContent();
+    this.syncMacroRegionWeather(this.activeMacroRegion);
+  }
+
+  /**
+   * Unbinds listeners and destroys the map engine upon route change.
+   */
+  unmount() {
+    if (this.storeUnsub) {
+      this.storeUnsub();
+      this.storeUnsub = null;
+    }
+    if (this.mapEngine) {
+      this.mapEngine.destroy();
+      this.mapEngine = null;
+    }
+    this.container = null;
+    this.mapContainer = null;
+  }
+
+  /**
+   * Binds interaction events to top toolbar and bottom scrubber.
+   */
+  bindEvents() {
+    if (!this.container) return;
+
+    // Macro-region selector
+    const regionSelect = this.container.querySelector('#gm-map-macro-region-select');
+    if (regionSelect) {
+      regionSelect.addEventListener('change', (e) => {
+        const newRegionId = e.target.value;
+        this.setMacroRegion(newRegionId);
+      });
+    }
+
+    // Top spot focus button
+    const topSpotBtn = this.container.querySelector('#gm-map-top-spot-btn');
+    if (topSpotBtn) {
+      topSpotBtn.addEventListener('click', () => {
+        if (this.topSpot) {
+          const coords = getComprensorioCoordinates(this.topSpot.comprensorio || this.topSpot);
+          if (coords && this.mapEngine) {
+            this.mapEngine.flyTo(coords, 10);
+            this.handleSpotClick(this.topSpot);
+          }
+        }
+      });
+    }
+
+    // Hourly Scrubber slot buttons
+    const scrubberSlots = this.container.querySelectorAll('.gm-map-hour-slot');
+    scrubberSlots.forEach(slot => {
+      slot.addEventListener('click', () => {
+        const hour = parseInt(slot.getAttribute('data-hour'), 10);
+        if (!isNaN(hour)) {
+          this.setActiveHour(hour, true);
+        }
+      });
+    });
+  }
+
+  /**
+   * Changes the active macro-region, re-centering the map and fetching data if needed.
+   * @param {string} regionId
+   */
+  setMacroRegion(regionId) {
+    this.activeMacroRegion = regionId;
+    const regionConfig = Object.values(MACRO_REGIONS).find(r => r.id === regionId) || MACRO_REGIONS.NORTH_WEST;
+
+    if (this.mapEngine) {
+      this.mapEngine.setView(regionConfig.defaultCenter, regionConfig.defaultZoom);
+    }
+
+    this.renderMapContent();
+    this.syncMacroRegionWeather(regionId);
+  }
+
+  /**
+   * Updates the selected hour index and triggers fast in-memory re-evaluation.
+   * @param {number} hour
+   * @param {boolean} [updateStore=true]
+   */
+  setActiveHour(hour, updateStore = true) {
+    if (this.activeHour === hour) return;
+    this.activeHour = hour;
+
+    if (updateStore && typeof store.setState === 'function') {
+      store.setState({ activeHourIndex: hour });
+    }
+
+    if (this.container) {
+      const activeLabel = this.container.querySelector('#gm-map-active-hour-label');
+      if (activeLabel) activeLabel.textContent = `Ore ${hour}:00`;
+
+      const slots = this.container.querySelectorAll('.gm-map-hour-slot');
+      slots.forEach(slot => {
+        const h = parseInt(slot.getAttribute('data-hour'), 10);
+        if (h === hour) {
+          slot.classList.add('active');
+          slot.setAttribute('aria-checked', 'true');
+        } else {
+          slot.classList.remove('active');
+          slot.setAttribute('aria-checked', 'false');
+        }
+      });
+    }
+
+    // Re-render overlays instantly in RAM (<15ms)
+    this.renderMapContent();
+  }
+
+  /**
+   * Handles map pan and zoom transitions.
+   * @param {object} view
+   */
+  handleMapMove(view) {
+    if (!this.mapEngine) return;
+    const evaluated = this.getEvaluatedSpotsForActiveRegion();
+    this.mapEngine.renderOverlays(evaluated, view.zoom, store.getState().activeGlider);
+  }
+
+  /**
+   * Evaluates flyability in RAM for all comprensori in the active macro-region.
+   * @returns {Array<object>}
+   */
+  getEvaluatedSpotsForActiveRegion() {
+    const spots = filterComprensoriByMacroRegion(this.comprensoriCatalog, this.activeMacroRegion);
+    const activeGlider = store.getState().activeGlider;
+
+    return spots.map(spot => {
+      let weather = this.cachedWeatherMap.get(spot.id)?.weatherData || null;
+      if (!weather) {
+        const coords = getComprensorioCoordinates(spot);
+        if (coords) {
+          weather = generateSyntheticWeather({ lat: coords.lat, lon: coords.lon }, { days: 1, targetDate: this.activeDate });
+        }
+      }
+
+      return evaluateComprensorio({
+        comprensorio: spot,
+        weatherData: weather,
+        hourIndex: this.activeHour,
+        glider: activeGlider,
+        allowSynthetic: true,
+        targetDate: this.activeDate
+      });
+    });
+  }
+
+  /**
+   * Re-evaluates spots in RAM and updates markers and top-spot recommendation.
+   */
+  renderMapContent() {
+    const evaluatedSpots = this.getEvaluatedSpotsForActiveRegion();
+    const activeGlider = store.getState().activeGlider;
+
+    // Update map overlays
+    if (this.mapEngine) {
+      const currentView = this.mapEngine.getView();
+      this.mapEngine.renderOverlays(evaluatedSpots, currentView.zoom, activeGlider);
+    }
+
+    // Find and update top-spot recommendation pill
+    this.topSpot = findTopFlyableSpot(evaluatedSpots);
+    if (this.container && this.topSpot) {
+      const topNameEl = this.container.querySelector('#gm-top-spot-name');
+      const topDotEl = this.container.querySelector('.gm-top-spot-dot');
+      if (topNameEl) {
+        topNameEl.textContent = `${this.topSpot.name} (${this.activeHour}:00)`;
+      }
+      if (topDotEl) {
+        const style = STATUS_COLORS[this.topSpot.status] || STATUS_COLORS.flyable;
+        topDotEl.style.color = style.fill;
+      }
+    }
+
+    // Update mini flyability bars on the hourly scrubber slots for the top spot
+    this.updateScrubberBars(this.topSpot || evaluatedSpots[0]);
+  }
+
+  /**
+   * Renders color bars on each scrubber hour slot reflecting the spot's daily progression.
+   * @param {object} spotEvaluation
+   */
+  updateScrubberBars(spotEvaluation) {
+    if (!this.container || !spotEvaluation || !spotEvaluation.comprensorio) return;
+    const spot = spotEvaluation.comprensorio;
+    const weather = this.cachedWeatherMap.get(spot.id)?.weatherData;
+    const activeGlider = store.getState().activeGlider;
+
+    this.hoursRange.forEach(h => {
+      const bar = this.container.querySelector(`[data-slot-hour="${h}"]`);
+      if (bar) {
+        const evalAtH = evaluateComprensorio({
+          comprensorio: spot,
+          weatherData: weather,
+          hourIndex: h,
+          glider: activeGlider,
+          allowSynthetic: true,
+          targetDate: this.activeDate
+        });
+        const style = STATUS_COLORS[evalAtH.status] || STATUS_COLORS.unavailable;
+        bar.style.backgroundColor = style.fill;
+      }
+    });
+  }
+
+  /**
+   * Asynchronously fetches batch Open-Meteo weather for the macro-region.
+   * @param {string} regionId
+   */
+  async syncMacroRegionWeather(regionId) {
+    if (typeof window === 'undefined' || typeof window.fetch !== 'function') {
+      return; // Headless environment guard
+    }
+
+    const spots = filterComprensoriByMacroRegion(this.comprensoriCatalog, regionId);
+    const missingSpots = getMissingSpots(spots, this.cachedWeatherMap, 1800000); // 30 min TTL
+    if (missingSpots.length === 0) return;
+
+    const badge = this.container?.querySelector('#gm-map-network-badge');
+    if (badge) {
+      badge.textContent = '🟡 Aggiornamento...';
+      badge.className = 'gm-badge gm-badge-caution';
+    }
+
+    try {
+      this.isFetchingWeather = true;
+      if (missingSpots.length > 0) {
+        const batchMap = await fetchBatchComprensoriWeather(missingSpots, {
+          targetDate: this.activeDate,
+          forecastDays: 7
+        });
+
+        const now = Date.now();
+        if (batchMap && typeof batchMap.entries === 'function') {
+          for (const [spotId, weatherData] of batchMap.entries()) {
+            this.cachedWeatherMap.set(spotId, {
+              fetchedAt: now,
+              weatherData
+            });
+          }
+        }
+      }
+
+      if (badge) {
+        badge.textContent = '🟢 Live Open-Meteo';
+        badge.className = 'gm-badge gm-badge-flyable';
+      }
+
+      // Re-render in RAM with freshly ingested real data
+      this.renderMapContent();
+    } catch (err) {
+      console.warn('[GlideMind Map] Background weather batch fetch error:', err);
+      if (badge) {
+        badge.textContent = '⚪ Modalità Offline';
+        badge.className = 'gm-badge gm-badge-unflyable';
+      }
+    } finally {
+      this.isFetchingWeather = false;
+    }
+  }
+
+  /**
+   * Opens the contextual Bottom Sheet drawer upon clicking any spot marker.
+   * @param {object} spotEval
+   */
+  handleSpotClick(spotEval) {
+    if (!spotEval) return;
+    const spot = spotEval.comprensorio || spotEval;
+    const statusStyle = STATUS_COLORS[spotEval.status] || STATUS_COLORS.unavailable;
+    const takeoff = spotEval.takeoff || spot.takeoffs?.[0];
+    const landing = spotEval.landing || spot.landings?.[0];
+    const glide = spotEval.glideMetrics || { requiredGlideRatio: 5.0, isSafe: true };
+    const glideRatioStr = typeof glide.requiredGlideRatio === 'number' ? `1:${glide.requiredGlideRatio}` : '1:5.0';
+
+    const tAlt = takeoff?.altitude ? `${takeoff.altitude}m slm` : 'N/D';
+    const lAlt = landing?.altitude ? `${landing.altitude}m slm` : 'N/D';
+    const windSpeed = spotEval.weatherSnapshot?.windSpeed != null ? `${Math.round(spotEval.weatherSnapshot.windSpeed)} km/h` : 'N/D';
+    const windDir = spotEval.weatherSnapshot?.direction?.cardinal || 'N/D';
+
+    const sheetContent = `
+      <div class="gm-spot-detail-sheet" style="display: flex; flex-direction: column; gap: 14px; padding: 4px 0;">
+        <!-- Header summary -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;">
+          <div>
+            <h4 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--gm-text-primary);">${spot.name || spot.location}</h4>
+            <div style="font-size: 0.8rem; color: var(--gm-text-secondary); margin-top: 2px;">
+              ${spot.location || ''} ${spot.province ? `(${spot.province})` : ''}
+            </div>
+          </div>
+          <span class="gm-badge" style="background-color: ${statusStyle.fill}; color: #ffffff; font-weight: 700; padding: 4px 10px; border-radius: var(--gm-radius-full); font-size: 0.78rem;">
+            ${statusStyle.icon} ${statusStyle.badge}
+          </span>
+        </div>
+
+        <!-- 2-Row Flight Overview (Decollo & Atterraggio) -->
+        <div class="gm-spot-flight-row">
+          <div class="gm-flight-stat-row">
+            <div class="gm-flight-label">
+              <span class="gm-flight-icon">▲</span>
+              <span class="gm-flight-target">${takeoff?.name || 'Decollo Principale'}</span>
+              <span class="gm-flight-alt">${tAlt}</span>
+            </div>
+            <div class="gm-flight-data">
+              <span class="gm-ind-pill">
+                <span class="gm-ind-dot" style="background-color: ${statusStyle.fill};"></span>
+                <span>${windSpeed} ${windDir}</span>
+              </span>
+            </div>
+          </div>
+
+          <div class="gm-flight-stat-row">
+            <div class="gm-flight-label">
+              <span class="gm-flight-icon">⏚</span>
+              <span class="gm-flight-target">${landing?.name || 'Atterraggio Sicuro'}</span>
+              <span class="gm-flight-alt">${lAlt}</span>
+            </div>
+            <div class="gm-flight-data">
+              <span class="gm-ind-pill">
+                <span class="gm-ind-dot" style="background-color: ${glide.isSafe ? '#22c55e' : '#ef4444'};"></span>
+                <span>Eff. ${glideRatioStr}</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Physical explainability text -->
+        ${spotEval.reason ? `
+          <div style="font-size: 0.82rem; color: var(--gm-text-secondary); background: var(--gm-bg-elevated); padding: 8px 12px; border-radius: var(--gm-radius-sm); border-left: 3px solid ${statusStyle.fill};">
+            ${spotEval.reason}
+          </div>
+        ` : ''}
+
+        <!-- Hazards warning if present -->
+        ${takeoff?.hazards ? `
+          <div style="font-size: 0.76rem; color: #f59e0b; background: rgba(245, 158, 11, 0.08); padding: 6px 10px; border-radius: var(--gm-radius-sm); border: 1px solid rgba(245, 158, 11, 0.2);">
+            ⚠️ <strong>Pericoli:</strong> ${cleanUserText(takeoff.hazards)}
+          </div>
+        ` : ''}
+
+        <!-- Primary CTA to Forecast View -->
+        <button type="button" id="gm-map-cta-forecast" class="gm-btn gm-btn-primary" style="min-height: var(--gm-touch-min, 48px); width: 100%; margin-top: 4px; font-weight: 700;">
+          Apri Previsioni Dettagliate
+        </button>
+      </div>
+    `;
+
+    openSheet(spot.name || 'Scheda Comprensorio', sheetContent);
+
+    // Bind CTA click
+    setTimeout(() => {
+      const ctaBtn = document.getElementById('gm-map-cta-forecast');
+      if (ctaBtn) {
+        ctaBtn.addEventListener('click', () => {
+          closeSheet();
+          if (typeof store.setState === 'function') {
+            store.setState({
+              selectedSpotId: spot.id,
+              activeHourIndex: this.activeHour
+            });
+          }
+          router.navigate('forecast');
+        });
+      }
+    }, 50);
+  }
+
+  /**
+   * Formats ISO date string into human-friendly Italian short date.
+   * @param {string} isoDate
+   * @returns {string}
+   */
+  formatDateDisplay(isoDate) {
+    if (!isoDate) return 'Oggi';
+    const today = formatDateIso(new Date());
+    if (isoDate === today) return 'Oggi';
+
+    const parts = isoDate.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}`;
+    }
+    return isoDate;
+  }
+}
+
+export const spotMapView = new SpotMapView();

@@ -8,6 +8,7 @@ import { router } from './router.js';
 import { initSheetManager } from './sheetManager.js';
 import { homeDashboardView } from './views/HomeDashboardView.js';
 import { forecastView } from './views/ForecastView.js';
+import { spotMapView } from './views/SpotMapView.js';
 import { normalizeLocationsCatalog, DEFAULT_COMPRENSORI } from '../core/comprensorio.js';
 import { APP_VERSION, APP_BUILD } from '../core/version.js';
 
@@ -30,6 +31,9 @@ export async function loadLocationsCatalog() {
           }
           if (typeof forecastView.setComprensoriCatalog === 'function') {
             forecastView.setComprensoriCatalog(normalized);
+          }
+          if (typeof spotMapView.setComprensoriCatalog === 'function') {
+            spotMapView.setComprensoriCatalog(normalized);
           }
           return normalized;
         }
@@ -102,6 +106,7 @@ export function bootstrapApp() {
   // Register view controllers
   router.registerView('home', homeDashboardView);
   router.registerView('forecast', forecastView);
+  router.registerView('map', spotMapView);
 
   // Initialize sheet manager
   initSheetManager();
