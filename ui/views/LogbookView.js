@@ -511,7 +511,11 @@ export class LogbookViewController {
       ? `${flight.thermalsCount} ${flight.thermalsCount === 1 ? 'termica' : 'termiche'}`
       : '--';
     const distance = flight.distanceKm ? `${flight.distanceKm} km` : '--';
-    const sparkline = flight.sparklineSvgPoints || '0,12 100,12';
+    const sparkline = flight.sparklineSvgPoints || '';
+    const hasValidSparkline = sparkline &&
+      sparkline.split(' ').length > 2 &&
+      !sparkline.includes('0,16 100,16') &&
+      !sparkline.includes('0,12 100,12');
     const siteArea = flight.site && flight.site !== title ? flight.site : '';
 
     return `
@@ -525,14 +529,14 @@ export class LogbookViewController {
       >
         <!-- Flight Card Header Row -->
         <div class="gm-flight-card-header">
-          <div class="flex items-center gap-2 min-w-0 flex-1">
+          <div class="gm-flight-title-group">
             ${flightNumber != null ? `<span class="gm-flight-number-badge" aria-label="Volo numero ${flightNumber}">#${escapeHtml(flightNumber)}</span>` : ''}
-            <h4 id="fl-title-${escapeHtml(flightId)}" class="gm-flight-site-title truncate" title="${escapeHtml(title)}">
+            <h4 id="fl-title-${escapeHtml(flightId)}" class="gm-flight-site-title" title="${escapeHtml(title)}">
               ${escapeHtml(title)}
             </h4>
           </div>
 
-          <div class="flex items-center gap-1.5 flex-shrink-0">
+          <div class="gm-flight-badge-group">
             <span class="gm-glider-pill-badge ${classBadgeStyle}">
               ${escapeHtml(gliderClass)}
             </span>
@@ -557,26 +561,28 @@ export class LogbookViewController {
           <span class="truncate max-w-[140px] text-[var(--gm-text-secondary)] font-medium">• ${escapeHtml(glider)}</span>
         </div>
 
-        <!-- Lean Altimetric Sparkline -->
-        <div class="gm-flight-sparkline-wrap" aria-hidden="true">
-          <svg viewBox="0 0 100 24" class="gm-flight-sparkline" preserveAspectRatio="none">
-            <polyline points="${escapeHtml(sparkline)}" class="gm-flight-sparkline-polyline" />
-          </svg>
-        </div>
+        <!-- Altimetric Sparkline (Rendered only if track has altitude variation) -->
+        ${hasValidSparkline ? `
+          <div class="gm-flight-sparkline-wrap" aria-hidden="true">
+            <svg viewBox="0 0 100 24" class="gm-flight-sparkline" preserveAspectRatio="none">
+              <polyline points="${escapeHtml(sparkline)}" class="gm-flight-sparkline-polyline" />
+            </svg>
+          </div>
+        ` : ''}
 
-        <!-- Glanceable 3-Metric Row -->
+        <!-- Glanceable 3-Metric Row (Grid-based: Never wraps) -->
         <div class="gm-flight-metrics-row">
-          <div class="gm-flight-metric-pill">
-            <span class="gm-flight-metric-label">Tempo:</span>
+          <div class="gm-flight-metric-item">
             <span class="gm-flight-metric-val">${escapeHtml(duration)}</span>
+            <span class="gm-flight-metric-lbl">Tempo</span>
           </div>
-          <div class="gm-flight-metric-pill">
-            <span class="gm-flight-metric-label">Quota:</span>
+          <div class="gm-flight-metric-item">
             <span class="gm-flight-metric-val">${escapeHtml(maxAlt)}</span>
+            <span class="gm-flight-metric-lbl">Quota MSL</span>
           </div>
-          <div class="gm-flight-metric-pill">
-            <span class="gm-flight-metric-label">Guadagno:</span>
+          <div class="gm-flight-metric-item">
             <span class="gm-flight-metric-val">${escapeHtml(maxGain)}</span>
+            <span class="gm-flight-metric-lbl">Guadagno</span>
           </div>
           <span class="gm-flight-chevron" aria-hidden="true">&#8250;</span>
         </div>
