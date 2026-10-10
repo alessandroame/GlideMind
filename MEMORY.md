@@ -677,3 +677,14 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
   4. **Pulsante 1-Tap "Top Spot" & Scrubber Dockato (Thumb Zone)**: Barra superiore con raccomandazione immediata del miglior comprensorio volabile della macro-regione attiva all'ora selezionata, e timeline oraria dockata a filo sopra la navbar con clearance $\ge 24\text{px}$ e `touch-action: pan-x`.
   5. **Dual Theme Tile Switching**: Commutazione trasparente tra CartoDB Dark Matter e CartoDB Positron/Sunlight Mode all'evento `themeChange` senza ricaricamento di pagina.
 
+---
+
+## 61. Smussamento Vettoriale dei Grafici Meteo tramite Spline Monotona (Fritsch-Carlson) e Zero Overshoot
+- **Problema**: Il rendering delle serie orarie meteorologiche (vento, raffiche, base cumulo LCL, CAPE, turbolenza EDR, copertura nuvolosa e brezza di valle) tramite polilinee spezzate (`<polyline points="...">` o sequenze lineari `L x y`) produceva curve angolari con spigoli vivi a ogni marcatore orario. Questo approccio generava affaticamento visivo all'aperto sotto forte contrasto solare e travisava visivamente l'evoluzione continua dei gradienti termodinamici e fluidodinamici dell'atmosfera.
+- **Causa Radice**: Connessione diretta punto-punto senza interpolazione di forma. L'applicazione di spline Bézier cubiche convenzionali prive di controllo di monotonicità causa tipicamente overshooting (creste che superano i massimi fisici o scendono sotto zero generando valori impossibili di CAPE o vento negativo).
+- **Pattern Vincolante**:
+  1. **Interpolazione Spline Monotona Cubica (`buildSmoothPath`)**: Implementare l'algoritmo di Fritsch-Carlson per calcolare i punti di controllo Bézier cubici (`C cp1x,cp1y cp2x,cp2y x,y`). Quando due segmenti consecutivi cambiano pendenza ($s_{i-1} \cdot s_i \le 0$), la tangente viene forzata orizzontale ($m_i = 0$), garantendo zero overshooting ed eliminando cuspidi sia sui picchi che sulle valli. Nei tratti monotoni, il gradiente è calcolato tramite media armonica ponderata.
+  2. **Tracciamento Coordinato dell'Area Sottesa (`buildSmoothAreaPath`)**: Le campiture ombreggiate (fill delle raffiche, instabilità CAPE, turbolenza ed insolazione) devono seguire la medesima curva cubica della linea superiore (`M x0,baselineY L x0,y0 C ... L xN,baselineY Z`), evitando qualsiasi disallineamento geometrico tra bordo e campitura.
+  3. **Attributi SVG di Fluidità Visiva**: Configurare sempre `stroke-linecap="round"` e `stroke-linejoin="round"` sui tracciati vettoriali per garantire una resa grafica priva di artefatti ad alta risoluzione su display retina e smartphone outdoor.
+
+

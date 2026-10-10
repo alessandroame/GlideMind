@@ -8,6 +8,8 @@ import {
   getCardinalDirection,
   polarToCartesian,
   describeSectorArc,
+  buildSmoothPath,
+  buildSmoothAreaPath,
   generateGuidoBriefing
 } from '../../ui/views/ForecastView.js';
 import { DEFAULT_COMPRENSORI } from '../../core/comprensorio.js';
@@ -864,6 +866,81 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.ok(paramsHtml.includes('param-card-vento-decollo'), 'Must update params container with parameter cards on hour change');
 
     controller.unmount();
+  });
+
+  it('should generate mathematically smooth cubic Bézier spline paths with Fritsch-Carlson monotonicity', () => {
+    // Edge cases
+    assert.equal(buildSmoothPath([]), '');
+    assert.equal(buildSmoothPath([{ x: 10, y: 20 }]), 'M 10,20');
+    assert.equal(buildSmoothPath([{ x: 10, y: 20 }, { x: 30, y: 40 }]), 'M 10,20 L 30,40');
+
+    // 3 points with a peak at (20, 10)
+    const peakPts = [
+      { x: 10, y: 50 },
+      { x: 20, y: 10 },
+      { x: 30, y: 50 }
+    ];
+    const peakPath = buildSmoothPath(peakPts);
+    assert.ok(peakPath.startsWith('M 10,50'), 'Must start at first point');
+    assert.ok(peakPath.includes('C'), 'Must contain cubic Bézier segments');
+    // Verify horizontal tangent at peak (y=10 for both approaching CP2 and leaving CP1)
+    assert.ok(peakPath.includes(' 20,10 C 23.3,10 '), 'Tangents at peak must be horizontal (dy/dx = 0)');
+
+    // Flat line (constant value)
+    const flatPts = [
+      { x: 10, y: 25 },
+      { x: 20, y: 25 },
+      { x: 30, y: 25 }
+    ];
+    const flatPath = buildSmoothPath(flatPts);
+    assert.ok(flatPath.includes('C 13.3,25 16.7,25 20,25'), 'Flat line must maintain constant Y without NaN or division by zero');
+
+    // Closed area path
+    const areaPath = buildSmoothAreaPath(peakPts, 95);
+    assert.ok(areaPath.startsWith('M 10,95 L 10,50'), 'Area path must start from baseline and rise to first point');
+    assert.ok(areaPath.endsWith('L 30,95 Z'), 'Area path must descend from last point to baseline and close with Z');
+  });
+
+  it('should render smooth curves in renderSvgTrendChart, renderWindChart, and renderSoundingChart', () => {
+    const mockStore = createStore({ selectedSpot: DEFAULT_COMPRENSORI[0] });
+    const controller = new ForecastViewController({ store: mockStore });
+    const weatherData = controller.getWeatherData(DEFAULT_COMPRENSORI[0], controller.activeDate);
+
+    // 1. renderSvgTrendChart must output smooth <path d="M... C..."> instead of <polyline
+    const trendSvg = controller.renderSvgTrendChart({
+      id: 'test-trend',
+      title: 'Vento Test',
+      unit: 'km/h',
+      series: [
+        {
+          name: 'Vento',
+          points: [
+            { hour: 8, value: 10 },
+            { hour: 12, value: 20 },
+            { hour: 16, value: 15 },
+            { hour: 20, value: 8 }
+          ],
+          fillArea: 'rgba(34, 197, 94, 0.15)'
+        }
+      ]
+    });
+    assert.ok(trendSvg.includes('stroke-linecap="round"'), 'Trend chart lines must have round linecaps for fluid rendering');
+    assert.ok(trendSvg.includes('stroke-linejoin="round"'), 'Trend chart lines must have round linejoins');
+    assert.ok(trendSvg.includes('d="M '), 'Must use SVG path with cubic curves');
+    assert.ok(trendSvg.includes(' C '), 'Must contain cubic Bézier spline segments');
+    assert.ok(!trendSvg.includes('<polyline'), 'Must not render jagged polyline');
+
+    // 2. renderWindChart must output smooth paths for wind and gust
+    const windChartSvg = controller.renderWindChart(DEFAULT_COMPRENSORI[0], weatherData, 170);
+    assert.ok(windChartSvg.includes('id="forecast-wind-chart-box"'), 'Must render wind chart box');
+    assert.ok(windChartSvg.includes('stroke-linecap="round"'), 'Wind chart must render rounded smooth lines');
+    assert.ok(!windChartSvg.includes('<polyline'), 'Wind chart must not render jagged polylines');
+
+    // 3. renderSoundingChart must output smooth paths for LCL and Ceiling
+    const soundingChartSvg = controller.renderSoundingChart(DEFAULT_COMPRENSORI[0], weatherData, 1000);
+    assert.ok(soundingChartSvg.includes('id="forecast-sounding-chart-box"'), 'Must render sounding chart box');
+    assert.ok(soundingChartSvg.includes('stroke-linecap="round"'), 'Sounding chart must render rounded smooth lines');
+    assert.ok(!soundingChartSvg.includes('<polyline'), 'Sounding chart must not render jagged polylines');
   });
 });
 

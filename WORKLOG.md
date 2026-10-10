@@ -648,6 +648,20 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Sviluppate le suite di test automatizzati [tests/core/mapDataPartition.test.mjs](file:///tests/core/mapDataPartition.test.mjs) e [tests/ui/spotMapView.test.mjs](file:///tests/ui/spotMapView.test.mjs) (377/377 test superati con successo in 51 suite).
   - Allineato lo stato in [DESIDERATA.md](file:///DESIDERATA.md) a `🟢 Completato` e registrata la Lezione Appresa #60 in [MEMORY.md](file:///MEMORY.md).
 
+---
+
+## 2026-10-10 - Smussamento Vettoriale dei Grafici Meteo (Spline Monotona Cubica Fritsch-Carlson)
+- **Tipo**: UI/UX Refinement / Computer Graphics / SVG Spline Interpolation
+- **Dettagli**: [.agents/worklog.d/2026-10-10_smooth-meteorological-charts-monotone-cubic-spline.md](file:///.agents/worklog.d/2026-10-10_smooth-meteorological-charts-monotone-cubic-spline.md)
+- **Sintesi**:
+  - Implementata l'interpolazione spline cubica monotona (`buildSmoothPath` e `buildSmoothAreaPath`) in [ui/views/ForecastView.js](file:///ui/views/ForecastView.js) secondo l'algoritmo di Fritsch-Carlson per eliminare spigoli e linee spezzate dai grafici orari (08:00 - 20:00).
+  - Azzeramento deterministico della tangente nei punti di inversione di pendenza ($s_{i-1} \cdot s_i \le 0 \implies m_i = 0$), garantendo zero overshooting sui massimi fisici e prevenendo valori spuri negativi (CAPE, vento).
+  - Applicate curve fluide continue $C^1$ con `stroke-linecap="round"` e `stroke-linejoin="round"` a tutti i grafici della vista: `renderSvgTrendChart` (accordion parametri e stack multi-trend), `renderWindChart` (vento e raffiche) e `renderSoundingChart` (base cumulo LCL e ceiling termico).
+  - Adattamento coordinato delle campiture ombreggiate d'area (`buildSmoothAreaPath`) chiuse deterministicamente sulla linea di base ($yMax$) per far combaciare perfettamente l'area con la linea curva superiore.
+  - Aggiunti test di regressione dedicati in [tests/ui/forecastView.test.mjs](file:///tests/ui/forecastView.test.mjs) coprendo monotonicità, tangenti orizzontali ed emissione di tracciati cubici SVG (379/379 test superati con successo in 51 suite).
+  - Registrata la Lezione Appresa #61 in [MEMORY.md](file:///MEMORY.md).
+
+
 
 
 

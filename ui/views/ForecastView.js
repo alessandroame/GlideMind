@@ -125,6 +125,78 @@ export function describeSectorArc(cx, cy, radius, startAngleDeg, endAngleDeg) {
 }
 
 /**
+ * Generates a smooth cubic Bézier SVG path from discrete data points.
+ * Uses Monotone Cubic Spline (Fritsch-Carlson) interpolation to eliminate jagged lines
+ * and guarantee zero overshoot at local extrema (peaks and troughs).
+ * 
+ * @param {Array<{x: number, y: number}>} points
+ * @returns {string} SVG path string
+ */
+export function buildSmoothPath(points) {
+  if (!points || points.length === 0) return '';
+  if (points.length === 1) return `M ${points[0].x},${points[0].y}`;
+  if (points.length === 2) return `M ${points[0].x},${points[0].y} L ${points[1].x},${points[1].y}`;
+
+  const n = points.length;
+  const dx = [];
+  const dy = [];
+  const s = [];
+
+  for (let i = 0; i < n - 1; i++) {
+    const dxi = points[i + 1].x - points[i].x;
+    const dyi = points[i + 1].y - points[i].y;
+    dx.push(dxi);
+    dy.push(dyi);
+    s.push(dxi === 0 ? 0 : dyi / dxi);
+  }
+
+  const m = [];
+  m.push(s[0]);
+
+  for (let i = 1; i < n - 1; i++) {
+    if (s[i - 1] * s[i] <= 0) {
+      m.push(0);
+    } else {
+      m.push((2 * s[i - 1] * s[i]) / (s[i - 1] + s[i]));
+    }
+  }
+  m.push(s[n - 2]);
+
+  let path = `M ${points[0].x},${points[0].y}`;
+  for (let i = 0; i < n - 1; i++) {
+    const p0 = points[i];
+    const p1 = points[i + 1];
+    const segDx = dx[i] / 3;
+    const cp1x = Math.round((p0.x + segDx) * 10) / 10;
+    const cp1y = Math.round((p0.y + m[i] * segDx) * 10) / 10;
+    const cp2x = Math.round((p1.x - segDx) * 10) / 10;
+    const cp2y = Math.round((p1.y - m[i + 1] * segDx) * 10) / 10;
+    path += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${p1.x},${p1.y}`;
+  }
+  return path;
+}
+
+/**
+ * Generates a closed area SVG path following the smoothed curve down to a baseline Y.
+ * 
+ * @param {Array<{x: number, y: number}>} points
+ * @param {number} baselineY
+ * @returns {string} SVG path string
+ */
+export function buildSmoothAreaPath(points, baselineY) {
+  if (!points || points.length === 0) return '';
+  const first = points[0];
+  const last = points[points.length - 1];
+  if (points.length === 1) {
+    return `M ${first.x},${baselineY} L ${first.x},${first.y} L ${last.x},${baselineY} Z`;
+  }
+  const linePath = buildSmoothPath(points);
+  const mMatch = linePath.match(/^M\s*[\d.-]+[,\s]+[\d.-]+\s*/);
+  const segments = mMatch ? linePath.slice(mMatch[0].length) : '';
+  return `M ${first.x},${baselineY} L ${first.x},${first.y} ${segments} L ${last.x},${baselineY} Z`;
+}
+
+/**
  * Escapes HTML characters for safe template rendering.
  * @param {string} str
  * @returns {string}
@@ -1891,19 +1963,22 @@ export class ForecastViewController {
     const mid2 = minY + yRange * 0.66;
 
     const renderedSeries = series.map(s => {
-      const pts = (s.points || []).map(p => `${getX(p.hour)},${getY(p.value)}`).join(' ');
+      const coords = (s.points || []).map(p => ({ x: getX(p.hour), y: getY(p.value) }));
       let areaMarkup = '';
-      if (s.fillArea) {
-        const areaPath = `M ${getX(8)} ${yMax} ` + (s.points || []).map(p => `L ${getX(p.hour)} ${getY(p.value)}`).join(' ') + ` L ${getX(20)} ${yMax} Z`;
+      if (s.fillArea && coords.length > 0) {
+        const areaPath = buildSmoothAreaPath(coords, yMax);
         areaMarkup = `<path d="${areaPath}" fill="${s.fillArea}" />`;
       }
+      const linePath = buildSmoothPath(coords);
       return `
         ${areaMarkup}
-        <polyline 
-          points="${pts}" 
+        <path 
+          d="${linePath}" 
           fill="none" 
           stroke="${s.stroke || 'var(--gm-accent)'}" 
           stroke-width="${s.strokeWidth || 2}" 
+          stroke-linecap="round"
+          stroke-linejoin="round"
           ${s.strokeDasharray ? `stroke-dasharray="${s.strokeDasharray}"` : ''} 
         />
       `;
@@ -2392,10 +2467,12 @@ export class ForecastViewController {
     const getX = (h) => Math.round(xMin + ((h - 8) / 12) * (xMax - xMin));
     const getY = (val) => Math.round(yMax - (Math.min(maxVal, Math.max(0, val)) / maxVal) * (yMax - yMin));
 
-    // Points string for speed & gust
-    const speedPoints = hours.map(p => `${getX(p.hour)},${getY(p.speed)}`).join(' ');
-    const gustPoints = hours.map(p => `${getX(p.hour)},${getY(p.gust)}`).join(' ');
-    const gustAreaPath = `M ${getX(8)} ${yMax} ` + hours.map(p => `L ${getX(p.hour)} ${getY(p.gust)}`).join(' ') + ` L ${getX(20)} ${yMax} Z`;
+    // Smooth curves for speed & gust
+    const speedCoords = hours.map(p => ({ x: getX(p.hour), y: getY(p.speed) }));
+    const gustCoords = hours.map(p => ({ x: getX(p.hour), y: getY(p.gust) }));
+    const speedPath = buildSmoothPath(speedCoords);
+    const gustPath = buildSmoothPath(gustCoords);
+    const gustAreaPath = buildSmoothAreaPath(gustCoords, yMax);
 
     // Active marker coordinates
     const activeMarkerX = getX(this.selectedHour);
@@ -2423,10 +2500,10 @@ export class ForecastViewController {
           <path d="${gustAreaPath}" fill="rgba(249, 115, 22, 0.15)" />
 
           <!-- Gust line -->
-          <polyline points="${gustPoints}" fill="none" stroke="var(--gm-status-alert)" stroke-width="1.8" stroke-dasharray="3,3" />
+          <path d="${gustPath}" fill="none" stroke="var(--gm-status-alert)" stroke-width="1.8" stroke-dasharray="3,3" stroke-linecap="round" stroke-linejoin="round" />
 
           <!-- Wind speed line -->
-          <polyline points="${speedPoints}" fill="none" stroke="var(--gm-status-flyable)" stroke-width="2.5" />
+          <path d="${speedPath}" fill="none" stroke="var(--gm-status-flyable)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
 
           <!-- Hourly X Axis Labels -->
           <text x="${getX(8)}" y="${H - 8}" font-size="9" fill="var(--gm-text-muted)" text-anchor="middle">08</text>
@@ -2591,8 +2668,10 @@ export class ForecastViewController {
     const getX = (h) => Math.round(xMin + ((h - 8) / 12) * (xMax - xMin));
     const getY = (alt) => Math.round(yMax - (Math.min(maxAlt, Math.max(0, alt)) / maxAlt) * (yMax - yMin));
 
-    const lclPoints = hours.map(p => `${getX(p.hour)},${getY(p.lclMsl)}`).join(' ');
-    const ceilingPoints = hours.map(p => `${getX(p.hour)},${getY(p.ceiling)}`).join(' ');
+    const lclCoords = hours.map(p => ({ x: getX(p.hour), y: getY(p.lclMsl) }));
+    const ceilingCoords = hours.map(p => ({ x: getX(p.hour), y: getY(p.ceiling) }));
+    const lclPath = buildSmoothPath(lclCoords);
+    const ceilingPath = buildSmoothPath(ceilingCoords);
 
     const activeMarkerX = getX(this.selectedHour);
     const activeData = hours.find(h => h.hour === this.selectedHour) || hours[0];
@@ -2614,10 +2693,10 @@ export class ForecastViewController {
           <line x1="${xMin}" y1="${getY(takeoffAlt)}" x2="${xMax}" y2="${getY(takeoffAlt)}" stroke="var(--gm-border-strong)" stroke-width="1.2" stroke-dasharray="3,3" />
 
           <!-- Ceiling line -->
-          <polyline points="${ceilingPoints}" fill="none" stroke="var(--gm-status-flyable)" stroke-width="2" />
+          <path d="${ceilingPath}" fill="none" stroke="var(--gm-status-flyable)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
 
           <!-- LCL Base line -->
-          <polyline points="${lclPoints}" fill="none" stroke="var(--gm-accent)" stroke-width="2.2" />
+          <path d="${lclPath}" fill="none" stroke="var(--gm-accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
 
           <!-- Hourly X Axis Labels -->
           <text x="${getX(8)}" y="${H - 8}" font-size="9" fill="var(--gm-text-muted)" text-anchor="middle">08</text>
