@@ -19,6 +19,7 @@
 
 import { store } from '../../core/store.js';
 import { router } from '../router.js';
+import { openSheet, closeSheet } from '../sheetManager.js';
 import { createMapEngine } from '../map/mapEngineAdapter.js';
 import { calculateLandingCircuit } from '../../core/flightProcedures.js';
 import {
@@ -366,6 +367,14 @@ export class ForecastViewController {
 
     // Contextual spot mini-map and vector windsock engine
     this.miniMapEngine = null;
+
+    // Comprensorio flight inspector fullscreen overlay
+    this.isFlightAnalysisOpen = false;
+    this.flightAnalysisOverlayEl = null;
+    this.flightAnalysisMapEngine = null;
+    this.flightAnalysisTriggerEl = null;
+    this.boundFlightAnalysisKeyHandler = this.handleFlightAnalysisKey.bind(this);
+    this.boundFlightAnalysisPopstate = this.handleFlightAnalysisPopstate.bind(this);
   }
 
   /**

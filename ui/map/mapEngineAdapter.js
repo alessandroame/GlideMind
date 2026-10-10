@@ -241,6 +241,7 @@ export class HeadlessMockMapEngine {
     this.activeFlightMapData = data;
     this.renderedMode = 'flightAnalysis';
     this.circuitData = data?.circuitData || null;
+    this.procedures = this.circuitData;
     this.renderedCircuitPolylines = data?.circuitData?.polylines ? Object.keys(data.circuitData.polylines) : [];
     this.paused = false;
     this.destroyed = false;
@@ -250,6 +251,7 @@ export class HeadlessMockMapEngine {
   updateFlightProcedures(circuitData, options = {}) {
     this.lastCircuitUpdate = circuitData;
     this.circuitData = circuitData;
+    this.procedures = circuitData;
     if (circuitData?.polylines) {
       this.renderedCircuitPolylines = Object.keys(circuitData.polylines);
     }
