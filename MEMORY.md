@@ -908,6 +908,18 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
      ```
   3. **Shift-Left Test Automation**: Inserire nella suite di governance (`tests/ui/shiftLeftGovernance.test.mjs`) una verifica automatica che controlla la presenza della direttiva `background-repeat: no-repeat, no-repeat !important;` per i selettori ad effetto vetro con icone vettoriali incorporate.
 
+---
+
+## 75. Architettura Modale Full-Screen a 100dvh per Analisi del Comprensorio, Isolamento Concorrente e Gestione del Ciclo di Vita (Pause/Resume)
+- **Problema**: Navigare verso la mappa globale (`#map?spot=...`) quando l'utente espande la mini-mappa strappava il pilota dal flusso previsionale orario, costringendolo a ripartire dalla selezione dello spot. Inoltre, mantenere due istanze Leaflet attive contemporaneamente (mini-mappa di sfondo e mappa a schermo intero) raddoppiava il carico computazionale, e il tasto nativo "indietro" su mobile faceva uscire l'utente dall'applicazione.
+- **Causa Radice**: Mancanza di una modalità ispettiva contestuale isolata a schermo intero (`100dvh`) integrata nel controller della vista previsionale con sincronizzazione dello stato, ciclo di vita pause/resume e gestione dello stack di navigazione browser (`history.pushState` / `popstate`).
+- **Pattern Vincolante**:
+  1. **Overlay Contestuale a 100dvh**: Invece di un cambio di rotta globale, aprire un overlay modale full-screen (`position: fixed`, `z-index: 1050`, `height: 100dvh`, `role="dialog"`, `aria-modal="true"`) che condivide lo stesso store e il medesimo orario selezionato.
+  2. **Isolamento Concorrente con Ciclo di Vita Pause/Resume**: All'apertura dell'overlay, sospendere esplicitamente l'animazione della mini-mappa sottostante (`this.miniMapEngine.pause()`) per azzerare cicli CPU/GPU; alla chiusura, riprendere le animazioni e ricalibrare i layout (`this.miniMapEngine.resume()`).
+  3. **Trappola di Navigazione Mobile Risolta con `popstate`**: Pushare uno stato sintetico nell'history del browser (`history.pushState({ overlay: 'flight-analysis' }, '')`) all'apertura e intercettare l'evento `popstate` per chiudere l'overlay su gesture o pulsante indietro fisico senza uscire dall'app.
+  4. **Doppio Tracciato Casing/Core per Polilinee di Volo (WCAG AA)**: Le polilinee delle procedure di volo devono sempre impiegare un doppio tracciato sovrapposto: casing a contrasto ($6\text{px}$) e core semantico colorato ($3\text{px}$) per garantire piena leggibilità su qualsiasi basemap (satellite, topo, dark, streets).
+
+
 
 
 
