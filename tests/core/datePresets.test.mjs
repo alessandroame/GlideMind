@@ -121,7 +121,7 @@ describe('GlideMind Phase 4 - Smart Date Selector & Calendar Presets Engine', ()
     assert.equal(result.presets[1].isoDate, '2026-10-11');
     assert.equal(result.presets[1].isWeekend, true);
 
-    assert.equal(result.presets[2].label, 'Prossimo Sab');
+    assert.equal(result.presets[2].label, 'Sabato');
     assert.equal(result.presets[2].subLabel, '17 Ott');
     assert.equal(result.presets[2].isoDate, '2026-10-17');
     assert.equal(result.presets[2].isWeekend, true);
@@ -142,7 +142,7 @@ describe('GlideMind Phase 4 - Smart Date Selector & Calendar Presets Engine', ()
     assert.equal(result.presets[1].subLabel, '12 Ott');
     assert.equal(result.presets[1].isoDate, '2026-10-12');
 
-    assert.equal(result.presets[2].label, 'Prossimo Sab');
+    assert.equal(result.presets[2].label, 'Sabato');
     assert.equal(result.presets[2].subLabel, '17 Ott');
     assert.equal(result.presets[2].isoDate, '2026-10-17');
   });

@@ -5,8 +5,8 @@
  * 1. Adaptive quick-presets based on the current day of the week:
  *    - Mon-Thu: Oggi, Domani, Sabato, Domenica (zero weekend blind spot).
  *    - Friday: Oggi, Sabato (Domani), Domenica (zero redundant buttons).
- *    - Saturday: Oggi (Sabato), Domani (Domenica), Prossimo Sabato.
- *    - Sunday: Oggi (Domenica), Domani (Lunedì), Prossimo Sabato.
+ *    - Saturday: Oggi (Sabato), Domani (Domenica), Sabato (17 Ott).
+ *    - Sunday: Oggi (Domenica), Domani (Lunedì), Sabato (17 Ott).
  * 2. Custom date integration: injects an active custom chip if a non-preset date is selected.
  * 3. Atmospheric model horizon assessment (high-res 0-3d, standard 4-7d, synoptic trend > 7d).
  * 4. Past date presets for flight logging (Oggi, Ieri, Ultimo Weekend).
@@ -254,7 +254,7 @@ export function getSmartDatePresets(refDate = new Date(), activeDateIso = null, 
 
     presets.push({
       isoDate: formatDateIso(nextSatDate),
-      label: 'Prossimo Sab',
+      label: 'Sabato',
       subLabel: formatShortDate(nextSatDate),
       isToday: false,
       isWeekend: true
@@ -282,7 +282,7 @@ export function getSmartDatePresets(refDate = new Date(), activeDateIso = null, 
 
     presets.push({
       isoDate: formatDateIso(nextSatDate),
-      label: 'Prossimo Sab',
+      label: 'Sabato',
       subLabel: formatShortDate(nextSatDate),
       isToday: false,
       isWeekend: true

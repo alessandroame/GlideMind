@@ -479,3 +479,11 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
      - ⚫ **`Severo`** (turbolenza estrema, temporali o NO-FLY)
   2. **Coerenza Orizzontale Trasversale**: Mantenere la stessa identica etichettatura testuale in tutti i layer: algoritmo di sintesi comprensorio ([`core/comprensorio.js`](file:///c:/github/GlideMind/core/comprensorio.js)), resolver giornaliero ([`core/flyability.js`](file:///c:/github/GlideMind/core/flyability.js)), preset date ([`core/datePresets.js`](file:///c:/github/GlideMind/core/datePresets.js)), legende del calendario e badge a colpo d'occhio ([`ui/views/HomeDashboardView.js`](file:///c:/github/GlideMind/ui/views/HomeDashboardView.js), [`ui/views/ForecastView.js`](file:///c:/github/GlideMind/ui/views/ForecastView.js)).
 
+---
+
+## 48. Lingua Inglese Esclusiva nel Codice Sorgente e Governance Regole Antigravity
+- **Problema**: In assenza di una direttiva prescrittiva montata nel system prompt globale e di workspace, l'agente può introdurre commenti, identificatori, descrizioni di test o messaggi di errore in italiano o linguaggi misti, degradando la leggibilità e l'interoperabilità del codebase. Inoltre, se un workspace non possiede il file canonico `AGENTS.md` alla radice, le specifiche in `.agents/rules/` rimangono dormienti e non vengono iniettate all'avvio.
+- **Causa Radice**: Mancata formalizzazione dello standard nel plugin globale `engineering-workflow` e assenza del file root `AGENTS.md` nel workspace per l'ingestion gerarchica di Antigravity.
+- **Pattern Vincolante**:
+  1. **Standard Globale (`engineering-workflow/rules/AGENTS.md`)**: Tutto il codice sorgente (nomi di variabili, funzioni, classi, file, commenti `//`, docstring JSDoc, test unitari `describe`/`it`, eccezioni e commit Git) deve essere redatto esclusivamente in lingua inglese. L'interfaccia utente (UI copy e file di localizzazione) segue la lingua target di prodotto, mantenendo chiavi e commenti in inglese.
+  2. **Attivazione Workspace (`AGENTS.md`)**: La radice del repository deve sempre ospitare `AGENTS.md` con l'inclusione attiva dei vincoli architetturali (`@[...]`), garantendo il montaggio deterministico delle direttive in ogni sessione.

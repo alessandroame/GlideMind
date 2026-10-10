@@ -20,8 +20,9 @@ Questa asimmetria violava la Legge di Prägnanz (ridondanza concettuale del gior
 1. **Normalizzazione Headless (`core/datePresets.js`)**:
    - Rimossa la concatenazione arbitraria del nome esteso del giorno (`'Sabato '` / `'Domenica '` / `'Lunedì '`) nei preset del weekend.
    - Uniformato `subLabel` all'output essenziale di `formatShortDate(d)` (es. `"10 Ott"`, `"11 Ott"`, `"17 Ott"`).
+   - Rimosso il prefisso `"Prossimo"` nel terzo preset del weekend: la label passa da `"Prossimo Sab"` a `"Sabato"` (in piena coerenza con i giorni feriali e con la data di riferimento `17 Ott` sottostante).
 2. **Copertura Test di Regressione (`tests/core/datePresets.test.mjs`)**:
-   - Aggiunte asserzioni esplicite su `result.presets[i].subLabel` per Sabato e Domenica, prevenendo regressioni future.
+   - Aggiunte asserzioni esplicite su `result.presets[i].subLabel` per Sabato e Domenica e aggiornata la verifica di `label === 'Sabato'`.
    - Tutti i 325 test della suite eseguono con successo (325/325 pass).
 
 ---
@@ -29,4 +30,5 @@ Questa asimmetria violava la Legge di Prägnanz (ridondanza concettuale del gior
 ### 3. Esito UX
 - Riduzione della lunghezza delle stringhe inferiori del 55-60%.
 - Eliminazione totale della ridondanza visiva tra etichetta primaria e secondaria.
+- Rimozione del prefisso verbale `"Prossimo"`: tutte le schede espongono una singola parola concisa (`Oggi`, `Domani`, `Sabato`).
 - Spaziatura interna ottimizzata e miglior contrasto percepito sui touch target.

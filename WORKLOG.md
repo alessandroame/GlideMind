@@ -475,3 +475,15 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Registrata la Lezione Appresa #47 in [MEMORY.md](file:///MEMORY.md).
 
 
+---
+
+## 2026-10-10 - Standard di Codifica: Governance Lingua Inglese Esclusiva nel Codice e Attivazione AGENTS.md
+- **Tipo**: Governance / Standard di Ingegneria / Architettura Customizzazioni Antigravity
+- **Dettagli**: [.agents/worklog.d/2026-10-10_strict-english-code-rule-governance.md](file:///.agents/worklog.d/2026-10-10_strict-english-code-rule-governance.md)
+- **Sintesi**:
+  - Esteso il plugin globale [C:/github/antigravity-plugins/plugins/engineering-workflow/rules/AGENTS.md](file:///C:/github/antigravity-plugins/plugins/engineering-workflow/rules/AGENTS.md) con la Sezione 3 (`Standard di Codifica: Lingua Inglese Esclusiva nel Codice Sorgente`), applicabile a tutti i progetti correnti e futuri.
+  - Definito il perimetro rigido: lingua inglese esclusiva per identificatori, commenti di codice, annotazioni TODO, JSDoc, test automatizzati (`describe`/`it`), asserzioni, log interni, eccezioni e commit Git.
+  - Distinta la localizzazione di prodotto (testi e copywriting della UI in italiano) dal codice sottostante e preservata la conversazione naturale in chat nella lingua dell'utente.
+  - Creato [AGENTS.md](file:///AGENTS.md) alla radice del workspace GlideMind con inclusione sintattica `@[...]` di [.agents/rules/constraints.md](file:///.agents/rules/constraints.md) e collegamenti a tutte le specifiche di dominio, attivando l'iniezione automatica delle regole ad ogni avvio di sessione.
+  - Suite di test convalidata: `node scripts/validate.mjs --all` sui plugin (9/9 OK) e `npm test` su GlideMind (325/325 passati).
+  - Registrata la Lezione Appresa #48 in [MEMORY.md](file:///MEMORY.md).
