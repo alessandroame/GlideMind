@@ -604,7 +604,50 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Applicata la progressive disclosure: numeri grezzi delegati a tooltip `title` per l'ispezione al tocco/hover e classe `.gm-ind-micro` nascosta su mobile (`display: none;`).
   - Risolta la compatibilità con payload orari parziali tramite risoluzione deterministica dell'ora esatta (`YYYY-MM-DDTHH:`).
   - Aggiunti test di regressione e governance CSS in [tests/ui/offlineWeatherUX.test.mjs](file:///tests/ui/offlineWeatherUX.test.mjs) e [tests/core/comprensorio.test.mjs](file:///tests/core/comprensorio.test.mjs) (353/353 test superati).
-  - Registrata la Lezione Appresa #56 in [MEMORY.md](file:///MEMORY.md) e aggiornata la matrice [DESIDERATA.md](file:///DESIDERATA.md).
+---
+
+## 2026-10-10 - Remediation Laws of UX Home Dashboard (Solid Badges, Filtro Volabilità & Explainability Multi-Rischio)
+- **Tipo**: UX Architecture / Visual Ergonomics / WCAG Compliance / Core Modeling
+- **Dettagli**: [.agents/worklog.d/2026-10-10_home-dashboard-ux-laws-remediation-solid-badges-and-filter-chips.md](file:///.agents/worklog.d/2026-10-10_home-dashboard-ux-laws-remediation-solid-badges-and-filter-chips.md)
+- **Sintesi**:
+  - Implementazione integrale del piano di remediation Laws of UX sulla Home Dashboard a seguito dell'audit visivo dello screenshot mobile:
+  - Risolto il mascheramento multi-rischio in [core/comprensorio.js](file:///core/comprensorio.js) (Tesler's Law & NN/G #1): quando decollo e atterraggio presentano allerte concorrenti (es. raffiche forti al decollo e inefficienza di planata fuori cono all'atterraggio), la riga di explainability riporta entrambi i fattori separati da bullet (`•`).
+  - Sostituite le pillole con testo esteso (`NON VOLABILE`, `CAUTELA`, `VOLABILE`) con badge compatti da $26\times 26\text{ px}$ contenenti simboli geometrici avionici ad alto contrasto (`✓`, `▲`, `✕`, `⚡`, `○`) conformi a WCAG 2.1 SC 1.4.1 (combinazione Colore + Simbolo + Forma + `aria-label`), recuperando $\approx 75\text{ px}$ orizzontali nella testata della card.
+  - Introdotti chip di filtro rapido della volabilità sotto la search bar (`Tutti (N)` vs `Volabili / Cautela (M)`) con stato reattivo `this.flyabilityFilter` in [ui/views/HomeDashboardView.js](file:///ui/views/HomeDashboardView.js) ed empty state dedicato (Hick's Law).
+  - De-enfatizzati gli indicatori nominali di volo in [css/theme.css](file:///css/theme.css) rimuovendo il bagliore fluorescente (effetto Von Restorff: risalto visivo concentrato unicamente sui reali pericoli).
+  - Incrementata la quota altimetrica `.gm-flight-alt` a `0.78rem` (`var(--gm-font-mono)`) per una rapida consultazione outdoor.
+  - Aggiunti 3 test di regressione e governance in [tests/core/comprensorio.test.mjs](file:///tests/core/comprensorio.test.mjs) e [tests/ui/homeDashboardView.test.mjs](file:///tests/ui/homeDashboardView.test.mjs) (358/358 test superati).
+  - Registrata la Lezione Appresa #58 in [MEMORY.md](file:///MEMORY.md) e allineata la matrice [DESIDERATA.md](file:///DESIDERATA.md).
+
+---
+
+## 2026-10-10 - Riprogettazione UI/UX Previsioni (Schede Parametri a 4 Stati, Accordion con Consigli Pilota, Vista Multi-Grafico e Nowcast Integration)
+- **Tipo**: UI/UX Architecture / Progressive Disclosure / Multi-Chart Trend Stack / Outdoor Ergonomics
+- **Dettagli**: [.agents/worklog.d/2026-10-10_forecast-ui-ux-parameter-cards-accordion-multi-trend-charts-nowcast.md](file:///.agents/worklog.d/2026-10-10_forecast-ui-ux-parameter-cards-accordion-multi-trend-charts-nowcast.md)
+- **Sintesi**:
+  - Riprogettata l'architettura visiva di [ui/views/ForecastView.js](file:///ui/views/ForecastView.js) introducendo una visualizzazione glanceable a 7 parametri aeronautici primari (vento decollo, raffiche & delta, base cumulo LCL, instabilità CAPE, turbolenza EDR, copertura nuvolosa e condizioni in atterraggio) con scala semaforica a 4 stati (verde, giallo, rosso, nero/severe).
+  - Implementato il pattern ad accordion con svelamento progressivo: tocco sull'intestazione (touch target $\ge 48\text{px}$) per rivelare la griglia analitica a 2 colonne, il box "Consiglio Pilota" con raccomandazioni operative di sicurezza per piloti principianti ed EN-A (Novice Pilot Spec) e il grafico orario di tendenza vettoriale SVG.
+  - Creata la modalità alternativa "Solo Grafici" (`this.forecastMode === 'charts'`), commutabile con la barra toggle superiore `Schede` vs `Solo Grafici` (zero emoji decorative vietate), offrendo uno stack sincronizzato di 6 curve diurne (08:00-20:00) con cursore verticale coordinato sull'ora selezionata.
+  - Integrato il contesto nowcast in modo ergonomico: risoluzione automatica dell'ora corrente (`_resolveInitialHour`) per la data odierna, rimozione del badge ingannevole "Live" nella testata delle previsioni numeriche (riservando il concetto di dato dal vivo a sensori fisici sul campo) e aggiornamento in-place del contenitore `#forecast-params-container` in `setHour(hour)` al trascinamento dello scrubber orario.
+  - Aggiunti 6 test unitari completi in [tests/ui/forecastView.test.mjs](file:///tests/ui/forecastView.test.mjs) (364/364 test superati, 0 regressioni).
+  - Certificati tutti i 5 Gate del Protocollo di Qualità Shift-Left (`.agents/rules/shift_left_quality_gate.md`) e registrata la Lezione Appresa #59 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-10 - Fase 5: Mappa Comprensori & Volabilità (SpotMapView.js con 6 Miglioramenti Architetturali)
+- **Tipo**: Cartografia / Nuova Feature / Ingegneria Aerologica / Headless Adapter
+- **Dettagli**: [.agents/worklog.d/2026-10-10_phase-5-spot-map-implementation-and-refinements.md](file:///.agents/worklog.d/2026-10-10_phase-5-spot-map-implementation-and-refinements.md)
+- **Sintesi**:
+  - Completamento integrale della Fase 5 della roadmap di GlideMind:
+  - Implementato l'Adapter Cartografico `IMapEngine` in [ui/map/mapEngineAdapter.js](file:///ui/map/mapEngineAdapter.js) (`LeafletMapEngine` per il browser e `HeadlessMockMapEngine` per i test Node.js a 0ms).
+  - Creato il modulo headless [core/mapDataPartition.js](file:///core/mapDataPartition.js) per partizionamento macro-regionale (Nord-Ovest, Nord-Est, Centro, Sud/Isole), filtri di raggio e calcolo differenze insiemistiche per prevenire errori HTTP 414 e HTTP 429.
+  - Implementato il controller [ui/views/SpotMapView.js](file:///ui/views/SpotMapView.js) con progressive marker scaling a 3 livelli (dot 14px -> aureole 8-10km -> vettori micro), pulsante 1-tap "Top Spot" focus, campionamento del vento a quota decollo reale e scrubber orario dockato (09:00 - 18:00) nella Thumb Zone con clearance $\ge 24\text{px}$ dalla navbar fissa.
+  - Aggiunta in [core/geoSpatialMath.js](file:///core/geoSpatialMath.js) la funzione `calculateWindCorrectedGlideRatio` per correzione aerodinamica della planata con vento di prua/poppa.
+  - Integrato il supporto Leaflet in [index.html](file:///index.html) mantenendo il file sotto 200 righe (133 righe).
+  - Registrata la vista `map` in [ui/app.js](file:///ui/app.js) e aggiunti stili reattivi e dual-theme in [css/theme.css](file:///css/theme.css).
+  - Sviluppate le suite di test automatizzati [tests/core/mapDataPartition.test.mjs](file:///tests/core/mapDataPartition.test.mjs) e [tests/ui/spotMapView.test.mjs](file:///tests/ui/spotMapView.test.mjs) (377/377 test superati con successo in 51 suite).
+  - Allineato lo stato in [DESIDERATA.md](file:///DESIDERATA.md) a `🟢 Completato` e registrata la Lezione Appresa #60 in [MEMORY.md](file:///MEMORY.md).
+
 
 
 

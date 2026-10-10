@@ -617,3 +617,63 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
   1. **Adozione del Protocollo Shift-Left**: Prima di presentare qualsiasi codice all'utente, l'agente deve applicare autonomamente la matrice a 5 Gate (`.agents/rules/shift_left_quality_gate.md`).
   2. **Automated Governance Gate (`shiftLeftGovernance.test.mjs`)**: La suite `npm test` include asserzioni automatiche su isolamento headless, traduzione fenomenologica obbligatoria (divieto di acronimi crudi isolati come CAPE o LCL), divieto di numeri nudi (`compact-wind`), floor Fitts $\ge 48\text{px}$, protezione landscape mobile e conformità al tema chiaro Sunlight Mode.
   3. **Zero Turn Yielding su Codice Non Conforme**: Vietato restituire il turno con la sola implementazione logica delegando all'utente la verifica visiva ed ergonomica. Il codice consegnato deve già incorporare tutte le protezioni di layout, vocabolario e accessibilità.
+
+---
+
+## 58. Badge di Stato a Simbolo Geometrico Avionico (WCAG 1.4.1), Chip di Filtro Rapido Volabilità (Hick's Law) ed Explainability Multi-Rischio
+- **Problema**:
+  1. Le scritte di testo estese ("NON VOLABILE", "CAUTELA", "VOLABILE") nelle pillole dei comprensori consumavano 75-90px di spazio orizzontale su schermi mobile da 390px, aumentando il rischio di troncamento dei nomi dei siti o competendo visivamente con la freccia di espansione. Rimuovere completamente il testo affidandosi solo al colore viola il requisito WCAG 2.1 SC 1.4.1 (Use of Color), rendendo l'interfaccia inaccessibile a piloti con deficit visivi (daltonismo) o con lenti da sole polarizzate in pieno giorno.
+  2. In giornate meteorologiche marginali o avverse, scorrere decine di comprensori senza poter filtrare a colpo d'occhio solo i siti volabili rallentava drasticamente il processo decisionale pre-volo (violazione della Hick's Law).
+  3. Quando un comprensorio presentava sia un decollo sfavorevole (es. vento forte) sia un rientro critico/fuori cono all'atterraggio, l'algoritmo di sintesi riportava solo il primo fattore, mascherando il pericolo geometrico d'atterraggio (violazione di Explainability e Tesler's Law).
+- **Causa Radice**:
+  1. Conflitto tra brevità di layout orizzontale su mobile ed eliminazione imprudente dei canali non cromatici.
+  2. Assenza di un filtro di stato di 1° livello nella Home Dashboard.
+  3. Branching condizionale `if-else` esclusivo nella composizione della motivazione nel Core (`core/comprensorio.js`).
+- **Pattern Vincolante**:
+  1. **Simboli Geometrici Avionici Compatti (Standard ForeFlight/SkyDemon)**: I badge di stato nella testata della card adottano una geometria quadrata/circolare compatta da $26\times 26\text{ px}$ con riempimento solido ad alto contrasto (WCAG AA/AAA $\ge 4.5:1$ fino a $7.9:1$) e simbolo geometrico esplicito:
+     - `✓` (Verde solido): Volabile
+     - `▲` (Ambra solido): Cautela
+     - `✕` (Rosso rubino solido): Non Volabile
+     - `⚡` (Rosso/Nero pericolo): Severe / Condizioni proibitive
+     - `○` (Grigio ardesia solido): Dati meteo non disponibili (N/D)
+     La conformità WCAG è garantita dalla combinazione quadrivalente: **Colore + Forma + Simbolo geometrico + `aria-label` / `title`**.
+  2. **Chip di Filtro Rapido Volabilità (`Tutti (N)` vs `Volabili / Cautela (M)`)**: Sotto la barra di ricerca, offrire due chip a tocco rapido (touch target visivo $\ge 36\text{px}$, area di tocco estesa) con contatore dinamico (`this.flyabilityFilter`). Gestire l'empty state dedicato con un'azione di reset rapido a 1 tap.
+  3. **Explainability Multi-Rischio nel Core Headless**: Quando sia il decollo sia l'atterraggio presentano allerte concorrenti (`takeoffSeverity >= 2` o `= 1` e `!glideMetrics.isSafe`), la stringa `reason` deve obbligatoriamente combinare entrambi i fattori separati da un bullet centrale (`•`), prevenendo il mascheramento del rischio d'atterraggio.
+
+---
+
+## 59. Riprogettazione UI/UX Previsioni: Parametri Glanceable a 4 Stati, Accordion con Consigli Pilota e Vista Sincronizzata Multi-Grafico (Nowcast Integration)
+- **Problema**:
+  1. La visualizzazione meteorologica oraria era frammentata in pannelli isolati (vento e radiosondaggi) privi di una sintesi organica a colpo d'occhio sui fattori determinanti del volo libero (vento, raffiche, base cumulo, CAPE, turbolenza, insolazione, rientro in atterraggio).
+  2. Mancava un pattern di progressive disclosure omogeneo per approfondire i singoli parametri con dati analitici, consigli pratici di sicurezza (Novice Pilot Spec) e grafici di tendenza oraria.
+  3. L'utente non poteva confrontare simultaneamente i trend di tutti i parametri fisici su un unico asse orario per cogliere a colpo d'occhio l'evoluzione del ciclo diurno (innesco termico, rinforzo vento, rischio sovrasviluppi pomeridiani).
+  4. L'etichetta "• Live" nella testata delle previsioni induceva confusione facendo credere che i dati provenissero da un anemometro fisico reale sul decollo, mentre si trattava di modelli numerici (Open-Meteo). Inoltre, consultando la giornata odierna ("Oggi"), la vista si posizionava staticamente sulle 13:00 anziché mostrare immediatamente l'ora reale corrente.
+- **Causa Radice**:
+  1. Architettura UI a sezioni chiuse e prive di una matrice comune di valutazione dei parametri.
+  2. Assenza di una vista multi-grafico aggregata sincronizzata sullo stesso intervallo diurno 08:00-20:00.
+  3. Mancanza di disaccoppiamento tra stato di connettività API e telemetria live sul campo, e mancata risoluzione automatica dell'ora odierna.
+- **Pattern Vincolante**:
+  1. **Triage Glanceable a 7 Parametri (`computeParamMetrics`)**: Modellare e presentare tutti i 7 fattori chiave (vento decollo, raffiche & delta, base cumulo LCL, instabilità CAPE, turbolenza EDR, copertura nuvolosa, atterraggio) con indicatori semaforici a 4 stati (verde, giallo, rosso, nero/severe), etichetta di testo e valore sintetico con unità esplicita.
+  2. **Accordion a Svelamento Progressivo**: Tocco sul parametro con touch target $\ge 48\text{px}$ per mostrare griglia analitica a 2 colonne, box "Consiglio Pilota" con raccomandazioni per piloti principianti ed EN-A, e grafico orario di tendenza vettoriale SVG.
+  3. **Modalità Alternativa "Solo Grafici" (`forecastMode === 'charts'`)**: Barra di switch `Schede` vs `Solo Grafici` (zero emoji decorative) con stack compatto di 6 curve diurne sincronizzate con cursore verticale coordinato sull'ora attiva.
+  4. **Nowcast Context & Pulizia Badge**: Risoluzione automatica dell'ora iniziale (`_resolveInitialHour`: ora locale corrente per oggi, 13:00 per date future); eliminazione del badge ingannevole "Live" nella testata previsionale numerica.
+
+---
+
+## 60. Mappa Comprensori con Headless Adapter, Progressive Scaling a 3 Livelli e Cono di Planata Corretto per Vento
+- **Problema**: L'integrazione di una cartografia mobile ad alta densità per 134 comprensori alpini e appenninici rischiava di incorrere in:
+  1. *Cluttering e sovrapposizione visiva a zoom macro* (cerchi sovrapposti e illeggibili a zoom 5-7).
+  2. *Falsi positivi di planata aerodinamica* ignorando la componente di vento contrario lungo la rotta tra decollo e atterraggio.
+  3. *Blocco dei test unitari in Node.js puro* legando il controller della mappa a WebGL2/MapLibre o istanze DOM Leaflet non mockabili.
+  4. *Errori HTTP 414 e 429* richiedendo tutti i comprensori nazionali contemporaneamente ad Open-Meteo.
+- **Causa Radice**: Assenza di un adapter cartografico astratto (`IMapEngine`), mancata partizione macro-regionale e semplificazione geometrica del cono di planata privo del vettore vento.
+- **Pattern Vincolante**:
+  1. **Headless Map Adapter Pattern (`IMapEngine`)**: Disaccoppiare la vista cartografica in `ui/map/mapEngineAdapter.js` con `LeafletMapEngine` nel browser e `HeadlessMockMapEngine` nei test Node.js a 0ms senza JSDOM.
+  2. **Progressive Marker Scaling a 3 Livelli**:
+     - *Zoom < 7.5 (Macro)*: Pillole semantiche compatte (dot 14px a 4 colori con nome spot).
+     - *Zoom 7.5 - 8.9 (Medio)*: Aureole di bacino aerologico (raggio 8-10 km) con quota centrale.
+     - *Zoom >= 9.0 (Micro)*: Vettori ad alta fedeltà con azimut decollo, freccia del vento reale calcolata a quota decollo (`XX km/h DIR (quota slm)`), e linea geodetica colorata in base all'efficienza con vento.
+  3. **Cono di Planata con Correzione Vento (`calculateWindCorrectedGlideRatio`)**: Calcolare la velocità al suolo effettiva $v_{\text{ground}} = \max(5, v_{\text{trim}} - v_{\text{headwind}})$ e l'efficienza richiesta sul terreno ($E_{\text{richiesta\_vento}} = E_{\text{still}} \cdot \frac{v_{\text{trim}}}{v_{\text{ground}}}$), segnalando rientri critici o impossibili in caso di forte vento contrario.
+  4. **Pulsante 1-Tap "Top Spot" & Scrubber Dockato (Thumb Zone)**: Barra superiore con raccomandazione immediata del miglior comprensorio volabile della macro-regione attiva all'ora selezionata, e timeline oraria dockata a filo sopra la navbar con clearance $\ge 24\text{px}$ e `touch-action: pan-x`.
+  5. **Dual Theme Tile Switching**: Commutazione trasparente tra CartoDB Dark Matter e CartoDB Positron/Sunlight Mode all'evento `themeChange` senza ricaricamento di pagina.
+
