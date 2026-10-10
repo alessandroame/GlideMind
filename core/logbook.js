@@ -35,6 +35,11 @@ export const PILOT_CURRENCY_LABELS = Object.freeze({
   lapsed: 'Fermo prolungato'
 });
 
+export const ITALIAN_MONTHS_SHORT = Object.freeze([
+  'Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu',
+  'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'
+]);
+
 /**
  * Default realistic seed flights for pilot profiles.
  * Reflects real paragliding where a single flight can feature BOTH thermals AND exercises!
@@ -386,3 +391,121 @@ export function createFlightLogEntry(input = {}) {
     notes: notesStr
   });
 }
+
+/**
+ * Calculates pilot flight activity aggregated by month over a rolling window (e.g. 12 months).
+ * @param {Array<Object>} [flights=[]]
+ * @param {Object} [options={}]
+ * @param {number} [options.monthsCount=12] - Number of months to include (default 12).
+ * @param {Date|string} [options.referenceDate=new Date()] - End reference date.
+ * @returns {{
+ *   months: Array<{
+ *     year: number,
+ *     month: number,
+ *     monthKey: string,
+ *     label: string,
+ *     flightCount: number,
+ *     totalMinutes: number,
+ *     totalHours: number,
+ *     isCurrentMonth: boolean
+ *   }>,
+ *   totalMinutes: number,
+ *   totalHours: number,
+ *   formattedHours: string,
+ *   totalFlights: number,
+ *   maxMonthlyHours: number,
+ *   maxMonthlyFlights: number,
+ *   activeMonthsCount: number
+ * }}
+ */
+export function calculateMonthlyFlightActivity(flights = [], options = {}) {
+  const safeFlights = Array.isArray(flights) ? flights : [];
+  const ref = options.referenceDate ? new Date(options.referenceDate) : new Date();
+  const validRef = isNaN(ref.getTime()) ? new Date() : ref;
+  const refYear = validRef.getFullYear();
+  const refMonth = validRef.getMonth() + 1; // 1-12
+  const monthsCount = Math.max(1, Math.min(36, parseInt(options.monthsCount, 10) || 12));
+
+  const months = [];
+  const monthMap = new Map();
+
+  for (let i = monthsCount - 1; i >= 0; i--) {
+    let y = refYear;
+    let m = refMonth - i;
+    while (m <= 0) {
+      m += 12;
+      y -= 1;
+    }
+    const monthKey = `${y}-${String(m).padStart(2, '0')}`;
+    const monthObj = {
+      year: y,
+      month: m,
+      monthKey,
+      label: ITALIAN_MONTHS_SHORT[m - 1] || `${m}`,
+      flightCount: 0,
+      totalMinutes: 0,
+      totalHours: 0,
+      isCurrentMonth: (y === refYear && m === refMonth)
+    };
+    months.push(monthObj);
+    monthMap.set(monthKey, monthObj);
+  }
+
+  for (const flight of safeFlights) {
+    if (!flight || !flight.date) continue;
+
+    let flightYear = null;
+    let flightMonth = null;
+
+    if (typeof flight.date === 'string') {
+      const match = flight.date.trim().match(/^(\d{4})-(\d{2})/);
+      if (match) {
+        flightYear = parseInt(match[1], 10);
+        flightMonth = parseInt(match[2], 10);
+      }
+    } else if (flight.date instanceof Date && !isNaN(flight.date.getTime())) {
+      flightYear = flight.date.getFullYear();
+      flightMonth = flight.date.getMonth() + 1;
+    }
+
+    if (!flightYear || !flightMonth) continue;
+
+    const key = `${flightYear}-${String(flightMonth).padStart(2, '0')}`;
+    const target = monthMap.get(key);
+    if (target) {
+      target.flightCount += 1;
+      const duration = Math.max(0, parseInt(flight.durationMinutes, 10) || 0);
+      target.totalMinutes += duration;
+    }
+  }
+
+  let totalPeriodMinutes = 0;
+  let totalPeriodFlights = 0;
+  let maxMonthlyHours = 0;
+  let maxMonthlyFlights = 0;
+  let activeMonthsCount = 0;
+
+  for (const m of months) {
+    m.totalHours = Number((m.totalMinutes / 60).toFixed(1));
+    totalPeriodMinutes += m.totalMinutes;
+    totalPeriodFlights += m.flightCount;
+    if (m.totalHours > maxMonthlyHours) maxMonthlyHours = m.totalHours;
+    if (m.flightCount > maxMonthlyFlights) maxMonthlyFlights = m.flightCount;
+    if (m.flightCount > 0) activeMonthsCount += 1;
+  }
+
+  const totalPeriodHours = Number((totalPeriodMinutes / 60).toFixed(1));
+  const formattedHours = totalPeriodHours >= 10 ? `${Math.round(totalPeriodHours)} h` : `${totalPeriodHours} h`;
+
+  return {
+    months,
+    totalMinutes: totalPeriodMinutes,
+    totalHours: totalPeriodHours,
+    formattedHours,
+    totalFlights: totalPeriodFlights,
+    maxMonthlyHours,
+    maxMonthlyFlights,
+    activeMonthsCount
+  };
+}
+

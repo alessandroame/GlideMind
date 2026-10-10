@@ -1,7 +1,10 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { renderLogbookStatsHtml } from '../../ui/views/LogbookStatsView.js';
+import {
+  renderLogbookStatsHtml,
+  renderMonthlyActivityChartHtml
+} from '../../ui/views/LogbookStatsView.js';
 
 describe('LogbookStatsView Component (UI Layer)', () => {
   const sampleFlights = [
@@ -78,4 +81,51 @@ describe('LogbookStatsView Component (UI Layer)', () => {
       assert.ok(!html.includes(emoji), `LogbookStatsView must not contain banned emoji "${emoji}"`);
     }
   });
+
+  it('should render the 12-month monthly activity bar chart with SVG bars and toggle controls', () => {
+    const html = renderLogbookStatsHtml(sampleFlights, { referenceDate: '2026-10-10' });
+
+    assert.ok(html.includes('heading-monthly-activity'));
+    assert.ok(html.includes('Attività Mensile'));
+    assert.ok(html.includes('gm-chart-card'));
+    assert.ok(html.includes('gm-chart-svg'));
+    assert.ok(html.includes('viewBox="0 0 360 148"'));
+    assert.ok(html.includes('data-action="toggle-stats-metric"'));
+    assert.ok(html.includes('data-metric="hours"'));
+    assert.ok(html.includes('data-metric="flights"'));
+
+    // Check SVG bars for flights in Sep and Oct 2026
+    assert.ok(html.includes('Ott'));
+    assert.ok(html.includes('Set'));
+    // Sep flight: 60 min = 1 h. Oct flight: 45 min = 0.8 h.
+    assert.ok(html.includes('0.8') || html.includes('1'));
+  });
+
+  it('should toggle between hours and flights metric modes cleanly', () => {
+    // Flights mode
+    const flightsHtml = renderLogbookStatsHtml(sampleFlights, {
+      metric: 'flights',
+      referenceDate: '2026-10-10'
+    });
+    assert.ok(flightsHtml.includes('2 voli negli ultimi 12 mesi'));
+    assert.ok(flightsHtml.includes('data-metric="flights"'));
+    assert.ok(flightsHtml.includes('gm-chart-toggle-btn active"'));
+
+    // Hours mode
+    const hoursHtml = renderLogbookStatsHtml(sampleFlights, {
+      metric: 'hours',
+      referenceDate: '2026-10-10'
+    });
+    assert.ok(hoursHtml.includes('1.8 h negli ultimi 12 mesi'));
+    assert.ok(hoursHtml.includes('data-metric="hours"'));
+    assert.ok(hoursHtml.includes('gm-chart-toggle-btn active"'));
+  });
+
+  it('should render baseline ticks for empty monthly activity without crashing', () => {
+    const html = renderLogbookStatsHtml([], { referenceDate: '2026-10-10' });
+    assert.ok(html.includes('0 h negli ultimi 12 mesi'));
+    assert.ok(html.includes('gm-chart-svg'));
+    assert.ok(!html.includes('NaN'), 'Chart markup must never contain NaN');
+  });
 });
+

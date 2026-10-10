@@ -46,6 +46,7 @@ export class LogbookViewController {
 
     // View sub-tabs: 'flights' | 'stats'
     this.activeTab = 'flights';
+    this.statsMetric = 'hours'; // 'hours' | 'flights'
 
     // Search and filter state
     this.searchQuery = '';
@@ -342,7 +343,7 @@ export class LogbookViewController {
    * @returns {string}
    */
   renderStatsTab(flights) {
-    return renderLogbookStatsHtml(flights);
+    return renderLogbookStatsHtml(flights, { metric: this.statsMetric || 'hours' });
   }
 
   /**
@@ -615,6 +616,14 @@ export class LogbookViewController {
         const tab = actionBtn.getAttribute('data-tab');
         if (tab && (tab === 'flights' || tab === 'stats')) {
           this.activeTab = tab;
+          this.render();
+        }
+        break;
+      }
+      case 'toggle-stats-metric': {
+        const metric = actionBtn.getAttribute('data-metric');
+        if (metric && (metric === 'hours' || metric === 'flights')) {
+          this.statsMetric = metric;
           this.render();
         }
         break;

@@ -8,7 +8,11 @@
  *  - Novice Pilot Spec & Safety (Currency tiers: Active, Reentry, Lapsed).
  */
 
-import { calculatePilotPeriodMetrics, PILOT_CURRENCY_STATUS } from '../../core/logbook.js';
+import {
+  calculatePilotPeriodMetrics,
+  calculateMonthlyFlightActivity,
+  PILOT_CURRENCY_STATUS
+} from '../../core/logbook.js';
 
 /**
  * Escapes HTML characters safely.
@@ -26,17 +30,212 @@ function escapeHtml(str) {
 }
 
 /**
- * Renders the Pilot Statistics & Currency tab content.
- * @param {Array<Object>} flights
+ * Renders the Monthly Flight Activity SVG Bar Chart.
+ * Generates lightweight, zero-dependency SVG markup compliant with outdoor contrast tokens.
+ * @param {Object} monthlyActivity - Aggregated monthly activity object from core/logbook.js
+ * @param {'hours'|'flights'} [metric='hours'] - Active metric mode
  * @returns {string} HTML string
  */
-export function renderLogbookStatsHtml(flights = []) {
+export function renderMonthlyActivityChartHtml(monthlyActivity, metric = 'hours') {
+  if (!monthlyActivity || !Array.isArray(monthlyActivity.months)) {
+    return '';
+  }
+
+  const isHours = metric !== 'flights';
+  const months = monthlyActivity.months;
+  const maxVal = isHours ? (monthlyActivity.maxMonthlyHours || 0) : (monthlyActivity.maxMonthlyFlights || 0);
+
+  // Ergonomic scale ceiling calculation
+  let ceiling;
+  if (maxVal <= 2) {
+    ceiling = 2;
+  } else if (maxVal <= 4) {
+    ceiling = 4;
+  } else if (maxVal <= 6) {
+    ceiling = 6;
+  } else if (maxVal <= 10) {
+    ceiling = 10;
+  } else {
+    ceiling = Math.ceil(maxVal / 5) * 5;
+  }
+  const midVal = isHours ? (Math.round((ceiling / 2) * 10) / 10) : Math.round(ceiling / 2);
+
+  // SVG Coordinate Geometry: viewBox="0 0 360 148"
+  // Chart area: left=32, right=352 (width=320), top=18, baseline=112 (height=94)
+  const chartLeft = 32;
+  const chartWidth = 320;
+  const baselineY = 112;
+  const chartHeight = 94;
+  const slotWidth = chartWidth / Math.max(1, months.length);
+  const barWidth = 14;
+
+  const barsMarkup = months.map((m, index) => {
+    const slotLeft = chartLeft + index * slotWidth;
+    const barX = (slotLeft + (slotWidth - barWidth) / 2).toFixed(1);
+    const textX = (slotLeft + slotWidth / 2).toFixed(1);
+
+    const val = isHours ? m.totalHours : m.flightCount;
+    const barHeight = ceiling > 0 ? (val / ceiling) * chartHeight : 0;
+    const barY = (baselineY - barHeight).toFixed(1);
+
+    const valText = isHours
+      ? (val >= 10 ? String(Math.round(val)) : String(val))
+      : String(val);
+
+    let barElement = '';
+    if (val > 0) {
+      const fillOpacity = m.isCurrentMonth ? '1' : '0.55';
+      const strokeWidth = m.isCurrentMonth ? '1.5' : '0';
+      const textFill = m.isCurrentMonth ? 'var(--gm-accent)' : 'var(--gm-text-secondary)';
+      const fontWeight = m.isCurrentMonth ? '700' : '600';
+      const textY = Math.max(14, barY - 4).toFixed(1);
+
+      barElement = `
+        <rect
+          x="${barX}"
+          y="${barY}"
+          width="${barWidth}"
+          height="${barHeight.toFixed(1)}"
+          rx="3"
+          ry="3"
+          fill="var(--gm-accent)"
+          fill-opacity="${fillOpacity}"
+          stroke="var(--gm-accent)"
+          stroke-width="${strokeWidth}"
+        />
+        <text
+          x="${textX}"
+          y="${textY}"
+          text-anchor="middle"
+          font-size="8"
+          font-family="monospace"
+          font-weight="${fontWeight}"
+          fill="${textFill}"
+        >${escapeHtml(valText)}</text>
+      `;
+    } else {
+      barElement = `
+        <rect
+          x="${barX}"
+          y="${baselineY - 2}"
+          width="${barWidth}"
+          height="2"
+          rx="1"
+          fill="var(--gm-border-strong)"
+          fill-opacity="0.4"
+        />
+      `;
+    }
+
+    const labelFill = m.isCurrentMonth ? 'var(--gm-accent)' : 'var(--gm-text-muted)';
+    const labelWeight = m.isCurrentMonth ? '700' : '500';
+    const monthLabel = `
+      <text
+        x="${textX}"
+        y="126"
+        text-anchor="middle"
+        font-size="9"
+        fill="${labelFill}"
+        font-weight="${labelWeight}"
+      >${escapeHtml(m.label)}</text>
+      ${m.isCurrentMonth ? `<circle cx="${textX}" cy="134" r="2" fill="var(--gm-accent)" />` : ''}
+    `;
+
+    return barElement + monthLabel;
+  }).join('');
+
+  const ariaLabel = isHours
+    ? `Attività mensile ultimi 12 mesi: ${monthlyActivity.formattedHours}, picco mensile ${monthlyActivity.maxMonthlyHours} ore.`
+    : `Attività mensile ultimi 12 mesi: ${monthlyActivity.totalFlights} voli, picco mensile ${monthlyActivity.maxMonthlyFlights} voli.`;
+
+  const totalSummary = isHours
+    ? `${escapeHtml(monthlyActivity.formattedHours)} negli ultimi 12 mesi`
+    : `${escapeHtml(monthlyActivity.totalFlights)} ${monthlyActivity.totalFlights === 1 ? 'volo' : 'voli'} negli ultimi 12 mesi`;
+
+  return `
+    <section class="gm-stats-section" aria-labelledby="heading-monthly-activity">
+      <div class="gm-chart-header">
+        <div class="gm-chart-title-group">
+          <h3 id="heading-monthly-activity" class="gm-stats-section-title">Attività Mensile</h3>
+          <span class="text-xs text-[var(--gm-text-muted)] font-mono">
+            ${totalSummary}
+          </span>
+        </div>
+
+        <div class="gm-chart-toggle-group" role="group" aria-label="Visualizzazione attività">
+          <button
+            type="button"
+            class="gm-chart-toggle-btn ${isHours ? 'active' : ''}"
+            data-action="toggle-stats-metric"
+            data-metric="hours"
+            aria-pressed="${isHours}"
+          >
+            Ore
+          </button>
+          <button
+            type="button"
+            class="gm-chart-toggle-btn ${!isHours ? 'active' : ''}"
+            data-action="toggle-stats-metric"
+            data-metric="flights"
+            aria-pressed="${!isHours}"
+          >
+            Voli
+          </button>
+        </div>
+      </div>
+
+      <div class="gm-chart-card">
+        <div class="gm-chart-svg-wrap">
+          <svg
+            class="gm-chart-svg"
+            viewBox="0 0 360 148"
+            width="100%"
+            height="auto"
+            role="img"
+            aria-label="${escapeHtml(ariaLabel)}"
+          >
+            <!-- Background Grid Lines -->
+            <line x1="32" y1="18" x2="352" y2="18" stroke="var(--gm-border)" stroke-dasharray="2,2" stroke-width="1" />
+            <line x1="32" y1="65" x2="352" y2="65" stroke="var(--gm-border)" stroke-dasharray="2,2" stroke-width="1" />
+            <line x1="32" y1="112" x2="352" y2="112" stroke="var(--gm-border-strong)" stroke-width="1" />
+
+            <!-- Y-Axis Value Labels -->
+            <text x="26" y="21" text-anchor="end" font-size="9" fill="var(--gm-text-muted)" font-family="monospace">${ceiling}</text>
+            <text x="26" y="68" text-anchor="end" font-size="9" fill="var(--gm-text-muted)" font-family="monospace">${midVal}</text>
+            <text x="26" y="115" text-anchor="end" font-size="9" fill="var(--gm-text-muted)" font-family="monospace">0</text>
+
+            <!-- 12 Monthly Bars & Labels -->
+            ${barsMarkup}
+          </svg>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+/**
+ * Renders the Pilot Statistics & Currency tab content.
+ * @param {Array<Object>} flights
+ * @param {Object} [options={}]
+ * @param {'hours'|'flights'} [options.metric='hours']
+ * @param {Date|string} [options.referenceDate=new Date()]
+ * @returns {string} HTML string
+ */
+export function renderLogbookStatsHtml(flights = [], options = {}) {
   const safeFlights = Array.isArray(flights) ? flights : [];
+  const metric = (options && options.metric === 'flights') ? 'flights' : 'hours';
+  const referenceDate = (options && options.referenceDate) || new Date();
 
   // Compute period metrics via headless core
   const periodMetrics = calculatePilotPeriodMetrics({
     flights: safeFlights,
-    referenceDate: new Date()
+    referenceDate
+  });
+
+  // Compute 12-month activity via headless core
+  const monthlyActivity = calculateMonthlyFlightActivity(safeFlights, {
+    monthsCount: 12,
+    referenceDate
   });
 
   // Calculate career aggregates & personal records
@@ -151,6 +350,9 @@ export function renderLogbookStatsHtml(flights = []) {
           </div>
         </div>
       </section>
+
+      <!-- Monthly Flight Activity Bar Chart -->
+      ${renderMonthlyActivityChartHtml(monthlyActivity, metric)}
 
       <!-- Cumulative Career Grid -->
       <section class="gm-stats-section" aria-labelledby="heading-career-totals">
