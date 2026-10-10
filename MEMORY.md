@@ -687,4 +687,14 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
   2. **Tracciamento Coordinato dell'Area Sottesa (`buildSmoothAreaPath`)**: Le campiture ombreggiate (fill delle raffiche, instabilità CAPE, turbolenza ed insolazione) devono seguire la medesima curva cubica della linea superiore (`M x0,baselineY L x0,y0 C ... L xN,baselineY Z`), evitando qualsiasi disallineamento geometrico tra bordo e campitura.
   3. **Attributi SVG di Fluidità Visiva**: Configurare sempre `stroke-linecap="round"` e `stroke-linejoin="round"` sui tracciati vettoriali per garantire una resa grafica priva di artefatti ad alta risoluzione su display retina e smartphone outdoor.
 
+---
+
+## 62. Stato Iniziale Collassato delle Sezioni Parametri nelle Previsioni (Hick's Law & Glanceable Overview)
+- **Problema**: L'apertura predefinita forzata della prima sezione/scheda ("Vento in Decollo") al montaggio della vista Previsioni espandeva immediatamente il corpo dell'accordion (dettagli analitici, consiglio pilota e grafico orario SVG), occupando gran parte della vista verticale e costringendo il pilota a scorrere la pagina per scoprire lo stato degli altri 6 parametri critici (raffiche, base cumulo, instabilità CAPE, ecc.).
+- **Causa Radice**: Inizializzazione arbitraria di `this.expandedCardId = 'vento-decollo'` anziché `null` nel costruttore del controller.
+- **Pattern Vincolante**:
+  1. **Inizializzazione Neutra Collassata**: Impostare `this.expandedCardId = null;` nel costruttore, nel metodo di montaggio vista (`mount`) e in qualsiasi selezione o cambio di comprensorio (`pick-spot`, `forecast-spot-select`).
+  2. **Panoramica a Colpo d'Occhio (Glanceable Triage)**: All'ingresso nella vista, tutte le schede dei parametri devono mostrarsi nella loro forma sintetica chiusa (titolo, semaforo a 4 stati, etichetta e valore chiave con unità), permettendo al pilota una scansione cognitiva completa in meno di 2 secondi, riservando l'espansione e i dettagli analitici al tocco esplicito.
+
+
 

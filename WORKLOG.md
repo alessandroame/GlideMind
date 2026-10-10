@@ -661,6 +661,17 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Aggiunti test di regressione dedicati in [tests/ui/forecastView.test.mjs](file:///tests/ui/forecastView.test.mjs) coprendo monotonicità, tangenti orizzontali ed emissione di tracciati cubici SVG (379/379 test superati con successo in 51 suite).
   - Registrata la Lezione Appresa #61 in [MEMORY.md](file:///MEMORY.md).
 
+---
+
+## 2026-10-10 - Inizializzazione Collassata delle Sezioni Parametri nelle Previsioni
+- **Tipo**: UI/UX Refinement / Gestalt Prägnanz / Accordion State Governance
+- **Dettagli**: [.agents/worklog.d/2026-10-10_forecast-sections-initial-collapsed-state.md](file:///.agents/worklog.d/2026-10-10_forecast-sections-initial-collapsed-state.md)
+- **Sintesi**:
+  - Configurato `this.expandedCardId = null;` all'inizializzazione del controller, al montaggio della vista (`mount`) e al cambio del comprensorio (`pick-spot`, `forecast-spot-select`) in [ui/views/ForecastView.js](file:///ui/views/ForecastView.js).
+  - Rimosso lo svelamento forzato della scheda "Vento in Decollo", consentendo al pilota una visione immediata a colpo d'occhio di tutti i 7 parametri di volo con relative scale semaforiche a 4 stati e valori sintetici.
+  - Aggiornati i test di integrazione in [tests/ui/forecastView.test.mjs](file:///tests/ui/forecastView.test.mjs) verificando l'assenza di corpi espansi al primo render e la corretta espansione/collasso su tocco (379/379 test superati).
+
+
 
 
 

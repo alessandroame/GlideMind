@@ -764,6 +764,11 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     // Verify 4-state indicator dots and badges
     assert.ok(html.includes('gm-param-status-dot'), 'Must render status dots');
     assert.ok(html.includes('gm-param-status-badge'), 'Must render status badges');
+
+    // Verify all parameter cards start collapsed by default
+    assert.equal(controller.expandedCardId, null, 'Must initialize with expandedCardId null');
+    assert.ok(!html.includes('gm-param-body'), 'No parameter card body should be expanded by default');
+    assert.ok(!html.includes('id="param-body-vento-decollo"'), 'Vento card must start collapsed');
   });
 
   it('should render analytical details, pilot advice and trend chart inside expanded parameter card', () => {
@@ -783,7 +788,7 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     const mockStore = createStore({ selectedSpot: DEFAULT_COMPRENSORI[0] });
     const controller = new ForecastViewController({ store: mockStore });
 
-    assert.equal(controller.expandedCardId, 'vento-decollo');
+    assert.equal(controller.expandedCardId, null, 'Must start with all parameter accordion cards collapsed');
 
     // Simulate clicking raffiche card header
     const mockActionEl = {

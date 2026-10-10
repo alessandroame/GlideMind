@@ -345,7 +345,7 @@ export class ForecastViewController {
     this.selectedSubSpot = 'overview'; // 'overview' | spotId
     this.isSubSpotMenuOpen = false;
     this.forecastMode = 'cards'; // 'cards' | 'charts'
-    this.expandedCardId = 'vento-decollo';
+    this.expandedCardId = null; // All parameter accordion cards start collapsed
     this.cachedWeatherMap = new Map(); // key: spotId_date -> weatherPayload
     this.isLoadingWeather = false;
     this.networkStatus = 'offline'; // 'live' | 'loading' | 'offline'
@@ -668,6 +668,7 @@ export class ForecastViewController {
    */
   mount(containerEl) {
     this.containerEl = containerEl;
+    this.expandedCardId = null;
 
     // Synchronize active spot from store if present
     const state = this.store ? this.store.getState() : {};
@@ -3453,6 +3454,7 @@ export class ForecastViewController {
       );
       if (spot) {
         this.selectedSubSpot = 'overview';
+        this.expandedCardId = null;
         if (this.store) {
           const state = this.store.getState();
           const recent = [spot.id, ...(state.recentSpotIds || []).filter(id => id !== spot.id)].slice(0, 5);
@@ -3523,6 +3525,7 @@ export class ForecastViewController {
         this.store.setState({ selectedSpot: spot });
       }
       this.selectedSubSpot = 'overview';
+      this.expandedCardId = null;
       this.render();
     } else if (target.id === 'forecast-subspot-select') {
       this.selectedSubSpot = target.value;
