@@ -357,7 +357,7 @@ export class ForecastViewController {
       return `
         <span id="${badgeId}" class="gm-live-badge live" title="Previsioni reali Open-Meteo attive">
           <span class="gm-live-badge-dot" aria-hidden="true"></span>
-          <span>Live Open-Meteo</span>
+          <span>Live</span>
         </span>
       `;
     }

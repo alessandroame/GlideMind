@@ -122,7 +122,7 @@ export class HomeDashboardViewController {
       return `
         <span id="gm-home-live-badge" class="gm-live-badge live" title="Previsioni reali Open-Meteo attive">
           <span class="gm-live-badge-dot" aria-hidden="true"></span>
-          <span>Live Open-Meteo</span>
+          <span>Live</span>
         </span>
       `;
     }

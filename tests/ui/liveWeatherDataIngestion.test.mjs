@@ -20,7 +20,7 @@ describe('GlideMind Phase 4-bis: Live Weather Data Ingestion & Cache Sync', () =
     assert.ok(elapsed < 150, `Initial render took ${elapsed.toFixed(1)}ms, must be < 150ms (0ms nominal)`);
     assert.ok(html.includes('gm-forecast-view'), 'Must render forecast view HTML');
     assert.ok(html.includes('gm-live-badge'), 'Must include live weather status badge');
-    assert.ok(html.includes('Offline / Stima') || html.includes('Live Open-Meteo'), 'Must show initial status');
+    assert.ok(html.includes('Offline / Stima') || html.includes('Live'), 'Must show initial status');
   });
 
   it('should guarantee 0ms optimistic initial rendering in HomeDashboardView without network blocks', () => {
@@ -47,7 +47,7 @@ describe('GlideMind Phase 4-bis: Live Weather Data Ingestion & Cache Sync', () =
     controller.networkStatus = 'live';
     const liveHtml = controller.renderLiveWeatherBadge();
     assert.ok(liveHtml.includes('gm-live-badge live'));
-    assert.ok(liveHtml.includes('Live Open-Meteo'));
+    assert.ok(liveHtml.includes('Live'));
 
     controller.networkStatus = 'offline';
     const offlineHtml = controller.renderLiveWeatherBadge();

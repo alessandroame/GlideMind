@@ -27,6 +27,8 @@ Questo generava una perdita dell'ancoraggio contestuale (*Recognition over Recal
    - L'attivazione avviene tramite toggle di classe CSS con listener passivo ad alte prestazioni (`{ passive: true }`), azzerando il Cumulative Layout Shift (CLS = 0).
 4. **Resilienza Headless**:
    - Guardie difensive su tutti i selettori DOM (`typeof this.containerEl.querySelector === 'function'`) per garantire compatibilità al 100% nei test unitari Node.js con mock containers.
+5. **Ottimizzazione Spazio Orizzontale Badge Live**:
+   - Abbreviato il testo del badge di stato rete da `Live Open-Meteo` a `Live`, riducendo l'ingombro orizzontale da ~110px a ~45px e liberando oltre 65px di larghezza utile per evitare il troncamento ad ellissi dei nomi di comprensorio e decollo su display compatti.
 
 ---
 
