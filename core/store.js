@@ -110,6 +110,14 @@ export const DEFAULT_INITIAL_STATE = Object.freeze({
     highContrast: true,
     theme: 'dark',
     mapLayer: 'dark'
+  }),
+  activeReplayFlightId: null,
+  replay: Object.freeze({
+    isPlaying: false,
+    progress: 0,
+    currentTimeSec: 0,
+    speed: 1,
+    cameraMode: 'chase'
   })
 });
 

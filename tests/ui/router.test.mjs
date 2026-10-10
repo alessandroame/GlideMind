@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  PRIMARY_NAV_ROUTES,
   VALID_ROUTES,
   DEFAULT_ROUTE,
   KEYBOARD_SHORTCUTS,
@@ -11,17 +12,19 @@ import {
 import { createStore } from '../../core/store.js';
 
 describe('GlideMind Router - Route Management & Contracts', () => {
-  it('should define the 5 standard aeronautical application routes', () => {
-    assert.deepEqual(VALID_ROUTES, ['home', 'forecast', 'map', 'logbook', 'settings']);
+  it('should define the 5 standard aeronautical application routes and full valid routes', () => {
+    assert.deepEqual(PRIMARY_NAV_ROUTES, ['home', 'forecast', 'map', 'logbook', 'settings']);
+    assert.deepEqual(VALID_ROUTES, ['home', 'forecast', 'map', 'logbook', 'settings', 'replay']);
     assert.equal(DEFAULT_ROUTE, 'home');
   });
 
-  it('should normalize arbitrary route hash formats safely', () => {
+  it('should normalize arbitrary route hash formats safely including replay', () => {
     assert.equal(normalizeRoute('#home'), 'home');
     assert.equal(normalizeRoute('#/forecast'), 'forecast');
     assert.equal(normalizeRoute('#map?spot=123'), 'map');
     assert.equal(normalizeRoute('logbook'), 'logbook');
     assert.equal(normalizeRoute('#SETTINGS'), 'settings');
+    assert.equal(normalizeRoute('#replay?flightId=fl_123'), 'replay');
 
     // Unknown or falsy routes must fallback to DEFAULT_ROUTE
     assert.equal(normalizeRoute(null), 'home');

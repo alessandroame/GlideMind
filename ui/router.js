@@ -7,7 +7,8 @@
 
 import { store } from '../core/store.js';
 
-export const VALID_ROUTES = Object.freeze(['home', 'forecast', 'map', 'logbook', 'settings']);
+export const PRIMARY_NAV_ROUTES = Object.freeze(['home', 'forecast', 'map', 'logbook', 'settings']);
+export const VALID_ROUTES = Object.freeze([...PRIMARY_NAV_ROUTES, 'replay']);
 export const DEFAULT_ROUTE = 'home';
 
 export const KEYBOARD_SHORTCUTS = Object.freeze({
@@ -176,7 +177,8 @@ export function createRouter(options = {}) {
       forecast: 'Meteo & Volabilità',
       map: 'Mappa Decolli & Spot',
       logbook: 'Libretto di Volo & Telemetria',
-      settings: 'Impostazioni & Strumenti'
+      settings: 'Impostazioni & Strumenti',
+      replay: 'Visualizzatore 3D Traiettoria'
     };
 
     container.innerHTML = `
