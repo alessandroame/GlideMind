@@ -4,7 +4,7 @@ import { spotMapView, SpotMapView } from '../../ui/views/SpotMapView.js';
 import { store } from '../../core/store.js';
 import { MACRO_REGIONS } from '../../core/mapDataPartition.js';
 import { DEFAULT_COMPRENSORI } from '../../core/comprensorio.js';
-import { STATUS_COLORS } from '../../ui/map/mapEngineAdapter.js';
+import { STATUS_COLORS, LeafletMapEngine } from '../../ui/map/mapEngineAdapter.js';
 
 function createMockElement(tagName = 'div', attributes = {}) {
   const children = [];
@@ -495,6 +495,143 @@ describe('Spot Map View - Controller & Cartography Contracts (UI Layer)', () => 
     assert.ok(mockContainer.innerHTML.includes('Timeline Volabilità'), 'Must contain Timeline Volabilità header');
     assert.ok(mockContainer.innerHTML.includes('id="gm-map-scrubber-spot-pill"'), 'Must contain spot status pill');
     assert.ok(mockContainer.innerHTML.includes('id="gm-map-active-hour-label"'), 'Must contain active hour label');
+  });
+
+  it('should render date picker bar in top bar identical to Home view', () => {
+    spotMapView.mount(mockContainer);
+
+    assert.ok(mockContainer.innerHTML.includes('id="gm-map-date-bar"'), 'Must contain #gm-map-date-bar');
+    assert.ok(mockContainer.innerHTML.includes('gm-date-tabs'), 'Must contain .gm-date-tabs container');
+    assert.ok(mockContainer.innerHTML.includes('data-action="select-date"'), 'Must contain select-date buttons');
+    assert.ok(mockContainer.innerHTML.includes('data-action="open-date-picker-sheet"'), 'Must contain calendar button');
+    assert.ok(mockContainer.innerHTML.includes('gm-date-tab-calendar'), 'Must declare gm-date-tab-calendar class');
+  });
+
+  it('should update activeDate and date tabs on select-date click and store changes', () => {
+    spotMapView.mount(mockContainer);
+
+    // Initial state
+    const todayIso = new Date().toISOString().split('T')[0];
+    assert.ok(mockContainer.innerHTML.includes(`data-date="${todayIso}"`));
+
+    // Simulate clicking a date preset
+    spotMapView.handleClick({
+      target: {
+        getAttribute: (k) => k === 'data-action' ? 'select-date' : (k === 'data-date' ? '2026-10-15' : null),
+        closest: (sel) => sel.includes('data-action') ? {
+          getAttribute: (k) => k === 'data-action' ? 'select-date' : (k === 'data-date' ? '2026-10-15' : null)
+        } : null
+      }
+    });
+
+    assert.equal(spotMapView.activeDate, '2026-10-15');
+    assert.equal(store.getState().activeDate, '2026-10-15');
+
+    // External store update
+    store.setState({ activeDate: '2026-10-18' });
+    assert.equal(spotMapView.activeDate, '2026-10-18');
+  });
+
+  it('should open the 14-day date picker sheet with clean neutral calendar grid in SpotMapView', async () => {
+    const { initSheetManager } = await import('../../ui/sheetManager.js');
+    let capturedHtml = '';
+    const mockSheetContainer = {
+      innerHTML: '',
+      querySelector(sel) {
+        if (sel === '#sheet-backdrop') return { addEventListener() {} };
+        if (sel === '.gm-sheet') return { addEventListener() {}, setAttribute() {} };
+        if (sel === '.gm-sheet-title') return { textContent: '' };
+        if (sel === '.gm-sheet-content') return {
+          get innerHTML() { return capturedHtml; },
+          set innerHTML(val) { capturedHtml = val; },
+          appendChild() {}
+        };
+        if (sel === '.gm-sheet-close-btn') return { addEventListener() {}, focus() {} };
+        return null;
+      },
+      classList: { add() {}, remove() {}, contains() { return false; } },
+      setAttribute() {}
+    };
+
+    initSheetManager(mockSheetContainer);
+    spotMapView.mount(mockContainer);
+
+    spotMapView.openDatePickerSheet();
+
+    assert.ok(capturedHtml.includes('Calendario Previsioni (Prossimi 14 Giorni)'));
+    assert.ok(capturedHtml.includes('data-action="pick-calendar-date"'));
+    assert.ok(capturedHtml.includes('id="custom-date-native-input"'));
+    assert.ok(capturedHtml.includes('data-action="apply-custom-date"'));
+    assert.ok(!capturedHtml.includes('grid-fly-status'), 'Map calendar should not include spot-specific flyability badges');
+  });
+
+  it('should render high-contrast circular markers with zoom-tier scaling and focused name tag', () => {
+    const mockLayers = [];
+    const mockLayerGroup = {
+      clearLayers() { mockLayers.length = 0; },
+      addLayer(layer) { mockLayers.push(layer); },
+      getLayers() { return mockLayers; },
+      addTo() { return mockLayerGroup; }
+    };
+
+    let capturedDivIcons = [];
+    const originalWindow = globalThis.window;
+    const mockMap = {
+      getZoom: () => 8,
+      on() {},
+      off() {},
+      addLayer() {},
+      removeLayer() {}
+    };
+
+    globalThis.window = {
+      L: {
+        map: () => mockMap,
+        control: { zoom: () => ({ addTo: () => {} }) },
+        tileLayer: () => ({ addTo: () => {} }),
+        layerGroup: () => mockLayerGroup,
+        marker: (coords, options) => ({
+          ...options,
+          coords,
+          bindPopup() {},
+          on() {}
+        }),
+        divIcon: (options) => {
+          capturedDivIcons.push(options);
+          return options;
+        },
+        circleMarker: (coords, options) => ({ ...options, coords, setStyle() {} })
+      }
+    };
+
+    try {
+      const mockSpots = [
+        { id: 'spot-1', name: 'Caprie / Condove', status: 'flyable', takeoff: { coordinates: '45.1, 7.3' } },
+        { id: 'spot-2', name: 'Coazze', status: 'caution', takeoff: { coordinates: '45.0, 7.2' } }
+      ];
+
+      const engine = new LeafletMapEngine(mockContainer, { preferCanvas: false });
+      engine.overlayLayerGroup = mockLayerGroup;
+
+      // 1. Standard Zoom (< 9.5)
+      engine.renderOverlays(mockSpots, 8.0, null, 'spot-1');
+      assert.equal(capturedDivIcons.length, 2);
+      assert.ok(capturedDivIcons[0].html.includes('gm-map-dot-marker'));
+      assert.ok(capturedDivIcons[0].html.includes('gm-status-flyable'));
+      assert.ok(capturedDivIcons[0].html.includes('gm-map-dot-focused'));
+      assert.ok(capturedDivIcons[0].html.includes('gm-map-focused-name-tag'));
+      assert.ok(capturedDivIcons[0].html.includes('Caprie / Condove'));
+      assert.deepEqual(capturedDivIcons[0].iconSize, [28, 28]);
+
+      // 2. Detailed Zoom (>= 9.5, e.g. zoom 10-11 as in screenshot)
+      capturedDivIcons = [];
+      engine.renderOverlays(mockSpots, 10.5, null, 'spot-1');
+      assert.equal(capturedDivIcons.length, 2);
+      assert.ok(capturedDivIcons[0].html.includes('gm-map-dot-detailed'), 'Must include gm-map-dot-detailed at zoom >= 9.5');
+      assert.deepEqual(capturedDivIcons[0].iconSize, [34, 34], 'Must scale to 34px at zoom >= 9.5 for outdoor glanceability');
+    } finally {
+      globalThis.window = originalWindow;
+    }
   });
 
   it('should clean up on unmount without memory leaks', () => {

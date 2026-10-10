@@ -4290,20 +4290,18 @@ input.gm-input:focus {
   flex-direction: column;
 }
 
-/* Top External Action & Filter Bar (Outside and above map canvas - Single clean row) */
+/* Top External Action & Filter Bar (Outside and above map canvas) */
 .gm-map-top-bar {
   position: relative;
   width: 100%;
-  height: 50px;
-  min-height: 50px;
-  max-height: 50px;
   flex-shrink: 0;
   z-index: 500;
   background: var(--gm-bg-surface);
   border-bottom: 1px solid var(--gm-border);
-  padding: 0 12px;
+  padding: 8px 12px 6px;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: 6px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
   pointer-events: auto;
 }
@@ -4320,6 +4318,15 @@ input.gm-input:focus {
   gap: 6px;
   width: 100%;
   flex-wrap: nowrap;
+}
+
+.gm-map-date-bar {
+  width: 100%;
+}
+
+.gm-map-date-bar .gm-date-tabs {
+  margin-bottom: 0;
+  padding-bottom: 0;
 }
 
 .gm-map-region-wrap {
@@ -4572,22 +4579,23 @@ input.gm-input:focus {
   border: none;
 }
 
-/* Circular Map Markers matching aeronautical glanceability (as in screenshot) */
+/* Circular Map Markers matching aeronautical glanceability and high-contrast cartography */
 .gm-map-dot-marker {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+  border: 2.5px solid #ffffff;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.65), 0 0 0 1.5px rgba(0, 0, 0, 0.35);
   cursor: pointer;
   user-select: none;
   position: relative;
   transition: transform var(--gm-transition-fast), box-shadow var(--gm-transition-fast);
 }
 
-/* 46px touch target floor (Fitts's Law / Outdoor HMI) */
+/* 48px touch target floor (Fitts's Law / Outdoor HMI) */
 .gm-map-dot-marker::before {
   content: '';
   position: absolute;
@@ -4599,12 +4607,26 @@ input.gm-input:focus {
 }
 
 .gm-map-dot-marker:hover {
-  transform: scale(1.22);
+  transform: scale(1.18);
   z-index: 500;
 }
 
+/* Detailed Zoom Scaling (>= 9.5 zoom, e.g. local valley view) */
+.gm-map-dot-marker.gm-map-dot-detailed {
+  width: 34px;
+  height: 34px;
+  border-width: 2.5px;
+}
+
+.gm-map-dot-marker.gm-map-dot-detailed::before {
+  top: -7px;
+  left: -7px;
+  right: -7px;
+  bottom: -7px;
+}
+
 .gm-map-dot-glyph {
-  font-size: 0.76rem;
+  font-size: 0.85rem;
   line-height: 1;
   font-weight: 900;
   display: flex;
@@ -4612,43 +4634,80 @@ input.gm-input:focus {
   justify-content: center;
 }
 
-.gm-map-dot-marker.gm-status-flyable {
-  border: 2px solid #22c55e;
-  background: rgba(34, 197, 94, 0.32);
+.gm-map-dot-marker.gm-map-dot-detailed .gm-map-dot-glyph {
+  font-size: 0.95rem;
 }
-.gm-map-dot-marker.gm-status-flyable .gm-map-dot-glyph { color: #22c55e; }
+
+/* Solid high-contrast status fills and contrasting glyphs */
+.gm-map-dot-marker.gm-status-flyable {
+  background: var(--gm-status-flyable, #22c55e);
+}
+.gm-map-dot-marker.gm-status-flyable .gm-map-dot-glyph {
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
 
 .gm-map-dot-marker.gm-status-caution {
-  border: 2px solid #eab308;
-  background: rgba(234, 179, 8, 0.32);
+  background: var(--gm-status-caution, #eab308);
 }
-.gm-map-dot-marker.gm-status-caution .gm-map-dot-glyph { color: #eab308; }
+.gm-map-dot-marker.gm-status-caution .gm-map-dot-glyph {
+  color: #0f172a;
+  text-shadow: none;
+}
 
 .gm-map-dot-marker.gm-status-unflyable {
-  border: 2px solid #ef4444;
-  background: rgba(239, 68, 68, 0.32);
+  background: var(--gm-status-unflyable, #ef4444);
 }
-.gm-map-dot-marker.gm-status-unflyable .gm-map-dot-glyph { color: #ef4444; }
+.gm-map-dot-marker.gm-status-unflyable .gm-map-dot-glyph {
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
 
 .gm-map-dot-marker.gm-status-severe {
-  border: 2px solid #18181b;
-  background: rgba(24, 24, 27, 0.5);
+  background: #18181b;
 }
-.gm-map-dot-marker.gm-status-severe .gm-map-dot-glyph { color: #a1a1aa; }
+.gm-map-dot-marker.gm-status-severe .gm-map-dot-glyph {
+  color: #facc15;
+}
 
 .gm-map-dot-marker.gm-status-unavailable {
-  border: 2px solid #64748b;
-  background: rgba(100, 116, 139, 0.32);
+  background: #64748b;
 }
-.gm-map-dot-marker.gm-status-unavailable .gm-map-dot-glyph { color: #94a3b8; }
+.gm-map-dot-marker.gm-status-unavailable .gm-map-dot-glyph {
+  color: #ffffff;
+}
 
-/* Active / Focused Spot Marker */
+/* Active / Focused Spot Marker Beacon */
 .gm-map-dot-marker.gm-map-dot-focused {
-  border-width: 2.5px;
   border-color: #ffffff;
-  box-shadow: 0 0 14px var(--gm-accent);
-  transform: scale(1.15);
+  box-shadow: 0 0 0 3px #ffffff, 0 0 0 6px var(--gm-accent, #38bdf8), 0 4px 16px rgba(0, 0, 0, 0.75);
+  transform: scale(1.22);
   z-index: 1000;
+}
+
+/* Floating Focused Spot Name Tag */
+.gm-map-focused-name-tag {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-family: var(--gm-font-sans, system-ui);
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.94);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+  z-index: 1001;
+}
+
+.gm-map-dot-marker.gm-map-dot-focused .gm-map-focused-name-tag {
+  display: block;
 }
 
 /* Cluster Marker Styling (<7.5 zoom) */
@@ -4977,21 +5036,14 @@ input.gm-input:focus {
 }
 
 [data-theme="light"] .gm-map-scrubber-inner,
-[data-theme="light"] .gm-map-dot-marker,
 [data-theme="light"] .gm-map-aureole-badge,
 [data-theme="light"] .gm-takeoff-badge,
 [data-theme="light"] .gm-map-landing-marker {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
 }
 
-[data-theme="light"] .gm-map-dot-marker.gm-status-flyable .gm-map-dot-glyph {
-  color: #15803d;
-}
-[data-theme="light"] .gm-map-dot-marker.gm-status-caution .gm-map-dot-glyph {
-  color: #b45309;
-}
-[data-theme="light"] .gm-map-dot-marker.gm-status-unflyable .gm-map-dot-glyph {
-  color: #b91c1c;
+[data-theme="light"] .gm-map-dot-marker {
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.65), 0 0 0 1.5px rgba(0, 0, 0, 0.35);
 }
 
 /* Light Theme overrides for Leaflet Popup */
@@ -6710,6 +6762,71 @@ input.gm-input:focus {
   letter-spacing: 0.04em;
   color: var(--gm-text-muted);
   margin: 0;
+}
+
+/* Monthly Activity SVG Chart */
+.gm-chart-card {
+  background: var(--gm-bg-card);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-md);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.gm-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.gm-chart-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.gm-chart-toggle-group {
+  display: flex;
+  align-items: center;
+  background: var(--gm-bg-base);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-sm);
+  padding: 2px;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.gm-chart-toggle-btn {
+  background: transparent;
+  border: none;
+  color: var(--gm-text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  min-height: 32px;
+  min-width: 44px;
+  transition: all 0.15s ease;
+}
+
+.gm-chart-toggle-btn.active {
+  background: var(--gm-bg-surface);
+  color: var(--gm-text-primary);
+  border: 1px solid var(--gm-border-strong);
+}
+
+.gm-chart-svg-wrap {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .gm-stats-grid {

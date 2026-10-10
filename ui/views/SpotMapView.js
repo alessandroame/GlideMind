@@ -30,8 +30,27 @@ import {
   getComprensorioCoordinates
 } from '../../core/mapDataPartition.js';
 import { createMapEngine, STATUS_COLORS } from '../map/mapEngineAdapter.js';
-import { formatDateIso } from '../../core/datePresets.js';
+import {
+  formatDateIso,
+  getSmartDatePresets,
+  getAvailableCalendarDates
+} from '../../core/datePresets.js';
 import { fetchBatchComprensoriWeather, generateSyntheticWeather } from '../../core/openMeteoApi.js';
+
+/**
+ * Escapes HTML characters for safe template string rendering.
+ * @param {string} str
+ * @returns {string}
+ */
+function escapeHtml(str) {
+  if (typeof str !== 'string') return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 
 export class SpotMapView {
   constructor() {
@@ -55,7 +74,9 @@ export class SpotMapView {
     this.hasDraggedPointer = false;
     this.activeScrubStrip = null;
     this.isAimMenuOpen = false;
+    this.sheetContainerEl = null;
 
+    this.boundClickHandler = this.handleClick.bind(this);
     this.boundPointerDown = this.handlePointerDown.bind(this);
     this.boundPointerMove = this.handlePointerMove.bind(this);
     this.boundPointerUp = this.handlePointerUp.bind(this);
@@ -460,7 +481,7 @@ export class SpotMapView {
     // Build DOM structure with external top bar placed outside and above map canvas
     this.container.innerHTML = `
       <section class="gm-map-view" aria-label="Mappa Comprensori e Volabilità">
-        <!-- Top External Filter Bar (Single compact row, strictly outside and above map canvas) -->
+        <!-- Top External Filter Bar (Outside and above map canvas) -->
         <header class="gm-map-top-bar" role="toolbar" aria-label="Filtri mappa e comprensori">
           <div class="gm-map-top-bar-inner">
             <!-- Macro-Region Selector -->
@@ -485,6 +506,11 @@ export class SpotMapView {
             <span id="gm-map-network-badge" class="gm-badge gm-badge-flyable" title="Stato connessione dati meteorologici Open-Meteo">
               Live
             </span>
+          </div>
+
+          <!-- Smart Date Selector for Comprensori Flyability (Identical to Home) -->
+          <div id="gm-map-date-bar" class="gm-map-date-bar">
+            ${this.renderDateBar(state)}
           </div>
         </header>
 
@@ -616,6 +642,14 @@ export class SpotMapView {
     // Bind UI Event Listeners
     this.bindEvents();
 
+    if (this.container && typeof this.container.addEventListener === 'function') {
+      this.container.addEventListener('click', this.boundClickHandler);
+    }
+    this.sheetContainerEl = typeof document !== 'undefined' ? document.getElementById('sheet-container') : null;
+    if (this.sheetContainerEl && typeof this.sheetContainerEl.addEventListener === 'function') {
+      this.sheetContainerEl.addEventListener('click', this.boundClickHandler);
+    }
+
     // Subscribe to store updates
     if (typeof store.subscribe === 'function') {
       this.storeUnsub = store.subscribe(() => {
@@ -649,7 +683,9 @@ export class SpotMapView {
         // Check date change
         if (s.activeDate && s.activeDate !== this.activeDate) {
           this.activeDate = s.activeDate;
+          this.updateDateBarInDom();
           this.renderMapContent();
+          this.syncVisibleSpotsWeather();
         }
         // Check hour change
         if (typeof s.activeHourIndex === 'number' && s.activeHourIndex !== this.activeHour && s.activeHourIndex >= 8 && s.activeHourIndex <= 20) {
@@ -667,6 +703,13 @@ export class SpotMapView {
    * Unbinds listeners and destroys the map engine upon route change.
    */
   unmount() {
+    if (this.container && typeof this.container.removeEventListener === 'function') {
+      this.container.removeEventListener('click', this.boundClickHandler);
+    }
+    if (this.sheetContainerEl && typeof this.sheetContainerEl.removeEventListener === 'function') {
+      this.sheetContainerEl.removeEventListener('click', this.boundClickHandler);
+      this.sheetContainerEl = null;
+    }
     if (typeof window !== 'undefined') {
       window.removeEventListener('pointermove', this.boundPointerMove);
       window.removeEventListener('pointerup', this.boundPointerUp);
@@ -1407,6 +1450,230 @@ export class SpotMapView {
       return `${parts[2]}/${parts[1]}`;
     }
     return isoDate;
+  }
+
+  /**
+   * Renders the Smart Date Bar for comprensori flyability filtering (identical to Home).
+   * @param {object} [state]
+   * @returns {string}
+   */
+  renderDateBar(state) {
+    const s = state || (store && typeof store.getState === 'function' ? store.getState() : {});
+    const activeDate = this.activeDate || s.activeDate || formatDateIso(new Date());
+    const smartData = getSmartDatePresets(new Date(), activeDate);
+
+    return `
+      <div class="gm-date-tabs mb-1" role="tablist" aria-label="Selettore data previsioni">
+        ${smartData.presets.map(p => `
+          <button 
+            type="button" 
+            class="gm-date-tab ${p.isActive ? 'active' : ''} ${p.isCustom ? 'custom' : ''}" 
+            data-action="select-date" 
+            data-date="${p.isoDate}" 
+            role="tab" 
+            aria-selected="${p.isActive ? 'true' : 'false'}" 
+            title="${p.label} - ${p.subLabel}"
+          >
+            <span class="gm-date-tab-main">
+              ${p.label}
+            </span>
+            <span class="gm-date-tab-sub">${p.subLabel}</span>
+          </button>
+        `).join('')}
+
+        <button 
+          type="button" 
+          class="gm-date-tab-calendar ${smartData.isCustomActive ? 'active' : ''}" 
+          data-action="open-date-picker-sheet" 
+          role="tab" 
+          aria-selected="${smartData.isCustomActive ? 'true' : 'false'}"
+          aria-label="Scegli data dal calendario" 
+          title="Scegli altra data"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+        </button>
+      </div>
+      ${smartData.activeHorizon && smartData.activeHorizon.isSynoptic ? `
+        <div class="gm-horizon-notice mb-1" role="status">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="gm-horizon-icon" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+          </svg>
+          <span><strong>Tendenza a lungo raggio:</strong> oltre 7 giorni le previsioni sono indicative.</span>
+        </div>
+      ` : ''}
+    `;
+  }
+
+  /**
+   * Updates the date selector bar in DOM without tearing down the map canvas.
+   */
+  updateDateBarInDom() {
+    if (!this.container) return;
+    const dateBarContainer = this.container.querySelector('#gm-map-date-bar');
+    if (dateBarContainer) {
+      dateBarContainer.innerHTML = this.renderDateBar();
+    }
+  }
+
+  /**
+   * Opens the accessible bottom sheet to select any date within the forecast horizon (up to 14 days, identical to Home).
+   */
+  openDatePickerSheet() {
+    const state = (store && typeof store.getState === 'function') ? store.getState() : {};
+    const activeDate = this.activeDate || state.activeDate || formatDateIso(new Date());
+    const today = new Date();
+    const minDate = formatDateIso(today);
+    const maxDate = formatDateIso(new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000));
+    const availableDates = getAvailableCalendarDates(today, 14, null);
+
+    const renderContent = () => `
+      <div class="gm-date-picker-sheet flex flex-col gap-4">
+        <!-- 14-Day Fast Tap Grid (Hero Primary Action) -->
+        <div class="gm-date-sheet-section">
+          <span class="text-xs font-bold uppercase tracking-wider text-[var(--gm-text-muted)] block mb-2">
+            Calendario Previsioni (Prossimi 14 Giorni)
+          </span>
+          <div class="gm-date-grid">
+            ${availableDates.map(d => {
+              const isSelected = d.isoDate === activeDate;
+              return `
+                <button 
+                  type="button" 
+                  class="gm-date-grid-item ${isSelected ? 'active' : ''} ${d.isWeekend ? 'weekend' : ''}"
+                  data-action="pick-calendar-date"
+                  data-date="${d.isoDate}"
+                  aria-selected="${isSelected ? 'true' : 'false'}"
+                  title="${d.dayName} ${d.formatted} (${d.horizon.label})"
+                >
+                  <span class="grid-day-name">${escapeHtml(d.dayName)}</span>
+                  <span class="grid-day-number">${d.dayNumber}</span>
+                  <span class="grid-month">${escapeHtml(d.formatted.split(' ')[1])}</span>
+
+                  ${d.horizon.isSynoptic ? `<span class="grid-synoptic-dot" title="Tendenza sinottica (attendibilità indicativa)">●</span>` : ''}
+                </button>
+              `;
+            }).join('')}
+          </div>
+        </div>
+
+        <!-- Secondary Native Input -->
+        <div class="gm-form-field pt-2 border-t border-[var(--gm-border)]">
+          <label for="custom-date-native-input" class="gm-form-label font-bold text-xs uppercase tracking-wider text-[var(--gm-text-muted)] block mb-1">
+            Oppure specifica altra data:
+          </label>
+          <div class="flex items-center gap-2">
+            <input 
+              type="date" 
+              id="custom-date-native-input" 
+              class="gm-form-control flex-1 font-mono text-sm" 
+              min="${minDate}" 
+              max="${maxDate}" 
+              value="${activeDate}" 
+              aria-label="Data personalizzata"
+            />
+            <button 
+              type="button" 
+              class="gm-btn gm-btn-primary px-3 py-2 font-bold text-xs" 
+              data-action="apply-custom-date"
+            >
+              Conferma
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    openSheet({
+      id: 'map-date-picker-sheet',
+      title: 'Seleziona Data Previsioni',
+      content: renderContent(),
+      onOpen: () => {
+        if (typeof document !== 'undefined') {
+          const input = document.getElementById('custom-date-native-input');
+          if (input) {
+            input.addEventListener('change', (e) => {
+              const val = e.target.value;
+              if (val) {
+                this.handleDateChange(val);
+                closeSheet();
+              }
+            });
+          }
+        }
+      }
+    });
+  }
+
+  /**
+   * Handles date change event, synchronizing store, date bar, map overlays, and weather fetch.
+   * @param {string} newDate
+   */
+  handleDateChange(newDate) {
+    if (!newDate) return;
+    this.activeDate = newDate;
+    if (typeof store.setState === 'function') {
+      if (store.getState().activeDate !== newDate) {
+        store.setState({ activeDate: newDate });
+      }
+    }
+    this.updateDateBarInDom();
+    this.renderMapContent();
+    this.syncVisibleSpotsWeather();
+  }
+
+  /**
+   * Delegated click handler for date tabs and date picker sheet.
+   * @param {MouseEvent|Event} evt
+   */
+  handleClick(evt) {
+    const target = evt?.target;
+    if (!target) return;
+
+    let actionEl = null;
+    if (typeof target.closest === 'function') {
+      actionEl = target.closest('[data-action]');
+    }
+    if (!actionEl) {
+      let cur = target;
+      while (cur) {
+        if (typeof cur.getAttribute === 'function' && cur.getAttribute('data-action')) {
+          actionEl = cur;
+          break;
+        }
+        cur = cur.parentElement;
+      }
+    }
+    if (!actionEl) return;
+
+    const action = actionEl.getAttribute('data-action');
+
+    if (action === 'select-date') {
+      const dateAttr = actionEl.getAttribute('data-date');
+      if (dateAttr) {
+        this.handleDateChange(dateAttr);
+      }
+    } else if (action === 'open-date-picker-sheet') {
+      this.openDatePickerSheet();
+    } else if (action === 'apply-custom-date') {
+      const input = typeof document !== 'undefined' ? document.getElementById('custom-date-native-input') : null;
+      if (input && input.value) {
+        this.handleDateChange(input.value);
+        closeSheet();
+      }
+    } else if (action === 'pick-calendar-date') {
+      const dateAttr = actionEl.getAttribute('data-date');
+      if (dateAttr) {
+        this.handleDateChange(dateAttr);
+        closeSheet();
+      }
+    }
   }
 }
 

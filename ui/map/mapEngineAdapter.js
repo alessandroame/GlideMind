@@ -604,7 +604,10 @@ export class LeafletMapEngine {
       return;
     }
 
-    const signature = `${this.currentLayerId || 'layer'}_` + evaluatedSpots.map(s => `${s.id || s.comprensorio?.id}:${s.status}`).join('|');
+    const currentZoom = typeof zoomLevel === 'number' ? zoomLevel : (this.map?.getZoom() || 7);
+    const isDetailedZoom = currentZoom >= 9.5;
+    const zoomTier = isDetailedZoom ? 'detailed' : 'standard';
+    const signature = `${this.currentLayerId || 'layer'}_${zoomTier}_` + evaluatedSpots.map(s => `${s.id || s.comprensorio?.id}:${s.status}`).join('|');
 
     // If identical dataset is already mounted, avoid destroying DOM markers and closing active popups
     if (this.lastRenderedSignature === signature && this.overlayLayerGroup.getLayers().length > 0) {
@@ -612,9 +615,7 @@ export class LeafletMapEngine {
         if (this.activeSpotId && this.markersMap?.has(this.activeSpotId)) {
           const m = this.markersMap.get(this.activeSpotId);
           if (m && typeof m.setStyle === 'function') {
-            const oldStatus = evaluatedSpots.find(s => (s.id || s.comprensorio?.id) === this.activeSpotId)?.status;
-            const oldStyle = STATUS_COLORS[oldStatus] || STATUS_COLORS.unavailable;
-            m.setStyle({ color: oldStyle.color, weight: 2, radius: 9 });
+            m.setStyle({ color: '#ffffff', weight: 2.5, radius: isDetailedZoom ? 11 : 9 });
           } else {
             const el = m?.getElement?.();
             el?.querySelector('.gm-map-dot-marker')?.classList.remove('gm-map-dot-focused');
@@ -623,7 +624,7 @@ export class LeafletMapEngine {
         if (activeSpotId && this.markersMap?.has(activeSpotId)) {
           const m = this.markersMap.get(activeSpotId);
           if (m && typeof m.setStyle === 'function') {
-            m.setStyle({ color: '#ffffff', weight: 3, radius: 13 });
+            m.setStyle({ color: '#ffffff', weight: 3.5, radius: isDetailedZoom ? 15 : 13 });
           } else {
             const el = m?.getElement?.();
             el?.querySelector('.gm-map-dot-marker')?.classList.add('gm-map-dot-focused');
@@ -693,11 +694,11 @@ export class LeafletMapEngine {
         // High-performance Canvas circle marker (zero DOM allocations, <5ms render for thousands of spots)
         marker = window.L.circleMarker([coords.lat, coords.lon], {
           renderer: this.canvasRenderer,
-          radius: isFocused ? 13 : 9,
+          radius: isFocused ? (isDetailedZoom ? 15 : 13) : (isDetailedZoom ? 11 : 9),
           fillColor: statusStyle.fill,
-          color: isFocused ? '#ffffff' : statusStyle.color,
-          weight: isFocused ? 3 : 2,
-          fillOpacity: 0.95,
+          color: '#ffffff',
+          weight: isFocused ? 3.5 : 2.5,
+          fillOpacity: 1.0,
           className: `gm-canvas-marker gm-status-${item.status || 'unavailable'} ${isFocused ? 'gm-marker-focused' : ''}`,
           zIndexOffset: isFocused ? 1000 : 0
         });
@@ -706,7 +707,7 @@ export class LeafletMapEngine {
         if (isFocused) {
           const haloBeacon = window.L.circleMarker([coords.lat, coords.lon], {
             renderer: this.canvasRenderer,
-            radius: 20,
+            radius: isDetailedZoom ? 24 : 20,
             fillColor: statusStyle.fill,
             fillOpacity: 0.25,
             color: '#ffffff',
@@ -717,19 +718,23 @@ export class LeafletMapEngine {
           this.overlayLayerGroup.addLayer(haloBeacon);
         }
       } else {
-        // Stylized DOM divIcon with CSS glyph
+        // Stylized DOM divIcon with high-contrast aeronautical glyph and focused name tag
+        const markerSize = isDetailedZoom ? 34 : 28;
+        const halfSize = Math.round(markerSize / 2);
+
         const iconHtml = `
-          <div class="gm-map-dot-marker gm-status-${item.status || 'unavailable'} ${isFocused ? 'gm-map-dot-focused' : ''}" title="${escapeHtml(spotName)} - ${statusStyle.badge}">
+          <div class="gm-map-dot-marker gm-status-${item.status || 'unavailable'} ${isDetailedZoom ? 'gm-map-dot-detailed' : ''} ${isFocused ? 'gm-map-dot-focused' : ''}" title="${escapeHtml(spotName)} - ${statusStyle.badge}">
             <span class="gm-map-dot-glyph">${statusStyle.icon}</span>
+            <span class="gm-map-focused-name-tag">${escapeHtml(spotName)}</span>
           </div>
         `;
 
         const markerIcon = window.L.divIcon({
           className: 'gm-map-div-icon',
           html: iconHtml,
-          iconSize: [26, 26],
-          iconAnchor: [13, 13],
-          popupAnchor: [0, -14]
+          iconSize: [markerSize, markerSize],
+          iconAnchor: [halfSize, halfSize],
+          popupAnchor: [0, -halfSize - 2]
         });
 
         marker = window.L.marker([coords.lat, coords.lon], {

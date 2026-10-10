@@ -1275,3 +1275,30 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
      - *Soglia Critica*: A $\ge 25$ turni, l'agente raccomanda esplicitamente di sincronizzare lo stato cognitivo (`memory-sync`), completare il task e aprire una nuova chat pulita.
   2. **Transizione Naturale su Confine di Task (Task Boundary)**: Il completamento di uno step di `DESIDERATA.md` o di un fix strutturale è il momento architetturalmente ideale per chiudere la sessione ed eseguire il riavvio fresco con `/next-step`.
   3. **Alert Strutturato**: Inserimento a fine messaggio di un box di avviso esplicito con indicazione del comando `/next-step` per la sessione successiva.
+
+
+---
+
+## 104. Contrasto dei Marker Cartografici su Basemap Eterogenee e Zoom Dettagliato
+- **Problema**: A zoom intermedio/dettagliato ($\ge 9.5$), i tile topografici (OpenTopoMap, Esri Topo) mostrano un fondo molto chiaro con curve di livello fitte, pendii verde chiaro e fondovalle bianchi. Marker dot con riempimento semitrasparente (`rgba(..., 0.32)`), bordi sottili omocromatici (2px) e glifi colorati si dissolvono completamente nell'orografia.
+- **Causa Radice**: Assunzione implicita di operare su cartografia scura e uso di alfa-trasparenza non supportata da una maschera o casing di contrasto solido.
+- **Pattern Vincolante**:
+  1. **Autosufficienza di Contrasto (Dual-Boundary Casing)**: I marker cartografici non devono mai usare riempimenti trasparenti a bassa opacità. Utilizzare sempre riempimento solido al 100% nel colore di stato, racchiuso da un bordo bianco puro ($\ge 2.5\text{px}$) e da un'ombra profonda con micro-chiave scura (`box-shadow: 0 3px 8px rgba(0,0,0,0.65), 0 0 0 1.5px rgba(0,0,0,0.35)`). In questo modo il marker stacca istantaneamente sia su sfondi bianchi/chiari sia su sfondi scuri/satellitari.
+  2. **Contrasto Interno dei Glifi**: I simboli interni devono rispettare la legge del contrasto massimo (glifi bianchi su verde `#22c55e` e rosso `#ef4444`, glifo scuro antracite `#0f172a` su ambra `#eab308` per conformità WCAG AA $\ge 4.5:1$).
+  3. **Scaling Progressivo per Livelli di Zoom**:
+     - *Macro Zoom ($< 7.5$)*: cluster circolari solidi numerati da 38px.
+     - *Standard Zoom ($7.5 - 9.4$)*: dot semaforici ad alto contrasto da 28px.
+     - *Detailed Zoom ($\ge 9.5$)*: dot maggiorati da 34px (`.gm-map-dot-detailed`) con glifo a $0.95\text{rem}$ per visione rapida a colpo d'occhio.
+  4. **Focalizzazione dello Spot Attivo**: Lo spot osservato riceve un tag testuale fluttuante con il nome (`.gm-map-focused-name-tag`) e una corona beacon luminosa a doppio anello.
+  5. **Nessun Indebolimento nel Tema Chiaro**: Evitare di depotenziare le ombre dei marker in `[data-theme="light"]`, poiché la basemap raster ha le proprie luminanze indipendenti dal tema dell'applicazione.
+
+---
+
+## 105. Istogrammi Mensili SVG a Zero Dipendenze per la Dimensione Temporale nel Logbook
+- **Problema**: Le dashboard di volo basate unicamente su totali numerici statici (ore di carriera, numero totale di voli, record di quota) appiattiscono la storia del pilota e non consentono di valutare la stagionalità termica, la regolarità delle sessioni o i periodi prolungati di inattività durante l'anno. Tentare di usare librerie esterne (Chart.js, D3) viola i vincoli di performance mobile e offline-first PWA, mentre grafici a torta o a dispersione violano le Laws of UX per scarsa leggibilità outdoor.
+- **Causa Radice**: Assenza di una funzione headless di aggregazione temporale mensile e mancata adozione di markup SVG inline matematico.
+- **Pattern Vincolante**:
+  1. **Generazione Matematica SVG a Zero Allocazione GPU**: L'istogramma mensile (12 mesi) viene generato come markup SVG inline leggero con coordinate normalizzate (`viewBox="0 0 360 148"`), griglia di riferimento a 3 quote con linee tratteggiate discrete, tick a baseline per i mesi a zero attività e indicatore solare primario sul mese corrente.
+  2. **Aggregazione Headless Core (`calculateMonthlyFlightActivity`)**: La logica temporale risiede nel core puramente matematico, calcolando max, scale ceiling adattivo (2, 4, 6, 10 o multipli di 5) e label brevi localizzate in italiano (`Gen`, `Feb`, ..., `Dic`), tollerando formati data ISO e stringhe parziali.
+  3. **Toggle Ergonomico Ore / Voli**: Consentire il cambio metrica rapido tramite bottoni dedicati con touch target minimo $\ge 32\text{px} \times 44\text{px}$ e feedback semantico `aria-pressed`, senza mai nascondere le metriche assolute.
+
