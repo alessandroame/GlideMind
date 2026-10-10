@@ -682,6 +682,18 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Stabilite le guardie ergonomiche mobile (`touch-action: pan-y`, `dragging: false` anti-scroll trap, Fitts target $\ge 44\text{px}$) e la sincronizzazione a 60 FPS con lo scrubber orario (08:00 - 20:00).
   - Allineata la matrice di stato [DESIDERATA.md](file:///DESIDERATA.md) alla Fase 5-bis, contrassegnata come `🔴 Prioritario (Prossima Sessione)`.
 
+---
+
+## 2026-10-10 - Rifattorizzazione Terminologica: Sezione "Aerologia" in Previsioni
+- **Tipo**: UI/UX Microcopy / Aeronautical Domain Precision / Accessibility
+- **Dettagli**: [.agents/worklog.d/2026-10-10_forecast-aerologia-heading-refactor.md](file:///.agents/worklog.d/2026-10-10_forecast-aerologia-heading-refactor.md)
+- **Sintesi**:
+  - Sostituita la dicitura generica `Parametri di Volo` con la denominazione aeronautica rigorosa `Aerologia` in [ui/views/ForecastView.js](file:///ui/views/ForecastView.js).
+  - Eliminata l'ambiguità con i parametri cinematici/avionici del velivolo (telemetria IGC, velocità, quota barometrica, variometro, glide ratio).
+  - Dimezzato l'ingombro orizzontale da 17 a 9 caratteri nella barra comandi, massimizzando il respiro del toggle `[ Schede | Solo Grafici ]` sui display outdoor compatti.
+  - Aggiornato l'attributo `aria-label="Modalità di visualizzazione aerologia"` e aggiunta asserzione di regressione semantica in [tests/ui/forecastView.test.mjs](file:///tests/ui/forecastView.test.mjs) (379/379 test superati).
+
+
 
 
 

@@ -870,8 +870,8 @@ export class ForecastViewController {
 
           <!-- Mode Toggle: Schede & Dettagli vs Solo Grafici (Trend) -->
           <div class="gm-forecast-mode-bar flex items-center justify-between mt-1 mb-1">
-            <span class="text-xs font-semibold uppercase tracking-wider text-[var(--gm-text-muted)]">Parametri di Volo</span>
-            <div class="gm-view-toggle" role="group" aria-label="Modalità di visualizzazione parametri">
+            <span class="text-xs font-semibold uppercase tracking-wider text-[var(--gm-text-muted)]">Aerologia</span>
+            <div class="gm-view-toggle" role="group" aria-label="Modalità di visualizzazione aerologia">
               <button 
                 type="button" 
                 class="gm-view-toggle-btn ${this.forecastMode !== 'charts' ? 'active' : ''}"

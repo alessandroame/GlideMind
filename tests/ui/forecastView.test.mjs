@@ -830,6 +830,8 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.equal(controller.forecastMode, 'charts', 'Must switch to charts mode');
 
     const html = controller.renderHtml();
+    assert.ok(html.includes('>Aerologia</span>'), 'Must render Aerologia section heading');
+    assert.ok(!html.includes('Parametri di Volo'), 'Must not render legacy Parametri di Volo heading');
     assert.ok(html.includes('gm-multi-charts-container'), 'Must render multi-charts container in Solo Grafici mode');
     assert.ok(html.includes('id="multi-chart-wind"'), 'Must render wind trend card');
     assert.ok(html.includes('id="multi-chart-sounding"'), 'Must render sounding trend card');
