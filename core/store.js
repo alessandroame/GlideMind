@@ -137,7 +137,7 @@ function deepClone(obj) {
  * @param {ReturnType<typeof createInMemoryStorageAdapter>|null} [customStorageAdapter=null]
  */
 export function createStore(initialStateOverrides = {}, customStorageAdapter = null) {
-  const storageAdapter = customStorageAdapter || createInMemoryStorageAdapter();
+  let storageAdapter = customStorageAdapter || createInMemoryStorageAdapter();
   let persistedKeys = new Set(['pinnedSpots', 'pinnedSpotIds', 'recentSpotIds', 'units', 'selectedSpot', 'flights', 'pilotPeriod', 'activeGlider', 'glider', 'ui']);
   const STORAGE_PREFIX = 'glidemind_store_';
 
@@ -356,6 +356,16 @@ export function createStore(initialStateOverrides = {}, customStorageAdapter = n
     setState(targetDefaults);
   }
 
+  /**
+   * Replaces or updates the storage adapter dynamically (e.g. UI shell mounting localStorage).
+   * @param {{ getItem: (key: string) => string | null, setItem: (key: string, value: string) => void, removeItem: (key: string) => void, clear: () => void }} adapter
+   */
+  function setStorageAdapter(adapter) {
+    if (adapter && typeof adapter.getItem === 'function' && typeof adapter.setItem === 'function') {
+      storageAdapter = adapter;
+    }
+  }
+
   return {
     getState,
     setState,
@@ -365,6 +375,7 @@ export function createStore(initialStateOverrides = {}, customStorageAdapter = n
     loadPersistedState,
     registerPersistedKeys,
     resetState,
+    setStorageAdapter,
     getStorageAdapter: () => storageAdapter
   };
 }

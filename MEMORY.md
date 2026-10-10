@@ -828,16 +828,86 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
 
 ---
 
-## 71. Comandi Mappa Non Invasivi con Sfumatura Radiale (Zero Invasiveness & High Legibility)
-- **Problema**: L'applicazione di card o pill rettangolari con sfondo scuro solido, filtri blur e bordi netti sopra la cartografia orografica compatta (come la mini-mappa da 180px in ForecastView) occlude ampie porzioni di creste montane, orografia e linee di planata, risultando eccessivamente invasiva alla vista del pilota.
-- **Causa Radice**: Sovrapposizione di controlli UI a geometria chiusa (rettangoli, pill con bordo) anziché elementi minimi (pura scritta e pura icona) dotati di sfumatura di contrasto integrata.
+## 71. Comandi Cartografici Non Invasivi: Micro-Capsule Frosted Glass Adattive vs Sfumature Radiali Macchianti
+- **Problema**: L'adozione di un'ampia sfumatura radiale scura (`radial-gradient`) priva di bordi geometrici definiti dietro ai controlli mappa ("OpenTopo" ed icona espansione), pur pensata per ridurre l'ingombro, su cartografie orografiche chiare ad alto dettaglio (come OpenTopoMap con curve di livello, isoipse e fondovalle verdi) produceva un artefatto visivo sgradevole simile a una macchia di fumo, alone sporco o bruciatura sull'ottica (evidenziato nel feedback utente e screenshot reale).
+- **Causa Radice**:
+  1. I gradienti radiali sfumati a zero trasparenza su fondi cartografici ad alta frequenza visiva (curve topografiche e ombreggiature di rilievo) mancano di chiusura Gestalt (*Law of Closure*), venendo percepiti dal cervello umano come difetti dell'immagine o aloni di sporcizia anziché controlli interattivi puliti.
+  2. Un elemento di 40-44px con gradiente esteso copre visivamente un raggio eccessivo rispetto alla parola o icona contenuta.
 - **Pattern Vincolante**:
-  1. **Assenza di Bordi e Box Rigidi (`border: none; box-shadow: none`)**: I comandi sovrapposti alla cartografia devono visualizzarsi come testo puro ("scritta" per il layer) o icona pura ("icona" SVG per l'espansione a schermo intero), eliminando qualsiasi cornice o sfondo squadrato coprente.
-  2. **Vignettatura a Sfumatura Radiale (`radial-gradient`)**:
-     - Sotto la scritta: `radial-gradient(ellipse at center, rgba(15, 23, 42, 0.76) 0%, rgba(15, 23, 42, 0.42) 55%, rgba(15, 23, 42, 0) 82%)`. L'ellisse si adatta fluidamente alla lunghezza della parola e sfuma a trasparenza zero verso i bordi senza linee di discontinuità.
-     - Sotto l'icona: `radial-gradient(circle at center, rgba(15, 23, 42, 0.76) 0%, rgba(15, 23, 42, 0.42) 55%, rgba(15, 23, 42, 0) 82%)`.
-     - Doppio text-shadow / drop-shadow vettoriale per garantire contrasto WCAG AA su qualsiasi sfondo (neve bianca, roccia grigia, boschi scuri).
-  3. **Pavimento Tattile Ergonomico Invisibile (Fitts's Law)**: Il contenitore interattivo preserva un'area di tocco $\ge 40\text{px}$/$\ge 44\text{px}$, ma l'impatto visivo sul paesaggio montano è ridotto al solo testo/icona galleggiante.
-  4. **Adattamento Dinamico al Layer Attivo (`data-map-layer`)**: Nei temi chiari (`[data-theme="light"]`), se il layer attivo è fotografico (satellite) o scuro, i comandi mantengono la sfumatura scura e testo bianco; sui layer chiari (OpenTopo, CyclOSM) la sfumatura commuta su toni chiari con testo scuro.
+  1. **Micro-Capsule Frosted Glass a Profilo Sottile (28px di altezza)**: Sostituire le sfumature radiali con micro-capsule pill-shaped a profilo compatto (`height: 28px`, `border-radius: var(--gm-radius-full)` per il selettore; cerchio $28 \times 28\text{px}$ per il pulsante espansione con icona SVG da $14\text{px}$).
+  2. **Contenitore Etereo con Bordo Capillare e Sfocatura (`backdrop-filter`)**: Utilizzare `backdrop-filter: blur(8px)` abbinato a un sottilissimo bordo perimetrale da 1px semitrasparente e micro-ombra morbida (`box-shadow: 0 1px 4px rgba(0,0,0,0.15)`). Questo conferisce confini geometrici impeccabili senza mai appesantire la mappa.
+  3. **Adattamento Dinamico alla Luminanza del Basemap (`data-map-layer`)**:
+     - *Basemap Chiari (OpenTopo, CyclOSM)*: Vetro smerigliato bianco luminoso (`rgba(255, 255, 255, 0.88)`), bordo sottile scuro (`rgba(15, 23, 42, 0.14)`), tipografia e freccia deep slate (`#0f172a`).
+     - *Basemap Fotografici e Scuri (Satellite, Scuro)*: Vetro avionico scuro (`rgba(15, 23, 42, 0.78)`), bordo chiaro (`rgba(255, 255, 255, 0.18)`), tipografia e freccia bianco nitido (`#f8fafc`).
+  4. **Pavimento Tattile Fitts Invisibile (`::before` a 44px)**: Preservare la conformità ergonomica outdoor ($\ge 44\text{px}$ per uso con dita fredde o guanti) espandendo l'area di tocco interattiva tramite pseudo-elemento invisibile:
+     ```css
+     .gm-mini-map-layer-select::before,
+     .gm-mini-map-expand-btn::before {
+       content: '';
+       position: absolute;
+       top: -8px;
+       bottom: -8px;
+       left: -8px;
+       right: -8px;
+     }
+     ```
+     La capsula visiva resta ultra-snella a 28px, mentre il touch target effettivo misura $44 \times 44\text{px}$.
+
+---
+
+## 72. Persistenza e Sincronizzazione Cross-View del Layer Cartografico (`SettingsView`)
+- **Problema**: La scelta del layer cartografico effettuata dall'utente in una vista (es. mini-mappa o mappa comprensori) rischiava di andare perduta al refresh o di non essere reperibile/gestibile nella schermata delle preferenze generali dell'app.
+- **Causa Radice**: La proprietà `mapLayer` non era dichiarata nel `DEFAULT_INITIAL_STATE.ui` del core reattivo (`core/store.js`), e la vista Impostazioni (`#settings`) non era montata e registrata nel router.
+- **Pattern Vincolante**:
+  1. **Dichiarazione Esplicita nel Core (`DEFAULT_INITIAL_STATE.ui.mapLayer`)**: La chiave `mapLayer: 'dark'` deve essere sempre dichiarata nello stato iniziale del core per garantire determinismo e type safety.
+  2. **Idratazione Resiliente (`loadPersistedState`)**: Durante il caricamento da `storageAdapter` (LocalStorage), i raggruppamenti compositi come `ui` devono essere sempre uniti (`deepClone(DEFAULT_INITIAL_STATE.ui) + loadedSlice.ui`), proteggendo le chiavi da cancellazioni accidentali di snapshot datati.
+  3. **Sincronizzazione Tri-Direzionale Reattiva**: `ForecastView` (mini-mappa), `SpotMapView` (mappa a tutto schermo) e `SettingsView` (pannello impostazioni) condividono l'unica sorgente di verità `store.ui.mapLayer`. La modifica in qualunque delle 3 interfacce invoca `store.setState({ ui: { ...ui, mapLayer } })` e propaga sincronicamente il valore alle altre due, persistendo automaticamente sul disco locale.
+
+---
+
+## 73. Montaggio Esplicito dell'Adapter LocalStorage nella UI Shell ed Effetto Vetro Cristallino (Glassmorphism)
+- **Problema**: 
+  1. Al ricaricamento della pagina nel browser (F5), il layer cartografico ritornava sempre al valore predefinito `'dark'`, ignorando l'ultima preferenza selezionata dall'utente (es. OpenTopo o Satellite).
+  2. I controlli sopra la mappa apparivano con sfondi scuri o bianchi opachi/piatti, privi della naturale trasparenza e rifrazione ottica tipica del vetro (effetto vetro / glassmorphism).
+- **Causa Radice**:
+  1. **Mancato Montaggio dell'Adapter Browser**: Il singleton `store` in `core/store.js` viene istanziato con `createStore()`, che di default assegna un `createInMemoryStorageAdapter()` per consentire i test in Node.js senza crash. Tuttavia, nella UI shell (`ui/app.js`), l'adapter `createLocalStorageAdapter(window.localStorage)` non veniva montato sul singleton, facendo sì che tutti i salvataggi rimanessero confinati nella memoria volatile della scheda browser e andassero persi al reload.
+  2. **Opacità Piatta dei Controlli Mappa**: Sia i pulsanti della barra mappa (`.gm-map-pill-btn`) che i selettori mini-mappa impiegavano colori solidi opachi (`var(--gm-bg-card)` o `rgba(15,23,42,0.78)`), bloccando la visione del terreno sottostante e annullando il rendering ottico del `backdrop-filter`.
+- **Pattern Vincolante**:
+  1. **Metodo `setStorageAdapter` e Montaggio Diretto nella Shell**: `createStore` espone `setStorageAdapter(adapter)`; il modulo di avvio `ui/app.js` esegue all'avvio:
+     ```javascript
+     if (typeof window !== 'undefined' && window.localStorage && typeof store.setStorageAdapter === 'function') {
+       store.setStorageAdapter(createLocalStorageAdapter(window.localStorage));
+       store.loadPersistedState();
+     }
+     ```
+     Ciò garantisce che `store.setState({ ui: { ...ui, mapLayer } })` scriva sul reale `localStorage` del browser e venga ricaricato fedelmente al boot.
+  2. **Effetto Vetro Cristallino (Specular Glassmorphism)**:
+     - Sfondo a gradiente angolare semitrasparente (`linear-gradient(135deg, rgba(255,255,255,0.16) 0%, rgba(15,23,42,0.62) 100%)`).
+     - Sfocatura ottica e saturazione potenziata: `backdrop-filter: blur(12px) saturate(180%)`.
+     - Smussatura speculare interna e bisellatura: `box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.35), 0 2px 8px rgba(0, 0, 0, 0.35)`.
+     - Bordo sottile lucido: `border: 1px solid rgba(255, 255, 255, 0.28)`.
+     I controlli lasciano intravedere l'orografia sottostante con una piacevole rifrazione luminosa sia su temi scuri che chiari.
+
+---
+
+## 74. Insidia Shorthand CSS `background:` e Tiling Indesiderato di Icone SVG su Elementi `<select>` Multi-Layer
+- **Problema**: All'interno del dropdown della mini-mappa (`.gm-mini-map-layer-select`), l'icona a freccia SVG verso il basso si replicava a matrice orizzontale e verticale lungo l'intero pulsante, coprendo la scritta con decine di chevrons ripetuti (`v v v v v v`).
+- **Causa Radice**: Nei selettori condizionali del layer (`[data-map-layer="topo"]`, `[data-map-layer="streets"]`, o `[data-theme="light"]`), la dichiarazione shorthand `background: linear-gradient(...)` sovrascriveva e reimpostava implicitamente tutte le proprietà di background correlate ai loro valori predefiniti del browser: `background-repeat: repeat`, `background-position: 0 0` e `background-size: auto`. Di conseguenza, quando `background-image: url("...svg")` veniva applicata a cascata, il chevron SVG da 9px veniva ripetuto a tappeto su tutta la superficie del controllo.
+- **Pattern Vincolante**:
+  1. **Accorpamento Multi-Layer Esplicito (`background-image`)**: Quando un elemento interattivo unisce un'icona vettoriale di controllo (Layer 1) a una sfumatura o effetto vetro (Layer 2), **NON** utilizzare mai la shorthand `background:` nei modificatori. Dichiarare entrambi i livelli in `background-image`:
+     ```css
+     background-image: 
+       url("data:image/svg+xml,..."),
+       linear-gradient(135deg, rgba(255, 255, 255, 0.76) 0%, rgba(240, 244, 248, 0.44) 100%);
+     ```
+  2. **Guardia Rigida Anti-Tiling (`background-repeat`)**: Definire esplicitamente la matrice di ripetizione e posizionamento per tutti i livelli, blindando `no-repeat` con `!important` sul selettore base per prevenire regressioni da sovrascritture di terze parti:
+     ```css
+     background-repeat: no-repeat, no-repeat !important;
+     background-position: right 6px center, 0 0 !important;
+     background-size: 9px 9px, 100% 100% !important;
+     ```
+  3. **Shift-Left Test Automation**: Inserire nella suite di governance (`tests/ui/shiftLeftGovernance.test.mjs`) una verifica automatica che controlla la presenza della direttiva `background-repeat: no-repeat, no-repeat !important;` per i selettori ad effetto vetro con icone vettoriali incorporate.
+
+
 
 

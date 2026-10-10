@@ -107,8 +107,12 @@ export class HeadlessMockMapEngine {
     this.currentLayerId = options.layer || (this.theme === 'light' ? 'topo' : 'dark');
     this.renderedOverlays = [];
     this.renderedMode = 'circular';
+    this.preferCanvas = Boolean(options.preferCanvas);
+    this.isCanvasRendered = Boolean(options.preferCanvas);
     this.activePopupSpotId = null;
     this.eventListeners = new Map();
+    this.isPaused = false;
+    this.paused = false;
     this.destroyed = false;
   }
 
@@ -117,13 +121,32 @@ export class HeadlessMockMapEngine {
     this.options = { ...this.options, ...options };
     if (options.center) this.center = options.center;
     if (options.zoom) this.zoom = options.zoom;
+    if (options.preferCanvas !== undefined) {
+      this.preferCanvas = Boolean(options.preferCanvas);
+      this.isCanvasRendered = Boolean(options.preferCanvas);
+    }
     return this;
   }
 
   setView(center, zoom) {
     if (center) this.center = center;
     if (typeof zoom === 'number') this.zoom = zoom;
-    this.emit('moveend', { center: this.center, zoom: this.zoom });
+    this.emit('moveend', { center: this.center, zoom: this.zoom, bounds: this.getBounds() });
+  }
+
+  getBounds() {
+    const latDelta = 10 / Math.pow(2, Math.max(0, this.zoom - 5));
+    const lonDelta = 15 / Math.pow(2, Math.max(0, this.zoom - 5));
+    return {
+      south: this.center.lat - latDelta,
+      north: this.center.lat + latDelta,
+      west: this.center.lon - lonDelta,
+      east: this.center.lon + lonDelta,
+      getSouth: () => this.center.lat - latDelta,
+      getNorth: () => this.center.lat + latDelta,
+      getWest: () => this.center.lon - lonDelta,
+      getEast: () => this.center.lon + lonDelta
+    };
   }
 
   getView() {
@@ -144,6 +167,7 @@ export class HeadlessMockMapEngine {
     this.renderedOverlays = Array.isArray(evaluatedSpots) ? [...evaluatedSpots] : [];
     this.activeSpotId = activeSpotId;
     this.renderedMode = 'circular';
+    this.isCanvasRendered = Boolean(this.options.preferCanvas || (evaluatedSpots && evaluatedSpots.length > 50));
   }
 
   openSpotPopup(spotId) {
@@ -212,13 +236,45 @@ export class HeadlessMockMapEngine {
     this.lastGlideUpdate = glideMetrics;
   }
 
+  renderComprensorioFlightMap(containerEl, data, options = {}) {
+    this.container = containerEl || this.container;
+    this.activeFlightMapData = data;
+    this.renderedMode = 'flightAnalysis';
+    this.circuitData = data?.circuitData || null;
+    this.renderedCircuitPolylines = data?.circuitData?.polylines ? Object.keys(data.circuitData.polylines) : [];
+    this.paused = false;
+    this.destroyed = false;
+    return this;
+  }
+
+  updateFlightProcedures(circuitData, options = {}) {
+    this.lastCircuitUpdate = circuitData;
+    this.circuitData = circuitData;
+    if (circuitData?.polylines) {
+      this.renderedCircuitPolylines = Object.keys(circuitData.polylines);
+    }
+  }
+
+  pause() {
+    this.paused = true;
+    this.isPaused = true;
+  }
+
+  resume() {
+    this.paused = false;
+    this.isPaused = false;
+  }
+
   destroy() {
     this.destroyed = true;
     this.eventListeners.clear();
     this.renderedOverlays = [];
     this.activeMiniMapSpotData = null;
+    this.activeFlightMapData = null;
     this.lastWindsockUpdate = null;
     this.lastGlideUpdate = null;
+    this.lastCircuitUpdate = null;
+    this.renderedCircuitPolylines = [];
   }
 }
 
@@ -352,6 +408,7 @@ export class LeafletMapEngine {
     this.takeoffMarker = null;
     this.theme = options.theme || 'dark';
     this.isMiniMap = Boolean(options.isMiniMap);
+    this.canvasRenderer = null;
     this.renderedMode = 'circular';
     this.init(containerEl, options);
   }
@@ -398,13 +455,27 @@ export class LeafletMapEngine {
     // Create persistent layer group for spots
     this.overlayLayerGroup = window.L.layerGroup().addTo(this.map);
 
+    // Create dedicated Canvas renderer for scalable vector markers
+    if (!this.isMiniMap && typeof window.L.canvas === 'function') {
+      this.canvasRenderer = window.L.canvas({ padding: 0.5 });
+    } else {
+      this.canvasRenderer = null;
+    }
+
     // Forward map lifecycle events
     this.map.on('moveend', () => {
       if (typeof this.options.onMoveEnd === 'function') {
         const c = this.map.getCenter();
+        const b = typeof this.map.getBounds === 'function' ? this.map.getBounds() : null;
         this.options.onMoveEnd({
           center: { lat: c.lat, lon: c.lng },
-          zoom: this.map.getZoom()
+          zoom: this.map.getZoom(),
+          bounds: b ? {
+            south: b.getSouth(),
+            west: b.getWest(),
+            north: b.getNorth(),
+            east: b.getEast()
+          } : null
         });
       }
     });
@@ -420,6 +491,13 @@ export class LeafletMapEngine {
     if (this.map && center) {
       this.map.setView([center.lat, center.lon], zoom || this.map.getZoom());
     }
+  }
+
+  getBounds() {
+    if (this.map && typeof this.map.getBounds === 'function') {
+      return this.map.getBounds();
+    }
+    return null;
   }
 
   getView() {
@@ -474,12 +552,24 @@ export class LeafletMapEngine {
     if (this.lastRenderedSignature === signature && this.overlayLayerGroup.getLayers().length > 0) {
       if (this.activeSpotId !== activeSpotId) {
         if (this.activeSpotId && this.markersMap?.has(this.activeSpotId)) {
-          const el = this.markersMap.get(this.activeSpotId).getElement();
-          el?.querySelector('.gm-map-dot-marker')?.classList.remove('gm-map-dot-focused');
+          const m = this.markersMap.get(this.activeSpotId);
+          if (m && typeof m.setStyle === 'function') {
+            const oldStatus = evaluatedSpots.find(s => (s.id || s.comprensorio?.id) === this.activeSpotId)?.status;
+            const oldStyle = STATUS_COLORS[oldStatus] || STATUS_COLORS.unavailable;
+            m.setStyle({ color: oldStyle.color, weight: 2, radius: 9 });
+          } else {
+            const el = m?.getElement?.();
+            el?.querySelector('.gm-map-dot-marker')?.classList.remove('gm-map-dot-focused');
+          }
         }
         if (activeSpotId && this.markersMap?.has(activeSpotId)) {
-          const el = this.markersMap.get(activeSpotId).getElement();
-          el?.querySelector('.gm-map-dot-marker')?.classList.add('gm-map-dot-focused');
+          const m = this.markersMap.get(activeSpotId);
+          if (m && typeof m.setStyle === 'function') {
+            m.setStyle({ color: '#ffffff', weight: 3, radius: 13 });
+          } else {
+            const el = m?.getElement?.();
+            el?.querySelector('.gm-map-dot-marker')?.classList.add('gm-map-dot-focused');
+          }
         }
         this.activeSpotId = activeSpotId;
       }
@@ -491,7 +581,42 @@ export class LeafletMapEngine {
     this.overlayLayerGroup.clearLayers();
     this.markersMap.clear();
 
+    const useCanvas = Boolean(this.options.preferCanvas || evaluatedSpots.length > 50) && Boolean(this.canvasRenderer);
+
     for (const item of evaluatedSpots) {
+      if (item.isCluster) {
+        const clusterCoords = item.coordinates;
+        if (!clusterCoords) continue;
+
+        const clusterHtml = `
+          <div class="gm-map-cluster-marker gm-status-${item.status || 'flyable'}" title="${escapeHtml(item.name || 'Cluster')} (${item.count} decolli)">
+            <span class="gm-cluster-count">${item.count}</span>
+          </div>
+        `;
+        const clusterIcon = window.L.divIcon({
+          className: 'gm-map-cluster-div-icon',
+          html: clusterHtml,
+          iconSize: [38, 38],
+          iconAnchor: [19, 19]
+        });
+        const clusterMarker = window.L.marker([clusterCoords.lat, clusterCoords.lon], {
+          icon: clusterIcon,
+          zIndexOffset: 500
+        });
+
+        clusterMarker.on('click', () => {
+          if (item.bounds && this.map) {
+            this.map.fitBounds([
+              [item.bounds.south, item.bounds.west],
+              [item.bounds.north, item.bounds.east]
+            ], { padding: [50, 50], maxZoom: 9 });
+          }
+        });
+
+        this.overlayLayerGroup.addLayer(clusterMarker);
+        continue;
+      }
+
       const coords = parseCoordinates(item.takeoff?.coordinates || item.comprensorio?.takeoffs?.[0]?.coordinates);
       if (!coords) continue;
 
@@ -505,25 +630,55 @@ export class LeafletMapEngine {
       const alt = item.takeoff?.altitude || item.comprensorio?.takeoffs?.[0]?.altitude;
       const altStr = alt ? `${alt}m` : '';
 
-      // Circular marker matching screenshot specification
-      const iconHtml = `
-        <div class="gm-map-dot-marker gm-status-${item.status || 'unavailable'} ${isFocused ? 'gm-map-dot-focused' : ''}" title="${escapeHtml(spotName)} - ${statusStyle.badge}">
-          <span class="gm-map-dot-glyph">${statusStyle.icon}</span>
-        </div>
-      `;
+      let marker;
+      if (useCanvas) {
+        // High-performance Canvas circle marker (zero DOM allocations, <5ms render for thousands of spots)
+        marker = window.L.circleMarker([coords.lat, coords.lon], {
+          renderer: this.canvasRenderer,
+          radius: isFocused ? 13 : 9,
+          fillColor: statusStyle.fill,
+          color: isFocused ? '#ffffff' : statusStyle.color,
+          weight: isFocused ? 3 : 2,
+          fillOpacity: 0.95,
+          className: `gm-canvas-marker gm-status-${item.status || 'unavailable'} ${isFocused ? 'gm-marker-focused' : ''}`,
+          zIndexOffset: isFocused ? 1000 : 0
+        });
 
-      const markerIcon = window.L.divIcon({
-        className: 'gm-map-div-icon',
-        html: iconHtml,
-        iconSize: [26, 26],
-        iconAnchor: [13, 13],
-        popupAnchor: [0, -14]
-      });
+        // Add pulsed halo beacon on canvas for the focused active spot
+        if (isFocused) {
+          const haloBeacon = window.L.circleMarker([coords.lat, coords.lon], {
+            renderer: this.canvasRenderer,
+            radius: 20,
+            fillColor: statusStyle.fill,
+            fillOpacity: 0.25,
+            color: '#ffffff',
+            weight: 1.5,
+            dashArray: '3, 4',
+            interactive: false
+          });
+          this.overlayLayerGroup.addLayer(haloBeacon);
+        }
+      } else {
+        // Stylized DOM divIcon with CSS glyph
+        const iconHtml = `
+          <div class="gm-map-dot-marker gm-status-${item.status || 'unavailable'} ${isFocused ? 'gm-map-dot-focused' : ''}" title="${escapeHtml(spotName)} - ${statusStyle.badge}">
+            <span class="gm-map-dot-glyph">${statusStyle.icon}</span>
+          </div>
+        `;
 
-      const marker = window.L.marker([coords.lat, coords.lon], {
-        icon: markerIcon,
-        zIndexOffset: isFocused ? 1000 : 0
-      });
+        const markerIcon = window.L.divIcon({
+          className: 'gm-map-div-icon',
+          html: iconHtml,
+          iconSize: [26, 26],
+          iconAnchor: [13, 13],
+          popupAnchor: [0, -14]
+        });
+
+        marker = window.L.marker([coords.lat, coords.lon], {
+          icon: markerIcon,
+          zIndexOffset: isFocused ? 1000 : 0
+        });
+      }
 
       // Contextual speech bubble ("fumetto") on tap
       const popupHtml = `
@@ -828,6 +983,253 @@ export class LeafletMapEngine {
     this.glidePolyline.setStyle({ color });
   }
 
+  pause() {
+    this.isPaused = true;
+  }
+
+  resume() {
+    this.isPaused = false;
+    if (this.map && typeof window !== 'undefined') {
+      setTimeout(() => {
+        if (this.map) this.map.invalidateSize();
+      }, 50);
+    }
+  }
+
+  renderComprensorioFlightMap(containerEl, data, options = {}) {
+    if (typeof window === 'undefined' || !window.L) return this;
+    if (containerEl && (!this.map || this.container !== containerEl)) {
+      if (this.map) {
+        this.destroy();
+      }
+      this.init(containerEl, { ...this.options, ...options, isFlightAnalysis: true });
+    }
+
+    if (!this.map || !this.overlayLayerGroup) return this;
+    this.overlayLayerGroup.clearLayers();
+    this.activeFlightData = data;
+    this.renderedMode = 'flightAnalysis';
+    this.circuitLayers = {};
+
+    if (!data) return this;
+
+    const tCoord = parseCoordinates(data.takeoff?.coordinates || data.comprensorio?.takeoffs?.[0]?.coordinates);
+    const lCoord = parseCoordinates(data.landing?.coordinates || data.comprensorio?.landings?.[0]?.coordinates);
+    const takeoffWeather = data.takeoffWeather || data.weatherSnapshot || {};
+    const landingWeather = data.landingWeather || data.weatherSnapshot || {};
+
+    const tSpeed = takeoffWeather.windSpeed ?? 12;
+    const tGust = takeoffWeather.windGust ?? (tSpeed > 0 ? tSpeed * 1.3 : 15);
+    const tDir = takeoffWeather.windDirection ?? takeoffWeather.windDir ?? 180;
+    const tTurb = takeoffWeather.turbulence ?? 0.1;
+    const tHeading = data.takeoff?.heading ?? 180;
+    const tAlt = data.takeoff?.altitude || 1000;
+
+    const lSpeed = landingWeather.windSpeed ?? 10;
+    const lGust = landingWeather.windGust ?? (lSpeed > 0 ? lSpeed * 1.3 : 12);
+    const lDir = landingWeather.windDirection ?? landingWeather.windDir ?? 180;
+    const lTurb = landingWeather.turbulence ?? 0.1;
+    const lAlt = data.landing?.altitude || 300;
+
+    // 1. Takeoff Windsock Marker + Sector
+    if (tCoord) {
+      const sectorSvg = generateTakeoffSectorSvg(tHeading, tDir, tAlt, { prefix: 'fl-to-sec-' });
+      const sectorIcon = window.L.divIcon({
+        className: 'gm-takeoff-sector-marker-container',
+        html: sectorSvg,
+        iconSize: [140, 140],
+        iconAnchor: [70, 70]
+      });
+      this.flightTakeoffSector = window.L.marker([tCoord.lat, tCoord.lon], {
+        icon: sectorIcon,
+        zIndexOffset: 300
+      });
+      this.overlayLayerGroup.addLayer(this.flightTakeoffSector);
+
+      const wsTakeoffHtml = generateWindsockSvg(tSpeed, tGust, tDir, tTurb, { prefix: 'fl-to-ws-', scale: 0.5 });
+      const wsTakeoffIcon = window.L.divIcon({
+        className: 'gm-windsock-marker-container',
+        html: wsTakeoffHtml,
+        iconSize: [240, 240],
+        iconAnchor: [120, 120]
+      });
+      this.flightTakeoffWindsock = window.L.marker([tCoord.lat, tCoord.lon], {
+        icon: wsTakeoffIcon,
+        zIndexOffset: 650
+      });
+      this.overlayLayerGroup.addLayer(this.flightTakeoffWindsock);
+    }
+
+    // 2. Landing Windsock Marker + Landing Pin
+    if (lCoord) {
+      const landingName = (data.landing?.name || 'Atterraggio').replace(/^Atterraggio\s*/i, '');
+      const lIcon = window.L.divIcon({
+        className: 'gm-map-div-icon',
+        html: `
+          <div class="gm-mini-pin gm-mini-pin-landing gm-mini-pin-focused" title="Atterraggio ${landingName} (${lAlt}m)">
+            <span class="gm-mini-pin-glyph">⏚</span>
+            <span class="gm-mini-pin-alt">${lAlt}m</span>
+          </div>
+        `,
+        iconSize: [60, 24],
+        iconAnchor: [30, 12]
+      });
+      this.flightLandingPin = window.L.marker([lCoord.lat, lCoord.lon], {
+        icon: lIcon,
+        zIndexOffset: 500
+      });
+      this.overlayLayerGroup.addLayer(this.flightLandingPin);
+
+      const wsLandingHtml = generateWindsockSvg(lSpeed, lGust, lDir, lTurb, { prefix: 'fl-ld-ws-', scale: 0.5 });
+      const wsLandingIcon = window.L.divIcon({
+        className: 'gm-windsock-marker-container',
+        html: wsLandingHtml,
+        iconSize: [240, 240],
+        iconAnchor: [120, 120]
+      });
+      this.flightLandingWindsock = window.L.marker([lCoord.lat, lCoord.lon], {
+        icon: wsLandingIcon,
+        zIndexOffset: 650
+      });
+      this.overlayLayerGroup.addLayer(this.flightLandingWindsock);
+    }
+
+    // 3. Glide line between takeoff and landing
+    if (tCoord && lCoord) {
+      this.flightGlideLine = window.L.polyline(
+        [[tCoord.lat, tCoord.lon], [lCoord.lat, lCoord.lon]],
+        { color: '#16a34a', weight: 2.5, dashArray: '6, 8', opacity: 0.75 }
+      );
+      this.overlayLayerGroup.addLayer(this.flightGlideLine);
+    }
+
+    // 4. Vector Landing Circuit (Dual-track casing 6px + core 3px)
+    const circuit = data.circuitData;
+    const casingColor = (this.theme === 'dark' && this.currentLayerId === 'dark') ? '#ffffff' : '#000000';
+    const allPoints = [];
+    if (tCoord) allPoints.push([tCoord.lat, tCoord.lon]);
+    if (lCoord) allPoints.push([lCoord.lat, lCoord.lon]);
+
+    if (circuit?.polylines) {
+      const isFig8 = circuit.circuitType === 'figure_eight';
+
+      const addDualPolyline = (key, pts, coreColor, isDashed = false) => {
+        if (!pts || pts.length < 2) return;
+        const casing = window.L.polyline(pts, {
+          color: casingColor,
+          weight: 6,
+          opacity: 0.85,
+          lineCap: 'round',
+          lineJoin: 'round'
+        });
+        const core = window.L.polyline(pts, {
+          color: coreColor,
+          weight: 3,
+          opacity: 0.95,
+          dashArray: isDashed ? '6, 6' : null,
+          lineCap: 'round',
+          lineJoin: 'round'
+        });
+        this.overlayLayerGroup.addLayer(casing);
+        this.overlayLayerGroup.addLayer(core);
+        this.circuitLayers[key + 'Casing'] = casing;
+        this.circuitLayers[key + 'Core'] = core;
+        pts.forEach(p => allPoints.push(p));
+      };
+
+      if (isFig8) {
+        addDualPolyline('fig8', circuit.polylines.figureEight, '#dc2626');
+      } else {
+        addDualPolyline('downwind', circuit.polylines.downwindLeg, '#b45309');
+        addDualPolyline('base', circuit.polylines.baseLeg, '#2563eb');
+        addDualPolyline('final', circuit.polylines.finalLeg, '#15803d');
+      }
+
+      if (circuit.holdingArea?.center && !isFig8) {
+        const hc = circuit.holdingArea.center;
+        this.circuitLayers.holdingCircle = window.L.circle([hc.lat, hc.lon], {
+          radius: circuit.holdingArea.radiusMeters || 75,
+          color: '#6366f1',
+          weight: 2,
+          dashArray: '4, 6',
+          fillColor: '#6366f1',
+          fillOpacity: 0.12
+        });
+        this.overlayLayerGroup.addLayer(this.circuitLayers.holdingCircle);
+        allPoints.push([hc.lat, hc.lon]);
+      }
+    }
+
+    // 5. Fit bounds
+    if (allPoints.length >= 2) {
+      const bounds = window.L.latLngBounds(allPoints);
+      this.map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+      if (typeof window !== 'undefined') {
+        setTimeout(() => {
+          if (this.map) {
+            this.map.invalidateSize();
+            this.map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+          }
+        }, 60);
+      }
+    } else if (lCoord) {
+      this.map.setView([lCoord.lat, lCoord.lon], 15);
+    }
+
+    return this;
+  }
+
+  updateFlightProcedures(circuitData, options = {}) {
+    if (!circuitData) return;
+    this.lastCircuitData = circuitData;
+
+    const isFig8 = circuitData.circuitType === 'figure_eight';
+
+    const updateDual = (key, pts) => {
+      const casing = this.circuitLayers?.[key + 'Casing'];
+      const core = this.circuitLayers?.[key + 'Core'];
+      if (casing && core && pts) {
+        casing.setLatLngs(pts);
+        core.setLatLngs(pts);
+      }
+    };
+
+    if (isFig8) {
+      updateDual('fig8', circuitData.polylines?.figureEight);
+    } else {
+      updateDual('downwind', circuitData.polylines?.downwindLeg);
+      updateDual('base', circuitData.polylines?.baseLeg);
+      updateDual('final', circuitData.polylines?.finalLeg);
+    }
+
+    if (this.circuitLayers?.holdingCircle && circuitData.holdingArea?.center) {
+      const hc = circuitData.holdingArea.center;
+      this.circuitLayers.holdingCircle.setLatLng([hc.lat, hc.lon]);
+    }
+
+    if (options.takeoffWeather && this.flightTakeoffWindsock) {
+      const el = this.flightTakeoffWindsock.getElement();
+      if (el) {
+        const speed = options.takeoffWeather.windSpeed ?? 0;
+        const gust = options.takeoffWeather.windGust ?? speed;
+        const dir = options.takeoffWeather.windDirection ?? 0;
+        const turb = options.takeoffWeather.turbulence ?? 0;
+        el.innerHTML = generateWindsockSvg(speed, gust, dir, turb, { prefix: 'fl-to-ws-', scale: 0.5 });
+      }
+    }
+
+    if (options.landingWeather && this.flightLandingWindsock) {
+      const el = this.flightLandingWindsock.getElement();
+      if (el) {
+        const speed = options.landingWeather.windSpeed ?? 0;
+        const gust = options.landingWeather.windGust ?? speed;
+        const dir = options.landingWeather.windDirection ?? 0;
+        const turb = options.landingWeather.turbulence ?? 0;
+        el.innerHTML = generateWindsockSvg(speed, gust, dir, turb, { prefix: 'fl-ld-ws-', scale: 0.5 });
+      }
+    }
+  }
+
   destroy() {
     this.clearOverlays();
     if (this.map) {
@@ -839,6 +1241,12 @@ export class LeafletMapEngine {
     this.glidePolyline = null;
     this.landingMarker = null;
     this.takeoffMarker = null;
+    this.flightTakeoffSector = null;
+    this.flightTakeoffWindsock = null;
+    this.flightLandingPin = null;
+    this.flightLandingWindsock = null;
+    this.flightGlideLine = null;
+    this.circuitLayers = null;
     this.overlayLayerGroup = null;
     this.tileLayer = null;
   }

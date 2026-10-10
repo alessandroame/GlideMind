@@ -147,6 +147,24 @@ describe('Spot Map View - Controller & Cartography Contracts (UI Layer)', () => 
     assert.equal(engine.renderedMode, 'circular', 'Zoom 9.5 must render in circular marker mode');
   });
 
+  it('should support Canvas marker mode for high-density rendering without DOM bloat', () => {
+    spotMapView.mount(mockContainer);
+    const engine = spotMapView.mapEngine;
+
+    // Simulate high density dataset (> 50 spots)
+    const mockSpots = Array.from({ length: 65 }, (_, i) => ({
+      id: `spot-${i}`,
+      name: `Spot ${i}`,
+      status: i % 2 === 0 ? 'flyable' : 'caution',
+      takeoff: { coordinates: `45.${i}, 7.${i}`, altitude: 1000 + i }
+    }));
+
+    engine.renderOverlays(mockSpots, 7, null, 'spot-0');
+    assert.equal(engine.renderedMode, 'circular');
+    assert.equal(engine.isCanvasRendered, true, 'Datasets with >50 spots must activate Canvas mode');
+    assert.equal(engine.renderedOverlays.length, 65);
+  });
+
   it('should support spot selection and opening speech bubble popup on tap', () => {
     spotMapView.mount(mockContainer);
     const engine = spotMapView.mapEngine;
@@ -198,6 +216,43 @@ describe('Spot Map View - Controller & Cartography Contracts (UI Layer)', () => 
     assert.equal(view.center.lon, MACRO_REGIONS.CENTRE.defaultCenter.lon);
   });
 
+  it('should cull markers and restrict rendering strictly to visible viewport bounds on map move', () => {
+    spotMapView.mount(mockContainer);
+    const engine = spotMapView.mapEngine;
+
+    // Simulate panning/zooming to a tight bounding box in Piemonte
+    const tightPiemonteBounds = {
+      south: 45.2,
+      north: 45.6,
+      west: 7.2,
+      east: 7.9,
+      getSouth: () => 45.2,
+      getNorth: () => 45.6,
+      getWest: () => 7.2,
+      getEast: () => 7.9
+    };
+
+    spotMapView.handleMapMove({
+      zoom: 10,
+      center: { lat: 45.4, lon: 7.5 },
+      bounds: tightPiemonteBounds
+    });
+
+    // Overlays should contain only spots inside the Piemonte bbox
+    assert.ok(engine.renderedOverlays.length > 0, 'Must render matching spots in Piemonte');
+    // Cornizzolo in Lombardia (~lon 9.3) or Bassano in Veneto (~lon 11.7) must NOT be present
+    assert.equal(
+      engine.renderedOverlays.some(s => (s.id || s.comprensorio?.id) === 'monte-cornizzolo-lc'),
+      false,
+      'Monte Cornizzolo must be culled out of western Piemonte viewport'
+    );
+    assert.equal(
+      engine.renderedOverlays.some(s => (s.id || s.comprensorio?.id) === 'bassano-borso-del-grappa-tv'),
+      false,
+      'Bassano must be culled out of western Piemonte viewport'
+    );
+  });
+
   it('should clean up on unmount without memory leaks', () => {
     spotMapView.mount(mockContainer);
     assert.ok(spotMapView.mapEngine);
@@ -206,5 +261,6 @@ describe('Spot Map View - Controller & Cartography Contracts (UI Layer)', () => 
     assert.equal(spotMapView.mapEngine, null);
     assert.equal(spotMapView.container, null);
     assert.equal(spotMapView.storeUnsub, null);
+    assert.equal(spotMapView.moveDebounceTimer, null);
   });
 });

@@ -28,7 +28,13 @@ export const COUNTRY_BBOX_MAP = {
   CH: '45.8,5.9,47.9,10.5',
   FR: '41.3,-5.2,51.1,9.6',
   AT: '46.3,9.5,49.1,17.2',
-  DE: '47.2,5.8,55.1,15.1'
+  DE: '47.2,5.8,55.1,15.1',
+  ES: '36.0,-9.3,43.8,3.3',
+  SI: '45.4,13.3,46.9,16.6',
+  HR: '42.3,13.4,46.5,19.4',
+  PT: '36.9,-9.5,42.2,-6.1',
+  UK: '49.8,-8.6,60.9,1.8',
+  GR: '34.8,19.3,41.8,28.3'
 };
 
 /**
@@ -207,7 +213,21 @@ export async function runHarvest({
 
 // Direct CLI execution check
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  runHarvest().catch(err => {
+  const args = process.argv.slice(2);
+  let country = 'IT';
+  for (const arg of args) {
+    if (arg.startsWith('--country=')) {
+      country = arg.split('=')[1].toUpperCase();
+    } else if (!arg.startsWith('-')) {
+      country = arg.toUpperCase();
+    }
+  }
+
+  const outFile = country === 'IT'
+    ? path.resolve(__dirname, '../data/raw-harvest/osm-raw.json')
+    : path.resolve(__dirname, `../data/raw-harvest/osm-raw-${country.toLowerCase()}.json`);
+
+  runHarvest({ country, outFile }).catch(err => {
     console.error(err.message);
     process.exit(1);
   });

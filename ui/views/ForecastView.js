@@ -19,8 +19,8 @@
 
 import { store } from '../../core/store.js';
 import { router } from '../router.js';
-import { openSheet, closeSheet } from '../sheetManager.js';
 import { createMapEngine } from '../map/mapEngineAdapter.js';
+import { calculateLandingCircuit } from '../../core/flightProcedures.js';
 import {
   DEFAULT_COMPRENSORI,
   evaluateComprensorio,
@@ -3542,8 +3542,16 @@ export class ForecastViewController {
       if (this.store && spot) {
         this.store.setState({ selectedSpot: spot });
       }
-      if (typeof window !== 'undefined' && window.location) {
-        window.location.hash = `#map?spot=${encodeURIComponent(spot?.id || '')}`;
+      this.openFlightAnalysisOverlay();
+    } else if (action === 'close-flight-analysis') {
+      this.closeFlightAnalysisOverlay();
+    } else if (action === 'flight-analysis-hour') {
+      const hourAttr = actionEl.getAttribute('data-hour');
+      if (hourAttr != null) {
+        const hour = parseInt(hourAttr, 10);
+        if (!isNaN(hour) && hour >= 8 && hour <= 20) {
+          this.setHour(hour);
+        }
       }
     } else if (action === 'set-forecast-mode') {
       const mode = actionEl.getAttribute('data-mode');
@@ -3722,6 +3730,345 @@ export class ForecastViewController {
         const ui = state.ui || {};
         this.store.setState({ ui: { ...ui, mapLayer: newLayer } });
       }
+    } else if (target.getAttribute('data-action') === 'set-flight-analysis-layer' || target.classList.contains('gm-flight-analysis-layer-select')) {
+      const newLayer = target.value;
+      if (this.flightAnalysisMapEngine && typeof this.flightAnalysisMapEngine.setLayer === 'function') {
+        this.flightAnalysisMapEngine.setLayer(newLayer);
+      }
+      if (this.store && typeof this.store.setState === 'function') {
+        const state = this.store.getState() || {};
+        const ui = state.ui || {};
+        this.store.setState({ ui: { ...ui, mapLayer: newLayer } });
+      }
+    }
+  }
+
+  /**
+   * Opens the Comprensorio Flight Inspector Fullscreen Overlay (100dvh).
+   */
+  openFlightAnalysisOverlay() {
+    this.isFlightAnalysisOpen = true;
+
+    // 1. Pause background mini-map animation to save GPU/CPU cycles
+    if (this.miniMapEngine && typeof this.miniMapEngine.pause === 'function') {
+      this.miniMapEngine.pause();
+    }
+
+    const spot = this.getCurrentSpot();
+    const glider = this.getActiveGlider();
+    const weatherData = this.getWeatherData(spot, this.activeDate);
+    const evalData = evaluateComprensorio({
+      comprensorio: spot,
+      weatherData,
+      hourIndex: this.selectedHour,
+      glider,
+      targetDate: this.activeDate
+    });
+    const takeoff = spot?.takeoffs?.[0] || {};
+    const landing = spot?.landings?.[0] || {};
+    const weather = evalData?.weatherSnapshot || {};
+    const takeoffWeather = evalData?.takeoffWeather || weather;
+    const landingWeather = evalData?.landingWeather || weather;
+    const activeLayer = this.store?.getState?.()?.ui?.mapLayer || 'topo';
+
+    const circuitData = calculateLandingCircuit({
+      landingCoordinates: landing.coordinates,
+      takeoffCoordinates: takeoff.coordinates,
+      windSpeedKmh: landingWeather.windSpeed,
+      windDirectionDeg: landingWeather.windDirection,
+      landing,
+      flightPlan: landing.flightPlans?.[0] || null,
+      glider: this.getActiveGlider()
+    });
+
+    // 2. If running in browser environment, construct DOM overlay
+    if (typeof document !== 'undefined') {
+      if (document.body) {
+        document.body.style.overflow = 'hidden';
+      }
+      this.flightAnalysisTriggerEl = document.querySelector('.gm-mini-map-expand-btn') || document.activeElement;
+
+      // Remove any existing overlay
+      let overlayEl = document.getElementById('gm-flight-analysis-overlay');
+      if (overlayEl) {
+        overlayEl.remove();
+      }
+
+      overlayEl = document.createElement('div');
+      overlayEl.id = 'gm-flight-analysis-overlay';
+      overlayEl.className = 'gm-flight-analysis-overlay';
+      overlayEl.setAttribute('role', 'dialog');
+      overlayEl.setAttribute('aria-modal', 'true');
+      overlayEl.setAttribute('aria-label', 'Modulo di Analisi Volo e Procedure Comprensorio');
+
+      const isFig8 = circuitData.circuitType === 'figure_eight';
+      const badgeText = isFig8
+        ? 'Attacco a 8'
+        : (circuitData.circuitType === 'calm_straight' ? 'Avvicinamento Diretto' : `Circuito a C (${circuitData.circuitHand === 'left' ? 'Mano Sinistra' : 'Mano Destra'})`);
+
+      overlayEl.innerHTML = `
+        <header class="gm-flight-analysis-header">
+          <div class="gm-flight-analysis-title-group">
+            <h1 class="gm-flight-analysis-title">${spot?.name || 'Analisi Comprensorio'}</h1>
+            <p class="gm-flight-analysis-subtitle">
+              ▲ ${takeoff.name || 'Decollo'} (${takeoff.altitude || 1000}m) • ⏚ ${landing.name || 'Atterraggio'} (${landing.altitude || 300}m)
+            </p>
+          </div>
+          <div class="gm-flight-analysis-actions">
+            <select class="gm-flight-analysis-layer-select" data-action="set-flight-analysis-layer" aria-label="Seleziona layer cartografico">
+              <option value="topo" ${activeLayer === 'topo' ? 'selected' : ''}>OpenTopo</option>
+              <option value="satellite" ${activeLayer === 'satellite' ? 'selected' : ''}>Satellite</option>
+              <option value="dark" ${activeLayer === 'dark' ? 'selected' : ''}>Scuro</option>
+              <option value="streets" ${activeLayer === 'streets' ? 'selected' : ''}>CyclOSM</option>
+            </select>
+            <button 
+              type="button" 
+              class="gm-flight-analysis-close-btn" 
+              data-action="close-flight-analysis" 
+              aria-label="Chiudi analisi volo comprensorio"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+        </header>
+
+        <div class="gm-flight-analysis-map-container">
+          <div id="forecast-flight-analysis-map" class="gm-flight-analysis-map"></div>
+        </div>
+
+        <section class="gm-flight-analysis-drawer" aria-label="Dettagli procedura e convenzioni">
+          <div class="gm-flight-analysis-badge-row">
+            <span id="flight-procedure-badge" class="gm-flight-procedure-badge ${circuitData.isSafetyWarning ? 'severe' : ''}">
+              ${badgeText} - Finale ${circuitData.finalHeading}°
+            </span>
+            <span id="flight-procedure-hour-pill" style="font-size: 12px; font-weight: 700; color: var(--gm-text-primary);">
+              ${String(this.selectedHour).padStart(2, '0')}:00
+            </span>
+          </div>
+
+          <div id="flight-safety-banner-container">
+            ${circuitData.isSafetyWarning ? `<div class="gm-flight-safety-warning-banner" role="alert">${circuitData.warningReason}</div>` : ''}
+          </div>
+
+          <p id="flight-procedure-explanation" class="gm-flight-analysis-explanation">
+            ${circuitData.explanation}
+          </p>
+
+          <div class="gm-flight-analysis-meta-row">
+            ${spot?.club?.radioFreq ? `<span class="gm-flight-analysis-meta-item">Radio Club: <strong>${spot.club.radioFreq}</strong></span>` : ''}
+            ${landing.rules ? `<span class="gm-flight-analysis-meta-item">Regole: ${landing.rules}</span>` : ''}
+          </div>
+
+          <div class="gm-flight-analysis-scrubber" role="toolbar" aria-label="Selettore orario continuo">
+            ${Array.from({ length: 13 }, (_, i) => {
+              const h = 8 + i;
+              const isActive = h === this.selectedHour;
+              return `
+                <button 
+                  type="button" 
+                  class="gm-flight-analysis-slot ${isActive ? 'active' : ''}" 
+                  data-action="flight-analysis-hour" 
+                  data-hour="${h}"
+                  aria-label="Ore ${h}:00"
+                  aria-pressed="${isActive}"
+                >
+                  <span class="gm-flight-analysis-slot-hour">${h}</span>
+                  <span class="gm-flight-analysis-slot-indicator"></span>
+                </button>
+              `;
+            }).join('')}
+          </div>
+        </section>
+      `;
+
+      document.body.appendChild(overlayEl);
+      this.flightAnalysisOverlayEl = overlayEl;
+      overlayEl.addEventListener('click', this.boundClickHandler);
+      overlayEl.addEventListener('change', this.boundChangeHandler);
+
+      // Event listeners
+      if (typeof window !== 'undefined') {
+        window.addEventListener('keydown', this.boundFlightAnalysisKeyHandler);
+        window.addEventListener('popstate', this.boundFlightAnalysisPopstate);
+
+        if (window.history && typeof window.history.pushState === 'function') {
+          window.history.pushState({ overlay: 'flight-analysis' }, '');
+        }
+      }
+
+      // Initialize map engine on overlay container
+      const mapEl = overlayEl.querySelector('#forecast-flight-analysis-map');
+      this.flightAnalysisMapEngine = createMapEngine(mapEl, {
+        theme: this.store?.getState?.()?.ui?.theme || 'dark',
+        layer: activeLayer
+      });
+      this.flightAnalysisMapEngine.renderComprensorioFlightMap(mapEl, {
+        comprensorio: spot,
+        takeoff,
+        landing,
+        takeoffWeather,
+        landingWeather,
+        circuitData
+      });
+
+      // Focus close button
+      const closeBtn = overlayEl.querySelector('.gm-flight-analysis-close-btn');
+      if (closeBtn && typeof closeBtn.focus === 'function') {
+        closeBtn.focus();
+      }
+    } else {
+      // Pure Node.js headless environment
+      this.flightAnalysisMapEngine = createMapEngine(null, {
+        theme: this.store?.getState?.()?.ui?.theme || 'dark',
+        layer: activeLayer
+      });
+      this.flightAnalysisMapEngine.renderComprensorioFlightMap(null, {
+        comprensorio: spot,
+        takeoff,
+        landing,
+        takeoffWeather,
+        landingWeather,
+        circuitData
+      });
+    }
+
+    return this;
+  }
+
+  /**
+   * Closes the Comprensorio Flight Inspector Overlay.
+   */
+  closeFlightAnalysisOverlay() {
+    this.isFlightAnalysisOpen = false;
+
+    if (this.flightAnalysisMapEngine) {
+      this.flightAnalysisMapEngine.destroy();
+      this.flightAnalysisMapEngine = null;
+    }
+
+    // Resume background mini-map
+    if (this.miniMapEngine && typeof this.miniMapEngine.resume === 'function') {
+      this.miniMapEngine.resume();
+    }
+
+    if (typeof document !== 'undefined') {
+      if (document.body) {
+        document.body.style.overflow = '';
+      }
+      if (this.flightAnalysisOverlayEl) {
+        if (typeof this.flightAnalysisOverlayEl.removeEventListener === 'function') {
+          this.flightAnalysisOverlayEl.removeEventListener('click', this.boundClickHandler);
+          this.flightAnalysisOverlayEl.removeEventListener('change', this.boundChangeHandler);
+        }
+        this.flightAnalysisOverlayEl.remove();
+        this.flightAnalysisOverlayEl = null;
+      } else {
+        const el = document.getElementById('gm-flight-analysis-overlay');
+        if (el) el.remove();
+      }
+
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('keydown', this.boundFlightAnalysisKeyHandler);
+        window.removeEventListener('popstate', this.boundFlightAnalysisPopstate);
+      }
+
+      // Restore focus to trigger button
+      if (this.flightAnalysisTriggerEl && typeof this.flightAnalysisTriggerEl.focus === 'function') {
+        this.flightAnalysisTriggerEl.focus();
+        this.flightAnalysisTriggerEl = null;
+      }
+    }
+
+    return this;
+  }
+
+  /**
+   * Keyboard handler for flight analysis overlay (ESC key).
+   * @param {KeyboardEvent} e
+   */
+  handleFlightAnalysisKey(e) {
+    if (e.key === 'Escape' && this.isFlightAnalysisOpen) {
+      e.preventDefault();
+      this.closeFlightAnalysisOverlay();
+    }
+  }
+
+  /**
+   * Popstate handler for mobile back gesture.
+   */
+  handleFlightAnalysisPopstate() {
+    if (this.isFlightAnalysisOpen) {
+      this.closeFlightAnalysisOverlay();
+    }
+  }
+
+  /**
+   * Updates flight analysis overlay DOM and map procedures in-place on hour scrub.
+   * @param {object} evaluated
+   */
+  updateFlightAnalysisOverlay(evaluated) {
+    if (!this.isFlightAnalysisOpen) return;
+
+    const spot = this.getCurrentSpot();
+    const takeoff = spot?.takeoffs?.[0] || {};
+    const landing = spot?.landings?.[0] || {};
+    const weather = evaluated?.weatherSnapshot || {};
+    const takeoffWeather = evaluated?.takeoffWeather || weather;
+    const landingWeather = evaluated?.landingWeather || weather;
+
+    const circuitData = calculateLandingCircuit({
+      landingCoordinates: landing?.coordinates,
+      takeoffCoordinates: takeoff?.coordinates,
+      windSpeedKmh: landingWeather.windSpeed,
+      windDirectionDeg: landingWeather.windDirection,
+      landing,
+      flightPlan: landing?.flightPlans?.[0] || null,
+      glider: this.getActiveGlider()
+    });
+
+    if (this.flightAnalysisMapEngine && typeof this.flightAnalysisMapEngine.updateFlightProcedures === 'function') {
+      this.flightAnalysisMapEngine.updateFlightProcedures(circuitData, { takeoffWeather, landingWeather });
+    }
+
+    if (typeof document !== 'undefined' && this.flightAnalysisOverlayEl) {
+      const isFig8 = circuitData.circuitType === 'figure_eight';
+      const badgeText = isFig8
+        ? 'Attacco a 8'
+        : (circuitData.circuitType === 'calm_straight' ? 'Avvicinamento Diretto' : `Circuito a C (${circuitData.circuitHand === 'left' ? 'Mano Sinistra' : 'Mano Destra'})`);
+
+      const badgeEl = this.flightAnalysisOverlayEl.querySelector('#flight-procedure-badge');
+      if (badgeEl) {
+        badgeEl.className = `gm-flight-procedure-badge ${circuitData.isSafetyWarning ? 'severe' : ''}`;
+        badgeEl.textContent = `${badgeText} - Finale ${circuitData.finalHeading}°`;
+      }
+
+      const hourPill = this.flightAnalysisOverlayEl.querySelector('#flight-procedure-hour-pill');
+      if (hourPill) {
+        hourPill.textContent = `${String(this.selectedHour).padStart(2, '0')}:00`;
+      }
+
+      const bannerContainer = this.flightAnalysisOverlayEl.querySelector('#flight-safety-banner-container');
+      if (bannerContainer) {
+        bannerContainer.innerHTML = circuitData.isSafetyWarning
+          ? `<div class="gm-flight-safety-warning-banner" role="alert">${circuitData.warningReason}</div>`
+          : '';
+      }
+
+      const explanationEl = this.flightAnalysisOverlayEl.querySelector('#flight-procedure-explanation');
+      if (explanationEl) {
+        explanationEl.textContent = circuitData.explanation;
+      }
+
+      const scrubberSlots = this.flightAnalysisOverlayEl.querySelectorAll('.gm-flight-analysis-slot');
+      scrubberSlots.forEach(slot => {
+        const h = parseInt(slot.getAttribute('data-hour'), 10);
+        const isActive = h === this.selectedHour;
+        slot.classList.toggle('active', isActive);
+        slot.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+      });
     }
   }
 }

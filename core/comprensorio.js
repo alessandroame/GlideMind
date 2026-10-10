@@ -98,7 +98,15 @@ export const DEFAULT_COMPRENSORI = Object.freeze([
         "altitude": 260,
         "isPrimary": true,
         "isOfficial": true,
-        "description": "Grandissimo campo atterraggio attrezzato presso Cielo & Terra."
+        "description": "Grandissimo campo atterraggio attrezzato presso Cielo & Terra.",
+        "flightPlans": [
+          {
+            "name": "Circuito Standard (Breva da Sud / Sud-Est)",
+            "pattern": "Circuito a 'C' o '8'",
+            "description": "Smaltimento quota sul costone a Ovest del campo, inserimento in sottovento verso Nord, virata base sopra il paese di Suello e finale controvento orientato a Sud-Est verso il ristorante Cielo & Terra.",
+            "circuitHand": "left"
+          }
+        ]
       }
     ]
   },
@@ -436,11 +444,19 @@ export function normalizeLocationsCatalog(rawJson) {
           name: l.name || `Atterraggio ${idx + 1}`,
           coordinates: l.coordinates || null,
           altitude: Number(l.altitude) || 0,
+          heading: typeof l.heading === 'number' ? l.heading : (typeof l.runwayHeading === 'number' ? l.runwayHeading : null),
+          runwayHeading: typeof l.runwayHeading === 'number' ? l.runwayHeading : (typeof l.heading === 'number' ? l.heading : null),
           isPrimary: l.isPrimary !== undefined ? Boolean(l.isPrimary) : (idx === 0),
           isOfficial: Boolean(l.isOfficial || (l.name && l.name.toLowerCase().includes('ufficiale'))),
           description: cleanUserText(l.description),
           hazards: cleanUserText(l.hazards),
           rules: cleanUserText(l.rules),
+          flightPlans: Array.isArray(l.flightPlans) ? l.flightPlans.map(fp => ({
+            name: cleanUserText(fp.name),
+            pattern: fp.pattern || 'Circuito standard',
+            description: cleanUserText(fp.description),
+            circuitHand: (fp.description && fp.description.toLowerCase().includes('destra')) ? 'right' : 'left'
+          })) : [],
           reliability: typeof l.reliability === 'number' ? l.reliability : (typeof loc.reliability === 'number' ? loc.reliability : 0)
         }));
 

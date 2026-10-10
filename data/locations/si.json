@@ -1,0 +1,270 @@
+[
+  {
+    "id": "vzletisce-kuk-luico",
+    "name": "Vzletišče Kuk",
+    "province": "",
+    "region": "Slovenia",
+    "country": "SI",
+    "location": "Vzletišče Kuk (Luico)",
+    "description": "Comprensorio di volo libero (Friuli-Venezia Giulia) censito su OpenStreetMap.",
+    "webcam": null,
+    "club": null,
+    "reliability": 90,
+    "takeoffs": [
+      {
+        "id": "vzletisce-kuk-luico-takeoff-1",
+        "name": "Vzletišče Kuk",
+        "coordinates": "46.195273, 13.619952",
+        "altitude": 1230,
+        "heading": 180,
+        "isPrimary": true,
+        "description": "Decollo per parapendio censito su OpenStreetMap.",
+        "hazards": "",
+        "reliability": 90
+      },
+      {
+        "id": "vzletisce-kuk-luico-takeoff-2",
+        "name": "Vzletišče Srednji vrh - Matajur",
+        "coordinates": "46.208920, 13.565558",
+        "altitude": 1320,
+        "heading": 180,
+        "isPrimary": false,
+        "description": "Decollo per parapendio censito su OpenStreetMap.",
+        "hazards": "",
+        "reliability": 90
+      }
+    ],
+    "landings": [
+      {
+        "id": "vzletisce-kuk-luico-landing-1",
+        "name": "Ozben - vzletišče",
+        "coordinates": "46.249595, 13.604092",
+        "altitude": 750,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio per parapendio censito su OpenStreetMap.",
+        "hazards": "",
+        "rules": "",
+        "reliability": 90
+      },
+      {
+        "id": "vzletisce-kuk-luico-landing-2",
+        "name": "Atterraggio Vzletišče Kuk",
+        "coordinates": "46.241388, 13.582560",
+        "altitude": 300,
+        "isPrimary": false,
+        "isOfficial": false,
+        "description": "Kobarid paragliding landing area",
+        "hazards": "",
+        "rules": "",
+        "reliability": 90
+      }
+    ]
+  },
+  {
+    "id": "vzletisce-stol-boreana",
+    "name": "Vzletišče Stol",
+    "province": "",
+    "region": "Slovenia",
+    "country": "SI",
+    "location": "Vzletišče Stol (Boreana)",
+    "description": "Comprensorio di volo libero (Friuli-Venezia Giulia) censito su OpenStreetMap.",
+    "webcam": null,
+    "club": null,
+    "reliability": 90,
+    "takeoffs": [
+      {
+        "id": "vzletisce-stol-boreana-takeoff-1",
+        "name": "Vzletišče Stol",
+        "coordinates": "46.273047, 13.473342",
+        "altitude": 1400,
+        "heading": 180,
+        "isPrimary": true,
+        "description": "Decollo per parapendio censito su OpenStreetMap.",
+        "hazards": "",
+        "reliability": 90
+      },
+      {
+        "id": "vzletisce-stol-boreana-takeoff-2",
+        "name": "Stol takeoff 2",
+        "coordinates": "46.271120, 13.459086",
+        "altitude": 1000,
+        "heading": 180,
+        "isPrimary": false,
+        "description": "Decollo per parapendio censito su OpenStreetMap.",
+        "hazards": "",
+        "reliability": 90
+      }
+    ],
+    "landings": [
+      {
+        "id": "vzletisce-stol-boreana-landing-1",
+        "name": "Atterraggio Vzletišče Stol",
+        "coordinates": "46.258047, 13.483341",
+        "altitude": 800,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
+        "hazards": "",
+        "rules": "",
+        "reliability": 80
+      }
+    ]
+  },
+  {
+    "id": "vzletisce-kanin-skripi-plusina-di-plezzo",
+    "name": "Vzletišče Kanin - Skripi",
+    "province": "",
+    "region": "Slovenia",
+    "country": "SI",
+    "location": "Vzletišče Kanin - Skripi (Plusina di Plezzo)",
+    "description": "Comprensorio di volo libero (Friuli-Venezia Giulia) censito su OpenStreetMap.",
+    "webcam": null,
+    "club": null,
+    "reliability": 90,
+    "takeoffs": [
+      {
+        "id": "vzletisce-kanin-skripi-plusina-di-plezzo-takeoff-1",
+        "name": "Vzletišče Kanin - Skripi",
+        "coordinates": "46.352171, 13.488741",
+        "altitude": 1717,
+        "heading": 180,
+        "isPrimary": true,
+        "description": "Decollo per parapendio censito su OpenStreetMap.",
+        "hazards": "",
+        "reliability": 90
+      }
+    ],
+    "landings": [
+      {
+        "id": "vzletisce-kanin-skripi-plusina-di-plezzo-landing-1",
+        "name": "Atterraggio Vzletišče Kanin - Skripi",
+        "coordinates": "46.337171, 13.498741",
+        "altitude": 1117,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
+        "hazards": "",
+        "rules": "",
+        "reliability": 80
+      }
+    ]
+  },
+  {
+    "id": "socerb-beka",
+    "name": "Socerb",
+    "province": "",
+    "region": "Slovenia",
+    "country": "SI",
+    "location": "Socerb (Beka)",
+    "description": "Comprensorio di volo libero (Friuli-Venezia Giulia) censito su OpenStreetMap.",
+    "webcam": null,
+    "club": null,
+    "reliability": 90,
+    "takeoffs": [
+      {
+        "id": "socerb-beka-takeoff-1",
+        "name": "Decollo Socerb",
+        "coordinates": "45.606813, 13.869170",
+        "altitude": 1000,
+        "heading": 180,
+        "isPrimary": true,
+        "description": "Decollo per parapendio censito su OpenStreetMap.",
+        "hazards": "",
+        "reliability": 90
+      }
+    ],
+    "landings": [
+      {
+        "id": "socerb-beka-landing-1",
+        "name": "Atterraggio Socerb",
+        "coordinates": "45.591813, 13.879170",
+        "altitude": 400,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
+        "hazards": "",
+        "rules": "",
+        "reliability": 80
+      }
+    ]
+  },
+  {
+    "id": "vzletisce-brestovica-brestovica",
+    "name": "Vzletišče Brestovica",
+    "province": "",
+    "region": "Slovenia",
+    "country": "SI",
+    "location": "Vzletišče Brestovica (Brestovica)",
+    "description": "Comprensorio di volo libero (Friuli-Venezia Giulia) censito su OpenStreetMap.",
+    "webcam": null,
+    "club": null,
+    "reliability": 90,
+    "takeoffs": [
+      {
+        "id": "vzletisce-brestovica-brestovica-takeoff-1",
+        "name": "Vzletišče Brestovica",
+        "coordinates": "45.819033, 13.625062",
+        "altitude": 1000,
+        "heading": 180,
+        "isPrimary": true,
+        "description": "Decollo per parapendio censito su OpenStreetMap.",
+        "hazards": "",
+        "reliability": 90
+      }
+    ],
+    "landings": [
+      {
+        "id": "vzletisce-brestovica-brestovica-landing-1",
+        "name": "Atterraggio Vzletišče Brestovica",
+        "coordinates": "45.804033, 13.635062",
+        "altitude": 400,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
+        "hazards": "",
+        "rules": "",
+        "reliability": 80
+      }
+    ]
+  },
+  {
+    "id": "vzletisce-raca-racna-gora-vrhnika-pri-lozu",
+    "name": "Vzletišče Raca (Racna gora)",
+    "province": "",
+    "region": "Slovenia",
+    "country": "SI",
+    "location": "Vzletišče Raca (Racna gora) (Vrhnika pri Ložu)",
+    "description": "Comprensorio di volo libero (Piemonte) censito su OpenStreetMap.",
+    "webcam": null,
+    "club": null,
+    "reliability": 90,
+    "takeoffs": [
+      {
+        "id": "vzletisce-raca-racna-gora-vrhnika-pri-lozu-takeoff-1",
+        "name": "Vzletišče Raca (Racna gora)",
+        "coordinates": "45.706525, 14.518470",
+        "altitude": 1000,
+        "heading": 180,
+        "isPrimary": true,
+        "description": "Decollo per parapendio censito su OpenStreetMap.",
+        "hazards": "",
+        "reliability": 90
+      }
+    ],
+    "landings": [
+      {
+        "id": "vzletisce-raca-racna-gora-vrhnika-pri-lozu-landing-1",
+        "name": "Atterraggio Vzletišče Raca (Racna gora)",
+        "coordinates": "45.691525, 14.528469",
+        "altitude": 400,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
+        "hazards": "",
+        "rules": "",
+        "reliability": 80
+      }
+    ]
+  }
+]

@@ -131,6 +131,40 @@ export function computeBearing(lat1, lon1, lat2, lon2) {
 export const calculateBearing = computeBearing;
 
 /**
+ * Calculates a destination point given an origin, distance in meters, and bearing.
+ * Uses high-precision planar tangent projection optimal for local aeronautical and landing patterns (< 10km).
+ * 
+ * @param {{ lat: number, lon: number }|number[]} origin Origin coordinates
+ * @param {number} distanceMeters Distance in meters
+ * @param {number} bearingDegrees Compass bearing in degrees [0, 360)
+ * @returns {{ lat: number, lon: number } | null}
+ */
+export function calculateDestinationPoint(origin, distanceMeters, bearingDegrees) {
+    if (!origin) return null;
+    const lat = typeof origin.lat === 'number' ? origin.lat : (Array.isArray(origin) ? Number(origin[0]) : NaN);
+    const lon = typeof origin.lon === 'number' ? origin.lon : (Array.isArray(origin) ? Number(origin[1]) : NaN);
+    if (isNaN(lat) || isNaN(lon)) return null;
+
+    const dist = Math.max(0, Number(distanceMeters) || 0);
+    if (dist === 0) return { lat, lon };
+
+    const brgRad = ((Number(bearingDegrees) || 0) * Math.PI) / 180;
+    const latRad = (lat * Math.PI) / 180;
+    const rEarth = 6371000; // Mean Earth radius in meters
+
+    const deltaY = dist * Math.cos(brgRad);
+    const deltaX = dist * Math.sin(brgRad);
+
+    const lat2 = lat + (deltaY / rEarth) * (180 / Math.PI);
+    const lon2 = lon + (deltaX / (rEarth * Math.cos(latRad))) * (180 / Math.PI);
+
+    return {
+        lat: Number(lat2.toFixed(6)),
+        lon: Number(lon2.toFixed(6))
+    };
+}
+
+/**
  * Computes shortest angular difference between two compass bearings in degrees [0, 180].
  * 
  * @param {number} a First angle in degrees

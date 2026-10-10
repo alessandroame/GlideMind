@@ -188,4 +188,27 @@ describe('GlideMind Reactive Store - Architecture & Contracts', () => {
     adapter.removeItem('test_key');
     assert.equal(adapter.getItem('test_key'), null);
   });
+
+  it('should allow mounting a storage adapter dynamically via setStorageAdapter', () => {
+    const defaultStore = createStore();
+    const mockStorage = new Map();
+    const customAdapter = {
+      getItem: (k) => mockStorage.get(k) || null,
+      setItem: (k, v) => mockStorage.set(k, String(v)),
+      removeItem: (k) => mockStorage.delete(k),
+      clear: () => mockStorage.clear()
+    };
+
+    defaultStore.setStorageAdapter(customAdapter);
+    defaultStore.setState({ ui: { theme: 'dark', mapLayer: 'topo' } });
+
+    assert.ok(mockStorage.has('glidemind_store_ui'), 'Must persist ui slice into dynamically mounted adapter');
+    assert.ok(mockStorage.get('glidemind_store_ui').includes('"mapLayer":"topo"'), 'Persisted JSON must include mapLayer');
+
+    // Create a new store instance mounted to the same adapter to verify reload behavior
+    const reloadedStore = createStore();
+    reloadedStore.setStorageAdapter(customAdapter);
+    reloadedStore.loadPersistedState();
+    assert.equal(reloadedStore.getState().ui.mapLayer, 'topo', 'Must restore mapLayer from persisted storage on reload');
+  });
 });

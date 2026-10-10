@@ -30,11 +30,13 @@ export const DEFAULT_REPORT_PATH = path.resolve(__dirname, '../docs/spots-audit-
  * Groups processed takeoffs and landings into comprensorio localities.
  * @param {Array<object>} takeoffs Processed takeoffs with paired landings
  * @param {Array<object>} landings Processed landings
+ * @param {string} [countryCode='IT']
  * @returns {Array<object>} Comprensorio entries
  */
-export function buildComprensoriFromClusters(takeoffs, landings) {
+export function buildComprensoriFromClusters(takeoffs, landings, countryCode = 'IT') {
   const comprensori = [];
   const assignedLandingIds = new Set();
+  const cCode = (countryCode || 'IT').toUpperCase();
 
   for (const takeoff of takeoffs) {
     const primaryLanding = takeoff.bestLanding;
@@ -59,6 +61,7 @@ export function buildComprensoriFromClusters(takeoffs, landings) {
     comprensori.push({
       id: slugifyComprensorio(compName),
       location: `${compName}`,
+      country: cCode,
       description: takeoff.description || 'Comprensorio di volo censito con decollo ed atterraggio verificati.',
       club: takeoff.operator ? { name: takeoff.operator } : null,
       reliability,
@@ -119,32 +122,45 @@ ${stats.entries.map(e => `| \`${e.id}\` | ${e.location} | **${e.reliability}%** 
  * Main execution function.
  */
 export async function runBuildCatalog({
-  rawFile = DEFAULT_RAW_PATH,
-  stagingFile = DEFAULT_STAGING_PATH,
-  reportFile = DEFAULT_REPORT_PATH,
+  country = 'IT',
+  rawFile = null,
+  stagingFile = null,
+  reportFile = null,
   demMap = null
 } = {}) {
-  if (!fs.existsSync(rawFile)) {
-    throw new Error(`[Catalog Builder] File grezzo non trovato: ${rawFile}. Eseguire prima 'node scripts/harvest-osm.mjs'.`);
+  const cCode = (country || 'IT').toUpperCase();
+  const effectiveRawFile = rawFile || (cCode === 'IT'
+    ? DEFAULT_RAW_PATH
+    : path.resolve(__dirname, `../data/raw-harvest/osm-raw-${cCode.toLowerCase()}.json`));
+  const effectiveStagingFile = stagingFile || (cCode === 'IT'
+    ? DEFAULT_STAGING_PATH
+    : path.resolve(__dirname, `../data/staging-locations-${cCode.toLowerCase()}.json`));
+  const effectiveReportFile = reportFile || (cCode === 'IT'
+    ? DEFAULT_REPORT_PATH
+    : path.resolve(__dirname, `../docs/spots-audit-report-${cCode.toLowerCase()}.md`));
+
+  if (!fs.existsSync(effectiveRawFile)) {
+    throw new Error(`[Catalog Builder] File grezzo non trovato: ${effectiveRawFile}. Eseguire prima 'node scripts/harvest-osm.mjs --country=${cCode}'.`);
   }
 
-  const rawSpots = JSON.parse(fs.readFileSync(rawFile, 'utf-8'));
-  console.log(`[Catalog Builder] Caricati ${rawSpots.length} spot grezzi da ${rawFile}`);
+  const rawSpots = JSON.parse(fs.readFileSync(effectiveRawFile, 'utf-8'));
+  console.log(`[Catalog Builder] Caricati ${rawSpots.length} spot grezzi [${cCode}] da ${effectiveRawFile}`);
 
   const processed = await processGeometricPipeline(rawSpots, { demElevationsMap: demMap });
-  const comprensori = buildComprensoriFromClusters(processed.takeoffs, processed.landings);
+  const comprensori = buildComprensoriFromClusters(processed.takeoffs, processed.landings, cCode);
 
   // Ensure staging directory exists
-  const stagingDir = path.dirname(stagingFile);
+  const stagingDir = path.dirname(effectiveStagingFile);
   if (!fs.existsSync(stagingDir)) {
     fs.mkdirSync(stagingDir, { recursive: true });
   }
 
-  fs.writeFileSync(stagingFile, JSON.stringify(comprensori, null, 2), 'utf-8');
-  console.log(`[Catalog Builder] Esportati ${comprensori.length} comprensori in staging: ${stagingFile}`);
+  fs.writeFileSync(effectiveStagingFile, JSON.stringify(comprensori, null, 2), 'utf-8');
+  console.log(`[Catalog Builder] Esportati ${comprensori.length} comprensori in staging: ${effectiveStagingFile}`);
 
   // Generate audit report
   const stats = {
+    country: cCode,
     rawCount: rawSpots.length,
     takeoffsCount: processed.takeoffs.length,
     landingsCount: processed.landings.length,
@@ -156,19 +172,29 @@ export async function runBuildCatalog({
   };
 
   const report = generateAuditReport(stats);
-  const reportDir = path.dirname(reportFile);
+  const reportDir = path.dirname(effectiveReportFile);
   if (!fs.existsSync(reportDir)) {
     fs.mkdirSync(reportDir, { recursive: true });
   }
-  fs.writeFileSync(reportFile, report, 'utf-8');
-  console.log(`[Catalog Builder] Report generato in ${reportFile}`);
+  fs.writeFileSync(effectiveReportFile, report, 'utf-8');
+  console.log(`[Catalog Builder] Report generato in ${effectiveReportFile}`);
 
   return { comprensori, stats };
 }
 
 // Direct CLI execution
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  runBuildCatalog().catch(err => {
+  const args = process.argv.slice(2);
+  let country = 'IT';
+  for (const arg of args) {
+    if (arg.startsWith('--country=')) {
+      country = arg.split('=')[1].toUpperCase();
+    } else if (!arg.startsWith('-')) {
+      country = arg.toUpperCase();
+    }
+  }
+
+  runBuildCatalog({ country }).catch(err => {
     console.error(err.message);
     process.exit(1);
   });

@@ -7,6 +7,7 @@ import {
     igcDecimalToDmm,
     computeDistanceKm,
     computeBearing,
+    calculateDestinationPoint,
     angularDifference,
     computeWindComponents,
     calculateRouteDistance,
@@ -102,6 +103,30 @@ describe('GeoSpatialMath Engine - Geodesy & Coordinates', () => {
 
         // Identical points return 0
         assert.equal(computeBearing(45.0, 10.0, 45.0, 10.0), 0);
+    });
+
+    it('should calculate destination point accurately for aeronautical circuits', () => {
+        const origin = { lat: 45.8172, lon: 9.3186 }; // Suello Landing
+
+        // Project 200m Due North (0 deg)
+        const destNorth = calculateDestinationPoint(origin, 200, 0);
+        assert.ok(destNorth);
+        assert.ok(destNorth.lat > origin.lat);
+        assert.equal(destNorth.lon, origin.lon);
+        const distCalculated = computeDistanceKm(origin.lat, origin.lon, destNorth.lat, destNorth.lon) * 1000;
+        assert.ok(Math.abs(distCalculated - 200) < 1.0, `Expected ~200m, got ${distCalculated}`);
+
+        // Project 150m Due East (90 deg)
+        const destEast = calculateDestinationPoint(origin, 150, 90);
+        assert.ok(destEast);
+        assert.equal(destEast.lat, origin.lat);
+        assert.ok(destEast.lon > origin.lon);
+        const distEast = computeDistanceKm(origin.lat, origin.lon, destEast.lat, destEast.lon) * 1000;
+        assert.ok(Math.abs(distEast - 150) < 1.0, `Expected ~150m, got ${distEast}`);
+
+        // Edge cases
+        assert.equal(calculateDestinationPoint(null, 100, 0), null);
+        assert.deepEqual(calculateDestinationPoint(origin, 0, 180), origin);
     });
 
     it('should calculate shortest angular difference across compass wrap-around', () => {

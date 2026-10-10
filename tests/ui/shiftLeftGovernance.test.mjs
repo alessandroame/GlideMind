@@ -158,4 +158,17 @@ describe('Shift-Left Quality Gate & Architectural Governance', () => {
       'theme.css must define .gm-flight-target for spot names'
     );
   });
+
+  it('Gate 4 (Frosted Glass & Control Safeguards): ensures mini-map select controls enforce no-repeat to prevent SVG icon tiling', () => {
+    const themeSrc = readFileSync(cssFile, 'utf-8');
+    assert.ok(
+      themeSrc.includes('.gm-mini-map-layer-select'),
+      'theme.css must define .gm-mini-map-layer-select'
+    );
+    assert.ok(
+      themeSrc.includes('background-repeat: no-repeat, no-repeat !important;'),
+      'theme.css must enforce no-repeat on multi-layer background to prevent SVG chevron repeating artifacts'
+    );
+  });
 });
+

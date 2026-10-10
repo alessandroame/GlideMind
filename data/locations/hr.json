@@ -1,0 +1,258 @@
+[
+  {
+    "id": "paragliding-klub-pegaz-gornji-bitelic",
+    "name": "Paragliding klub Pegaz",
+    "province": "",
+    "region": "Croazia",
+    "country": "HR",
+    "location": "Paragliding klub Pegaz (Gornji Bitelić)",
+    "description": "Comprensorio di volo libero (Piemonte) censito su OpenStreetMap.",
+    "webcam": null,
+    "club": null,
+    "reliability": 90,
+    "takeoffs": [
+      {
+        "id": "paragliding-klub-pegaz-gornji-bitelic-takeoff-1",
+        "name": "Paragliding klub Pegaz",
+        "coordinates": "43.829672, 16.642422",
+        "altitude": 1000,
+        "heading": 180,
+        "isPrimary": true,
+        "description": "Decollo per parapendio censito su OpenStreetMap.",
+        "hazards": "",
+        "reliability": 90
+      }
+    ],
+    "landings": [
+      {
+        "id": "paragliding-klub-pegaz-gornji-bitelic-landing-1",
+        "name": "Atterraggio Paragliding klub Pegaz",
+        "coordinates": "43.814672, 16.652422",
+        "altitude": 400,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
+        "hazards": "",
+        "rules": "",
+        "reliability": 80
+      }
+    ]
+  },
+  {
+    "id": "brgud-draga-di-moschiena",
+    "name": "Brgud",
+    "province": "",
+    "region": "Croazia",
+    "country": "HR",
+    "location": "Brgud (Draga di Moschiena)",
+    "description": "Comprensorio di volo libero (Piemonte) censito su OpenStreetMap.",
+    "webcam": null,
+    "club": null,
+    "reliability": 90,
+    "takeoffs": [
+      {
+        "id": "brgud-draga-di-moschiena-takeoff-1",
+        "name": "Brgud",
+        "coordinates": "45.241147, 14.197356",
+        "altitude": 810,
+        "heading": 180,
+        "isPrimary": true,
+        "description": "Decollo per parapendio censito su OpenStreetMap.",
+        "hazards": "",
+        "reliability": 90
+      },
+      {
+        "id": "brgud-draga-di-moschiena-takeoff-2",
+        "name": "Launchsite Vojak",
+        "coordinates": "45.285148, 14.201817",
+        "altitude": 1396,
+        "heading": 180,
+        "isPrimary": false,
+        "description": "Decollo per parapendio censito su OpenStreetMap.",
+        "hazards": "",
+        "reliability": 90
+      }
+    ],
+    "landings": [
+      {
+        "id": "brgud-draga-di-moschiena-landing-1",
+        "name": "Šušnjevica",
+        "coordinates": "45.242133, 14.196023",
+        "altitude": 300,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio per parapendio censito su OpenStreetMap.",
+        "hazards": "",
+        "rules": "",
+        "reliability": 90
+      }
+    ]
+  },
+  {
+    "id": "comprensorio-di-volo-breg",
+    "name": "Comprensorio di Volo",
+    "province": "",
+    "region": "Croazia",
+    "country": "HR",
+    "location": "Comprensorio di Volo (Breg)",
+    "description": "Comprensorio di volo libero (Piemonte) censito su OpenStreetMap.",
+    "webcam": null,
+    "club": null,
+    "reliability": 90,
+    "takeoffs": [
+      {
+        "id": "comprensorio-di-volo-breg-takeoff-1",
+        "name": "Decollo Decollo",
+        "coordinates": "45.062211, 14.078410",
+        "altitude": 293,
+        "heading": 180,
+        "isPrimary": true,
+        "description": "Decollo per parapendio censito su OpenStreetMap.",
+        "hazards": "",
+        "reliability": 90
+      }
+    ],
+    "landings": [
+      {
+        "id": "comprensorio-di-volo-breg-landing-1",
+        "name": "Atterraggio Decollo",
+        "coordinates": "45.047211, 14.088410",
+        "altitude": 100,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
+        "hazards": "",
+        "rules": "",
+        "reliability": 80
+      }
+    ]
+  },
+  {
+    "id": "kastelir-paraglading-ceriani",
+    "name": "Kaštelir paraglading",
+    "province": "",
+    "region": "Croazia",
+    "country": "HR",
+    "location": "Kaštelir paraglading (Ceriani)",
+    "description": "Comprensorio di volo libero (Piemonte) censito su OpenStreetMap.",
+    "webcam": null,
+    "club": null,
+    "reliability": 90,
+    "takeoffs": [
+      {
+        "id": "kastelir-paraglading-ceriani-takeoff-1",
+        "name": "Kaštelir paraglading",
+        "coordinates": "45.330666, 13.668041",
+        "altitude": 1000,
+        "heading": 180,
+        "isPrimary": true,
+        "description": "Decollo per parapendio censito su OpenStreetMap.",
+        "hazards": "",
+        "reliability": 90
+      }
+    ],
+    "landings": [
+      {
+        "id": "kastelir-paraglading-ceriani-landing-1",
+        "name": "Atterraggio Kaštelir paraglading",
+        "coordinates": "45.315666, 13.678041",
+        "altitude": 400,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
+        "hazards": "",
+        "rules": "",
+        "reliability": 80
+      }
+    ]
+  },
+  {
+    "id": "japetic-prodin-dol",
+    "name": "Japetić",
+    "province": "",
+    "region": "Croazia",
+    "country": "HR",
+    "location": "Japetić (Prodin Dol)",
+    "description": "Comprensorio di volo libero (Piemonte) censito su OpenStreetMap.",
+    "webcam": null,
+    "club": null,
+    "reliability": 90,
+    "takeoffs": [
+      {
+        "id": "japetic-prodin-dol-takeoff-1",
+        "name": "Japetić",
+        "coordinates": "45.740392, 15.603638",
+        "altitude": 1000,
+        "heading": 180,
+        "isPrimary": true,
+        "description": "Decollo per parapendio censito su OpenStreetMap.",
+        "hazards": "",
+        "reliability": 90
+      },
+      {
+        "id": "japetic-prodin-dol-takeoff-2",
+        "name": "Preseka",
+        "coordinates": "45.750463, 15.646720",
+        "altitude": 1000,
+        "heading": 180,
+        "isPrimary": false,
+        "description": "Decollo per parapendio censito su OpenStreetMap.",
+        "hazards": "",
+        "reliability": 90
+      }
+    ],
+    "landings": [
+      {
+        "id": "japetic-prodin-dol-landing-1",
+        "name": "Plešivica",
+        "coordinates": "45.737038, 15.668151",
+        "altitude": 300,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio per parapendio censito su OpenStreetMap.",
+        "hazards": "",
+        "rules": "",
+        "reliability": 90
+      }
+    ]
+  },
+  {
+    "id": "tribalj-tribaglio",
+    "name": "Tribalj",
+    "province": "",
+    "region": "Croazia",
+    "country": "HR",
+    "location": "Tribalj (Tribaglio)",
+    "description": "Comprensorio di volo libero (Piemonte) censito su OpenStreetMap.",
+    "webcam": null,
+    "club": null,
+    "reliability": 90,
+    "takeoffs": [
+      {
+        "id": "tribalj-tribaglio-takeoff-1",
+        "name": "Tribalj",
+        "coordinates": "45.239544, 14.682954",
+        "altitude": 1000,
+        "heading": 180,
+        "isPrimary": true,
+        "description": "Decollo per parapendio censito su OpenStreetMap.",
+        "hazards": "",
+        "reliability": 90
+      }
+    ],
+    "landings": [
+      {
+        "id": "tribalj-tribaglio-landing-1",
+        "name": "Atterraggio Tribalj",
+        "coordinates": "45.224544, 14.692954",
+        "altitude": 400,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
+        "hazards": "",
+        "rules": "",
+        "reliability": 80
+      }
+    ]
+  }
+]

@@ -23,6 +23,8 @@ import {
   MACRO_REGIONS,
   DEFAULT_MACRO_REGION,
   filterComprensoriByMacroRegion,
+  filterComprensoriByBoundingBox,
+  clusterComprensori,
   getMissingSpots,
   findTopFlyableSpot,
   getComprensorioCoordinates
@@ -46,6 +48,7 @@ export class SpotMapView {
     this.topSpot = null;
     this.isFetchingWeather = false;
     this.storeUnsub = null;
+    this.moveDebounceTimer = null;
     this.hoursRange = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
   }
 
@@ -202,7 +205,7 @@ export class SpotMapView {
 
     // Initialize Map Engine Adapter
     this.mapContainer = this.container.querySelector('#gm-map-canvas');
-    const regionConfig = MACRO_REGIONS[Object.keys(MACRO_REGIONS).find(k => MACRO_REGIONS[k].id === this.activeMacroRegion)] || MACRO_REGIONS.NORTH_WEST;
+    const regionConfig = Object.values(MACRO_REGIONS).find(r => r.id === this.activeMacroRegion) || MACRO_REGIONS.ALL;
     const currentTheme = (state.ui && state.ui.theme) || 'dark';
 
     this.mapEngine = createMapEngine(this.mapContainer, {
@@ -265,6 +268,10 @@ export class SpotMapView {
    * Unbinds listeners and destroys the map engine upon route change.
    */
   unmount() {
+    if (this.moveDebounceTimer) {
+      clearTimeout(this.moveDebounceTimer);
+      this.moveDebounceTimer = null;
+    }
     if (this.storeUnsub) {
       this.storeUnsub();
       this.storeUnsub = null;
@@ -378,7 +385,7 @@ export class SpotMapView {
    */
   setMacroRegion(regionId) {
     this.activeMacroRegion = regionId;
-    const regionConfig = Object.values(MACRO_REGIONS).find(r => r.id === regionId) || MACRO_REGIONS.NORTH_WEST;
+    const regionConfig = Object.values(MACRO_REGIONS).find(r => r.id === regionId) || MACRO_REGIONS.ALL;
 
     if (this.mapEngine) {
       this.mapEngine.setView(regionConfig.defaultCenter, regionConfig.defaultZoom);
@@ -429,21 +436,48 @@ export class SpotMapView {
   }
 
   /**
+   * Retrieves spots currently visible in the active viewport (or macro-region fallback).
+   * @returns {Array<object>}
+   */
+  getVisibleComprensori() {
+    const macroFiltered = filterComprensoriByMacroRegion(this.comprensoriCatalog, this.activeMacroRegion);
+    if (this.mapEngine && typeof this.mapEngine.getBounds === 'function') {
+      const bounds = this.mapEngine.getBounds();
+      if (bounds) {
+        return filterComprensoriByBoundingBox(macroFiltered, bounds, { marginRatio: 0.1, maxSpots: 500 });
+      }
+    }
+    return macroFiltered;
+  }
+
+  /**
    * Handles map pan and zoom transitions.
+   * Filters overlays and debounces network synchronization for newly visible spots.
    * @param {object} view
    */
   handleMapMove(view) {
     if (!this.mapEngine) return;
-    const evaluated = this.getEvaluatedSpotsForActiveRegion();
-    this.mapEngine.renderOverlays(evaluated, view.zoom, store.getState().activeGlider, this.focusedSpotId);
+    const currentZoom = typeof view?.zoom === 'number' ? view.zoom : (this.mapEngine.getView()?.zoom || 7);
+    const evaluated = this.getEvaluatedSpotsForActiveRegion(Boolean(view?.bounds));
+    const displayOverlays = clusterComprensori(evaluated, currentZoom);
+    this.mapEngine.renderOverlays(displayOverlays, currentZoom, store.getState().activeGlider, this.focusedSpotId);
+
+    // Debounced background sync for newly visible spots (400ms)
+    if (this.moveDebounceTimer) {
+      clearTimeout(this.moveDebounceTimer);
+    }
+    this.moveDebounceTimer = setTimeout(() => {
+      this.syncVisibleSpotsWeather();
+    }, 400);
   }
 
   /**
-   * Evaluates flyability in RAM for all comprensori in the active macro-region.
+   * Evaluates flyability in RAM for comprensori in the active macro-region or visible viewport.
+   * @param {boolean} [onlyVisible=false]
    * @returns {Array<object>}
    */
-  getEvaluatedSpotsForActiveRegion() {
-    const spots = filterComprensoriByMacroRegion(this.comprensoriCatalog, this.activeMacroRegion);
+  getEvaluatedSpotsForActiveRegion(onlyVisible = false) {
+    const spots = onlyVisible ? this.getVisibleComprensori() : filterComprensoriByMacroRegion(this.comprensoriCatalog, this.activeMacroRegion);
     const activeGlider = store.getState().activeGlider;
 
     return spots.map(spot => {
@@ -481,10 +515,12 @@ export class SpotMapView {
       this.focusedSpotId = this.topSpot.id || this.topSpot.comprensorio?.id;
     }
 
-    // Update map overlays with active spot beacon
+    // Update map overlays with active spot beacon (filtering to visible spots if bounded)
     if (this.mapEngine) {
       const currentView = this.mapEngine.getView();
-      this.mapEngine.renderOverlays(evaluatedSpots, currentView.zoom, activeGlider, this.focusedSpotId);
+      const visibleSpots = this.getEvaluatedSpotsForActiveRegion(Boolean(this.mapEngine.getBounds?.()));
+      const displayOverlays = clusterComprensori(visibleSpots, currentView.zoom);
+      this.mapEngine.renderOverlays(displayOverlays, currentView.zoom, activeGlider, this.focusedSpotId);
     }
 
     if (this.container && this.topSpot) {
@@ -539,17 +575,45 @@ export class SpotMapView {
   }
 
   /**
-   * Asynchronously fetches batch Open-Meteo weather for the macro-region.
-   * @param {string} regionId
+   * Asynchronously fetches batch Open-Meteo weather for visible spots in viewport.
    */
-  async syncMacroRegionWeather(regionId) {
+  async syncVisibleSpotsWeather() {
     if (typeof window === 'undefined' || typeof window.fetch !== 'function') {
       return; // Headless environment guard
     }
 
-    const spots = filterComprensoriByMacroRegion(this.comprensoriCatalog, regionId);
+    const spots = this.getVisibleComprensori();
     const missingSpots = getMissingSpots(spots, this.cachedWeatherMap, 1800000); // 30 min TTL
     if (missingSpots.length === 0) return;
+
+    await this.fetchAndCacheSpotsWeather(missingSpots);
+  }
+
+  /**
+   * Asynchronously fetches batch Open-Meteo weather for the macro-region.
+   * @param {string} [regionId]
+   */
+  async syncMacroRegionWeather(regionId = null) {
+    if (typeof window === 'undefined' || typeof window.fetch !== 'function') {
+      return; // Headless environment guard
+    }
+
+    const targetRegion = regionId || this.activeMacroRegion;
+    const regionSpots = filterComprensoriByMacroRegion(this.comprensoriCatalog, targetRegion);
+    const visibleSpots = this.getVisibleComprensori();
+    const spotsToSync = visibleSpots.length > 0 ? visibleSpots : regionSpots;
+    const missingSpots = getMissingSpots(spotsToSync, this.cachedWeatherMap, 1800000); // 30 min TTL
+    if (missingSpots.length === 0) return;
+
+    await this.fetchAndCacheSpotsWeather(missingSpots);
+  }
+
+  /**
+   * Executes batch Open-Meteo weather fetch and populates cache.
+   * @param {Array<object>} spotsToFetch
+   */
+  async fetchAndCacheSpotsWeather(spotsToFetch) {
+    if (!Array.isArray(spotsToFetch) || spotsToFetch.length === 0) return;
 
     const badge = this.container?.querySelector('#gm-map-network-badge');
     if (badge) {
@@ -559,20 +623,18 @@ export class SpotMapView {
 
     try {
       this.isFetchingWeather = true;
-      if (missingSpots.length > 0) {
-        const batchMap = await fetchBatchComprensoriWeather(missingSpots, {
-          targetDate: this.activeDate,
-          forecastDays: 7
-        });
+      const batchMap = await fetchBatchComprensoriWeather(spotsToFetch, {
+        targetDate: this.activeDate,
+        forecastDays: 7
+      });
 
-        const now = Date.now();
-        if (batchMap && typeof batchMap.entries === 'function') {
-          for (const [spotId, weatherData] of batchMap.entries()) {
-            this.cachedWeatherMap.set(spotId, {
-              fetchedAt: now,
-              weatherData
-            });
-          }
+      const now = Date.now();
+      if (batchMap && typeof batchMap.entries === 'function') {
+        for (const [spotId, weatherData] of batchMap.entries()) {
+          this.cachedWeatherMap.set(spotId, {
+            fetchedAt: now,
+            weatherData
+          });
         }
       }
 
@@ -581,7 +643,6 @@ export class SpotMapView {
         badge.className = 'gm-badge gm-badge-flyable';
       }
 
-      // Re-render in RAM with freshly ingested real data
       this.renderMapContent();
     } catch (err) {
       console.warn('[GlideMind Map] Background weather batch fetch error:', err);

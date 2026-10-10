@@ -4332,22 +4332,23 @@ input.gm-input:focus {
   gap: 6px;
   min-height: var(--gm-touch-min, 48px);
   padding: 6px 14px;
-  background: var(--gm-bg-card);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(18, 22, 31, 0.70) 100%);
   color: var(--gm-text-primary);
-  border: 1px solid var(--gm-border);
+  border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: var(--gm-radius-full);
   font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  box-shadow: var(--gm-shadow-sm);
-  transition: background-color var(--gm-transition-fast), border-color var(--gm-transition-fast);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.35), var(--gm-shadow-sm);
+  transition: background var(--gm-transition-fast), border-color var(--gm-transition-fast), transform var(--gm-transition-fast);
 }
 
 .gm-map-pill-btn:hover {
-  background: var(--gm-bg-elevated);
-  border-color: var(--gm-border-focus);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.25) 0%, rgba(26, 33, 48, 0.82) 100%);
+  border-color: rgba(56, 189, 248, 0.6);
+  color: var(--gm-accent);
 }
 
 .gm-map-top-spot-btn {
@@ -4356,23 +4357,24 @@ input.gm-input:focus {
   gap: 6px;
   min-height: var(--gm-touch-min, 48px);
   padding: 6px 14px;
-  background: var(--gm-bg-elevated);
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.20) 0%, rgba(18, 22, 31, 0.72) 100%);
   color: var(--gm-text-primary);
-  border: 1px solid rgba(34, 197, 94, 0.4);
+  border: 1px solid rgba(34, 197, 94, 0.5);
   border-radius: var(--gm-radius-full);
   font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: var(--gm-shadow-md);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.35), var(--gm-shadow-md);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
   pointer-events: auto;
-  transition: transform var(--gm-transition-fast), border-color var(--gm-transition-fast);
+  transition: transform var(--gm-transition-fast), border-color var(--gm-transition-fast), background var(--gm-transition-fast);
 }
 
 .gm-map-top-spot-btn:hover {
   transform: translateY(-1px);
-  border-color: var(--gm-accent);
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.30) 0%, rgba(26, 33, 48, 0.82) 100%);
+  border-color: rgba(34, 197, 94, 0.75);
 }
 
 .gm-top-spot-dot {
@@ -4621,6 +4623,57 @@ input.gm-input:focus {
   box-shadow: 0 0 14px var(--gm-accent);
   transform: scale(1.15);
   z-index: 1000;
+}
+
+/* Cluster Marker Styling (<7.5 zoom) */
+.gm-map-cluster-div-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
+.gm-map-cluster-marker {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--gm-font-mono, monospace);
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #ffffff;
+  border: 2.5px solid #ffffff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+  user-select: none;
+}
+
+.gm-map-cluster-marker:hover,
+.gm-map-cluster-marker:active {
+  transform: scale(1.1);
+}
+
+.gm-map-cluster-marker.gm-status-flyable {
+  background: var(--gm-status-flyable, #22c55e);
+}
+
+.gm-map-cluster-marker.gm-status-caution {
+  background: var(--gm-status-caution, #eab308);
+}
+
+.gm-map-cluster-marker.gm-status-unflyable {
+  background: var(--gm-status-unflyable, #ef4444);
+}
+
+.gm-map-cluster-marker.gm-status-unavailable {
+  background: var(--gm-border, #64748b);
+}
+
+[data-theme="light"] .gm-map-cluster-marker {
+  color: #ffffff;
+  border-color: #0f172a;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
 }
 
 /* Leaflet Popup Styling - Aeronautical Speech Bubble ("Fumetto") */
@@ -4877,8 +4930,26 @@ input.gm-input:focus {
   color: #ffffff;
 }
 
-[data-theme="light"] .gm-map-pill-btn,
-[data-theme="light"] .gm-map-top-spot-btn,
+[data-theme="light"] .gm-map-pill-btn {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.82) 0%, rgba(240, 244, 248, 0.55) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  color: #0f172a;
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.95), 0 2px 8px rgba(15, 23, 42, 0.12);
+}
+
+[data-theme="light"] .gm-map-pill-btn:hover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.92) 0%, rgba(240, 244, 248, 0.70) 100%);
+  border-color: rgba(2, 132, 199, 0.5);
+  color: #0284c7;
+}
+
+[data-theme="light"] .gm-map-top-spot-btn {
+  background: linear-gradient(135deg, rgba(220, 252, 231, 0.85) 0%, rgba(240, 253, 244, 0.60) 100%);
+  border: 1px solid rgba(34, 197, 94, 0.5);
+  color: #15803d;
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.95), 0 2px 8px rgba(15, 23, 42, 0.12);
+}
+
 [data-theme="light"] .gm-map-scrubber-inner,
 [data-theme="light"] .gm-map-dot-marker,
 [data-theme="light"] .gm-map-aureole-badge,
@@ -4964,42 +5035,56 @@ input.gm-input:focus {
   z-index: 1;
 }
 
+/* Sleek, non-invasive liquid frosted glass (effetto vetro) micro-capsules for mini-map controls */
 .gm-mini-map-layer-select {
   position: absolute;
-  top: 6px;
-  left: 6px;
+  top: 8px;
+  left: 8px;
   z-index: 10;
-  min-height: 40px;
-  height: 40px;
-  padding: 0 22px 0 10px;
+  height: 28px;
+  padding: 0 20px 0 10px;
   background-color: transparent;
   background-image: 
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%23f8fafc' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"),
-    radial-gradient(ellipse at center, rgba(15, 23, 42, 0.76) 0%, rgba(15, 23, 42, 0.42) 55%, rgba(15, 23, 42, 0) 82%);
-  background-repeat: no-repeat, no-repeat;
-  background-position: right 6px center, center center;
-  background-size: 11px 11px, 100% 100%;
-  color: var(--gm-text-primary, #f8fafc);
-  border: none;
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' viewBox='0 0 24 24' fill='none' stroke='%23f8fafc' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, rgba(15, 23, 42, 0.62) 100%);
+  background-repeat: no-repeat, no-repeat !important;
+  background-position: right 6px center, 0 0 !important;
+  background-size: 9px 9px, 100% 100% !important;
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  backdrop-filter: blur(12px) saturate(180%);
+  color: #f8fafc;
+  border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: var(--gm-radius-full, 9999px);
   font-family: var(--gm-font-sans, system-ui, sans-serif);
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 26px;
   cursor: pointer;
-  box-shadow: none;
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.35), 0 2px 8px rgba(0, 0, 0, 0.35);
   outline: none;
   appearance: none;
   -webkit-appearance: none;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 0 6px rgba(0, 0, 0, 0.85);
-  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.8));
-  transition: transform 0.15s ease, color 0.15s ease, filter 0.15s ease;
+  transition: border-color 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Invisible touch floor expanding to >= 44px for outdoor ergonomics without visual bulk */
+.gm-mini-map-layer-select::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  bottom: -8px;
+  left: -8px;
+  right: -8px;
 }
 
 .gm-mini-map-layer-select:hover {
   background-image: 
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%2338bdf8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"),
-    radial-gradient(ellipse at center, rgba(15, 23, 42, 0.88) 0%, rgba(15, 23, 42, 0.52) 60%, rgba(15, 23, 42, 0) 88%);
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' viewBox='0 0 24 24' fill='none' stroke='%2338bdf8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.28) 0%, rgba(15, 23, 42, 0.75) 100%);
+  border-color: rgba(56, 189, 248, 0.6);
   color: var(--gm-accent, #38bdf8);
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.6), 0 3px 10px rgba(0, 0, 0, 0.45);
 }
 
 .gm-mini-map-layer-select:focus-visible {
@@ -5014,31 +5099,42 @@ input.gm-input:focus {
 
 .gm-mini-map-expand-btn {
   position: absolute;
-  top: 6px;
-  right: 6px;
+  top: 8px;
+  right: 8px;
   z-index: 10;
-  min-width: var(--gm-touch-min, 44px);
-  min-height: var(--gm-touch-min, 44px);
-  width: 44px;
-  height: 44px;
+  width: 28px;
+  height: 28px;
   padding: 0;
   border-radius: 50%;
-  border: none;
-  background: radial-gradient(circle at center, rgba(15, 23, 42, 0.76) 0%, rgba(15, 23, 42, 0.42) 55%, rgba(15, 23, 42, 0) 82%);
-  box-shadow: none;
-  color: var(--gm-text-primary, #f8fafc);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, rgba(15, 23, 42, 0.62) 100%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  backdrop-filter: blur(12px) saturate(180%);
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.35), 0 2px 8px rgba(0, 0, 0, 0.35);
+  color: #f8fafc;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.9)) drop-shadow(0 0 6px rgba(0, 0, 0, 0.75));
-  transition: transform 0.15s ease, color 0.15s ease, filter 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Invisible touch floor expanding to >= 44px for outdoor ergonomics */
+.gm-mini-map-expand-btn::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  bottom: -8px;
+  left: -8px;
+  right: -8px;
 }
 
 .gm-mini-map-expand-btn:hover {
-  background: radial-gradient(circle at center, rgba(15, 23, 42, 0.88) 0%, rgba(15, 23, 42, 0.52) 60%, rgba(15, 23, 42, 0) 88%);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.28) 0%, rgba(15, 23, 42, 0.75) 100%);
+  border-color: rgba(56, 189, 248, 0.6);
   color: var(--gm-accent, #38bdf8);
-  transform: scale(1.1);
+  transform: scale(1.05);
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.6), 0 3px 10px rgba(0, 0, 0, 0.45);
 }
 
 .gm-mini-map-expand-btn:active {
@@ -5048,6 +5144,86 @@ input.gm-input:focus {
 .gm-mini-map-expand-btn:focus-visible {
   outline: 2px solid var(--gm-accent, #38bdf8);
   outline-offset: 2px;
+}
+
+/* Glass effect adaptive styling: light topographic & road basemaps (OpenTopo, CyclOSM) */
+.gm-mini-map-box[data-map-layer="topo"] .gm-mini-map-layer-select,
+.gm-mini-map-box[data-map-layer="streets"] .gm-mini-map-layer-select {
+  background-image: 
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' viewBox='0 0 24 24' fill='none' stroke='%230f172a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.76) 0%, rgba(240, 244, 248, 0.44) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  color: #0f172a;
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.95), 0 2px 8px rgba(15, 23, 42, 0.12);
+}
+
+.gm-mini-map-box[data-map-layer="topo"] .gm-mini-map-layer-select:hover,
+.gm-mini-map-box[data-map-layer="streets"] .gm-mini-map-layer-select:hover {
+  background-image: 
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' viewBox='0 0 24 24' fill='none' stroke='%230284c7' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.90) 0%, rgba(240, 244, 248, 0.60) 100%);
+  border-color: rgba(2, 132, 199, 0.5);
+  color: #0284c7;
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 1), 0 3px 10px rgba(15, 23, 42, 0.18);
+}
+
+.gm-mini-map-box[data-map-layer="topo"] .gm-mini-map-layer-select option,
+.gm-mini-map-box[data-map-layer="streets"] .gm-mini-map-layer-select option {
+  background-color: #ffffff;
+  color: #0f172a;
+}
+
+.gm-mini-map-box[data-map-layer="topo"] .gm-mini-map-expand-btn,
+.gm-mini-map-box[data-map-layer="streets"] .gm-mini-map-expand-btn {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.76) 0%, rgba(240, 244, 248, 0.44) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  color: #0f172a;
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.95), 0 2px 8px rgba(15, 23, 42, 0.12);
+}
+
+.gm-mini-map-box[data-map-layer="topo"] .gm-mini-map-expand-btn:hover,
+.gm-mini-map-box[data-map-layer="streets"] .gm-mini-map-expand-btn:hover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.90) 0%, rgba(240, 244, 248, 0.60) 100%);
+  border-color: rgba(2, 132, 199, 0.5);
+  color: #0284c7;
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 1), 0 3px 10px rgba(15, 23, 42, 0.18);
+}
+
+/* Glass effect adaptive styling: photographic satellite & dark basemaps */
+.gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-layer-select,
+.gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-layer-select {
+  background-image: 
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' viewBox='0 0 24 24' fill='none' stroke='%23f8fafc' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, rgba(15, 23, 42, 0.62) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #f8fafc;
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.35), 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-layer-select:hover,
+.gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-layer-select:hover {
+  background-image: 
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' viewBox='0 0 24 24' fill='none' stroke='%2338bdf8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.28) 0%, rgba(15, 23, 42, 0.75) 100%);
+  border-color: rgba(56, 189, 248, 0.6);
+  color: #38bdf8;
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.6), 0 3px 10px rgba(0, 0, 0, 0.45);
+}
+
+.gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-expand-btn,
+.gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-expand-btn {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, rgba(15, 23, 42, 0.62) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #f8fafc;
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.35), 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-expand-btn:hover,
+.gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-expand-btn:hover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.28) 0%, rgba(15, 23, 42, 0.75) 100%);
+  border-color: rgba(56, 189, 248, 0.6);
+  color: #38bdf8;
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.6), 0 3px 10px rgba(0, 0, 0, 0.45);
 }
 
 .gm-windsock-marker-container {
@@ -5145,22 +5321,36 @@ input.gm-input:focus {
   color: #0f172a;
 }
 
-[data-theme="light"] .gm-mini-map-layer-select {
-  border: none;
-  box-shadow: none;
+[data-theme="light"] .gm-mini-map-expand-btn {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.76) 0%, rgba(240, 244, 248, 0.44) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.85);
   color: #0f172a;
-  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.9), 0 0 6px rgba(255, 255, 255, 0.8);
-  filter: drop-shadow(0 1px 2px rgba(255, 255, 255, 0.7));
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.95), 0 2px 8px rgba(15, 23, 42, 0.12);
+}
+
+[data-theme="light"] .gm-mini-map-layer-select {
   background-image: 
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%230f172a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"),
-    radial-gradient(ellipse at center, rgba(255, 255, 255, 0.88) 0%, rgba(255, 255, 255, 0.5) 55%, rgba(255, 255, 255, 0) 82%);
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' viewBox='0 0 24 24' fill='none' stroke='%230f172a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.76) 0%, rgba(240, 244, 248, 0.44) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  color: #0f172a;
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.95), 0 2px 8px rgba(15, 23, 42, 0.12);
+}
+
+[data-theme="light"] .gm-mini-map-expand-btn:hover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.90) 0%, rgba(240, 244, 248, 0.60) 100%);
+  border-color: rgba(2, 132, 199, 0.5);
+  color: #0284c7;
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 1), 0 3px 10px rgba(15, 23, 42, 0.18);
 }
 
 [data-theme="light"] .gm-mini-map-layer-select:hover {
   background-image: 
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%230284c7' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"),
-    radial-gradient(ellipse at center, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.6) 60%, rgba(255, 255, 255, 0) 88%);
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' viewBox='0 0 24 24' fill='none' stroke='%230284c7' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.90) 0%, rgba(240, 244, 248, 0.60) 100%);
+  border-color: rgba(2, 132, 199, 0.5);
   color: #0284c7;
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 1), 0 3px 10px rgba(15, 23, 42, 0.18);
 }
 
 [data-theme="light"] .gm-mini-map-layer-select option {
@@ -5168,49 +5358,41 @@ input.gm-input:focus {
   color: #0f172a;
 }
 
-[data-theme="light"] .gm-mini-map-expand-btn {
-  border: none;
-  box-shadow: none;
-  color: #0f172a;
-  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.88) 0%, rgba(255, 255, 255, 0.5) 55%, rgba(255, 255, 255, 0) 82%);
-  filter: drop-shadow(0 1px 2px rgba(255, 255, 255, 0.8));
-}
-
-[data-theme="light"] .gm-mini-map-expand-btn:hover {
-  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.6) 60%, rgba(255, 255, 255, 0) 88%);
-  color: #0284c7;
-}
-
-/* Light theme with dark or photographic map layers (satellite & dark): ensure high-contrast white text & dark radial vignette */
+/* Light theme with dark or photographic map layers (satellite & dark): ensure dark frosted glass */
 [data-theme="light"] .gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-layer-select,
 [data-theme="light"] .gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-layer-select {
-  color: #ffffff;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 0 6px rgba(0, 0, 0, 0.85);
-  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.8));
   background-image: 
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%23f8fafc' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"),
-    radial-gradient(ellipse at center, rgba(15, 23, 42, 0.76) 0%, rgba(15, 23, 42, 0.42) 55%, rgba(15, 23, 42, 0) 82%);
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' viewBox='0 0 24 24' fill='none' stroke='%23f8fafc' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, rgba(15, 23, 42, 0.62) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #f8fafc;
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.35), 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 
 [data-theme="light"] .gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-layer-select:hover,
 [data-theme="light"] .gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-layer-select:hover {
-  color: #38bdf8;
   background-image: 
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%2338bdf8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"),
-    radial-gradient(ellipse at center, rgba(15, 23, 42, 0.88) 0%, rgba(15, 23, 42, 0.52) 60%, rgba(15, 23, 42, 0) 88%);
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' viewBox='0 0 24 24' fill='none' stroke='%2338bdf8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.28) 0%, rgba(15, 23, 42, 0.75) 100%);
+  border-color: rgba(56, 189, 248, 0.6);
+  color: #38bdf8;
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.6), 0 3px 10px rgba(0, 0, 0, 0.45);
 }
 
 [data-theme="light"] .gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-expand-btn,
 [data-theme="light"] .gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-expand-btn {
-  color: #ffffff;
-  background: radial-gradient(circle at center, rgba(15, 23, 42, 0.76) 0%, rgba(15, 23, 42, 0.42) 55%, rgba(15, 23, 42, 0) 82%);
-  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.9)) drop-shadow(0 0 6px rgba(0, 0, 0, 0.75));
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, rgba(15, 23, 42, 0.62) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #f8fafc;
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.35), 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 
 [data-theme="light"] .gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-expand-btn:hover,
 [data-theme="light"] .gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-expand-btn:hover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.28) 0%, rgba(15, 23, 42, 0.75) 100%);
+  border-color: rgba(56, 189, 248, 0.6);
   color: #38bdf8;
-  background: radial-gradient(circle at center, rgba(15, 23, 42, 0.88) 0%, rgba(15, 23, 42, 0.52) 60%, rgba(15, 23, 42, 0) 88%);
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.6), 0 3px 10px rgba(0, 0, 0, 0.45);
 }
 
 /* Desktop layout: 2-column split within spot summary card */
@@ -5239,4 +5421,380 @@ input.gm-input:focus {
 .leaflet-container {
   background-color: var(--gm-bg-card, #12161f);
 }
+
+/* ==========================================================================
+   GlideMind Settings View Component
+   ========================================================================== */
+
+.gm-settings-view {
+  max-width: 840px;
+  margin: 0 auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-sizing: border-box;
+}
+
+.gm-settings-header {
+  margin-bottom: 4px;
+}
+
+.gm-settings-section-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--gm-accent, #38bdf8);
+  margin: 0 0 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gm-settings-layer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.gm-settings-layer-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: var(--gm-touch-min, 48px);
+  padding: 12px 14px;
+  border-radius: var(--gm-radius-md, 8px);
+  border: 1px solid var(--gm-border);
+  background-color: var(--gm-bg-base);
+  color: var(--gm-text-primary);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color var(--gm-transition-fast), background-color var(--gm-transition-fast), transform var(--gm-transition-fast);
+}
+
+.gm-settings-layer-card:hover {
+  border-color: var(--gm-border-strong);
+  background-color: var(--gm-bg-elevated);
+}
+
+.gm-settings-layer-card.active {
+  border-color: var(--gm-accent, #38bdf8);
+  background-color: rgba(56, 189, 248, 0.08);
+}
+
+.gm-settings-layer-radio {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--gm-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+  transition: border-color var(--gm-transition-fast), background-color var(--gm-transition-fast);
+}
+
+.gm-settings-layer-card.active .gm-settings-layer-radio {
+  border-color: var(--gm-accent, #38bdf8);
+  background-color: var(--gm-accent, #38bdf8);
+}
+
+.gm-settings-layer-radio-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--gm-bg-base);
+}
+
+.gm-settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--gm-border);
+}
+
+.gm-settings-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+/* ==========================================================================
+   Comprensorio Flight Inspector Overlay (Forecast View - Phase 5-ter)
+   ========================================================================== */
+
+.gm-flight-analysis-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100dvh;
+  z-index: 1050;
+  background-color: var(--gm-bg-base);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.gm-flight-analysis-header {
+  position: absolute;
+  top: env(safe-area-inset-top, 8px);
+  left: 12px;
+  right: 12px;
+  z-index: 1060;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--gm-radius-lg, 12px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="light"] .gm-flight-analysis-header {
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(15, 23, 42, 0.15);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.gm-flight-analysis-title-group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.gm-flight-analysis-title {
+  font-size: var(--gm-font-base, 14px);
+  font-weight: 700;
+  color: var(--gm-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.gm-flight-analysis-subtitle {
+  font-size: var(--gm-font-xs, 12px);
+  color: var(--gm-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.gm-flight-analysis-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.gm-flight-analysis-layer-select {
+  height: 36px;
+  padding: 0 10px;
+  font-size: var(--gm-font-xs, 12px);
+  font-weight: 600;
+  color: var(--gm-text-primary);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--gm-radius-md, 8px);
+  cursor: pointer;
+  outline: none;
+}
+
+[data-theme="light"] .gm-flight-analysis-layer-select {
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+.gm-flight-analysis-close-btn {
+  width: var(--gm-touch-min, 48px);
+  height: var(--gm-touch-min, 48px);
+  min-width: var(--gm-touch-min, 48px);
+  min-height: var(--gm-touch-min, 48px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--gm-radius-md, 8px);
+  color: var(--gm-text-primary);
+  cursor: pointer;
+  transition: background-color var(--gm-transition-fast), transform var(--gm-transition-fast);
+  padding: 0;
+}
+
+.gm-flight-analysis-close-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.05);
+}
+
+.gm-flight-analysis-close-btn:active {
+  transform: scale(0.95);
+}
+
+.gm-flight-analysis-map-container {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.gm-flight-analysis-map {
+  width: 100%;
+  height: 100%;
+}
+
+.gm-flight-analysis-drawer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1060;
+  padding: 12px 14px calc(14px + env(safe-area-inset-bottom, 0px));
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  touch-action: pan-y;
+}
+
+[data-theme="light"] .gm-flight-analysis-drawer {
+  background: rgba(255, 255, 255, 0.94);
+  border-top: 1px solid rgba(15, 23, 42, 0.12);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.gm-flight-analysis-badge-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.gm-flight-procedure-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font-size: var(--gm-font-xs, 12px);
+  font-weight: 700;
+  border-radius: var(--gm-radius-full, 9999px);
+  background: rgba(37, 99, 235, 0.15);
+  color: #3b82f6;
+  border: 1px solid rgba(37, 99, 235, 0.3);
+}
+
+.gm-flight-procedure-badge.severe {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.gm-flight-safety-warning-banner {
+  padding: 8px 12px;
+  font-size: var(--gm-font-xs, 12px);
+  font-weight: 600;
+  line-height: 1.4;
+  color: #fca5a5;
+  background: rgba(185, 28, 28, 0.25);
+  border-left: 4px solid #ef4444;
+  border-radius: 4px;
+}
+
+[data-theme="light"] .gm-flight-safety-warning-banner {
+  color: #b91c1c;
+  background: rgba(254, 226, 226, 0.85);
+  border-left-color: #dc2626;
+}
+
+.gm-flight-analysis-explanation {
+  font-size: var(--gm-font-xs, 12px);
+  color: var(--gm-text-secondary);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.gm-flight-analysis-meta-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--gm-text-muted);
+}
+
+.gm-flight-analysis-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.gm-flight-analysis-scrubber {
+  display: flex;
+  align-items: stretch;
+  gap: 3px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 4px;
+  border-radius: var(--gm-radius-md, 8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="light"] .gm-flight-analysis-scrubber {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+.gm-flight-analysis-slot {
+  flex: 1;
+  min-height: var(--gm-touch-min, 48px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--gm-text-secondary);
+  cursor: pointer;
+  padding: 2px;
+  transition: background-color var(--gm-transition-fast), color var(--gm-transition-fast);
+}
+
+.gm-flight-analysis-slot:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--gm-text-primary);
+}
+
+.gm-flight-analysis-slot.active {
+  background: var(--gm-accent, #38bdf8);
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.gm-flight-analysis-slot-hour {
+  font-size: 11px;
+  line-height: 1;
+}
+
+.gm-flight-analysis-slot-indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: currentColor;
+}
+
 

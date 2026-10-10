@@ -755,7 +755,54 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Ridefinita la specifica dell'ingrandimento della mappa nella vista Previsioni (`ForecastView.js`): dismesso il redirect alla vista globale `#map`, progettato l'overlay a schermo intero `gm-flight-analysis-overlay` (100dvh) dedicato all'ispezione analitica del comprensorio.
   - Pianificato il modulo headless `core/flightProcedures.js` per il calcolo geometrico e geodetico dei circuiti di atterraggio (attacco a C e attacco a 8) orientati controvento in funzione dell'ora, con indicazione di sottovento, base, finale e area di smaltimento quota.
   - Progettata l'estensione dell'adapter cartografico per la doppia manica a vento (quota decollo e suolo atterraggio) e il layer ostacoli/convenzioni locali.
-  - Aggiornata la matrice di stato `DESIDERATA.md` marcando la Fase 5-ter come prioritaria (`🔴 Prioritario`).
+---
+
+## 2026-10-10 - Persistenza e Sincronizzazione del Layer Cartografico nei Settings (Fase 8-bis)
+- **Tipo**: Feature Implementation / State Management & Persistence / Cross-View Synchronization
+- **Dettagli**: [.agents/worklog.d/2026-10-10_persist-map-layer-settings-synchronization.md](file:///.agents/worklog.d/2026-10-10_persist-map-layer-settings-synchronization.md)
+- **Sintesi**:
+  - Dichiarata esplicitamente la proprietà `mapLayer: 'dark'` in `DEFAULT_INITIAL_STATE.ui` in [core/store.js](file:///core/store.js), garantendo il ripristino affidabile della preferenza al boot via `loadPersistedState()` e prevenendo regressioni su snapshot legacy.
+  - Implementato il controller [ui/views/SettingsView.js](file:///ui/views/SettingsView.js) disaccoppiato e registrato nel router (`router.registerView('settings', settingsView)` in [ui/app.js](file:///ui/app.js)).
+  - Realizzata la sezione "Cartografia & Mappe" con radio card interattive per i 4 layer cartografici (`Scuro`, `OpenTopo`, `Satellite`, `CyclOSM`), sincronizzata in tempo reale sia con la mini-mappa previsioni che con la mappa comprensori.
+  - Integrate le sezioni per tema visivo, unità aeronautiche, profilo vela e diagnostica storage locale.
+  - Registrata la Lezione Appresa #72 in [MEMORY.md](file:///MEMORY.md). 409/409 test superati in 59 suite.
+---
+
+## 2026-10-10 - Micro-Capsule Frosted Glass Adattive per Controlli Cartografici
+- **Tipo**: UI/UX Refinement / Design System & Fitts Touch Ergonomics
+- **Dettagli**: [.agents/worklog.d/2026-10-10_adaptive-frosted-glass-micro-capsules-minimap.md](file:///.agents/worklog.d/2026-10-10_adaptive-frosted-glass-micro-capsules-minimap.md)
+- **Sintesi**:
+  - Eliminati i gradienti radiali scuri che, in assenza di confini perimetrali definiti, su basemap chiari (OpenTopoMap) apparivano come aloni o macchie di fumo/bruciatura sull'ottica.
+  - Implementate micro-capsule pill-shaped a profilo ultra-sottile da 28px in [css/theme.css](file:///css/theme.css), dotate di `backdrop-filter: blur(8px)`, bordo capillare da 1px semitrasparente e micro-ombra morbida.
+  - Introdotto pavimento ergonomico Fitts invisibile a $\ge 44\text{px}$ via pseudo-elemento `::before`, preservando una geometria visiva eterea e sgombra senza sacrificare l'operabilità touch con guanti outdoor.
+  - Raffinato l'adattamento visivo in funzione della luminanza del basemap (`data-map-layer`): bianco smerigliato con tipografia deep slate su layer chiari (`topo`, `streets`), avionico scuro con tipografia bianco nitido su layer scuri (`satellite`, `dark`).
+  - Aggiornata la Lezione Appresa #71 in [MEMORY.md](file:///MEMORY.md). 409/409 test superati con successo.
+---
+
+## 2026-10-10 - Fix Persistenza Layer Cartografico al Reload ed Effetto Vetro (Glassmorphism)
+- **Tipo**: Bug Fix / State Management & Persistence / UI Design System
+- **Dettagli**: [.agents/worklog.d/2026-10-10_fix-map-layer-persistence-and-glass-effect.md](file:///.agents/worklog.d/2026-10-10_fix-map-layer-persistence-and-glass-effect.md)
+- **Sintesi**:
+  - Risolta la mancata persistenza del layer al refresh (F5): aggiunto `setStorageAdapter(adapter)` in [core/store.js](file:///core/store.js) e montato esplicitamente l'adapter browser [core/store.js](file:///core/store.js) `createLocalStorageAdapter(window.localStorage)` in [ui/app.js](file:///ui/app.js) all'avvio dell'applicazione.
+  - Implementato il vero effetto vetro cristallino (specular glassmorphism) sui controlli mini-mappa e mappa comprensori in [css/theme.css](file:///css/theme.css): `backdrop-filter: blur(12px) saturate(180%)`, gradienti semitrasparenti angolari `linear-gradient(135deg, ...)`, bisellatura interna speculare (`box-shadow: inset 0 1px 1px ...`) e bordi lucidi sottili.
+  - Aggiunto test di persistenza dinamica in [tests/core/store.test.mjs](file:///tests/core/store.test.mjs). Suite a 417/417 test passati.
+  - Registrata la Lezione Appresa #73 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-10 - Fix Difetto CSS Tiling Freccia SVG su Selettore Layer Mappa & Modulo di Audit Qualità UI
+- **Tipo**: Bug Fix / CSS Defect & Governance Shift-Left
+- **Dettagli**: [.agents/worklog.d/2026-10-10_fix-css-svg-tiling-select-and-ui-audit-capability.md](file:///.agents/worklog.d/2026-10-10_fix-css-svg-tiling-select-and-ui-audit-capability.md)
+- **Sintesi**:
+  - Risolto il difetto visivo evidenziato nello screenshot utente in cui l'icona chevron a freccia verso il basso del dropdown layer si ripeteva a matrice (`v v v v v v`) sul testo.
+  - Eliminata la shorthand `background:` nei modificatori di [css/theme.css](file:///css/theme.css) che azzerava `background-repeat: repeat` e sostituita con accorpamento esplicito multi-layer in `background-image: url(...), linear-gradient(...)`.
+  - Blindata la direttiva `background-repeat: no-repeat, no-repeat !important;` e registrato il Gate 4 in [tests/ui/shiftLeftGovernance.test.mjs](file:///tests/ui/shiftLeftGovernance.test.mjs).
+  - Presentate le capacità di audit UI specializzate (`laws-of-ux-audit`, `novice-pilot-auditor`, `outdoor-hmi-touch`, `a11y-debugging`).
+  - Aggiornata la Lezione Appresa #74 in [MEMORY.md](file:///MEMORY.md). Test suite: 428/428 test superati con successo in 61 suite.
+
+
+
+
 
 
 

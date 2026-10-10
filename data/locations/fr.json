@@ -1,0 +1,479 @@
+[
+  {
+    "id": "la-scubiccia-cervione",
+    "name": "La Scubiccia",
+    "province": "",
+    "region": "Corsica",
+    "country": "FR",
+    "location": "La Scubiccia (Cervione)",
+    "description": "Comprensorio di volo libero (Corsica) censito su OpenStreetMap.",
+    "webcam": null,
+    "club": null,
+    "reliability": 90,
+    "takeoffs": [
+      {
+        "id": "la-scubiccia-cervione-takeoff-1",
+        "name": "La Scubiccia",
+        "coordinates": "42.329192, 9.474663",
+        "altitude": 1000,
+        "heading": 180,
+        "isPrimary": true,
+        "description": "Decollo per parapendio censito su OpenStreetMap.",
+        "hazards": "",
+        "reliability": 90
+      }
+    ],
+    "landings": [
+      {
+        "id": "la-scubiccia-cervione-landing-1",
+        "name": "Cervione - e-piane",
+        "coordinates": "42.323815, 9.502653",
+        "altitude": 143,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Accès:Se garer le long de la route départementale sans gêner les sorties des habitations. / Conditions aéro :Régime de brise direction Est, Sud Est. / Dangers: Ne pas voler par vent de Nord. /",
+        "hazards": "",
+        "rules": "",
+        "reliability": 90
+      }
+    ]
+  },
+  {
+    "id": "nonza-pointe-de-solaru-nonza",
+    "name": "Nonza - pointe-de-solaru",
+    "province": "",
+    "region": "Corsica",
+    "country": "FR",
+    "location": "Nonza - pointe-de-solaru (Nonza)",
+    "description": "Comprensorio di volo libero (Corsica) censito su OpenStreetMap.",
+    "webcam": null,
+    "club": null,
+    "reliability": 90,
+    "takeoffs": [
+      {
+        "id": "nonza-pointe-de-solaru-nonza-takeoff-1",
+        "name": "Nonza - pointe-de-solaru",
+        "coordinates": "42.794743, 9.351743",
+        "altitude": 280,
+        "heading": 180,
+        "isPrimary": true,
+        "description": "Decollo per parapendio censito su OpenStreetMap.",
+        "hazards": "",
+        "reliability": 90
+      }
+    ],
+    "landings": [
+      {
+        "id": "nonza-pointe-de-solaru-nonza-landing-1",
+        "name": "Nonza",
+        "coordinates": "42.788867, 9.344602",
+        "altitude": 4,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio per parapendio censito su OpenStreetMap.",
+        "hazards": "",
+        "rules": "",
+        "reliability": 90
+      }
+    ]
+  },
+  {
+    "id": "calacuccia-bocca-a-sforssi-calacuccia",
+    "name": "Calacuccia - bocca-a-sforssi",
+    "province": "",
+    "region": "Corsica",
+    "country": "FR",
+    "location": "Calacuccia - bocca-a-sforssi (Calacuccia)",
+    "description": "Comprensorio di volo libero (Corsica) censito su OpenStreetMap.",
+    "webcam": null,
+    "club": null,
+    "reliability": 90,
+    "takeoffs": [
+      {
+        "id": "calacuccia-bocca-a-sforssi-calacuccia-takeoff-1",
+        "name": "Calacuccia - bocca-a-sforssi",
+        "coordinates": "42.309962, 9.044876",
+        "altitude": 1527,
+        "heading": 180,
+        "isPrimary": true,
+        "description": "Decollo per parapendio censito su OpenStreetMap.",
+        "hazards": "",
+        "reliability": 90
+      }
+    ],
+    "landings": [
+      {
+        "id": "calacuccia-bocca-a-sforssi-calacuccia-landing-1",
+        "name": "Atterraggio Calacuccia - bocca-a-sforssi",
+        "coordinates": "42.312199, 9.041110",
+        "altitude": 300,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio per parapendio censito su OpenStreetMap.",
+        "hazards": "",
+        "rules": "",
+        "reliability": 90
+      },
+      {
+        "id": "calacuccia-bocca-a-sforssi-calacuccia-landing-2",
+        "name": "Lozzi",
+        "coordinates": "42.319214, 9.000296",
+        "altitude": 874,
+        "isPrimary": false,
+        "isOfficial": false,
+        "description": "Atterraggio per parapendio censito su OpenStreetMap.",
+        "hazards": "",
+        "rules": "",
+        "reliability": 90
+      },
+      {
+        "id": "calacuccia-bocca-a-sforssi-calacuccia-landing-3",
+        "name": "Calacuccia",
+        "coordinates": "42.331925, 9.016919",
+        "altitude": 791,
+        "isPrimary": false,
+        "isOfficial": false,
+        "description": "Atterraggio per parapendio censito su OpenStreetMap.",
+        "hazards": "",
+        "rules": "",
+        "reliability": 90
+      }
+    ]
+  },
+  {
+    "id": "lozzi-alturaghja-lozzi",
+    "name": "Lozzi - alturaghja",
+    "province": "",
+    "region": "Corsica",
+    "country": "FR",
+    "location": "Lozzi - alturaghja (Lozzi)",
+    "description": "Comprensorio di volo libero (Corsica) censito su OpenStreetMap.",
+    "webcam": null,
+    "club": null,
+    "reliability": 90,
+    "takeoffs": [
+      {
+        "id": "lozzi-alturaghja-lozzi-takeoff-1",
+        "name": "Lozzi - alturaghja",
+        "coordinates": "42.356100, 8.969079",
+        "altitude": 1572,
+        "heading": 180,
+        "isPrimary": true,
+        "description": "Decollo per parapendio censito su OpenStreetMap.",
+        "hazards": "",
+        "reliability": 90
+      }
+    ],
+    "landings": [
+      {
+        "id": "lozzi-alturaghja-lozzi-landing-1",
+        "name": "Atterraggio Lozzi - alturaghja",
+        "coordinates": "42.351101, 8.967220",
+        "altitude": 300,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio per parapendio censito su OpenStreetMap.",
+        "hazards": "",
+        "rules": "",
+        "reliability": 90
+      },
+      {
+        "id": "lozzi-alturaghja-lozzi-landing-2",
+        "name": "Lozzi",
+        "coordinates": "42.349866, 8.996230",
+        "altitude": 1205,
+        "isPrimary": false,
+        "isOfficial": false,
+        "description": "Atterraggio per parapendio censito su OpenStreetMap.",
+        "hazards": "",
+        "rules": "",
+        "reliability": 90
+      },
+      {
+        "id": "lozzi-alturaghja-lozzi-landing-3",
+        "name": "Calacuccia",
+        "coordinates": "42.333809, 9.007755",
+        "altitude": 860,
+        "isPrimary": false,
+        "isOfficial": false,
+        "description": "Atterraggio per parapendio censito su OpenStreetMap.",
+        "hazards": "",
+        "rules": "",
+        "reliability": 90
+      }
+    ]
+  },
+  {
+    "id": "birout-ale-suaghjola-minerviu",
+    "name": "Birout'ale - suaghjola",
+    "province": "",
+    "region": "Corsica",
+    "country": "FR",
+    "location": "Birout'ale - suaghjola (Minerviu)",
+    "description": "Comprensorio di volo libero (Corsica) censito su OpenStreetMap.",
+    "webcam": null,
+    "club": null,
+    "reliability": 90,
+    "takeoffs": [
+      {
+        "id": "birout-ale-suaghjola-minerviu-takeoff-1",
+        "name": "Birout'ale - suaghjola",
+        "coordinates": "42.882975, 9.345916",
+        "altitude": 527,
+        "heading": 180,
+        "isPrimary": true,
+        "description": "Accès:Accès du décollage à partir de l'atterrissage A 25 mn en partant de la marine de Giottani (15mn route sinueuse en enrobé de 10 mn de piste carrossable) 1 Embranchement de la marine à la D80 puis tourner à gauche. 3km sur D80 2 Embranchement de Barre",
+        "hazards": "",
+        "reliability": 90
+      }
+    ],
+    "landings": [
+      {
+        "id": "birout-ale-suaghjola-minerviu-landing-1",
+        "name": "Birout'ale",
+        "coordinates": "42.865672, 9.343181",
+        "altitude": 110,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Accès:A 55 km de Bastia par la D80 Par l'Ouest au départ de Bastia vers ST Florent Col de Teghime Patrimonia Nonza Albo Marinca (Canari) Marine de Giottani (Barrettali) Par l'Est au départ de Bastia Cap Corse Erbalunga Porticcciolo Luri Marine de Santa Se",
+        "hazards": "",
+        "rules": "",
+        "reliability": 90
+      }
+    ]
+  },
+  {
+    "id": "chapelle-santa-brigida-a-punta-tox",
+    "name": "Chapelle santa brigida - a punta",
+    "province": "",
+    "region": "Corsica",
+    "country": "FR",
+    "location": "Chapelle santa brigida - a punta (Tox)",
+    "description": "Comprensorio di volo libero (Corsica) censito su OpenStreetMap.",
+    "webcam": null,
+    "club": null,
+    "reliability": 90,
+    "takeoffs": [
+      {
+        "id": "chapelle-santa-brigida-a-punta-tox-takeoff-1",
+        "name": "Chapelle santa brigida - a punta",
+        "coordinates": "42.241578, 9.441176",
+        "altitude": 532,
+        "heading": 180,
+        "isPrimary": true,
+        "description": "Accès:Accès par la route départementale 16 puis prendre route carrossable sur la droite 2km avant le village de Tox. / Accès véhicule: 10 minutes / Conditions aéro :Régime de brises. / Détails: Décollage technique, très courte distance de décollage. Inter",
+        "hazards": "",
+        "reliability": 90
+      }
+    ],
+    "landings": [
+      {
+        "id": "chapelle-santa-brigida-a-punta-tox-landing-1",
+        "name": "Chappelle santa brigida",
+        "coordinates": "42.232866, 9.448598",
+        "altitude": 204,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Conditions aéro :Régime de brises. / Détails: Aucune restriction. Toujours refermer les barrières pour les animaux !!! / Dangers: Attention aux thermiques puissants qui compliquent l'approche par journée ensoleillée. /",
+        "hazards": "",
+        "rules": "",
+        "reliability": 90
+      }
+    ]
+  },
+  {
+    "id": "teghime-monti-rossi-barbaggio",
+    "name": "Teghime - monti-rossi",
+    "province": "",
+    "region": "Corsica",
+    "country": "FR",
+    "location": "Teghime - monti-rossi (Barbaggio)",
+    "description": "Comprensorio di volo libero (Corsica) censito su OpenStreetMap.",
+    "webcam": null,
+    "club": null,
+    "reliability": 90,
+    "takeoffs": [
+      {
+        "id": "teghime-monti-rossi-barbaggio-takeoff-1",
+        "name": "Teghime - monti-rossi",
+        "coordinates": "42.672447, 9.375183",
+        "altitude": 596,
+        "heading": 180,
+        "isPrimary": true,
+        "description": "Accès:Accès au site à pied à partir du parking du Col de Teghime / Accès piéton: 10 minutes / Conditions aéro :Vent d' EST (SUD EST à NORD EST) - Possibilité de pratique pente école, gonflages et statique par vent d'EST - Possibilité de grand vol à partir",
+        "hazards": "",
+        "reliability": 90
+      }
+    ],
+    "landings": [
+      {
+        "id": "teghime-monti-rossi-barbaggio-landing-1",
+        "name": "Atterraggio Teghime - monti-rossi",
+        "coordinates": "42.657447, 9.385183",
+        "altitude": 100,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
+        "hazards": "",
+        "rules": "",
+        "reliability": 80
+      }
+    ]
+  },
+  {
+    "id": "san-bastiano-calcatoggio-calcatoghju",
+    "name": "San-bastiano",
+    "province": "",
+    "region": "Corsica",
+    "country": "FR",
+    "location": "San-bastiano (Calcatoggio / Calcatoghju)",
+    "description": "Comprensorio di volo libero (Corsica) censito su OpenStreetMap.",
+    "webcam": null,
+    "club": null,
+    "reliability": 90,
+    "takeoffs": [
+      {
+        "id": "san-bastiano-calcatoggio-calcatoghju-takeoff-1",
+        "name": "San-bastiano",
+        "coordinates": "42.021051, 8.755121",
+        "altitude": 680,
+        "heading": 180,
+        "isPrimary": true,
+        "description": "Decollo per parapendio censito su OpenStreetMap.",
+        "hazards": "",
+        "reliability": 90
+      }
+    ],
+    "landings": [
+      {
+        "id": "san-bastiano-calcatoggio-calcatoghju-landing-1",
+        "name": "Atterraggio San-bastiano",
+        "coordinates": "42.006051, 8.765121",
+        "altitude": 100,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
+        "hazards": "",
+        "rules": "",
+        "reliability": 80
+      }
+    ]
+  },
+  {
+    "id": "vizzavona-bocognano",
+    "name": "Vizzavona",
+    "province": "",
+    "region": "Corsica",
+    "country": "FR",
+    "location": "Vizzavona (Bocognano)",
+    "description": "Comprensorio di volo libero (Corsica) censito su OpenStreetMap.",
+    "webcam": null,
+    "club": null,
+    "reliability": 90,
+    "takeoffs": [
+      {
+        "id": "vizzavona-bocognano-takeoff-1",
+        "name": "Vizzavona",
+        "coordinates": "42.103387, 9.106764",
+        "altitude": 1107,
+        "heading": 180,
+        "isPrimary": true,
+        "description": "Accès:Parking le long de la route juste au nord du déco (peu de places). / Accès piéton: 10 minutes / montée par sentier dans le virage juste au nord du déco. Sentier non balisé, 10 minutes de marche bien raide. Repose au déco presque obligatoire, atterri",
+        "hazards": "",
+        "reliability": 90
+      }
+    ],
+    "landings": [
+      {
+        "id": "vizzavona-bocognano-landing-1",
+        "name": "Atterraggio Vizzavona",
+        "coordinates": "42.088387, 9.116764",
+        "altitude": 507,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
+        "hazards": "",
+        "rules": "",
+        "reliability": 80
+      }
+    ]
+  },
+  {
+    "id": "punta-isa-ucciani",
+    "name": "Punta-isa",
+    "province": "",
+    "region": "Corsica",
+    "country": "FR",
+    "location": "Punta-isa (Ucciani)",
+    "description": "Comprensorio di volo libero (Corsica) censito su OpenStreetMap.",
+    "webcam": null,
+    "club": null,
+    "reliability": 90,
+    "takeoffs": [
+      {
+        "id": "punta-isa-ucciani-takeoff-1",
+        "name": "Punta-isa",
+        "coordinates": "42.041441, 9.020978",
+        "altitude": 1624,
+        "heading": 180,
+        "isPrimary": true,
+        "description": "Decollo per parapendio censito su OpenStreetMap.",
+        "hazards": "",
+        "reliability": 90
+      }
+    ],
+    "landings": [
+      {
+        "id": "punta-isa-ucciani-landing-1",
+        "name": "Atterraggio Punta-isa",
+        "coordinates": "42.026441, 9.030978",
+        "altitude": 1024,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
+        "hazards": "",
+        "rules": "",
+        "reliability": 80
+      }
+    ]
+  },
+  {
+    "id": "salvi-montemaggiore",
+    "name": "Salvi",
+    "province": "",
+    "region": "Corsica",
+    "country": "FR",
+    "location": "Salvi (Montemaggiore)",
+    "description": "Comprensorio di volo libero (Corsica) censito su OpenStreetMap.",
+    "webcam": null,
+    "club": null,
+    "reliability": 90,
+    "takeoffs": [
+      {
+        "id": "salvi-montemaggiore-takeoff-1",
+        "name": "Salvi",
+        "coordinates": "42.552484, 8.863015",
+        "altitude": 479,
+        "heading": 180,
+        "isPrimary": true,
+        "description": "Decollo per parapendio censito su OpenStreetMap.",
+        "hazards": "",
+        "reliability": 90
+      }
+    ],
+    "landings": [
+      {
+        "id": "salvi-montemaggiore-landing-1",
+        "name": "Salvi",
+        "coordinates": "42.547419, 8.840255",
+        "altitude": 101,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio per parapendio censito su OpenStreetMap.",
+        "hazards": "",
+        "rules": "",
+        "reliability": 90
+      }
+    ]
+  }
+]

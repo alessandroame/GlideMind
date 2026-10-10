@@ -4,7 +4,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { generateTakeoffSectorSvg, LeafletMapEngine } from '../../ui/map/mapEngineAdapter.js';
+import { generateTakeoffSectorSvg, LeafletMapEngine, HeadlessMockMapEngine } from '../../ui/map/mapEngineAdapter.js';
 
 describe('GlideMind Cartography - Takeoff Slope Exposure Sector & Launch Window', () => {
 
@@ -101,5 +101,47 @@ describe('GlideMind Cartography - Takeoff Slope Exposure Sector & Launch Window'
 
     assert.equal(wrapperTransform, 'rotate(0deg)', 'Windsock must rotate to 0deg for 180deg wind');
     assert.ok(sectorInnerHtml.includes('stroke="#22c55e"'), '180deg wind vs 180deg heading is 0deg diff -> Green sector');
+  });
+
+  it('should support flight analysis procedures rendering, scrubbing updates and pause/resume in HeadlessMockMapEngine', () => {
+    const mockEngine = new HeadlessMockMapEngine();
+
+    const mockData = {
+      takeoff: { coordinates: '45.833, 9.302', altitude: 1060 },
+      landing: { coordinates: '45.817, 9.318', altitude: 260 },
+      circuitData: {
+        circuitType: 'standard_c',
+        polylines: {
+          finalLeg: [[45.818, 9.317], [45.817, 9.318]],
+          baseLeg: [[45.819, 9.319], [45.818, 9.317]],
+          downwindLeg: [[45.816, 9.320], [45.819, 9.319]]
+        }
+      }
+    };
+
+    mockEngine.renderComprensorioFlightMap(null, mockData);
+    assert.equal(mockEngine.renderedMode, 'flightAnalysis');
+    assert.equal(mockEngine.paused, false);
+    assert.deepEqual(mockEngine.renderedCircuitPolylines, ['finalLeg', 'baseLeg', 'downwindLeg']);
+
+    // Pause / Resume
+    mockEngine.pause();
+    assert.equal(mockEngine.paused, true);
+    mockEngine.resume();
+    assert.equal(mockEngine.paused, false);
+
+    // Scrub update to figure eight
+    const updatedCircuit = {
+      circuitType: 'figure_eight',
+      polylines: {
+        figureEight: [[45.818, 9.316], [45.818, 9.317], [45.818, 9.318]]
+      }
+    };
+    mockEngine.updateFlightProcedures(updatedCircuit);
+    assert.deepEqual(mockEngine.renderedCircuitPolylines, ['figureEight']);
+
+    mockEngine.destroy();
+    assert.equal(mockEngine.destroyed, true);
+    assert.equal(mockEngine.renderedCircuitPolylines.length, 0);
   });
 });

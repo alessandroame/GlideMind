@@ -1099,7 +1099,7 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     controller.unmount();
   });
 
-  it('should render unobtrusive mini-map controls with SVG expand icon and radial-gradient vignette styles', () => {
+  it('should render unobtrusive mini-map controls with SVG expand icon and adaptive frosted glass micro-capsules', () => {
     const mockStore = createStore({
       selectedSpot: DEFAULT_COMPRENSORI[0],
       ui: { theme: 'dark', mapLayer: 'satellite' }
@@ -1108,15 +1108,220 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     const html = controller.renderHtml();
 
     assert.ok(html.includes('data-map-layer="satellite"'), 'Mini-map container must declare data-map-layer attribute');
-    assert.ok(html.includes('<svg width="18" height="18" viewBox="0 0 24 24"'), 'Expand button must contain clean SVG icon');
+    assert.ok(html.includes('<svg width="14" height="14" viewBox="0 0 24 24"'), 'Expand button must contain clean SVG icon');
     assert.ok(!html.includes('class="gm-mini-map-expand-btn">\n          ⤢'), 'Must not use raw unicode glyph ⤢');
 
-    // Verify CSS styles in theme.css for radial gradient and non-invasive layout
+    // Verify CSS styles in theme.css for frosted glass micro-capsules and non-invasive layout
     const themeCss = readFileSync(new URL('../../css/theme.css', import.meta.url), 'utf-8');
     assert.ok(themeCss.includes('.gm-mini-map-layer-select {'), 'Must define .gm-mini-map-layer-select');
-    assert.ok(themeCss.includes('radial-gradient(ellipse at center,'), 'Must use elliptical radial gradient behind layer select text');
+    assert.ok(themeCss.includes('backdrop-filter: blur('), 'Must use backdrop-filter for frosted glass micro-capsule');
     assert.ok(themeCss.includes('.gm-mini-map-expand-btn {'), 'Must define .gm-mini-map-expand-btn');
-    assert.ok(themeCss.includes('radial-gradient(circle at center,'), 'Must use circular radial gradient behind expand icon');
+    assert.ok(themeCss.includes('.gm-mini-map-layer-select::before'), 'Must provide touch expansion pseudo-element on layer select');
+    assert.ok(themeCss.includes('.gm-mini-map-expand-btn::before'), 'Must provide touch expansion pseudo-element on expand button');
+    assert.ok(themeCss.includes('.gm-mini-map-box[data-map-layer="topo"] .gm-mini-map-layer-select'), 'Must define adaptive light styling for topo basemap');
+    assert.ok(themeCss.includes('.gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-layer-select'), 'Must define adaptive dark styling for satellite basemap');
+  });
+
+  it('should open and close flight analysis overlay, pausing and resuming miniMapEngine', () => {
+    const mockStore = createStore({
+      selectedSpot: DEFAULT_COMPRENSORI[0],
+      ui: { theme: 'dark', mapLayer: 'topo' }
+    });
+    const controller = new ForecastViewController({ store: mockStore });
+
+    const mockMiniMapEl = { innerHTML: '', style: {} };
+    const mockContainer = {
+      innerHTML: '',
+      addEventListener() {},
+      removeEventListener() {},
+      querySelector(sel) {
+        if (sel === '#forecast-mini-map') return mockMiniMapEl;
+        return null;
+      }
+    };
+
+    controller.mount(mockContainer);
+    assert.ok(controller.miniMapEngine, 'miniMapEngine must be initialized');
+    assert.equal(controller.miniMapEngine.isPaused, false, 'miniMapEngine must not be paused initially');
+    assert.equal(controller.isFlightAnalysisOpen, false, 'Overlay must be closed initially');
+
+    // Open flight analysis overlay
+    controller.openFlightAnalysisOverlay();
+    assert.equal(controller.isFlightAnalysisOpen, true, 'Overlay must be open');
+    assert.equal(controller.miniMapEngine.isPaused, true, 'miniMapEngine must be paused when overlay is open');
+    assert.ok(controller.flightAnalysisMapEngine, 'flightAnalysisMapEngine must be instantiated');
+    assert.ok(controller.flightAnalysisMapEngine.procedures, 'flightAnalysisMapEngine must receive initial flight procedures');
+
+    // Close flight analysis overlay
+    controller.closeFlightAnalysisOverlay();
+    assert.equal(controller.isFlightAnalysisOpen, false, 'Overlay must be closed');
+    assert.equal(controller.flightAnalysisMapEngine, null, 'flightAnalysisMapEngine must be destroyed and nulled');
+    assert.equal(controller.miniMapEngine.isPaused, false, 'miniMapEngine must be resumed');
+
+    controller.unmount();
+  });
+
+  it('should update flight procedures in-place on flight analysis overlay when setHour is called', () => {
+    const mockStore = createStore({
+      selectedSpot: DEFAULT_COMPRENSORI[0],
+      ui: { theme: 'dark', mapLayer: 'topo' }
+    });
+    const controller = new ForecastViewController({ store: mockStore });
+
+    const mockMiniMapEl = { innerHTML: '', style: {} };
+    const mockContainer = {
+      innerHTML: '',
+      addEventListener() {},
+      removeEventListener() {},
+      querySelector(sel) {
+        if (sel === '#forecast-mini-map') return mockMiniMapEl;
+        return null;
+      }
+    };
+
+    controller.mount(mockContainer);
+    controller.openFlightAnalysisOverlay();
+
+    const initialProcedures = controller.flightAnalysisMapEngine.procedures;
+    assert.ok(initialProcedures, 'Must have procedures before hour scrub');
+
+    // Scrub hour to 16
+    controller.setHour(16);
+    assert.equal(controller.selectedHour, 16, 'Selected hour must update to 16');
+    assert.ok(controller.flightAnalysisMapEngine.procedures, 'Procedures must be updated in-place on scrub');
+
+    controller.closeFlightAnalysisOverlay();
+    controller.unmount();
+  });
+
+  it('should handle open-full-map, close-flight-analysis, and flight-analysis-hour actions in handleClick', () => {
+    const mockStore = createStore({
+      selectedSpot: DEFAULT_COMPRENSORI[0],
+      ui: { theme: 'dark', mapLayer: 'topo' }
+    });
+    const controller = new ForecastViewController({ store: mockStore });
+
+    const mockMiniMapEl = { innerHTML: '', style: {} };
+    const mockContainer = {
+      innerHTML: '',
+      addEventListener() {},
+      removeEventListener() {},
+      querySelector(sel) {
+        if (sel === '#forecast-mini-map') return mockMiniMapEl;
+        return null;
+      }
+    };
+
+    controller.mount(mockContainer);
+
+    // 1. Simulate click on open-full-map
+    controller.handleClick({
+      target: {
+        closest: (sel) => {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute: (attr) => (attr === 'data-action' ? 'open-full-map' : null)
+            };
+          }
+          return null;
+        }
+      },
+      preventDefault() {}
+    });
+    assert.equal(controller.isFlightAnalysisOpen, true, 'open-full-map must open flight analysis overlay');
+
+    // 2. Simulate click on flight-analysis-hour (hour 11)
+    controller.handleClick({
+      target: {
+        closest: (sel) => {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute: (attr) => (attr === 'data-action' ? 'flight-analysis-hour' : (attr === 'data-hour' ? '11' : null))
+            };
+          }
+          return null;
+        }
+      },
+      preventDefault() {}
+    });
+    assert.equal(controller.selectedHour, 11, 'flight-analysis-hour must set hour to 11');
+
+    // 3. Simulate click on close-flight-analysis
+    controller.handleClick({
+      target: {
+        closest: (sel) => {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute: (attr) => (attr === 'data-action' ? 'close-flight-analysis' : null)
+            };
+          }
+          return null;
+        }
+      },
+      preventDefault() {}
+    });
+    assert.equal(controller.isFlightAnalysisOpen, false, 'close-flight-analysis must close flight analysis overlay');
+
+    controller.unmount();
+  });
+
+  it('should close overlay on Escape key via handleFlightAnalysisKey', () => {
+    const mockStore = createStore({
+      selectedSpot: DEFAULT_COMPRENSORI[0],
+      ui: { theme: 'dark', mapLayer: 'topo' }
+    });
+    const controller = new ForecastViewController({ store: mockStore });
+
+    controller.openFlightAnalysisOverlay();
+    assert.equal(controller.isFlightAnalysisOpen, true);
+
+    let defaultPrevented = false;
+    controller.handleFlightAnalysisKey({
+      key: 'Escape',
+      preventDefault() { defaultPrevented = true; }
+    });
+
+    assert.equal(defaultPrevented, true, 'Escape must call preventDefault');
+    assert.equal(controller.isFlightAnalysisOpen, false, 'Escape must close flight analysis overlay');
+  });
+
+  it('should switch layer on flightAnalysisMapEngine when set-flight-analysis-layer change event occurs', () => {
+    const mockStore = createStore({
+      selectedSpot: DEFAULT_COMPRENSORI[0],
+      ui: { theme: 'dark', mapLayer: 'topo' }
+    });
+    const controller = new ForecastViewController({ store: mockStore });
+
+    controller.openFlightAnalysisOverlay();
+    assert.equal(controller.flightAnalysisMapEngine.currentLayerId, 'topo');
+
+    // Trigger layer switch to satellite
+    controller.handleChange({
+      target: {
+        getAttribute: (attr) => (attr === 'data-action' ? 'set-flight-analysis-layer' : null),
+        classList: { contains: () => false },
+        value: 'satellite'
+      }
+    });
+
+    assert.equal(controller.flightAnalysisMapEngine.currentLayerId, 'satellite', 'flightAnalysisMapEngine must update layer');
+    assert.equal(mockStore.getState().ui.mapLayer, 'satellite', 'Store ui.mapLayer must be updated');
+
+    controller.closeFlightAnalysisOverlay();
+  });
+
+  it('should declare responsive full-screen 100dvh overlay, touch targets, and banners in theme.css', () => {
+    const themeCss = readFileSync(new URL('../../css/theme.css', import.meta.url), 'utf-8');
+
+    assert.ok(themeCss.includes('.gm-flight-analysis-overlay {'), 'Must declare .gm-flight-analysis-overlay');
+    assert.ok(themeCss.includes('height: 100dvh'), 'Overlay must use dynamic viewport 100dvh');
+    assert.ok(themeCss.includes('z-index: 1050'), 'Overlay must use elevated modal z-index 1050');
+    assert.ok(themeCss.includes('.gm-flight-analysis-close-btn {'), 'Must declare close button');
+    assert.ok(themeCss.includes('min-width: var(--gm-touch-min, 48px)'), 'Close button must satisfy Fitts touch floor');
+    assert.ok(themeCss.includes('.gm-flight-procedure-badge {'), 'Must declare flight procedure badge');
+    assert.ok(themeCss.includes('.gm-flight-safety-warning-banner {'), 'Must declare flight safety warning banner');
+    assert.ok(themeCss.includes('.gm-flight-analysis-slot {'), 'Must declare scrubber slots');
+    assert.ok(themeCss.includes('touch-action: pan-x'), 'Scrubber must support single-row horizontal pan-x');
   });
 });
 

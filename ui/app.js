@@ -3,14 +3,21 @@
  * Orchestrates Store, Router, and SheetManager upon DOM readiness.
  */
 
-import { store } from '../core/store.js';
+import { store, createLocalStorageAdapter } from '../core/store.js';
 import { router } from './router.js';
 import { initSheetManager } from './sheetManager.js';
 import { homeDashboardView } from './views/HomeDashboardView.js';
 import { forecastView } from './views/ForecastView.js';
 import { spotMapView } from './views/SpotMapView.js';
+import { settingsView } from './views/SettingsView.js';
 import { normalizeLocationsCatalog, DEFAULT_COMPRENSORI } from '../core/comprensorio.js';
 import { APP_VERSION, APP_BUILD } from '../core/version.js';
+
+// Mount browser localStorage adapter in UI shell to ensure cross-session persistence across page reloads
+if (typeof window !== 'undefined' && window.localStorage && typeof store.setStorageAdapter === 'function') {
+  store.setStorageAdapter(createLocalStorageAdapter(window.localStorage));
+  store.loadPersistedState();
+}
 
 /**
  * Loads the master real locations catalog from /data/locations.json.
@@ -72,7 +79,12 @@ export function applyTheme(theme = 'dark') {
  * Initializes the GlideMind client application shell.
  */
 export function bootstrapApp() {
-  // Load persisted user preferences and cached spots
+  // Ensure browser localStorage adapter is mounted in UI shell
+  if (typeof window !== 'undefined' && window.localStorage && typeof store.setStorageAdapter === 'function') {
+    store.setStorageAdapter(createLocalStorageAdapter(window.localStorage));
+  }
+
+  // Load persisted user preferences, cached spots, and active mapLayer
   store.loadPersistedState();
 
   // Synchronize visual theme
@@ -107,6 +119,7 @@ export function bootstrapApp() {
   router.registerView('home', homeDashboardView);
   router.registerView('forecast', forecastView);
   router.registerView('map', spotMapView);
+  router.registerView('settings', settingsView);
 
   // Initialize sheet manager
   initSheetManager();
