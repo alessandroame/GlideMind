@@ -10,6 +10,9 @@ import { homeDashboardView } from './views/HomeDashboardView.js';
 import { forecastView } from './views/ForecastView.js';
 import { spotMapView } from './views/SpotMapView.js';
 import { settingsView } from './views/SettingsView.js';
+import { logbookView } from './views/LogbookView.js';
+import { openFlightDetailSheet } from './views/FlightDetailSheet.js';
+import { logbookManager, createIndexedDbAdapter } from '../core/logbookDb.js';
 import { normalizeLocationsCatalog, DEFAULT_COMPRENSORI } from '../core/comprensorio.js';
 import { APP_VERSION, APP_BUILD } from '../core/version.js';
 
@@ -17,6 +20,18 @@ import { APP_VERSION, APP_BUILD } from '../core/version.js';
 if (typeof window !== 'undefined' && window.localStorage && typeof store.setStorageAdapter === 'function') {
   store.setStorageAdapter(createLocalStorageAdapter(window.localStorage));
   store.loadPersistedState();
+}
+
+// Mount browser IndexedDB adapter for logbook track persistence
+if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined' && typeof logbookManager.setAdapter === 'function') {
+  logbookManager.setAdapter(createIndexedDbAdapter());
+  logbookManager.getAllFlights().then((flights) => {
+    if (Array.isArray(flights) && flights.length > 0) {
+      store.setState({ flights });
+    }
+  }).catch((err) => {
+    console.warn('[GlideMind] Impossibile caricare voli da IndexedDB:', err);
+  });
 }
 
 /**
@@ -119,6 +134,7 @@ export function bootstrapApp() {
   router.registerView('home', homeDashboardView);
   router.registerView('forecast', forecastView);
   router.registerView('map', spotMapView);
+  router.registerView('logbook', logbookView);
   router.registerView('settings', settingsView);
 
   // Initialize sheet manager
@@ -138,6 +154,9 @@ export function bootstrapApp() {
     window.__GLIDEMIND__ = {
       store,
       router,
+      logbookManager,
+      logbookView,
+      openFlightDetailSheet,
       loadLocationsCatalog,
       applyTheme,
       version: APP_VERSION,

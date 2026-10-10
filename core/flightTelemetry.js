@@ -164,6 +164,8 @@ export function lttbDecimate(points, targetCount, metricKey = 'alt') {
     return sampled;
 }
 
+export { lttbDecimate as decimateLTTB };
+
 /**
  * Calculates ground speed in km/h between two track points.
  * @param {Object} p1 

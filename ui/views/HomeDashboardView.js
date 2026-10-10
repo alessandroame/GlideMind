@@ -43,6 +43,7 @@ import {
   DEFAULT_SEED_FLIGHTS
 } from '../../core/logbook.js';
 import { parseIgc } from '../../core/igcParser.js';
+import { logbookManager } from '../../core/logbookDb.js';
 import { openSheet, closeSheet } from '../sheetManager.js';
 import {
   getSmartDatePresets,
@@ -647,9 +648,13 @@ export class HomeDashboardViewController {
     }
     if (!this._homeFlyCache) this._homeFlyCache = {};
 
-    const takeoff = (targetSpot.takeoffs && targetSpot.takeoffs[0]) ? targetSpot.takeoffs[0] : { altitude: 1000, heading: 180 };
+    const takeoff = (targetSpot.takeoffs && targetSpot.takeoffs[0]) ? targetSpot.takeoffs[0] : { altitude: 1000, heading: null };
     const coords = parseCoordinates(takeoff.coordinates) || { lat: 45.833, lon: 9.302 };
     let payload = null;
+
+    const takeoffHeading = (takeoff && takeoff.heading != null && !isNaN(Number(takeoff.heading)))
+      ? Number(takeoff.heading)
+      : null;
 
     if (state.weatherData && state.weatherData.hourly?.time?.length >= 24 * days) {
       payload = state.weatherData;
@@ -660,12 +665,12 @@ export class HomeDashboardViewController {
           targetDate: todayIso,
           days,
           elevation: takeoff.altitude || 1000,
-          takeoffAzimuth: takeoff.heading || 180,
+          takeoffAzimuth: takeoffHeading,
           weatherModel: 'best_match'
         }
       );
       payload = enrichWeatherData(synthetic, todayIso, Date.now(), {
-        customHeading: takeoff.heading || 180
+        customHeading: takeoffHeading
       });
     }
 
@@ -1875,41 +1880,21 @@ export class HomeDashboardViewController {
    * Automatically parses track, deduces thermals and exercises, and logs flight.
    * @param {Event} evt
    */
-  handleFileInput(evt) {
+  async handleFileInput(evt) {
     const input = evt.target;
     if (input && input.files && input.files[0]) {
       const file = input.files[0];
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const igcText = e.target.result;
-          const parsed = parseIgc(igcText, this.comprensoriCatalog);
-          const flightDate = (parsed.metadata && parsed.metadata.date) || new Date().toISOString().split('T')[0];
-          const duration = (parsed.statistics && parsed.statistics.durationMinutes) || 45;
-          const site = parsed.takeoffName || parsed.siteTitle || 'Spot da IGC';
-
-          const newEntry = createFlightLogEntry({
-            date: flightDate,
-            site: site,
-            durationMinutes: duration,
-            trackPoints: parsed.points,
-            notes: `Traccia IGC: ${file.name}`
-          });
-
-          if (this.store) {
-            const currentFlights = this.store.getState().flights || [];
-            this.store.setState({
-              flights: [newEntry, ...currentFlights]
-            });
-          }
-
-          this.render();
-        } catch (err) {
-          console.warn('Errore lettura traccia IGC:', err);
-          this.navigateTo('logbook');
-        }
-      };
-      reader.readAsText(file);
+      try {
+        const igcText = await file.text();
+        await logbookManager.importIgcTrack(igcText, {
+          fileName: file.name,
+          spotsCatalog: this.comprensoriCatalog
+        });
+        this.render();
+      } catch (err) {
+        console.warn('Errore lettura traccia IGC:', err);
+        this.navigateTo('logbook');
+      }
     }
   }
 

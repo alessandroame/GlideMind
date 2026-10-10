@@ -6204,5 +6204,423 @@ input.gm-input:focus {
   box-shadow: 0 0 0 1px var(--gm-accent, #38bdf8);
 }
 
+/* ==========================================================================
+   Flight Logbook & Telemetry View Styles (Fase 6)
+   ========================================================================== */
+
+.gm-logbook-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 12px 16px 80px 16px;
+}
+
+.gm-career-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  .gm-career-kpi-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.gm-career-kpi-card {
+  background: var(--gm-bg-card);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-md);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  user-select: none;
+}
+
+.gm-career-kpi-val {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--gm-text-primary);
+  font-feature-settings: "tnum";
+  line-height: 1.2;
+}
+
+.gm-career-kpi-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--gm-text-muted);
+  font-weight: 600;
+}
+
+.gm-logbook-dropzone {
+  border: 2px dashed var(--gm-border-strong);
+  border-radius: var(--gm-radius-lg);
+  background: var(--gm-bg-surface);
+  padding: 24px 16px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: border-color var(--gm-transition-fast), background-color var(--gm-transition-fast);
+}
+
+.gm-logbook-dropzone.dragover {
+  border-color: var(--gm-accent, #38bdf8);
+  background: rgba(56, 189, 248, 0.08);
+}
+
+.gm-logbook-dropzone-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--gm-text-primary);
+}
+
+.gm-logbook-dropzone-hint {
+  font-size: 0.8rem;
+  color: var(--gm-text-muted);
+  max-width: 480px;
+}
+
+.gm-logbook-progress-wrap {
+  width: 100%;
+  max-width: 320px;
+  height: 6px;
+  background: var(--gm-bg-base);
+  border-radius: var(--gm-radius-full);
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.gm-logbook-progress-bar {
+  height: 100%;
+  background: var(--gm-accent, #38bdf8);
+  width: 0%;
+  transition: width 0.2s ease-out;
+}
+
+.gm-flight-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.gm-flight-card {
+  width: 100%;
+  background: var(--gm-bg-card);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-md);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color var(--gm-transition-fast);
+}
+
+.gm-flight-card:hover {
+  border-color: var(--gm-border-strong);
+}
+
+.gm-flight-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.gm-flight-site-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--gm-text-primary);
+  min-width: 0;
+  word-break: break-word;
+}
+
+.gm-flight-card-sub {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  color: var(--gm-text-muted);
+}
+
+.gm-flight-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 8px 0;
+  border-top: 1px solid var(--gm-border);
+  border-bottom: 1px solid var(--gm-border);
+}
+
+.gm-flight-metric-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.gm-flight-metric-num {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--gm-text-primary);
+  font-feature-settings: "tnum";
+}
+
+.gm-flight-metric-desc {
+  font-size: 0.72rem;
+  color: var(--gm-text-muted);
+  text-transform: uppercase;
+}
+
+.gm-flight-sparkline-wrap {
+  width: 100%;
+  height: 36px;
+  background: var(--gm-bg-surface);
+  border-radius: var(--gm-radius-sm);
+  padding: 2px 4px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+
+.gm-flight-sparkline {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.gm-flight-sparkline-polyline {
+  fill: none;
+  stroke: var(--gm-accent, #38bdf8);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.gm-flight-card-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.gm-logbook-empty {
+  text-align: center;
+  padding: 32px 16px;
+  background: var(--gm-bg-card);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-md);
+  color: var(--gm-text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.gm-logbook-undo-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--gm-bg-surface);
+  border: 1px solid var(--gm-border-strong);
+  border-radius: var(--gm-radius-md);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.gm-storage-warning-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: var(--gm-radius-md);
+  font-size: 0.8rem;
+  color: var(--gm-text-primary);
+}
+
+/* ==========================================================================
+   Flight Detail & Debriefing Sheet Styles (Fase 6-ter)
+   ========================================================================== */
+.gm-flight-detail-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-bottom: 32px;
+}
+
+.gm-flight-detail-header-card {
+  padding: 16px;
+  background: var(--gm-bg-card);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gm-flight-detail-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--gm-text-primary);
+  line-height: 1.3;
+}
+
+.gm-flight-detail-sub {
+  font-size: 0.8rem;
+  color: var(--gm-text-secondary);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.gm-flight-detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gm-flight-detail-section-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--gm-text-secondary);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.gm-flight-detail-alt-chart {
+  width: 100%;
+  height: 120px;
+  background: var(--gm-bg-card);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-md);
+  overflow: hidden;
+  position: relative;
+}
+
+.gm-flight-detail-phase-bar {
+  height: 14px;
+  width: 100%;
+  border-radius: var(--gm-radius-sm);
+  border: 1px solid var(--gm-border);
+}
+
+.gm-phase-legend-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  font-size: 0.75rem;
+  color: var(--gm-text-secondary);
+}
+
+.gm-phase-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.gm-phase-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.gm-thermals-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gm-thermal-card {
+  padding: 12px 14px;
+  background: var(--gm-bg-card);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.gm-thermal-index-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--gm-radius-sm);
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  font-weight: 800;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.gm-debrief-box {
+  padding: 16px;
+  background: var(--gm-bg-card);
+  border: 1px solid var(--gm-border-strong);
+  border-radius: var(--gm-radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gm-debrief-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.gm-debrief-instructor-tag {
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(14, 165, 233, 0.15);
+  color: #0ea5e9;
+  letter-spacing: 0.03em;
+}
+
+.gm-debrief-text {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--gm-text-primary);
+  white-space: pre-line;
+}
+
+.gm-flight-notes-textarea {
+  width: 100%;
+  min-height: 90px;
+  padding: 10px 12px;
+  font-size: 0.875rem;
+  border-radius: var(--gm-radius-md);
+  border: 1px solid var(--gm-border);
+  background: var(--gm-bg-input, var(--gm-bg-base));
+  color: var(--gm-text-primary);
+  font-family: inherit;
+  resize: vertical;
+}
+
+.gm-flight-notes-textarea:focus {
+  outline: 2px solid var(--gm-accent-sky, #0ea5e9);
+}
+
+
 
 
