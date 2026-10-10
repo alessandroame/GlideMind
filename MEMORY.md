@@ -487,3 +487,24 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
 - **Pattern Vincolante**:
   1. **Standard Globale (`engineering-workflow/rules/AGENTS.md`)**: Tutto il codice sorgente (nomi di variabili, funzioni, classi, file, commenti `//`, docstring JSDoc, test unitari `describe`/`it`, eccezioni e commit Git) deve essere redatto esclusivamente in lingua inglese. L'interfaccia utente (UI copy e file di localizzazione) segue la lingua target di prodotto, mantenendo chiavi e commenti in inglese.
   2. **Attivazione Workspace (`AGENTS.md`)**: La radice del repository deve sempre ospitare `AGENTS.md` con l'inclusione attiva dei vincoli architetturali (`@[...]`), garantendo il montaggio deterministico delle direttive in ogni sessione.
+
+---
+
+## 49. Neutralità del Selettore Temporale nelle Viste Multi-Sito vs Viste Dettaglio
+- **Problema**: Mostrare badge o dot di volabilità (es. "Volabile", "Non Volabile") nel selettore di data della Home Dashboard induceva un grave bias cognitivo e di sicurezza per il pilota: mancando uno spot selezionato, il calcolo ripiegava silenziosamente sul primo comprensorio del catalogo (Monte Cornizzolo). Se a Cornizzolo c'era vento forte da Sud, il calendario indicava la giornata come "Non Volabile", inducendo il pilota a credere che l'intera regione non fosse volabile, mentre in altre vallate con diversa esposizione le condizioni erano ottimali.
+- **Causa Radice**: Sovrapposizione indebita tra il selettore di navigazione temporale di una vista aggregata multi-sito (Home) e il calendario di valutazione micro-meteorologica di un singolo sito montano (`ForecastView`).
+- **Pattern Vincolante**:
+  1. **Selettore Date Neutro nelle Viste Globali/Catalogo (`HomeDashboardView`)**: Quando il contesto operativo comprende molteplici comprensori orograficamente diversi, il selettore date (quick tabs e bottom sheet calendario) deve rimanere **neutro** (date, giorni, mesi, indicatore di orizzonte sinottico per > 7gg), senza dot o badge di volabilità ancorati a spot sentinella arbitrari e senza legende semantiche per singolo sito. Il suo scopo esclusivo è consentire il cambio di data per filtrare e riordinare la classifica dei comprensori.
+  2. **Valutazione Semantica Riservata alle Viste di Dettaglio (`ForecastView`)**: I badge a 4 colori (Verde, Giallo, Rosso, Nero) e la legenda semantica sono riservati esclusivamente alle viste in cui il decollo primario e l'atterraggio sono noti, univoci ed esplicitati al pilota.
+
+---
+
+## 50. Contratti Operabili da Tastiera e Affordance Navigazionale delle Card Dashboard (Jakob's Law & WCAG POUR)
+- **Problema**: L'uso di elementi semantici contenitore (`<article>`) per card cliccabili in dashboard responsive le rende invisibili agli screen reader come controlli azionabili e inaccessibili da tastiera (`Tab`, `Enter`, `Space`). Inoltre, in assenza di chevron o indicatori visuali espliciti, l'utente fatica a percepire immediatamente che la card sia un target d'azione a tutta area verso una vista di dettaglio (`ForecastView`).
+- **Causa Radice**: Affidamento esclusivo all'evento mouse `click` su un elemento non interattivo per default nel DOM senza implementare il pattern WAI-ARIA Card Navigation.
+- **Pattern Vincolante**:
+  1. **Semantica Interattiva**: Quando una card svolge la funzione di pulsante di navigazione verso un'altra vista, deve esporre esplicitamente `role="button"` e `tabindex="0"`.
+  2. **Event Delegation Tastiera**: Il controller della vista deve intercettare gli eventi `keydown` sui target con `role="button"`, attivando la navigazione su tasti `Enter` e `Space` (`e.preventDefault()`).
+  3. **Visual Affordance (Jakob's Law)**: Includere sempre una chevron di avanzamento (`.gm-spot-chevron`) e uno stile `:focus-visible` ad alto contrasto per confermare visivamente la destinazione dell'interazione.
+  4. **Robustezza di Ricerca (Postel's Law)**: Nelle barre di ricerca filtri, normalizzare sempre la query e i campi target con rimozione dei diacritici Unicode (`normalize('NFD').replace(/[\u0300-\u036f]/g, '')`), consentendo il matching tollerante a prescindere da accenti o formattazioni.
+

@@ -1,5 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import { HomeDashboardViewController } from '../../ui/views/HomeDashboardView.js';
 import { createStore } from '../../core/store.js';
 import { GLIDER_CLASSES, DEFAULT_GLIDER } from '../../core/flyability.js';
@@ -364,7 +366,7 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     assert.equal(mockStore.getState().activeDate, '2026-10-10');
   });
 
-  it('should open the 14-day date picker sheet with 4-color flyability indicators and legend in HomeDashboard', async () => {
+  it('should open the 14-day date picker sheet with clean neutral dates in HomeDashboard', async () => {
     const { initSheetManager } = await import('../../ui/sheetManager.js');
     let capturedHtml = '';
     const mockContainer = {
@@ -392,12 +394,9 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     controller.openDatePickerSheet();
 
     assert.ok(capturedHtml.includes('Calendario Previsioni (Prossimi 14 Giorni)'));
-    assert.ok(capturedHtml.includes('grid-fly-status'));
-    assert.ok(capturedHtml.includes('gm-date-sheet-legend'));
-    assert.ok(capturedHtml.includes('Volabile'));
-    assert.ok(capturedHtml.includes('Cautela'));
-    assert.ok(capturedHtml.includes('Non Volabile'));
-    assert.ok(capturedHtml.includes('Severo'));
+    assert.ok(capturedHtml.includes('data-action="pick-calendar-date"'));
+    assert.ok(!capturedHtml.includes('grid-fly-status'), 'Home calendar should not include spot-specific flyability badges');
+    assert.ok(!capturedHtml.includes('gm-date-sheet-legend'), 'Home calendar should not include single-spot flyability legend');
   });
 
   it('should display only favorite spots and react to store pinnedSpotIds changes', () => {
@@ -659,5 +658,187 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     // Dashboard UI must now display Swing Nyos 2 RS
     const html = controller.renderHtml();
     assert.ok(html.includes('Swing Nyos 2 RS'), 'Must display Swing Nyos 2 RS in glider pill');
+  });
+
+  it('should enforce accessibility attributes (role="button", tabindex="0") and keyboard activation on comprensorio cards (Jakob & WCAG POUR)', () => {
+    const mockStore = createStore();
+    let navigatedRoute = null;
+    const mockRouter = {
+      navigate(route) {
+        navigatedRoute = route;
+      }
+    };
+    const controller = new HomeDashboardViewController({
+      store: mockStore,
+      router: mockRouter
+    });
+
+    const html = controller.renderHtml();
+    assert.ok(html.includes('role="button"'), 'Card must declare role="button" for screen readers');
+    assert.ok(html.includes('tabindex="0"'), 'Card must declare tabindex="0" for keyboard focusability');
+    assert.ok(html.includes('gm-spot-chevron'), 'Card must render chevron affordance for glanceable interaction');
+
+    // Simulate keyboard activation via Enter key
+    const mockEnterEvent = {
+      key: 'Enter',
+      target: {
+        closest(sel) {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute(attr) {
+                if (attr === 'data-action') return 'view-forecast';
+                if (attr === 'data-id') return 'monte-cornizzolo-lc';
+                return null;
+              }
+            };
+          }
+          return null;
+        }
+      },
+      preventDefault() {}
+    };
+
+    controller.handleKeyDown(mockEnterEvent);
+    assert.equal(navigatedRoute, 'forecast', 'Enter key on focused card must navigate to forecast');
+    assert.equal(mockStore.getState().selectedSpot.id, 'monte-cornizzolo-lc');
+
+    // Simulate keyboard activation via Space key
+    navigatedRoute = null;
+    const mockSpaceEvent = {
+      key: ' ',
+      target: {
+        tagName: 'ARTICLE',
+        closest(sel) {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute(attr) {
+                if (attr === 'data-action') return 'view-forecast';
+                if (attr === 'data-id') return 'meduno-monte-valinis-pn';
+                return null;
+              }
+            };
+          }
+          return null;
+        }
+      },
+      preventDefault() {}
+    };
+
+    controller.handleKeyDown(mockSpaceEvent);
+    assert.equal(navigatedRoute, 'forecast', 'Space key on focused card must navigate to forecast');
+    assert.equal(mockStore.getState().selectedSpot.id, 'meduno-monte-valinis-pn');
+  });
+
+  it('should render search clear button and handle clearing search (Fitts, Cheap Takeover & NN/G #7)', () => {
+    const mockStore = createStore();
+    const controller = new HomeDashboardViewController({ store: mockStore });
+
+    // Initially search query is empty -> clear button has hidden class
+    let html = controller.renderHtml();
+    assert.ok(html.includes('id="home-search-clear-btn"'), 'Must render search clear button');
+    assert.ok(html.includes('gm-search-clear hidden'), 'Clear button must be hidden when search is empty');
+
+    // Search query is set -> clear button is not hidden
+    controller.searchQuery = 'Cavallaria';
+    html = controller.renderHtml();
+    assert.ok(!html.includes('gm-search-clear hidden'), 'Clear button must be visible when query is present');
+
+    // Simulate clicking clear-search
+    let focused = false;
+    controller.containerEl = {
+      querySelector(sel) {
+        if (sel === '#home-spot-search') {
+          return {
+            value: 'Cavallaria',
+            focus() { focused = true; }
+          };
+        }
+        if (sel === '#home-search-clear-btn') {
+          return {
+            classList: {
+              add(cls) {
+                assert.equal(cls, 'hidden');
+              }
+            }
+          };
+        }
+        return null;
+      }
+    };
+
+    const mockClickEvent = {
+      target: {
+        closest(sel) {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute(attr) {
+                if (attr === 'data-action') return 'clear-search';
+                return null;
+              }
+            };
+          }
+          return null;
+        }
+      }
+    };
+
+    controller.handleClick(mockClickEvent);
+    assert.equal(controller.searchQuery, '', 'searchQuery must be reset to empty string');
+    assert.equal(focused, true, 'Search input must regain focus after clearing');
+  });
+
+  it('should normalize search query removing accents and diacritics tolerantly (Postel\'s Law)', () => {
+    const mockStore = createStore();
+    const controller = new HomeDashboardViewController({ store: mockStore });
+
+    // Search with accent 'Cavallària'
+    controller.searchQuery = 'Cavallària';
+    let results = controller.getEvaluatedComprensori();
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, 'Monte Cavallaria');
+
+    // Search without accent and extra whitespace '  cavallaria  '
+    controller.searchQuery = '  cavallaria  ';
+    results = controller.getEvaluatedComprensori();
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, 'Monte Cavallaria');
+  });
+
+  it('should provide 1-tap "Azzera ricerca" button in empty search state (NN/G #9 & Cheap Takeover)', () => {
+    const mockStore = createStore();
+    const controller = new HomeDashboardViewController({ store: mockStore });
+
+    controller.searchQuery = 'LocalitaInesistenteXYZ';
+    const html = controller.renderHtml();
+
+    assert.ok(html.includes('Nessuna località trovata per "LocalitaInesistenteXYZ"'), 'Empty state must declare accurate copy');
+    assert.ok(html.includes('Azzera ricerca'), 'Must provide 1-tap reset action');
+    assert.ok(html.includes('data-action="clear-search"'), 'Reset action must have clear-search attribute');
+  });
+
+  it('should enforce Fitts\'s Law touch target floor and focus-visible states in theme.css', () => {
+    const cssContent = fs.readFileSync(path.resolve('css/theme.css'), 'utf-8');
+
+    // Check search input touch height >= 44px
+    assert.ok(
+      cssContent.includes('.gm-search-input {\n  width: 100%;\n  height: 44px;') ||
+      cssContent.includes('.gm-search-input {\r\n  width: 100%;\r\n  height: 44px;') ||
+      /\.gm-search-input\s*\{[^}]*min-height:\s*44px/.test(cssContent),
+      '.gm-search-input must enforce >= 44px touch height'
+    );
+
+    // Check search clear button touch size 44x44px
+    assert.ok(
+      /\.gm-search-clear\s*\{[^}]*width:\s*44px/.test(cssContent) &&
+      /\.gm-search-clear\s*\{[^}]*height:\s*44px/.test(cssContent),
+      '.gm-search-clear must enforce 44x44px touch area'
+    );
+
+    // Check spot card focus-visible declaration
+    assert.ok(cssContent.includes('.gm-spot-card:focus-visible'), 'Must declare .gm-spot-card:focus-visible');
+
+    // Check light theme contrast overrides
+    assert.ok(cssContent.includes('[data-theme="light"] .gm-spot-flight-row'), 'Must declare light mode .gm-spot-flight-row override');
+    assert.ok(cssContent.includes('[data-theme="light"] .gm-spot-prov'), 'Must declare light mode .gm-spot-prov override');
   });
 });

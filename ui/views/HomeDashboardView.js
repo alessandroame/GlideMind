@@ -68,6 +68,20 @@ function escapeHtml(str) {
 }
 
 /**
+ * Normalizes text for tolerant search matching (Postel's Law: accents, diacritics, case, whitespace).
+ * @param {string} str
+ * @returns {string}
+ */
+export function normalizeSearchText(str) {
+  if (typeof str !== 'string') return '';
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+/**
  * HomeDashboardViewController implementation.
  */
 export class HomeDashboardViewController {
@@ -77,6 +91,7 @@ export class HomeDashboardViewController {
     this.containerEl = null;
     this.storeUnsubscribe = null;
     this.boundClickHandler = this.handleClick.bind(this);
+    this.boundKeyDownHandler = this.handleKeyDown.bind(this);
     this.boundFileInputHandler = this.handleFileInput.bind(this);
     this.boundSearchInputHandler = this.handleSearchInput.bind(this);
     
@@ -253,6 +268,7 @@ export class HomeDashboardViewController {
     // Attach delegated events if in browser/DOM environment
     if (this.containerEl && typeof this.containerEl.addEventListener === 'function') {
       this.containerEl.addEventListener('click', this.boundClickHandler);
+      this.containerEl.addEventListener('keydown', this.boundKeyDownHandler);
 
       const fileInput = typeof this.containerEl.querySelector === 'function'
         ? this.containerEl.querySelector('#home-igc-file-input')
@@ -287,6 +303,7 @@ export class HomeDashboardViewController {
 
     if (this.containerEl && typeof this.containerEl.removeEventListener === 'function') {
       this.containerEl.removeEventListener('click', this.boundClickHandler);
+      this.containerEl.removeEventListener('keydown', this.boundKeyDownHandler);
     }
     if (this.sheetContainerEl && typeof this.sheetContainerEl.removeEventListener === 'function') {
       this.sheetContainerEl.removeEventListener('click', this.boundClickHandler);
@@ -309,13 +326,13 @@ export class HomeDashboardViewController {
     // Filter catalog to include ONLY spots pinned as favorites from Forecast view
     const favoriteComprensori = this.comprensoriCatalog.filter(c => isSpotPinned(c, pinnedIds));
 
-    const query = this.searchQuery.trim().toLowerCase();
+    const query = normalizeSearchText(this.searchQuery);
     const sourceComprensori = query
       ? this.comprensoriCatalog.filter(c => {
-          const matchName = (c.name || '').toLowerCase().includes(query);
-          const matchProv = (c.province || '').toLowerCase().includes(query);
-          const matchLoc = (c.location || '').toLowerCase().includes(query);
-          const matchRegion = (c.region || '').toLowerCase().includes(query);
+          const matchName = normalizeSearchText(c.name).includes(query);
+          const matchProv = normalizeSearchText(c.province).includes(query);
+          const matchLoc = normalizeSearchText(c.location).includes(query);
+          const matchRegion = normalizeSearchText(c.region).includes(query);
           return matchName || matchProv || matchLoc || matchRegion;
         })
       : favoriteComprensori;
@@ -377,7 +394,7 @@ export class HomeDashboardViewController {
             <h2 id="heading-comprensori">Volabilità</h2>
             <div class="flex items-center gap-2">
               ${this.renderLiveWeatherBadge()}
-              <span id="home-spots-count">${evaluatedList.length} siti</span>
+              <span id="home-spots-count" aria-live="polite">${evaluatedList.length} siti</span>
             </div>
           </div>
 
@@ -386,7 +403,7 @@ export class HomeDashboardViewController {
 
           <!-- Compact Search Bar (Sotto il titolo Volabilità) -->
           <div class="gm-search-wrapper">
-            <svg class="gm-search-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2">
+            <svg class="gm-search-icon" viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" fill="none" stroke-width="2" aria-hidden="true">
               <circle cx="11" cy="11" r="8"></circle>
               <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
             </svg>
@@ -398,7 +415,21 @@ export class HomeDashboardViewController {
               value="${escapeHtml(this.searchQuery)}" 
               autocomplete="off" 
               aria-label="Ricerca" 
+              aria-controls="home-spots-list"
             />
+            <button 
+              type="button" 
+              id="home-search-clear-btn" 
+              class="gm-search-clear ${this.searchQuery ? '' : 'hidden'}" 
+              data-action="clear-search" 
+              aria-label="Cancella testo di ricerca" 
+              title="Cancella ricerca"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
           </div>
 
           ${this.renderComprensoriList(evaluatedList)}
@@ -462,12 +493,10 @@ export class HomeDashboardViewController {
    */
   renderDateBar(state) {
     const activeDate = state.activeDate || formatDateIso(new Date());
-    const spot = state.selectedSpot || this.comprensoriCatalog[0] || DEFAULT_COMPRENSORI[0];
-    const flySummaries = this.getMultiDayFlyability(spot, 14);
-    const smartData = getSmartDatePresets(new Date(), activeDate, flySummaries);
+    const smartData = getSmartDatePresets(new Date(), activeDate);
 
     return `
-      <div class="gm-date-tabs mb-1" role="tablist" aria-label="Selettore data volabilità">
+      <div class="gm-date-tabs mb-1" role="tablist" aria-label="Selettore data previsioni">
         ${smartData.presets.map(p => `
           <button 
             type="button" 
@@ -476,11 +505,10 @@ export class HomeDashboardViewController {
             data-date="${p.isoDate}" 
             role="tab" 
             aria-selected="${p.isActive ? 'true' : 'false'}" 
-            title="${p.label} - ${p.subLabel}${p.flyability && p.flyability.status !== 'unknown' ? ` (${p.flyability.label})` : ''}"
+            title="${p.label} - ${p.subLabel}"
           >
             <span class="gm-date-tab-main">
               ${p.label}
-              ${p.flyability && p.flyability.status !== 'unknown' ? `<span class="gm-tab-fly-dot fly-${p.flyability.status}" title="${escapeHtml(p.flyability.label)}"></span>` : ''}
             </span>
             <span class="gm-date-tab-sub">${p.subLabel}</span>
           </button>
@@ -534,13 +562,20 @@ export class HomeDashboardViewController {
     if (evaluatedList.length === 0) {
       if (this.searchQuery) {
         return `
-          <div id="home-spots-list" class="gm-spot-card text-center py-4 px-3 flex flex-col items-center gap-1">
+          <div id="home-spots-list" class="gm-spot-card text-center py-4 px-3 flex flex-col items-center gap-2">
             <div class="text-xs font-semibold text-[var(--gm-text-primary)]">
-              Nessun sito preferito trovato per "${escapeHtml(this.searchQuery)}"
+              Nessuna località trovata per "${escapeHtml(this.searchQuery)}"
             </div>
-            <p class="text-xs text-[var(--gm-text-muted)]">
-              Verifica il nome inserito o cancella il filtro di ricerca.
+            <p class="text-xs text-[var(--gm-text-muted)] max-w-xs">
+              Verifica i termini digitati o ripristina la visualizzazione completa.
             </p>
+            <button 
+              type="button" 
+              class="gm-btn-compact-accent mt-1" 
+              data-action="clear-search"
+            >
+              Azzera ricerca
+            </button>
           </div>
         `;
       }
@@ -550,7 +585,7 @@ export class HomeDashboardViewController {
             Nessuna località tra i preferiti
           </div>
           <p class="text-xs text-[var(--gm-text-muted)] max-w-xs">
-            Seleziona le tue località preferite dalla pagina Previsioni toccando l'icona della stella (★).
+            Aggiungi le tue località dai dettagli in Previsioni per visualizzarle rapidamente nella panoramica.
           </p>
           <button 
             type="button" 
@@ -600,17 +635,24 @@ export class HomeDashboardViewController {
         data-comprensorio-id="${escapeHtml(item.comprensorioId)}"
         data-action="view-forecast"
         data-id="${escapeHtml(item.comprensorioId)}"
+        role="button"
+        tabindex="0"
         aria-label="${escapeHtml(item.name)}, stato ${escapeHtml(item.badge)}"
       >
-        <!-- Line 1: Spot Name + Province + Live Flyability Badge -->
+        <!-- Line 1: Spot Name + Province + Live Flyability Badge + Navigation Affordance -->
         <div class="gm-spot-header">
           <div class="gm-spot-title-group">
             <span class="gm-spot-name">${escapeHtml(item.name)}</span>
             ${item.province ? `<span class="gm-spot-prov">${escapeHtml(item.province)}</span>` : ''}
           </div>
-          <span class="gm-badge ${badgeClass}">
-            ${escapeHtml(item.badge)}
-          </span>
+          <div class="flex items-center gap-2">
+            <span class="gm-badge ${badgeClass}">
+              ${escapeHtml(item.badge)}
+            </span>
+            <svg class="gm-spot-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+          </div>
         </div>
 
         <!-- Line 2: Dual Launch & Landing Rows -->
@@ -1173,9 +1215,7 @@ export class HomeDashboardViewController {
     const today = new Date();
     const minDate = formatDateIso(today);
     const maxDate = formatDateIso(new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000));
-    const spot = state.selectedSpot || this.comprensoriCatalog[0] || DEFAULT_COMPRENSORI[0];
-    const flySummaries = this.getMultiDayFlyability(spot, 14);
-    const availableDates = getAvailableCalendarDates(today, 14, flySummaries);
+    const availableDates = getAvailableCalendarDates(today, 14, null);
 
     const renderContent = () => `
       <div class="gm-date-picker-sheet flex flex-col gap-4">
@@ -1204,7 +1244,7 @@ export class HomeDashboardViewController {
           </div>
         </div>
 
-        <!-- 14-Day Fast Tap Grid -->
+        <!-- 14-Day Fast Tap Grid (Neutral Calendar for Multi-Spot Dashboard) -->
         <div class="gm-date-sheet-section">
           <span class="text-xs font-bold uppercase tracking-wider text-[var(--gm-text-muted)] block mb-2">
             Calendario Previsioni (Prossimi 14 Giorni)
@@ -1215,33 +1255,20 @@ export class HomeDashboardViewController {
               return `
                 <button 
                   type="button" 
-                  class="gm-date-grid-item ${isSelected ? 'active' : ''} ${d.isWeekend ? 'weekend' : ''} fly-${d.flyability.status}"
+                  class="gm-date-grid-item ${isSelected ? 'active' : ''} ${d.isWeekend ? 'weekend' : ''}"
                   data-action="pick-calendar-date"
                   data-date="${d.isoDate}"
                   aria-selected="${isSelected ? 'true' : 'false'}"
-                  title="${d.dayName} ${d.formatted} (${d.horizon.label}) - ${d.flyability.label}: ${d.flyability.limitingFactor || ''}"
+                  title="${d.dayName} ${d.formatted} (${d.horizon.label})"
                 >
                   <span class="grid-day-name">${escapeHtml(d.dayName)}</span>
                   <span class="grid-day-number">${d.dayNumber}</span>
                   <span class="grid-month">${escapeHtml(d.formatted.split(' ')[1])}</span>
 
-                  <span class="grid-fly-status ${d.flyability.badgeClass}" title="${escapeHtml(d.flyability.label)}">
-                    <span class="grid-fly-icon" aria-hidden="true">${d.flyability.icon}</span>
-                    <span class="grid-fly-label">${escapeHtml(d.flyability.label)}</span>
-                  </span>
-
                   ${d.horizon.isSynoptic ? `<span class="grid-synoptic-dot" title="Tendenza sinottica (attendibilità indicativa)">●</span>` : ''}
                 </button>
               `;
             }).join('')}
-          </div>
-
-          <!-- 4-Color Semantic Legend -->
-          <div class="gm-date-sheet-legend flex items-center justify-between text-[0.68rem] px-1 pt-3 text-[var(--gm-text-muted)] border-t border-[var(--gm-border)] mt-3">
-            <span class="flex items-center gap-1"><span class="text-[var(--gm-status-flyable)]">●</span> Volabile</span>
-            <span class="flex items-center gap-1"><span class="text-[var(--gm-status-caution)]">▲</span> Cautela</span>
-            <span class="flex items-center gap-1"><span class="text-[var(--gm-status-unflyable)]">✕</span> Non Volabile</span>
-            <span class="flex items-center gap-1"><span class="text-[#f87171]">⚡</span> Severo</span>
           </div>
         </div>
       </div>
@@ -1249,7 +1276,7 @@ export class HomeDashboardViewController {
 
     openSheet({
       id: 'home-date-picker-sheet',
-      title: 'Seleziona Data Volabilità Siti',
+      title: 'Seleziona Data Previsioni',
       content: renderContent(),
       onOpen: () => {
         if (typeof document !== 'undefined') {
@@ -1270,6 +1297,76 @@ export class HomeDashboardViewController {
   }
 
   /**
+   * Handles keyboard navigation and shortcuts (Escape to clear search, Enter/Space to activate).
+   * @param {KeyboardEvent} evt
+   */
+  handleKeyDown(evt) {
+    if (!evt || !evt.key) return;
+
+    if (evt.key === 'Escape' && this.searchQuery) {
+      this.clearSearch();
+      return;
+    }
+
+    if (evt.key !== 'Enter' && evt.key !== ' ') return;
+    const target = evt.target;
+    if (!target) return;
+
+    const actionEl = typeof target.closest === 'function'
+      ? target.closest('[data-action]')
+      : (typeof target.getAttribute === 'function' ? target : null);
+    if (!actionEl) return;
+
+    // Prevent default scroll when activating cards or buttons via Space
+    if (evt.key === ' ') {
+      const tagName = (target.tagName || '').toLowerCase();
+      if (tagName !== 'input' && tagName !== 'textarea') {
+        if (typeof evt.preventDefault === 'function') {
+          evt.preventDefault();
+        }
+      }
+    }
+
+    this.handleClick({
+      target: actionEl,
+      stopPropagation: () => {},
+      preventDefault: () => {
+        if (typeof evt.preventDefault === 'function') evt.preventDefault();
+      }
+    });
+  }
+
+  /**
+   * Clears the active search query and re-renders the spot list.
+   */
+  clearSearch() {
+    this.searchQuery = '';
+    if (this.containerEl) {
+      const searchInput = this.containerEl.querySelector('#home-spot-search');
+      if (searchInput) {
+        searchInput.value = '';
+        if (typeof searchInput.focus === 'function') searchInput.focus();
+      }
+      const clearBtn = this.containerEl.querySelector('#home-search-clear-btn');
+      if (clearBtn && typeof clearBtn.classList?.add === 'function') {
+        clearBtn.classList.add('hidden');
+      }
+      const listContainer = this.containerEl.querySelector('section[aria-labelledby="heading-comprensori"]');
+      if (listContainer) {
+        const evaluatedList = this.getEvaluatedComprensori();
+        const countBadge = listContainer.querySelector('#home-spots-count') || listContainer.querySelector('.flex.items-center.justify-between.text-xs span:last-child');
+        if (countBadge) countBadge.textContent = `${evaluatedList.length} siti`;
+        const existingList = listContainer.querySelector('#home-spots-list') || listContainer.querySelector('.flex.flex-col.gap-2');
+        if (existingList) {
+          existingList.outerHTML = this.renderComprensoriList(evaluatedList);
+        }
+        return;
+      }
+    }
+    this.render();
+  }
+
+  /**
    * Handles user clicks within the view via event delegation.
    * @param {MouseEvent} evt
    */
@@ -1277,13 +1374,17 @@ export class HomeDashboardViewController {
     const target = evt.target;
     if (!target) return;
 
-    const actionEl = target.closest('[data-action]');
+    const actionEl = typeof target.closest === 'function'
+      ? target.closest('[data-action]')
+      : (typeof target.getAttribute === 'function' ? target : null);
     if (!actionEl) return;
 
     const action = actionEl.getAttribute('data-action');
     const id = actionEl.getAttribute('data-id');
 
-    if (action === 'select-date') {
+    if (action === 'clear-search') {
+      this.clearSearch();
+    } else if (action === 'select-date') {
       const dateAttr = actionEl.getAttribute('data-date');
       if (dateAttr && this.store) {
         this.store.setState({ activeDate: dateAttr });
@@ -1405,10 +1506,18 @@ export class HomeDashboardViewController {
     const input = evt.target;
     if (input) {
       this.searchQuery = input.value || '';
+      
+      if (this.containerEl) {
+        const clearBtn = this.containerEl.querySelector('#home-search-clear-btn');
+        if (clearBtn && typeof clearBtn.classList?.toggle === 'function') {
+          clearBtn.classList.toggle('hidden', !this.searchQuery);
+        }
+      }
+
       const listContainer = this.containerEl ? this.containerEl.querySelector('section[aria-labelledby="heading-comprensori"]') : null;
       if (listContainer) {
         const evaluatedList = this.getEvaluatedComprensori();
-        const countBadge = listContainer.querySelector('.flex.items-center.justify-between.text-xs span:last-child');
+        const countBadge = listContainer.querySelector('#home-spots-count') || listContainer.querySelector('.flex.items-center.justify-between.text-xs span:last-child');
         if (countBadge) countBadge.textContent = `${evaluatedList.length} siti`;
         
         const existingList = listContainer.querySelector('#home-spots-list') || listContainer.querySelector('.flex.flex-col.gap-2');

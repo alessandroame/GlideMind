@@ -487,3 +487,32 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Creato [AGENTS.md](file:///AGENTS.md) alla radice del workspace GlideMind con inclusione sintattica `@[...]` di [.agents/rules/constraints.md](file:///.agents/rules/constraints.md) e collegamenti a tutte le specifiche di dominio, attivando l'iniezione automatica delle regole ad ogni avvio di sessione.
   - Suite di test convalidata: `node scripts/validate.mjs --all` sui plugin (9/9 OK) e `npm test` su GlideMind (325/325 passati).
   - Registrata la Lezione Appresa #48 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-10 - Neutralizzazione del Calendario e Selettore Data nella Home Dashboard
+- **Tipo**: Refactor / UX & Flight Safety / Bias Cognitivo
+- **Dettagli**: [.agents/worklog.d/2026-10-10_neutral-home-date-picker.md](file:///.agents/worklog.d/2026-10-10_neutral-home-date-picker.md)
+- **Sintesi**:
+  - Eliminato il fallback silente su Monte Cornizzolo per il calcolo della volabilità nel selettore date della Home Dashboard, rimuovendo un grave bias cognitivo di disinformazione meteorologica per decolli con orografia ed esposizioni diverse.
+  - In [ui/views/HomeDashboardView.js](file:///ui/views/HomeDashboardView.js): rimossi i dot di volabilità arbitrari dai tab rapidi della `renderDateBar` e neutralizzata la griglia 14 giorni in `openDatePickerSheet` (date pulite, orizzonte sinottico >7gg, zero classi `fly-*`, zero badge e rimozione della legenda per singolo sito). Titolo del foglio aggiornato a *"Seleziona Data Previsioni"*.
+  - Preservata la valutazione di volabilità a 4 colori in [ui/views/ForecastView.js](file:///ui/views/ForecastView.js), dove lo spot è univoco e contestualizzato.
+  - Aggiornato il test unitario in [tests/ui/homeDashboardView.test.mjs](file:///tests/ui/homeDashboardView.test.mjs). Tutti i 325 test passati con successo.
+  - Registrata la Lezione Appresa #49 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-10 - Risoluzione UX Laws, Accessibilità e Touch Ergonomics nella Home Dashboard
+- **Tipo**: UX Law & Accessibility Remediation / Ergonomia Outdoor
+- **Dettagli**: [.agents/worklog.d/2026-10-10_home-ux-laws-remediation.md](file:///.agents/worklog.d/2026-10-10_home-ux-laws-remediation.md)
+- **Sintesi**:
+  - Eseguito audit e risolute le criticità UX Laws nella Home Dashboard (esclusa la sezione attività di volo/currency per direttiva esplicita).
+  - **Postel's Law (Robustezza)**: Normalizzazione caratteri accentati e diacritici Unicode nella ricerca dei comprensori (`normalizeSearchText`), garantendo matching esatto su variazioni ortografiche.
+  - **Fitts's Law & Touch Target Floor ($\ge 44\text{px}$)**: Aumentata altezza minima del campo di ricerca `.gm-search-input` a 44px; inserito pulsante rapido di azzeramento ricerca `.gm-search-clear` ($44\times 44\text{px}$); portati i pulsanti compatti a 44px di altezza minima.
+  - **Jakob's Law & WCAG POUR**: Card comprensorio dotate di `role="button"`, `tabindex="0"`, chevron indicatore (`.gm-spot-chevron`) e gestione da tastiera (`Enter` e `Space` per navigare a `ForecastView`).
+  - **NN/G #9 & Cheap Takeover**: Aggiunto pulsante 1-tap "Azzera ricerca" nello stato di lista vuota e supporto al tasto `Escape`.
+  - **WCAG POUR & Sunlight High-Contrast**: `aria-live="polite"` sul conteggio risultati, `aria-controls` sull'input, selettori `:focus-visible` ad alto contrasto e token CSS per tema luce ad alta luminanza solare.
+  - Convalidati 330 test su 46 suite (+5 test unitari dedicati in [tests/ui/homeDashboardView.test.mjs](file:///tests/ui/homeDashboardView.test.mjs)).
+  - Registrata la Lezione Appresa #50 in [MEMORY.md](file:///MEMORY.md).
+
+
