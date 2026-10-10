@@ -29,11 +29,14 @@
         "name": "Atterraggio Paragliding klub Pegaz",
         "coordinates": "43.814672, 16.652422",
         "altitude": 400,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -79,11 +82,14 @@
         "name": "Šušnjevica",
         "coordinates": "45.242133, 14.196023",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -118,11 +124,14 @@
         "name": "Atterraggio Decollo",
         "coordinates": "45.047211, 14.088410",
         "altitude": 100,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -157,11 +166,14 @@
         "name": "Atterraggio Kaštelir paraglading",
         "coordinates": "45.315666, 13.678041",
         "altitude": 400,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -207,11 +219,14 @@
         "name": "Plešivica",
         "coordinates": "45.737038, 15.668151",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -246,11 +261,14 @@
         "name": "Atterraggio Tribalj",
         "coordinates": "45.224544, 14.692954",
         "altitude": 400,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]

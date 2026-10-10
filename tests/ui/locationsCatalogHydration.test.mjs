@@ -159,7 +159,8 @@ describe('Master Locations Catalog Hydration & Runtime Integration', () => {
     assert.ok(defaultHtml.includes('Chialamberto'));
     assert.ok(defaultHtml.includes('Martiniana Po'));
     assert.ok(defaultHtml.includes('Monte Cavallaria'));
-    assert.ok(defaultHtml.includes('Altri Comprensori (132)'), 'Must render 132 non-pinned spots');
+    const expectedUnpinned = fullCatalog.length - 3;
+    assert.ok(defaultHtml.includes(`Altri Comprensori (${expectedUnpinned})`), `Must render ${expectedUnpinned} non-pinned spots`);
   });
 
   it('should select spot from picker sheet and update store when sheet click is triggered', () => {

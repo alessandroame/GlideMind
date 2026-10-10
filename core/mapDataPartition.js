@@ -59,19 +59,26 @@ export const MACRO_REGIONS = Object.freeze({
   ALPS_WEST: Object.freeze({
     id: 'alps-west',
     name: 'Francia & Alpi Ovest (FR/CH)',
-    regions: Object.freeze(['Corse', 'Auvergne-Rhône-Alpes', "Provence-Alpes-Côte d'Azur", 'Occitanie', 'Valais', 'Vaud', 'Geneve']),
+    regions: Object.freeze([
+      'Corsica', 'Corse', 'Auvergne-Rhône-Alpes', "Provence-Alpes-Côte d'Azur", 'Occitanie',
+      'Berner Oberland', 'Valais', 'Graubünden', 'Vaud', 'Jura', 'Ticino', 'Unterwalden'
+    ]),
     countries: Object.freeze(['FR', 'CH']),
     isSubdivision: false,
-    defaultCenter: Object.freeze({ lat: 45.5, lon: 6.5 }),
+    defaultCenter: Object.freeze({ lat: 46.2, lon: 7.2 }),
     defaultZoom: 7
   }),
   ALPS_EAST: Object.freeze({
     id: 'alps-east',
     name: 'Austria, Slovenia & Balcani (AT/SI/HR)',
-    regions: Object.freeze(['Tirol', 'Salzburg', 'Kärnten', 'Goriška', 'Gorenjska', 'Osrednjeslovenska', 'Istarska županija', 'Primorsko-goranska županija']),
+    regions: Object.freeze([
+      'Tirol', 'Salzburg', 'Kärnten', 'Steiermark', 'Bayern',
+      'Slovenia', 'Goriška', 'Gorenjska', 'Osrednjeslovenska',
+      'Croazia', 'Istarska županija', 'Primorsko-goranska županija'
+    ]),
     countries: Object.freeze(['AT', 'SI', 'HR', 'DE']),
     isSubdivision: false,
-    defaultCenter: Object.freeze({ lat: 46.2, lon: 14.2 }),
+    defaultCenter: Object.freeze({ lat: 47.0, lon: 13.0 }),
     defaultZoom: 7
   })
 });

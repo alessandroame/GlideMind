@@ -1,0 +1,254 @@
+[
+  {
+    "id": "zillertal-mayrhofen-tirol",
+    "name": "Zillertal - Mayrhofen",
+    "province": "",
+    "region": "Tirol",
+    "country": "AT",
+    "location": "Zillertal - Mayrhofen (Tirol)",
+    "description": "La mecca del parapendio tirolese con decollo dal Penken e discesa nel cuore della Zillertal.",
+    "webcam": null,
+    "club": null,
+    "reliability": 95,
+    "takeoffs": [
+      {
+        "id": "zillertal-mayrhofen-tirol-takeoff-1",
+        "name": "Penken (Mayrhofen)",
+        "coordinates": "47.168000, 11.815000",
+        "altitude": 2090,
+        "heading": 340,
+        "isPrimary": true,
+        "description": "Decollo ad alta quota con vista sulle Alpi Zillertaler.",
+        "hazards": "",
+        "reliability": 95
+      }
+    ],
+    "landings": [
+      {
+        "id": "zillertal-mayrhofen-tirol-landing-1",
+        "name": "Mayrhofen Bruggerstube",
+        "coordinates": "47.182000, 11.871000",
+        "altitude": 630,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio ufficiale con club house e ristorante per piloti.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 95
+      }
+    ]
+  },
+  {
+    "id": "innsbruck-nordkette-tirol",
+    "name": "Innsbruck - Nordkette",
+    "province": "",
+    "region": "Tirol",
+    "country": "AT",
+    "location": "Innsbruck - Nordkette (Tirol)",
+    "description": "Volo alpino direttamente sopra i tetti della capitale del Tirolo.",
+    "webcam": null,
+    "club": null,
+    "reliability": 92,
+    "takeoffs": [
+      {
+        "id": "innsbruck-nordkette-tirol-takeoff-1",
+        "name": "Seegrube",
+        "coordinates": "47.306000, 11.380000",
+        "altitude": 1905,
+        "heading": 160,
+        "isPrimary": true,
+        "description": "Decollo esposto a Sud sulla valle dell'Inn servito dalla Nordkettenbahn.",
+        "hazards": "",
+        "reliability": 92
+      }
+    ],
+    "landings": [
+      {
+        "id": "innsbruck-nordkette-tirol-landing-1",
+        "name": "Hungerburg",
+        "coordinates": "47.287000, 11.398000",
+        "altitude": 860,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio a mezza costa sopra Innsbruck.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 91
+      }
+    ]
+  },
+  {
+    "id": "kossen-unterberghorn-tirol",
+    "name": "Kössen - Unterberghorn",
+    "province": "",
+    "region": "Tirol",
+    "country": "AT",
+    "location": "Kössen - Unterberghorn (Tirol)",
+    "description": "Culla del volo libero austriaco con decollo riparato e termica costante.",
+    "webcam": null,
+    "club": null,
+    "reliability": 93,
+    "takeoffs": [
+      {
+        "id": "kossen-unterberghorn-tirol-takeoff-1",
+        "name": "Bärenhütte",
+        "coordinates": "47.643000, 12.433000",
+        "altitude": 1500,
+        "heading": 300,
+        "isPrimary": true,
+        "description": "Decollo regolare con moquette adiacente al rifugio Bärenhütte.",
+        "hazards": "",
+        "reliability": 93
+      }
+    ],
+    "landings": [
+      {
+        "id": "kossen-unterberghorn-tirol-landing-1",
+        "name": "Kössen Fliegerbar",
+        "coordinates": "47.665000, 12.418000",
+        "altitude": 600,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Grande prato d'atterraggio presso la stazione a valle con la Fliegerbar.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 93
+      }
+    ]
+  },
+  {
+    "id": "greifenburg-emberger-alm-karnten",
+    "name": "Greifenburg - Emberger Alm",
+    "province": "",
+    "region": "Kärnten",
+    "country": "AT",
+    "location": "Greifenburg - Emberger Alm (Kärnten)",
+    "description": "Sito mondiale di volo nella Drautal: termiche potenti e punto di partenza per triangoli FAI epici.",
+    "webcam": null,
+    "club": null,
+    "reliability": 96,
+    "takeoffs": [
+      {
+        "id": "greifenburg-emberger-alm-karnten-takeoff-1",
+        "name": "Emberger Alm",
+        "coordinates": "46.772000, 13.155000",
+        "altitude": 1750,
+        "heading": 180,
+        "isPrimary": true,
+        "description": "Decollo eccezionale esposto a Sud con termiche precoci fin dal mattino.",
+        "hazards": "",
+        "reliability": 96
+      }
+    ],
+    "landings": [
+      {
+        "id": "greifenburg-emberger-alm-karnten-landing-1",
+        "name": "Greifenburg Fliegercamp",
+        "coordinates": "46.745000, 13.180000",
+        "altitude": 610,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Il più famoso campeggio per piloti d'Europa con laghetto e grande atterraggio.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 96
+      }
+    ]
+  },
+  {
+    "id": "zell-am-see-schmittenhohe-salzburg",
+    "name": "Zell am See - Schmittenhöhe",
+    "province": "",
+    "region": "Salzburg",
+    "country": "AT",
+    "location": "Zell am See - Schmittenhöhe (Salzburg)",
+    "description": "Volo spettacolare sul lago di Zell con vista sui ghiacciai degli Alti Tauri.",
+    "webcam": null,
+    "club": null,
+    "reliability": 93,
+    "takeoffs": [
+      {
+        "id": "zell-am-see-schmittenhohe-salzburg-takeoff-1",
+        "name": "Schmittenhöhe",
+        "coordinates": "47.329000, 12.738000",
+        "altitude": 1965,
+        "heading": 90,
+        "isPrimary": true,
+        "description": "Decollo sommitale servito da funivia, ottimo punto di partenza per cross.",
+        "hazards": "",
+        "reliability": 93
+      }
+    ],
+    "landings": [
+      {
+        "id": "zell-am-see-schmittenhohe-salzburg-landing-1",
+        "name": "Fürth Piesendorf",
+        "coordinates": "47.291000, 12.753000",
+        "altitude": 760,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Ampio campo d'atterraggio ufficiale nella valle della Salzach.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 92
+      }
+    ]
+  },
+  {
+    "id": "schladming-planai-steiermark",
+    "name": "Schladming - Planai",
+    "province": "",
+    "region": "Steiermark",
+    "country": "AT",
+    "location": "Schladming - Planai (Steiermark)",
+    "description": "Sito della valle dell'Enns di fronte all'imponente parete Sud del Dachstein.",
+    "webcam": null,
+    "club": null,
+    "reliability": 91,
+    "takeoffs": [
+      {
+        "id": "schladming-planai-steiermark-takeoff-1",
+        "name": "Planai Schafalm",
+        "coordinates": "47.375000, 13.725000",
+        "altitude": 1820,
+        "heading": 330,
+        "isPrimary": true,
+        "description": "Decollo erboso servito dalla cabinovia della Planai.",
+        "hazards": "",
+        "reliability": 91
+      }
+    ],
+    "landings": [
+      {
+        "id": "schladming-planai-steiermark-landing-1",
+        "name": "Schladming WM-Stadion",
+        "coordinates": "47.394000, 13.693000",
+        "altitude": 740,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio ufficiale nella piana di Schladming.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 91
+      }
+    ]
+  }
+]

@@ -36,11 +36,14 @@
         "name": "Atterraggio Campo di Fossa (Calascio)",
         "coordinates": "42.315000, 13.695000",
         "altitude": 1100,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Ampio prato atterraggio a fondo valle.",
         "hazards": "Presenza di recinzioni per pascolo.",
         "rules": "Non disturbare le greggi e chiudere le vele prontamente.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -75,11 +78,14 @@
         "name": "Atterraggio Panettone",
         "coordinates": "42.329699, 13.794784",
         "altitude": 720,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -114,11 +120,14 @@
         "name": "Atterraggio Partenza parapendio",
         "coordinates": "42.177773, 13.917836",
         "altitude": 400,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -153,11 +162,14 @@
         "name": "Emilia in Volo parapendio",
         "coordinates": "44.222127, 10.763011",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Parapendio tandem turistico e scuola parapendio. Bar Calvanella & Protti sport meeting points.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -192,11 +204,14 @@
         "name": "atterraggio di Palanzano",
         "coordinates": "44.437727, 10.181264",
         "altitude": 588,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -242,11 +257,14 @@
         "name": "atterraggio di Riano (parapendio)",
         "coordinates": "44.594312, 10.213593",
         "altitude": 490,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -292,11 +310,14 @@
         "name": "atterraggio Groppo",
         "coordinates": "44.509268, 10.209142",
         "altitude": 600,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       },
       {
@@ -304,11 +325,14 @@
         "name": "atterraggio parapendio Campora",
         "coordinates": "44.522144, 10.279924",
         "altitude": 638,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -373,11 +397,14 @@
         "name": "Atterraggio Gemona / Godo",
         "coordinates": "46.275000, 13.136000",
         "altitude": 230,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Pratone ufficiale pianeggiante provvisto di manica a vento e parcheggio.",
         "hazards": "Forte brezza pomeridiana nei mesi estivi.",
         "rules": "Piegare le vele a lato del prato.",
+        "flightPlans": [],
         "reliability": 96
       },
       {
@@ -385,11 +412,14 @@
         "name": "Atterraggio Orvenco",
         "coordinates": "46.253135, 13.141197",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio (Atterraggio Orvenco) censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       },
       {
@@ -397,11 +427,14 @@
         "name": "Atterraggio Godo",
         "coordinates": "46.267945, 13.140256",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio (Atterraggio Godo) censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -443,11 +476,14 @@
         "name": "Atterraggio Aviano",
         "coordinates": "46.068000, 12.571000",
         "altitude": 160,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Ampio prato pianeggiante alle porte di Aviano.",
         "hazards": "Presenza di canali irrigui lungo il perimetro.",
         "rules": "Non oltrepassare la linea ferroviaria verso sud (zona militare CTR).",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -522,11 +558,14 @@
         "name": "Atterraggio Meduno",
         "coordinates": "46.215000, 12.805000",
         "altitude": 280,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Grandissimo campo atterraggio attrezzato con manica a vento, chiosco e servizi.",
         "hazards": "Brezza di valle pomeridiana.",
         "rules": "Piegare le vele a bordo campo.",
+        "flightPlans": [],
         "reliability": 96
       },
       {
@@ -534,11 +573,14 @@
         "name": "Atterraggio in vetta Monte Valinis",
         "coordinates": "46.230916, 12.806903",
         "altitude": 975,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio (Atterraggio in vetta Monte Valinis) censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       },
       {
@@ -546,11 +588,14 @@
         "name": "Atterraggio Meduno",
         "coordinates": "46.205959, 12.819663",
         "altitude": 275,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio (Atterraggio Meduno) censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -585,11 +630,14 @@
         "name": "Atterraggio Musi",
         "coordinates": "46.306959, 13.274622",
         "altitude": 400,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -635,11 +683,14 @@
         "name": "Atterraggio Bernadia",
         "coordinates": "46.216136, 13.272987",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       },
       {
@@ -647,11 +698,14 @@
         "name": "Atterraggio Plan di Paluz",
         "coordinates": "46.225005, 13.227555",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -686,11 +740,14 @@
         "name": "Atterraggio Alesso",
         "coordinates": "46.317244, 13.059476",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       },
       {
@@ -698,11 +755,14 @@
         "name": "Atterraggio Bordano",
         "coordinates": "46.306516, 13.112628",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -737,11 +797,14 @@
         "name": "Atterraggio Decollo",
         "coordinates": "46.169015, 13.342764",
         "altitude": 400,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -776,11 +839,14 @@
         "name": "Atterraggio Flyouf",
         "coordinates": "46.152819, 12.663306",
         "altitude": 307,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       },
       {
@@ -788,11 +854,14 @@
         "name": "Atterraggio Montereale",
         "coordinates": "46.165302, 12.663741",
         "altitude": 280,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -845,11 +914,14 @@
         "name": "Atterraggio Bivio Norma / Ninfa",
         "coordinates": "41.568000, 12.945000",
         "altitude": 35,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Grandissimo prato pianeggiante con manica a vento e bacheca all'incrocio per Norma e Ninfa.",
         "hazards": "Gradiente di vento e canali di bonifica ai margini del campo.",
         "rules": "Non oltrepassare l'area archeologica di Ninfa a bassa quota (oasi protetta).",
+        "flightPlans": [],
         "reliability": 96
       },
       {
@@ -857,11 +929,14 @@
         "name": "Norma landing site",
         "coordinates": "41.581339, 12.942210",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio (Norma landing site) censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -914,11 +989,14 @@
         "name": "Atterraggio Val di Comino",
         "coordinates": "41.692000, 13.808000",
         "altitude": 400,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Prato atterraggio a fondo valle provvisto di manica a vento.",
         "hazards": "Brezza pomeridiana sostenuta.",
         "rules": "Piegaggio vele a bordo campo.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -953,11 +1031,14 @@
         "name": "Atterraggio Decollo",
         "coordinates": "42.344336, 12.157813",
         "altitude": 400,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -992,11 +1073,14 @@
         "name": "Campo atterraggio parapendio Poggio Bustone",
         "coordinates": "42.485315, 12.857374",
         "altitude": 370,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -1031,11 +1115,14 @@
         "name": "Atterraggio Area di decollo per parapendio di Monteripoli",
         "coordinates": "41.926080, 12.817146",
         "altitude": 400,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -1070,11 +1157,14 @@
         "name": "Atterraggio Monte Soratte",
         "coordinates": "42.230519, 12.511825",
         "altitude": 400,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -1109,11 +1199,14 @@
         "name": "Landing Seronne",
         "coordinates": "41.828530, 13.091776",
         "altitude": 325,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -1148,11 +1241,14 @@
         "name": "Atterraggio Pista di decollo parapendio VoloLibero Cassino",
         "coordinates": "41.541534, 13.835744",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -1194,11 +1290,14 @@
         "name": "Atterraggio Spiaggia Spotorno",
         "coordinates": "44.231000, 8.418000",
         "altitude": 2,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio su spiaggia sabbiosa di fronte alla costa di Spotorno.",
         "hazards": "Praticabile da ottobre a maggio; durante la stagione balneare estiva l'atterraggio è soggetto alle ordinanze della Guardia Costiera.",
         "rules": "Non atterrare tra i bagnanti durante l'estate e ripiegare le vele lontano dalla battigia.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -1252,11 +1351,14 @@
         "name": "Atterraggio Spiaggia Fegina (Monterosso)",
         "coordinates": "44.145000, 9.646000",
         "altitude": 2,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio sulla spiaggia di Fegina a Monterosso al Mare.",
         "hazards": "Consentito esclusivamente in periodo invernale/primaverile non balneare. Attenzione agli ombrelloni e turisti.",
         "rules": "Vietato l'atterraggio in spiaggia nei mesi estivi di balneazione.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -1299,11 +1401,14 @@
         "name": "Atterraggio Spiaggia Finale Ligure / Varigotti",
         "coordinates": "44.172000, 8.345000",
         "altitude": 2,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio sulla spiaggia autorizzato esclusivamente nel periodo invernale/primaverile (1 Ottobre - 30 Aprile).",
         "hazards": "Presenza di bagnanti, strutture balneari e moto ondoso in caso di mareggiata.",
         "rules": "Volo e atterraggio tassativamente vietati da Maggio a Settembre.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -1338,11 +1443,14 @@
         "name": "Atterraggio Parapendio",
         "coordinates": "43.930857, 8.134727",
         "altitude": 100,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -1377,11 +1485,14 @@
         "name": "Atterraggio Area Decollo Lanci Parapendio Monte Maggio",
         "coordinates": "44.540720, 9.017777",
         "altitude": 400,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -1416,11 +1527,14 @@
         "name": "Atterraggio parapendio",
         "coordinates": "44.078139, 7.809690",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -1455,11 +1569,14 @@
         "name": "Atterraggio Decollo",
         "coordinates": "43.792708, 7.699396",
         "altitude": 400,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -1494,11 +1611,14 @@
         "name": "Atterraggio Mt San Nicolai",
         "coordinates": "44.238135, 9.580852",
         "altitude": 400,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -1533,11 +1653,14 @@
         "name": "Atterraggio Riva Trigoso",
         "coordinates": "44.238239, 9.445861",
         "altitude": 400,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -1591,11 +1714,27 @@
         "name": "Atterraggio Ufficiale Suello",
         "coordinates": "45.817209157684964, 9.318668541499529",
         "altitude": 260,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": true,
         "description": "Grandissimo campo atterraggio attrezzato di fronte al ristorante Cielo & Terra con area piegaggio e maniche a vento multiple.",
         "hazards": "Brezza da Sud/Sud-Est (Breva) rinforzata nel pomeriggio.",
         "rules": "Vietato atterrare nei campi non falciati attorno all'area ufficiale.",
+        "flightPlans": [
+          {
+            "name": "Circuito Standard (Breva da Sud / Sud-Est)",
+            "pattern": "Circuito a 'C' o '8'",
+            "description": "Smaltimento quota sul costone a Ovest del campo, inserimento in sottovento verso Nord, virata base sopra il paese di Suello e finale controvento orientato a Sud-Est verso il ristorante Cielo & Terra.",
+            "circuitHand": "left"
+          },
+          {
+            "name": "Circuito Alternativo (Vento debole / Componente Nord)",
+            "pattern": "Circuito a '8'",
+            "description": "Smaltimento quota al centro della valle aperta, virata base a Sud dell'atterraggio e finale verso Nord mantenendosi a distanza di sicurezza dai tralicci e dalla strada.",
+            "circuitHand": "left"
+          }
+        ],
         "reliability": 96
       }
     ]
@@ -1649,11 +1788,14 @@
         "name": "Atterraggio Laveno - Mombello (Tubo)",
         "coordinates": "45.901300, 8.661100",
         "altitude": 210,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio ufficiale ampio e pianeggiante in località Mombello (detto 'Il Tubo'), provvisto di manica a vento, bacheca informativa e parcheggio.",
         "hazards": "Presenza di alberi perimetrali e possibile gradiente di vento nelle ore calde estive.",
         "rules": "Non atterrare nei campi coltivati attigui; piegare le vele a bordo campo.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -1718,11 +1860,14 @@
         "name": "Atterraggio Palazzago",
         "coordinates": "45.746600, 9.555200",
         "altitude": 310,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Grande prato atterraggio pianeggiante con casetta sociale del club e manica a vento ben visibile.",
         "hazards": "Presenza di pali e alberi lungo il perimetro.",
         "rules": "Non sostare al centro del campo; chiudere le vele nell'area dedicata.",
+        "flightPlans": [],
         "reliability": 96
       },
       {
@@ -1730,11 +1875,14 @@
         "name": "Atterraggio Valcava",
         "coordinates": "45.758089, 9.494245",
         "altitude": 420,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio (Atterraggio Valcava) censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -1799,11 +1947,14 @@
         "name": "Atterraggio Cecima / Cà del Monte",
         "coordinates": "44.811100, 9.079200",
         "altitude": 350,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Prato pianeggiante con manica a vento a fondo valle lungo la strada per Cecima.",
         "hazards": "Fossi di scolo ai margini del campo.",
         "rules": "Ripiegare immediatamente le vele sul bordo campo.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -1857,11 +2008,14 @@
         "name": "Atterraggio Maslianico / Vacallo",
         "coordinates": "45.848000, 9.043000",
         "altitude": 240,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Prato atterraggio in zona di confine Maslianico/Vacallo.",
         "hazards": "Spazio limitato circondato da abitazioni e linee elettriche; consigliato a piloti con brevetto.",
         "rules": "Rispettare le zone abitate durante l'avvicinamento in finale.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -1915,11 +2069,14 @@
         "name": "Atterraggio Rezzato / Sant'Eufemia",
         "coordinates": "45.531000, 10.282000",
         "altitude": 150,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Ampio prato pianeggiante alle pendici della collina.",
         "hazards": "Linee elettriche lungo la strada di accesso.",
         "rules": "Non invadere i campi adiacenti coltivati.",
+        "flightPlans": [],
         "reliability": 96
       },
       {
@@ -1927,11 +2084,14 @@
         "name": "Atterraggio Volo Libero",
         "coordinates": "45.524676, 10.258712",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio (Atterraggio Volo Libero) censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -1973,11 +2133,14 @@
         "name": "Atterraggio Sale Marasino",
         "coordinates": "45.701000, 10.098000",
         "altitude": 200,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Prato atterraggio nei pressi della litoranea lacustre.",
         "hazards": "Spazio limitato con edifici e alberi circostanti.",
         "rules": "Priorità ai piloti in finale e divieto di sostare in mezzo al prato.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -2012,11 +2175,14 @@
         "name": "Atterraggio Decollo",
         "coordinates": "45.888371, 9.981325",
         "altitude": 633,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -2062,11 +2228,14 @@
         "name": "Atterraggio Pedana di decollo Giulio Ravelli",
         "coordinates": "46.178308, 9.395645",
         "altitude": 400,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -2101,11 +2270,14 @@
         "name": "Atterraggio Monte Pirello",
         "coordinates": "45.650515, 10.571062",
         "altitude": 576,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -2147,11 +2319,14 @@
         "name": "Atterraggio Sarnano",
         "coordinates": "43.025000, 13.305000",
         "altitude": 530,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Prato pianeggiante alle porte del borgo medievale di Sarnano con manica a vento.",
         "hazards": "Linee telefoniche sui margini del campo.",
         "rules": "Piegare le vele a bordo pista.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -2204,11 +2379,14 @@
         "name": "PeterPan school / Baratonga",
         "coordinates": "45.365077, 7.331723",
         "altitude": 800,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio ufficiale e base operativa in Loc. Cossiglia (Chialamberto), adiacente alla sede dell'A.S.D. Baratonga Flyers e della Scuola Peter Pan. Ampio prato pianeggiante con manica a vento ben visibile.",
         "hazards": "Possibile rinforzo della brezza di valle pomeridiana da Sud-Est. Prestare attenzione alla linea elettrica a monte e agli alberi lungo il torrente Stura.",
         "rules": "Ripiegare tempestivamente le vele a bordo campo per lasciare libera l'area di contatto a terra e i voli tandem didattici.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -2250,11 +2428,14 @@
         "name": "Atterraggio Martiniana Po",
         "coordinates": "44.632382, 7.361931",
         "altitude": 440,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Grande prato pianeggiante con manica a vento posizionata sul container del club.",
         "hazards": "Attenzione ai cavi telefonici perimetrali e ai canali di scolo lungo il confine del campo.",
         "rules": "Parcheggiare esclusivamente negli spazi delimitati adiacenti alla casetta del club.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -2307,11 +2488,14 @@
         "name": "Atterraggio Brione / Val della Torre",
         "coordinates": "45.148000, 7.478000",
         "altitude": 410,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Ampio prato pianeggiante situato a fondo valle in frazione Brione / Caselette, provvisto di manica a vento.",
         "hazards": "Attenzione ai fili elettrici lungo la strada comunale e alla brezza di valle pomeridiana.",
         "rules": "Ripiegare immediatamente le vele sul bordo campo per non ostacolare i piloti in finale.",
+        "flightPlans": [],
         "reliability": 96
       },
       {
@@ -2319,11 +2503,14 @@
         "name": "Val della Torre School landing",
         "coordinates": "45.147303, 7.459962",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio (Val della Torre School landing) censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       },
       {
@@ -2331,11 +2518,14 @@
         "name": "Val della Torre landing",
         "coordinates": "45.150454, 7.451189",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio (Val della Torre landing) censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -2377,11 +2567,14 @@
         "name": "Atterraggio Bertassi",
         "coordinates": "45.087380, 7.373710",
         "altitude": 380,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Ampio campo agricolo pianeggiante in località Bertassi (Avigliana/Sant'Ambrogio).",
         "hazards": "Presenza di linee elettriche a media tensione lungo la strada d'accesso.",
         "rules": "Non calpestare prati non sfalciati durante il periodo primaverile.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -2424,11 +2617,14 @@
         "name": "Atterraggio Ufficiale Piossasco",
         "coordinates": "44.980517, 7.451423",
         "altitude": 320,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": true,
         "description": "Pratone ufficiale situato alla base della collina di Piossasco, provvisto di manica a vento.",
         "hazards": "Possibile gradiente di vento e presenza di alberi lungo la strada comunale.",
         "rules": "Non atterrare nei campi coltivati limitrofi; chiudere le vele tempestivamente a bordo campo.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -2481,11 +2677,14 @@
         "name": "Atterraggio Cuorgnè / Colleretto",
         "coordinates": "45.385000, 7.641000",
         "altitude": 410,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Ampio prato pianeggiante adiacente alla tangenziale di Cuorgnè.",
         "hazards": "Attenzione ai fili dell'alta tensione a debita distanza ma visibili a Nord-Ovest.",
         "rules": "Rispetto assoluto delle colture agricole circostanti.",
+        "flightPlans": [],
         "reliability": 96
       },
       {
@@ -2493,11 +2692,14 @@
         "name": "landing volo libero S. Elisabetta",
         "coordinates": "45.402744, 7.634229",
         "altitude": 400,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio (landing volo libero S. Elisabetta) censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -2572,11 +2774,14 @@
         "name": "Atterraggio Lessolo",
         "coordinates": "45.498300, 7.828300",
         "altitude": 320,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Pratone ufficiale atterraggio situato a Lessolo, ben segnalato e dotato di manica a vento e bacheca.",
         "hazards": "Brezza di valle pomeridiana da Sud-Est sostenuta.",
         "rules": "Non atterrare nei campi non falciati.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -2618,11 +2823,14 @@
         "name": "Atterraggio Corio",
         "coordinates": "45.318000, 7.538000",
         "altitude": 580,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Prato pianeggiante adiacente al paese.",
         "hazards": "Presenza di recinzioni e pali telefonici sul lato Est.",
         "rules": "Chiudere le vele sui bordi campo.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -2664,11 +2872,14 @@
         "name": "Atterraggio Caprie",
         "coordinates": "45.116000, 7.330500",
         "altitude": 360,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Campo pianeggiante vicino alla statale.",
         "hazards": "Pali e fili della luce in testata campo.",
         "rules": "Non atterrare su colture in atto.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -2732,11 +2943,14 @@
         "name": "Atterraggio Susa",
         "coordinates": "45.137500, 7.045800",
         "altitude": 500,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Campo atterraggio alle porte di Susa.",
         "hazards": "Forte brezza di valle pomeridiana.",
         "rules": "Piegaggio vele a bordo pista.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -2778,11 +2992,14 @@
         "name": "Atterraggio Piasco",
         "coordinates": "44.561000, 7.420500",
         "altitude": 460,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Ampio prato pianeggiante con manica a vento a fondo valle.",
         "hazards": "Alberi su un lato del campo.",
         "rules": "Non calpestare i campi coltivati adiacenti.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -2836,11 +3053,14 @@
         "name": "Atterraggio Ufficiale Liretta",
         "coordinates": "44.486000, 7.392600",
         "altitude": 650,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": true,
         "description": "Atterraggio ufficiale a fondo valle vicino a Villar San Costanzo, ampio prato pianeggiante con manica a vento.",
         "hazards": "Attenzione agli alberi sul perimetro e alla brezza di valle pomeridiana.",
         "rules": "Ripiegare immediatamente sul bordo campo.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -2883,11 +3103,14 @@
         "name": "Atterraggio Paesana / Pian Munè",
         "coordinates": "44.685000, 7.280000",
         "altitude": 650,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Ampio prato pianeggiante vicino all'abitato di Paesana a fondovalle.",
         "hazards": "Fili elettrici lungo la strada e brezza di valle pomeridiana.",
         "rules": "Ripiegare tempestivamente le vele.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -2930,11 +3153,14 @@
         "name": "Atterraggio Frabosa Soprana",
         "coordinates": "44.288000, 7.807000",
         "altitude": 890,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Prato a fondovalle in prossimità della partenza degli impianti.",
         "hazards": "Spazio di manovra delimitato e alberi perimetrali.",
         "rules": "Lasciare sgombra l'area centrale.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -2977,11 +3203,14 @@
         "name": "Atterraggio Bagnolo Piemonte",
         "coordinates": "44.760000, 7.310000",
         "altitude": 365,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Prato a fondovalle nei pressi di Bagnolo Piemonte con manica a vento.",
         "hazards": "Linee elettriche e canali di irrigazione ai bordi del campo.",
         "rules": "Ripiegare le vele sui margini.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -3024,11 +3253,14 @@
         "name": "Atterraggio Caraglio / Valle Grana",
         "coordinates": "44.425000, 7.420000",
         "altitude": 580,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Ampio campo pianeggiante a fondo valle all'imbocco di Caraglio.",
         "hazards": "Attenzione a fili elettrici e coltivazioni agricole confinanti.",
         "rules": "Evitare calpestio dei campi coltivati non sfalciati.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -3082,11 +3314,14 @@
         "name": "Atterraggio San Germano Chisone / Pramollo",
         "coordinates": "44.905000, 7.230000",
         "altitude": 550,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Prato a fondovalle in prossimità di San Germano Chisone provvisto di manica a vento.",
         "hazards": "Rinforzo della brezza di valle pomeridiana lungo il fiume Chisone.",
         "rules": "Ripiegare immediatamente le vele sui bordi.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -3129,11 +3364,14 @@
         "name": "Atterraggio Pomaretto",
         "coordinates": "44.956000, 7.182000",
         "altitude": 620,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Prato a fondovalle in prossimità del centro abitato di Pomaretto.",
         "hazards": "Spazio circoscritto da alberi e viabilità locale.",
         "rules": "Ripiegare immediatamente le vele.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -3176,11 +3414,14 @@
         "name": "Atterraggio Frossasco / Roletto",
         "coordinates": "44.925000, 7.340000",
         "altitude": 380,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Ampio prato agricolo a fondovalle tra Roletto e Frossasco.",
         "hazards": "Fili elettrici e canali d'irrigazione.",
         "rules": "Rispettare le coltivazioni.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -3223,11 +3464,14 @@
         "name": "Atterraggio Pinasca",
         "coordinates": "44.945000, 7.230000",
         "altitude": 560,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Prato a fondovalle in prossimità dell'abitato di Pinasca.",
         "hazards": "Alberi e linea telefonica a lato del campo.",
         "rules": "Ripiegare tempestivamente le vele.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -3270,11 +3514,14 @@
         "name": "Atterraggio Pourrieres / Usseaux",
         "coordinates": "45.045000, 7.025000",
         "altitude": 1400,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Prato a fondovalle vicino alla frazione Pourrieres di Usseaux.",
         "hazards": "Dislivello contenuto e possibile brezza di valle sostenuta.",
         "rules": "Non disturbare il pascolo e gli animali.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -3309,11 +3556,14 @@
         "name": "Atterraggio Decollo",
         "coordinates": "44.978402, 8.498119",
         "altitude": 400,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -3359,11 +3609,14 @@
         "name": "Atterraggio Decollo",
         "coordinates": "45.097612, 7.460286",
         "altitude": 400,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -3398,11 +3651,14 @@
         "name": "Atterraggio Parapendio Le Condotte",
         "coordinates": "45.145332, 6.986117",
         "altitude": 400,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -3448,11 +3704,14 @@
         "name": "Area atterraggio con parapendio",
         "coordinates": "45.044205, 6.839086",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area dove poter atterrare con parapendio e deltaplano, in estate attenzione al vento di valle che soffia da est alla velocità di 28-30km/h dalle 11:00 fino alle 19:00.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       },
       {
@@ -3460,11 +3719,14 @@
         "name": "Atterraggio di emergenza parapendio",
         "coordinates": "45.045629, 6.779350",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio di emergenza in parapendio, zona poco soggetta al vento di valle perché il vento di valle spinge sull'altro versante",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       },
       {
@@ -3472,11 +3734,14 @@
         "name": "Atterraggio per parapendio",
         "coordinates": "45.043468, 6.789844",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Zona per atterraggi di emergenza in parapendio, ampia e priva di linee elettriche. Quest'area è abbastanza al riparo dal vento di valle, non si raggiungono mai velocità elevate e pericolose, non superare mai l'autostrada.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       },
       {
@@ -3484,11 +3749,14 @@
         "name": "Atterraggio emergenza parapendio",
         "coordinates": "45.023669, 6.836392",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Area dove poter atterrare in parapendio, questa zona è soggetta al vento di valle che soffia deciso dalle 11:00 alle 19:00 in estate.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -3523,11 +3791,14 @@
         "name": "Atterraggio Decollo",
         "coordinates": "45.645367, 8.085337",
         "altitude": 860,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -3579,11 +3850,14 @@
         "name": "Atterraggio Susa (Crotte)",
         "coordinates": "45.137833, 7.099267",
         "altitude": 465,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Campo di atterraggio praticato alle porte est di Susa in località Crotte.",
         "hazards": "Attenzione alla brezza di valle pomeridiana.",
         "rules": "",
+        "flightPlans": [],
         "reliability": 92
       },
       {
@@ -3591,11 +3865,14 @@
         "name": "Atterraggio Bruzolo",
         "coordinates": "45.136469, 7.186983",
         "altitude": 450,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio ufficiale e campo scuola The Fly Club a Bruzolo nel fondovalle.",
         "hazards": "Taglio termico pomeridiano nei mesi estivi.",
         "rules": "",
+        "flightPlans": [],
         "reliability": 93
       }
     ]
@@ -3630,11 +3907,14 @@
         "name": "Atterraggio San Raffaele takeoff",
         "coordinates": "45.140345, 7.870794",
         "altitude": 400,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -3669,11 +3949,14 @@
         "name": "Atterraggio Monte Carza",
         "coordinates": "46.027074, 8.683579",
         "altitude": 400,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -3716,11 +3999,14 @@
         "name": "Area Atterraggio Campetto Peter Pan",
         "coordinates": "45.009697, 7.626743",
         "altitude": 240,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Superficie erbosa per rientro da brevi stacchi didattici e ripiegamento vele.",
         "hazards": "Mantenere distanza di sicurezza da passanti e strutture del parco urbano.",
         "rules": "Utilizzo per fini didattici ed addestrativi. Rispettare la fruizione pubblica del parco.",
+        "flightPlans": [],
         "reliability": 95
       }
     ]
@@ -3755,11 +4041,14 @@
         "name": "Atterraggio Deltaplani e Parapendio",
         "coordinates": "41.214992, 15.275288",
         "altitude": 400,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -3794,11 +4083,14 @@
         "name": "Atterraggio Volo libero",
         "coordinates": "41.658262, 15.578733",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -3833,11 +4125,14 @@
         "name": "Atterraggio Decollo",
         "coordinates": "40.840640, 17.314036",
         "altitude": 400,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -3872,11 +4167,14 @@
         "name": "Atterraggio Monte Bardia Paragliding Take-Off",
         "coordinates": "40.260405, 9.604506",
         "altitude": 400,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -3911,11 +4209,14 @@
         "name": "Atterraggio Buggerru",
         "coordinates": "39.395872, 8.435443",
         "altitude": 400,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -3957,11 +4258,14 @@
         "name": "Atterraggio Spiaggia Macari / Baia Santa Margherita",
         "coordinates": "38.128000, 12.731000",
         "altitude": 2,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio sulla sabbia della Baia Santa Margherita a Macari.",
         "hazards": "Praticabile tutto l'anno con attenzione ai bagnanti nella stagione estiva.",
         "rules": "Atterrare sul bagnasciuga libero e ripiegare immediatamente la vela.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -4004,11 +4308,14 @@
         "name": "Atterraggio San Giuliano Terme",
         "coordinates": "43.765000, 10.435000",
         "altitude": 20,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Ampio prato pianeggiante alle pendici dei Monti Pisani con manica a vento ben visibile.",
         "hazards": "Fossi e canali di bonifica perimetrali.",
         "rules": "Non atterrare nei campi coltivati limitrofi.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -4051,11 +4358,14 @@
         "name": "Atterraggio Diecimo",
         "coordinates": "43.962000, 10.498000",
         "altitude": 80,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Pratone pianeggiante a fondovalle vicino al fiume Serchio.",
         "hazards": "Alberi lungo l'argine del fiume.",
         "rules": "Piegare le vele a bordo campo.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -4090,11 +4400,14 @@
         "name": "Atterraggio Stribugliano Monte Aquilaia",
         "coordinates": "42.830230, 11.487401",
         "altitude": 400,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -4136,11 +4449,14 @@
         "name": "Atterraggio Campitello di Fassa",
         "coordinates": "46.476000, 11.742000",
         "altitude": 1420,
+        "heading": 0,
+        "runwayHeading": 0,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Pratone pianeggiante vicino alla stazione di partenza della funivia a Campitello di Fassa, con manica a vento e bar.",
         "hazards": "Forte brezza di valle pomeridiana da Sud; attenzione alla fune della cabinovia a monte.",
         "rules": "Seguire rigorosamente il circuito di atterraggio ed evitare sorvoli bassi sulle case.",
+        "flightPlans": [],
         "reliability": 96
       },
       {
@@ -4148,11 +4464,14 @@
         "name": "Lokomotive",
         "coordinates": "46.508492, 11.771638",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio (Lokomotive) censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       },
       {
@@ -4160,11 +4479,14 @@
         "name": "Atterraggio Col Rodella",
         "coordinates": "46.476119, 11.750543",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio (Atterraggio Col Rodella) censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -4206,11 +4528,14 @@
         "name": "Atterraggio Lago di Molveno",
         "coordinates": "46.141000, 10.966000",
         "altitude": 860,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Ampio prato pianeggiante adiacente alla riva nord del Lago di Molveno.",
         "hazards": "Presenza di bagnanti e turisti nei mesi estivi; seguire le aree delimitate.",
         "rules": "Non atterrare sulla spiaggia principale durante la stagione balneare.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -4264,11 +4589,14 @@
         "name": "Atterraggio Barco di Levico",
         "coordinates": "46.007000, 11.282000",
         "altitude": 450,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Grande prato atterraggio in località Barco di Levico, provvisto di manica a vento.",
         "hazards": "Brezza pomeridiana della Valsugana sostenuta.",
         "rules": "Ripiegare tempestivamente le vele lungo il bordo della recinzione.",
+        "flightPlans": [],
         "reliability": 96
       },
       {
@@ -4276,11 +4604,14 @@
         "name": "Landingplace Barco 2 - Atterraggio Volo Libero Trentino",
         "coordinates": "46.011896, 11.343138",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio (Landingplace Barco 2 - Atterraggio Volo Libero Trentino) censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -4323,11 +4654,14 @@
         "name": "Atterraggio Riscone (Brunico)",
         "coordinates": "46.772500, 11.938000",
         "altitude": 960,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Ampio prato pianeggiante adiacente alla stazione a valle degli impianti di Riscone.",
         "hazards": "Brezza di valle pomeridiana.",
         "rules": "Non atterrare sui campi sportivi adiacenti.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -4362,11 +4696,14 @@
         "name": "Atterraggio Prämajur",
         "coordinates": "46.691928, 10.527790",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -4423,11 +4760,14 @@
         "name": "Atterraggio Decollo",
         "coordinates": "46.786158, 11.695510",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       },
       {
@@ -4435,11 +4775,14 @@
         "name": "Paragleiter Landeplatz Lüsen - Sito di atterraggio parapendio di Luson",
         "coordinates": "46.747671, 11.748776",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -4485,11 +4828,14 @@
         "name": "Atterraggio Decollo",
         "coordinates": "46.427580, 11.621495",
         "altitude": 400,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -4546,11 +4892,14 @@
         "name": "Atterraggio Seceda South",
         "coordinates": "46.579460, 11.725063",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       },
       {
@@ -4558,11 +4907,14 @@
         "name": "Seceda Glider Landing",
         "coordinates": "46.578491, 11.684152",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       },
       {
@@ -4570,11 +4922,14 @@
         "name": "Atterraggio Seceda South",
         "coordinates": "46.568336, 11.682906",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -4609,11 +4964,14 @@
         "name": "Atterraggio Decollo",
         "coordinates": "45.917452, 11.183755",
         "altitude": 400,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -4648,11 +5006,14 @@
         "name": "Paragliding Landeplatz - Atterraggio S. Vigilio",
         "coordinates": "46.630610, 11.147850",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -4687,11 +5048,14 @@
         "name": "Atterraggio Decollo",
         "coordinates": "45.933328, 11.055144",
         "altitude": 480,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -4726,11 +5090,14 @@
         "name": "Atterraggio Cermis",
         "coordinates": "46.284531, 11.474439",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Unofficial. Avoid after midday due to strong valley winds and turbulence. Fences at both ends!",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       },
       {
@@ -4738,11 +5105,14 @@
         "name": "Atterraggio Masi",
         "coordinates": "46.283450, 11.489761",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       },
       {
@@ -4750,11 +5120,14 @@
         "name": "Atterraggio Parapendio",
         "coordinates": "46.284926, 11.484503",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -4789,11 +5162,14 @@
         "name": "Atterraggio Val D'Ultimo",
         "coordinates": "46.529150, 10.958657",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -4839,11 +5215,14 @@
         "name": "Paragleiter Landeplatz - Sito di atterraggio per parapendio",
         "coordinates": "46.724728, 11.200530",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -4878,11 +5257,14 @@
         "name": "Atterraggio Corno Nero",
         "coordinates": "46.315741, 11.470003",
         "altitude": 400,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -4917,11 +5299,14 @@
         "name": "Atterraggio Decollo",
         "coordinates": "46.552656, 11.562703",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -4986,11 +5371,14 @@
         "name": "Atterraggio Piana Grande",
         "coordinates": "42.798000, 13.205000",
         "altitude": 1280,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Immenso altopiano pianeggiante di oltre 10 km² privo di ostacoli, ideale per qualsiasi livello di esperienza.",
         "hazards": "Brezza termica sostenuta al centro della Piana nelle ore calde estive.",
         "rules": "Rispettare le coltivazioni della celebre lenticchia di Castelluccio (atterrare nei prati non coltivati).",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -5055,11 +5443,14 @@
         "name": "Atterraggio Villa Scfi (Sigillo)",
         "coordinates": "43.328000, 12.738000",
         "altitude": 500,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Grande campo atterraggio pianeggiante e attrezzato a Sigillo con sede sociale, manica a vento e bacheche.",
         "hazards": "Brezza di valle pomeridiana da Sud.",
         "rules": "Ripiegare tempestivamente le vele sui lati del campo.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -5094,11 +5485,14 @@
         "name": "Atterraggio Ovest",
         "coordinates": "43.047245, 12.615754",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -5155,11 +5549,14 @@
         "name": "Atterraggio Decollo",
         "coordinates": "42.752477, 13.186902",
         "altitude": 400,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -5202,11 +5599,14 @@
         "name": "Atterraggio Antey-Saint-André",
         "coordinates": "45.808000, 7.591000",
         "altitude": 1050,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Prato pianeggiante adiacente all'area sportiva di Antey con manica a vento.",
         "hazards": "Attenzione ai cavi della funivia e alla brezza di valle pomeridiana.",
         "rules": "Non atterrare sui campi coltivati limitrofi.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -5249,11 +5649,14 @@
         "name": "Atterraggio Saint-Vincent",
         "coordinates": "45.748000, 7.652000",
         "altitude": 550,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Prato pianeggiante situato nei pressi di Saint-Vincent.",
         "hazards": "Pali elettrici e viabilità limitrofa.",
         "rules": "Chiudere le vele sui bordi campo.",
+        "flightPlans": [],
         "reliability": 96
       }
     ]
@@ -5373,11 +5776,14 @@
         "name": "Atterraggio Paradiso / Garden Relais",
         "coordinates": "45.811800, 11.787100",
         "altitude": 190,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Immenso campo atterraggio attrezzato con maniche a vento multiple, hotel, ristorante, bar, piscina, shop tecnico e navette.",
         "hazards": "Numerosi piloti contemporaneamente in circuito di atterraggio. Rispettare rigorosamente il circuito a 'C' o '8'.",
         "rules": "Ripiegare tempestivamente le vele lungo le apposite aree laterali delimitate.",
+        "flightPlans": [],
         "reliability": 96
       },
       {
@@ -5385,11 +5791,14 @@
         "name": "Atterraggio A - Garden Relais",
         "coordinates": "45.806416, 11.785362",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio (Atterraggio A - Garden Relais) censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       },
       {
@@ -5397,11 +5806,14 @@
         "name": "Atterraggio Paradiso",
         "coordinates": "45.808570, 11.769640",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio (Atterraggio Paradiso) censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       },
       {
@@ -5409,11 +5821,14 @@
         "name": "Pedana",
         "coordinates": "45.824438, 11.771276",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio (Pedana) censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       },
       {
@@ -5421,11 +5836,14 @@
         "name": "Atteraggio Abbazia",
         "coordinates": "45.809915, 11.759468",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio (Atteraggio Abbazia) censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -5467,11 +5885,14 @@
         "name": "Atterraggio Navene / Malcesine",
         "coordinates": "45.772000, 10.814000",
         "altitude": 70,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio ufficiale situato sul lago a Navene (a nord di Malcesine) con manica a vento e battello di recupero.",
         "hazards": "Atterraggio tecnico con spazio ridotto; forte vento lacustre pomeridiano e acqua a bordo campo.",
         "rules": "Tesseramento club obbligatorio e rispetto assoluto delle precedenze dei piloti tandem/SIV.",
+        "flightPlans": [],
         "reliability": 96
       },
       {
@@ -5479,11 +5900,14 @@
         "name": "Paragliding Club Malcesine",
         "coordinates": "45.782230, 10.817727",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio (Paragliding Club Malcesine) censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -5547,11 +5971,14 @@
         "name": "Atterraggio Boscherai (Pedavena)",
         "coordinates": "46.012000, 11.865000",
         "altitude": 320,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Grandissimo campo atterraggio situato in località Boscherai a Pedavena con sede club.",
         "hazards": "Brezza di valle pomeridiana sostenuta da Sud.",
         "rules": "Non piegare le vele al centro del campo di atterraggio.",
+        "flightPlans": [],
         "reliability": 96
       },
       {
@@ -5559,11 +5986,14 @@
         "name": "Atterraggio Boscherài",
         "coordinates": "46.030022, 11.880085",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio (Atterraggio Boscherài) censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       },
       {
@@ -5571,11 +6001,14 @@
         "name": "Atterraggio Arten",
         "coordinates": "46.004168, 11.824269",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio (Atterraggio Arten) censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -5632,11 +6065,14 @@
         "name": "Atterraggio Colombare",
         "coordinates": "45.773177, 11.438329",
         "altitude": 280,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       },
       {
@@ -5644,11 +6080,14 @@
         "name": "Atterraggio Caltrano",
         "coordinates": "45.765849, 11.480262",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       },
       {
@@ -5656,11 +6095,14 @@
         "name": "Atterraggio Caltrano",
         "coordinates": "45.765202, 11.476293",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -5706,11 +6148,14 @@
         "name": "Atterraggio Cavaso del Tomba",
         "coordinates": "45.854225, 11.890941",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       },
       {
@@ -5718,11 +6163,14 @@
         "name": "Atterraggio Possagno",
         "coordinates": "45.850092, 11.881233",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -5790,11 +6238,14 @@
         "name": "Atterraggio Parapendio scuola Manta",
         "coordinates": "45.768775, 11.652784",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       },
       {
@@ -5802,11 +6253,14 @@
         "name": "FloryCup Landing Zone",
         "coordinates": "45.766636, 11.658185",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -5841,11 +6295,14 @@
         "name": "Atterraggio Decollo",
         "coordinates": "45.978019, 12.209861",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Campo atterraggio parapendio e deltaplani",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -5880,11 +6337,14 @@
         "name": "Landingplace Dolada",
         "coordinates": "46.158238, 12.368805",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]

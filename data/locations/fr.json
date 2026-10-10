@@ -29,11 +29,14 @@
         "name": "Cervione - e-piane",
         "coordinates": "42.323815, 9.502653",
         "altitude": 143,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Accès:Se garer le long de la route départementale sans gêner les sorties des habitations. / Conditions aéro :Régime de brise direction Est, Sud Est. / Dangers: Ne pas voler par vent de Nord. /",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -68,11 +71,14 @@
         "name": "Nonza",
         "coordinates": "42.788867, 9.344602",
         "altitude": 4,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -107,11 +113,14 @@
         "name": "Atterraggio Calacuccia - bocca-a-sforssi",
         "coordinates": "42.312199, 9.041110",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       },
       {
@@ -119,11 +128,14 @@
         "name": "Lozzi",
         "coordinates": "42.319214, 9.000296",
         "altitude": 874,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       },
       {
@@ -131,11 +143,14 @@
         "name": "Calacuccia",
         "coordinates": "42.331925, 9.016919",
         "altitude": 791,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -170,11 +185,14 @@
         "name": "Atterraggio Lozzi - alturaghja",
         "coordinates": "42.351101, 8.967220",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       },
       {
@@ -182,11 +200,14 @@
         "name": "Lozzi",
         "coordinates": "42.349866, 8.996230",
         "altitude": 1205,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       },
       {
@@ -194,11 +215,14 @@
         "name": "Calacuccia",
         "coordinates": "42.333809, 9.007755",
         "altitude": 860,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -233,11 +257,14 @@
         "name": "Birout'ale",
         "coordinates": "42.865672, 9.343181",
         "altitude": 110,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Accès:A 55 km de Bastia par la D80 Par l'Ouest au départ de Bastia vers ST Florent Col de Teghime Patrimonia Nonza Albo Marinca (Canari) Marine de Giottani (Barrettali) Par l'Est au départ de Bastia Cap Corse Erbalunga Porticcciolo Luri Marine de Santa Se",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -272,11 +299,14 @@
         "name": "Chappelle santa brigida",
         "coordinates": "42.232866, 9.448598",
         "altitude": 204,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Conditions aéro :Régime de brises. / Détails: Aucune restriction. Toujours refermer les barrières pour les animaux !!! / Dangers: Attention aux thermiques puissants qui compliquent l'approche par journée ensoleillée. /",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -311,11 +341,14 @@
         "name": "Atterraggio Teghime - monti-rossi",
         "coordinates": "42.657447, 9.385183",
         "altitude": 100,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -350,11 +383,14 @@
         "name": "Atterraggio San-bastiano",
         "coordinates": "42.006051, 8.765121",
         "altitude": 100,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -389,11 +425,14 @@
         "name": "Atterraggio Vizzavona",
         "coordinates": "42.088387, 9.116764",
         "altitude": 507,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -428,11 +467,14 @@
         "name": "Atterraggio Punta-isa",
         "coordinates": "42.026441, 9.030978",
         "altitude": 1024,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -467,12 +509,662 @@
         "name": "Salvi",
         "coordinates": "42.547419, 8.840255",
         "altitude": 101,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
+      }
+    ]
+  },
+  {
+    "id": "annecy-col-de-la-forclaz-montmin-74",
+    "name": "Annecy - Col de la Forclaz",
+    "province": "",
+    "region": "Auvergne-Rhône-Alpes",
+    "country": "FR",
+    "location": "Annecy - Col de la Forclaz (Montmin - 74)",
+    "description": "Il sito di volo libero più rinomato d'Europa con vista sul lago di Annecy, termiche costanti e atterraggio ufficiale a Doussard.",
+    "webcam": null,
+    "club": null,
+    "reliability": 95,
+    "takeoffs": [
+      {
+        "id": "annecy-col-de-la-forclaz-montmin-74-takeoff-1",
+        "name": "Col de la Forclaz (Montmin)",
+        "coordinates": "45.811600, 6.246400",
+        "altitude": 1280,
+        "heading": 290,
+        "isPrimary": true,
+        "description": "Decollo ufficiale FFVL erboso con moquette, esposizione Ovest/Nord-Ovest verso il lago di Annecy.",
+        "hazards": "",
+        "reliability": 95
+      },
+      {
+        "id": "annecy-col-de-la-forclaz-montmin-74-takeoff-2",
+        "name": "Planfait",
+        "coordinates": "45.850500, 6.221200",
+        "altitude": 960,
+        "heading": 250,
+        "isPrimary": false,
+        "description": "Decollo pomeridiano molto attivo con brezza di valle e moquette.",
+        "hazards": "",
+        "reliability": 92
+      }
+    ],
+    "landings": [
+      {
+        "id": "annecy-col-de-la-forclaz-montmin-74-landing-1",
+        "name": "Doussard (Bout du Lac)",
+        "coordinates": "45.782500, 6.223800",
+        "altitude": 460,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Grande campo ufficiale FFVL con manica a vento e parcheggio dedicato.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 95
+      },
+      {
+        "id": "annecy-col-de-la-forclaz-montmin-74-landing-2",
+        "name": "Perroix (Talloires)",
+        "coordinates": "45.845800, 6.216300",
+        "altitude": 540,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": false,
+        "isOfficial": false,
+        "description": "Atterraggio ufficiale sotto Planfait con bar e scuola di volo.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 92
+      }
+    ]
+  },
+  {
+    "id": "chamonix-mont-blanc-planpraz-74",
+    "name": "Chamonix - Mont Blanc",
+    "province": "",
+    "region": "Auvergne-Rhône-Alpes",
+    "country": "FR",
+    "location": "Chamonix - Mont Blanc (Planpraz - 74)",
+    "description": "Volo d'alta montagna al cospetto del massiccio del Monte Bianco con decollo da Planpraz e Flégère.",
+    "webcam": null,
+    "club": null,
+    "reliability": 94,
+    "takeoffs": [
+      {
+        "id": "chamonix-mont-blanc-planpraz-74-takeoff-1",
+        "name": "Planpraz (Brévent)",
+        "coordinates": "45.936100, 6.852200",
+        "altitude": 2000,
+        "heading": 160,
+        "isPrimary": true,
+        "description": "Decollo accessibile con la cabinovia del Brévent, vista frontale sul Monte Bianco.",
+        "hazards": "",
+        "reliability": 94
+      },
+      {
+        "id": "chamonix-mont-blanc-planpraz-74-takeoff-2",
+        "name": "Décollage de la Flégère",
+        "coordinates": "45.968332, 6.876707",
+        "altitude": 1890,
+        "heading": 150,
+        "isPrimary": false,
+        "description": "Decollo FFVL della Flégère servito da funivia, ottimo punto di partenza per cross verso Vallorcine.",
+        "hazards": "",
+        "reliability": 90
+      }
+    ],
+    "landings": [
+      {
+        "id": "chamonix-mont-blanc-planpraz-74-landing-1",
+        "name": "Bois du Bouchet (Chamonix)",
+        "coordinates": "45.928800, 6.879100",
+        "altitude": 1040,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio ufficiale a monte del centro abitato di Chamonix con manica a vento.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 94
+      }
+    ]
+  },
+  {
+    "id": "saint-hilaire-du-touvet-coupe-icare-38",
+    "name": "Saint-Hilaire du Touvet",
+    "province": "",
+    "region": "Auvergne-Rhône-Alpes",
+    "country": "FR",
+    "location": "Saint-Hilaire du Touvet (Coupe Icare - 38)",
+    "description": "Culla del volo libero francese e sede della Coupe Icare, sulla falesia orientale del massiccio della Chartreuse.",
+    "webcam": null,
+    "club": null,
+    "reliability": 95,
+    "takeoffs": [
+      {
+        "id": "saint-hilaire-du-touvet-coupe-icare-38-takeoff-1",
+        "name": "Décollage Sud (Moquette)",
+        "coordinates": "45.306100, 5.886600",
+        "altitude": 960,
+        "heading": 100,
+        "isPrimary": true,
+        "description": "Falesia attrezzata con moquette, decollo facilitato con regime di brezza da est.",
+        "hazards": "",
+        "reliability": 95
+      },
+      {
+        "id": "saint-hilaire-du-touvet-coupe-icare-38-takeoff-2",
+        "name": "Décollage Est",
+        "coordinates": "45.308000, 5.889000",
+        "altitude": 1000,
+        "heading": 90,
+        "isPrimary": false,
+        "description": "Decollo alto adiacente alla stazione della funicolare.",
+        "hazards": "",
+        "reliability": 92
+      }
+    ],
+    "landings": [
+      {
+        "id": "saint-hilaire-du-touvet-coupe-icare-38-landing-1",
+        "name": "Lumbin",
+        "coordinates": "45.298200, 5.918900",
+        "altitude": 240,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Vasto atterraggio nella valle del Grésivaudan con ampio parcheggio e club house.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 95
+      }
+    ]
+  },
+  {
+    "id": "passy-plaine-joux-mont-blanc-74",
+    "name": "Passy - Plaine-Joux",
+    "province": "",
+    "region": "Auvergne-Rhône-Alpes",
+    "country": "FR",
+    "location": "Passy - Plaine-Joux (Mont Blanc - 74)",
+    "description": "Balcone soleggiato di fronte alla catena del Monte Bianco con decollo dolcemente inclinato ed atterraggio a valle.",
+    "webcam": null,
+    "club": null,
+    "reliability": 93,
+    "takeoffs": [
+      {
+        "id": "passy-plaine-joux-mont-blanc-74-takeoff-1",
+        "name": "Plaine-Joux",
+        "coordinates": "45.950000, 6.740000",
+        "altitude": 1360,
+        "heading": 190,
+        "isPrimary": true,
+        "description": "Decollo erboso ideale per principianti e termiche generose sui costoni rocciosi.",
+        "hazards": "",
+        "reliability": 93
+      }
+    ],
+    "landings": [
+      {
+        "id": "passy-plaine-joux-mont-blanc-74-landing-1",
+        "name": "Marlioz Passy (Chedde)",
+        "coordinates": "45.916700, 6.690000",
+        "altitude": 580,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio ufficiale in fondovalle con manica a vento ben visibile.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 92
+      }
+    ]
+  },
+  {
+    "id": "samoens-grand-massif-haute-savoie-74",
+    "name": "Samoëns - Grand Massif",
+    "province": "",
+    "region": "Auvergne-Rhône-Alpes",
+    "country": "FR",
+    "location": "Samoëns - Grand Massif (Haute-Savoie - 74)",
+    "description": "Volo panoramica nella valle del Giffre con decollo da La Bourgeoise e dal Plateau des Saix.",
+    "webcam": null,
+    "club": null,
+    "reliability": 91,
+    "takeoffs": [
+      {
+        "id": "samoens-grand-massif-haute-savoie-74-takeoff-1",
+        "name": "La Bourgeoise",
+        "coordinates": "46.114985, 6.719794",
+        "altitude": 1770,
+        "heading": 200,
+        "isPrimary": true,
+        "description": "Decollo erboso con vista sul Monte Bianco e valle del Giffre.",
+        "hazards": "",
+        "reliability": 91
+      },
+      {
+        "id": "samoens-grand-massif-haute-savoie-74-takeoff-2",
+        "name": "Plateau des Saix",
+        "coordinates": "46.068200, 6.702500",
+        "altitude": 1600,
+        "heading": 340,
+        "isPrimary": false,
+        "description": "Decollo invernale ed estivo servito da impianti.",
+        "hazards": "",
+        "reliability": 88
+      }
+    ],
+    "landings": [
+      {
+        "id": "samoens-grand-massif-haute-savoie-74-landing-1",
+        "name": "Samoëns Piscine",
+        "coordinates": "46.079200, 6.721400",
+        "altitude": 690,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio ufficiale adiacente agli impianti sportivi comunali.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 91
+      }
+    ]
+  },
+  {
+    "id": "thollon-les-memises-lac-leman-74",
+    "name": "Thollon-les-Mémises",
+    "province": "",
+    "region": "Auvergne-Rhône-Alpes",
+    "country": "FR",
+    "location": "Thollon-les-Mémises (Lac Léman - 74)",
+    "description": "Decollo a picco sul lago di Ginevra con brezza lacustre e termodinamica lungo le creste delle Mémises.",
+    "webcam": null,
+    "club": null,
+    "reliability": 90,
+    "takeoffs": [
+      {
+        "id": "thollon-les-memises-lac-leman-74-takeoff-1",
+        "name": "Les Mémises",
+        "coordinates": "46.380052, 6.724839",
+        "altitude": 1620,
+        "heading": 350,
+        "isPrimary": true,
+        "description": "Decollo FFVL servito dalla telecabina di Thollon, orientamento Nord verso il lago.",
+        "hazards": "",
+        "reliability": 90
+      }
+    ],
+    "landings": [
+      {
+        "id": "thollon-les-memises-lac-leman-74-landing-1",
+        "name": "Les Vernes (Thollon)",
+        "coordinates": "46.394345, 6.702708",
+        "altitude": 870,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio ufficiale a metà costa tra monte e lago.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 90
+      }
+    ]
+  },
+  {
+    "id": "morzine-avoriaz-haute-savoie-74",
+    "name": "Morzine - Avoriaz",
+    "province": "",
+    "region": "Auvergne-Rhône-Alpes",
+    "country": "FR",
+    "location": "Morzine - Avoriaz (Haute-Savoie - 74)",
+    "description": "Comprensorio alpino dell'alta Savoia collegato al domaine Portes du Soleil.",
+    "webcam": null,
+    "club": null,
+    "reliability": 89,
+    "takeoffs": [
+      {
+        "id": "morzine-avoriaz-haute-savoie-74-takeoff-1",
+        "name": "Super Morzine",
+        "coordinates": "46.191047, 6.722306",
+        "altitude": 1650,
+        "heading": 260,
+        "isPrimary": true,
+        "description": "Decollo raggiungibile con ovovia, orientamento Ovest.",
+        "hazards": "",
+        "reliability": 89
+      }
+    ],
+    "landings": [
+      {
+        "id": "morzine-avoriaz-haute-savoie-74-landing-1",
+        "name": "Morzine Puthey",
+        "coordinates": "46.178840, 6.715986",
+        "altitude": 980,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio ufficiale vicino al centro fondo di Morzine.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 89
+      }
+    ]
+  },
+  {
+    "id": "chatel-portes-du-soleil-haute-savoie-74",
+    "name": "Châtel - Portes du Soleil",
+    "province": "",
+    "region": "Auvergne-Rhône-Alpes",
+    "country": "FR",
+    "location": "Châtel - Portes du Soleil (Haute-Savoie - 74)",
+    "description": "Comprensorio transfrontaliero al confine con la Svizzera (valle d'Abondance).",
+    "webcam": null,
+    "club": null,
+    "reliability": 88,
+    "takeoffs": [
+      {
+        "id": "chatel-portes-du-soleil-haute-savoie-74-takeoff-1",
+        "name": "Châtel Morclan",
+        "coordinates": "46.276573, 6.857341",
+        "altitude": 1950,
+        "heading": 270,
+        "isPrimary": true,
+        "description": "Decollo alto sotto la cima del Morclan.",
+        "hazards": "",
+        "reliability": 88
+      }
+    ],
+    "landings": [
+      {
+        "id": "chatel-portes-du-soleil-haute-savoie-74-landing-1",
+        "name": "Châtel l'Ortaz",
+        "coordinates": "46.283033, 6.840033",
+        "altitude": 1200,
+        "heading": 180,
+        "runwayHeading": 180,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio in fondovalle con manica a vento.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 88
+      }
+    ]
+  },
+  {
+    "id": "montlambert-savoie-73",
+    "name": "Montlambert",
+    "province": "",
+    "region": "Auvergne-Rhône-Alpes",
+    "country": "FR",
+    "location": "Montlambert (Savoie - 73)",
+    "description": "Punto di partenza classico per grandi voli di distanza lungo la combe de Savoie.",
+    "webcam": null,
+    "club": null,
+    "reliability": 92,
+    "takeoffs": [
+      {
+        "id": "montlambert-savoie-73-takeoff-1",
+        "name": "Montlambert",
+        "coordinates": "45.549200, 6.136700",
+        "altitude": 650,
+        "heading": 190,
+        "isPrimary": true,
+        "description": "Decollo termico ad attivazione precoce al mattino.",
+        "hazards": "",
+        "reliability": 92
+      }
+    ],
+    "landings": [
+      {
+        "id": "montlambert-savoie-73-landing-1",
+        "name": "Saint-Pierre d'Albigny",
+        "coordinates": "45.558300, 6.155000",
+        "altitude": 280,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Ampio atterraggio in valle con parcheggio e club house.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 92
+      }
+    ]
+  },
+  {
+    "id": "aiguebelette-savoie-73",
+    "name": "Aiguebelette",
+    "province": "",
+    "region": "Auvergne-Rhône-Alpes",
+    "country": "FR",
+    "location": "Aiguebelette (Savoie - 73)",
+    "description": "Volo panoramico sul lago verde di Aiguebelette lungo l'avant-pays savoyard.",
+    "webcam": null,
+    "club": null,
+    "reliability": 90,
+    "takeoffs": [
+      {
+        "id": "aiguebelette-savoie-73-takeoff-1",
+        "name": "Col du Banchet",
+        "coordinates": "45.534200, 5.768100",
+        "altitude": 580,
+        "heading": 270,
+        "isPrimary": true,
+        "description": "Decollo erboso con pendenza costante.",
+        "hazards": "",
+        "reliability": 90
+      }
+    ],
+    "landings": [
+      {
+        "id": "aiguebelette-savoie-73-landing-1",
+        "name": "Marais d'Aiguebelette",
+        "coordinates": "45.541000, 5.789000",
+        "altitude": 370,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio pianeggiante sulle rive meridionali del lago.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 90
+      }
+    ]
+  },
+  {
+    "id": "roquebrune-cap-martin-cote-d-azur-06",
+    "name": "Roquebrune Cap-Martin",
+    "province": "",
+    "region": "Provence-Alpes-Côte d'Azur",
+    "country": "FR",
+    "location": "Roquebrune Cap-Martin (Côte d'Azur - 06)",
+    "description": "Celebre volo marittimo invernale con decollo sopra Monaco e atterraggio sulla spiaggia del Golfe Bleu.",
+    "webcam": null,
+    "club": null,
+    "reliability": 94,
+    "takeoffs": [
+      {
+        "id": "roquebrune-cap-martin-cote-d-azur-06-takeoff-1",
+        "name": "Mont Gros",
+        "coordinates": "43.766700, 7.433300",
+        "altitude": 680,
+        "heading": 170,
+        "isPrimary": true,
+        "description": "Decollo panoramico sulla baia di Monaco e Cap Martin.",
+        "hazards": "",
+        "reliability": 94
+      }
+    ],
+    "landings": [
+      {
+        "id": "roquebrune-cap-martin-cote-d-azur-06-landing-1",
+        "name": "Plage du Golfe Bleu",
+        "coordinates": "43.755000, 7.446700",
+        "altitude": 5,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio su spiaggia autorizzato nel periodo autunno-primavera.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 92
+      }
+    ]
+  },
+  {
+    "id": "gourdon-alpes-maritimes-06",
+    "name": "Gourdon",
+    "province": "",
+    "region": "Provence-Alpes-Côte d'Azur",
+    "country": "FR",
+    "location": "Gourdon (Alpes-Maritimes - 06)",
+    "description": "Nido d'aquila sul retroterra di Grasse con termodinamica sulle gole del Loup.",
+    "webcam": null,
+    "club": null,
+    "reliability": 91,
+    "takeoffs": [
+      {
+        "id": "gourdon-alpes-maritimes-06-takeoff-1",
+        "name": "Gourdon Pré-Haut",
+        "coordinates": "43.725800, 6.974200",
+        "altitude": 810,
+        "heading": 180,
+        "isPrimary": true,
+        "description": "Decollo erboso con esposizione Sud.",
+        "hazards": "",
+        "reliability": 91
+      }
+    ],
+    "landings": [
+      {
+        "id": "gourdon-alpes-maritimes-06-landing-1",
+        "name": "Pont du Loup",
+        "coordinates": "43.731700, 7.001700",
+        "altitude": 220,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio alle porte della gola con manica a vento.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 90
+      }
+    ]
+  },
+  {
+    "id": "saint-vincent-les-forts-lac-de-serre-poncon-04",
+    "name": "Saint-Vincent-les-Forts",
+    "province": "",
+    "region": "Provence-Alpes-Côte d'Azur",
+    "country": "FR",
+    "location": "Saint-Vincent-les-Forts (Lac de Serre-Ponçon - 04)",
+    "description": "Sito termico d'eccezione affacciato sulle acque turchesi del lago di Serre-Ponçon.",
+    "webcam": null,
+    "club": null,
+    "reliability": 93,
+    "takeoffs": [
+      {
+        "id": "saint-vincent-les-forts-lac-de-serre-poncon-04-takeoff-1",
+        "name": "Saint-Vincent-les-Forts",
+        "coordinates": "44.446700, 6.368300",
+        "altitude": 1280,
+        "heading": 280,
+        "isPrimary": true,
+        "description": "Decollo sul ciglio del costone roccioso esposto a Ovest.",
+        "hazards": "",
+        "reliability": 93
+      }
+    ],
+    "landings": [
+      {
+        "id": "saint-vincent-les-forts-lac-de-serre-poncon-04-landing-1",
+        "name": "Le Sauze du Lac",
+        "coordinates": "44.471700, 6.335000",
+        "altitude": 780,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio ufficiale pianeggiante con ottima visibilità.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 92
+      }
+    ]
+  },
+  {
+    "id": "courtet-trieves-vercors-38",
+    "name": "Courtet",
+    "province": "",
+    "region": "Provence-Alpes-Côte d'Azur",
+    "country": "FR",
+    "location": "Courtet (Trièves / Vercors - 38)",
+    "description": "Decollo sotto le imponenti scogliere del massiccio del Dévoluy e del Vercors.",
+    "webcam": null,
+    "club": null,
+    "reliability": 91,
+    "takeoffs": [
+      {
+        "id": "courtet-trieves-vercors-38-takeoff-1",
+        "name": "Courtet",
+        "coordinates": "44.789200, 5.811700",
+        "altitude": 1500,
+        "heading": 200,
+        "isPrimary": true,
+        "description": "Decollo erboso regolare esposto a Sud/Sud-Ovest.",
+        "hazards": "",
+        "reliability": 91
+      }
+    ],
+    "landings": [
+      {
+        "id": "courtet-trieves-vercors-38-landing-1",
+        "name": "Mens",
+        "coordinates": "44.815000, 5.760000",
+        "altitude": 750,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio in pianura aperto e privo di ostacoli.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 91
       }
     ]
   }

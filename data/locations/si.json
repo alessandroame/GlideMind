@@ -40,11 +40,14 @@
         "name": "Ozben - vzletišče",
         "coordinates": "46.249595, 13.604092",
         "altitude": 750,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Atterraggio per parapendio censito su OpenStreetMap.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       },
       {
@@ -52,11 +55,14 @@
         "name": "Atterraggio Vzletišče Kuk",
         "coordinates": "46.241388, 13.582560",
         "altitude": 300,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": false,
         "isOfficial": false,
         "description": "Kobarid paragliding landing area",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 90
       }
     ]
@@ -102,11 +108,14 @@
         "name": "Atterraggio Vzletišče Stol",
         "coordinates": "46.258047, 13.483341",
         "altitude": 800,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -141,11 +150,14 @@
         "name": "Atterraggio Vzletišče Kanin - Skripi",
         "coordinates": "46.337171, 13.498741",
         "altitude": 1117,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -180,11 +192,14 @@
         "name": "Atterraggio Socerb",
         "coordinates": "45.591813, 13.879170",
         "altitude": 400,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -219,11 +234,14 @@
         "name": "Atterraggio Vzletišče Brestovica",
         "coordinates": "45.804033, 13.635062",
         "altitude": 400,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]
@@ -258,11 +276,14 @@
         "name": "Atterraggio Vzletišče Raca (Racna gora)",
         "coordinates": "45.691525, 14.528469",
         "altitude": 400,
+        "heading": null,
+        "runwayHeading": null,
         "isPrimary": true,
         "isOfficial": false,
         "description": "Area di atterraggio a fondo valle. Verificare sul posto manica a vento e ostacoli prima del volo.",
         "hazards": "",
         "rules": "",
+        "flightPlans": [],
         "reliability": 80
       }
     ]

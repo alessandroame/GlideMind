@@ -57,6 +57,30 @@ describe('Map Data Partitioning & Geospatial Filtering (Headless Core)', () => {
     assert.equal(allSpots.length, DEFAULT_COMPRENSORI.length);
   });
 
+  it('should correctly filter European spots for Alps West and Alps East macro-regions', () => {
+    const sampleSpots = [
+      { id: 'annecy', name: 'Annecy', country: 'FR', region: 'Auvergne-Rhône-Alpes' },
+      { id: 'interlaken', name: 'Interlaken', country: 'CH', region: 'Berner Oberland' },
+      { id: 'innsbruck', name: 'Innsbruck', country: 'AT', region: 'Tirol' },
+      { id: 'lijak', name: 'Lijak', country: 'SI', region: 'Goriška' },
+      { id: 'cavallaria', name: 'Cavallaria', country: 'IT', region: 'Piemonte' }
+    ];
+
+    const alpsWest = filterComprensoriByMacroRegion(sampleSpots, 'alps-west');
+    assert.equal(alpsWest.length, 2);
+    assert.ok(alpsWest.some(s => s.id === 'annecy'));
+    assert.ok(alpsWest.some(s => s.id === 'interlaken'));
+
+    const alpsEast = filterComprensoriByMacroRegion(sampleSpots, 'alps-east');
+    assert.equal(alpsEast.length, 2);
+    assert.ok(alpsEast.some(s => s.id === 'innsbruck'));
+    assert.ok(alpsEast.some(s => s.id === 'lijak'));
+
+    const itNorthWest = filterComprensoriByMacroRegion(sampleSpots, 'north-west');
+    assert.equal(itNorthWest.length, 1);
+    assert.equal(itNorthWest[0].id, 'cavallaria');
+  });
+
   it('should filter and sort comprensori within a given kilometer radius', () => {
     // Reference center: Torino (45.0703, 7.6869)
     const torinoCoords = { lat: 45.0703, lon: 7.6869 };

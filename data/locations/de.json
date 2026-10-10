@@ -1,0 +1,128 @@
+[
+  {
+    "id": "tegelberg-fussen-allgau-by-by",
+    "name": "Tegelberg - Füssen",
+    "province": "BY",
+    "region": "Bayern",
+    "country": "DE",
+    "location": "Tegelberg - Füssen (Allgäu - BY)",
+    "description": "Volo da favola sui castelli di Neuschwanstein e Hohenschwangau.",
+    "webcam": null,
+    "club": null,
+    "reliability": 94,
+    "takeoffs": [
+      {
+        "id": "tegelberg-fussen-allgau-by-by-takeoff-1",
+        "name": "Tegelberg Bergstation",
+        "coordinates": "47.558000, 10.778000",
+        "altitude": 1720,
+        "heading": 320,
+        "isPrimary": true,
+        "description": "Decollo su moquette con decollo con vento da Ovest/Nord-Ovest.",
+        "hazards": "",
+        "reliability": 94
+      }
+    ],
+    "landings": [
+      {
+        "id": "tegelberg-fussen-allgau-by-by-landing-1",
+        "name": "Tegelberg Talstation",
+        "coordinates": "47.570000, 10.758000",
+        "altitude": 830,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio ufficiale con manica a vento adiacente al parcheggio funivia.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 94
+      }
+    ]
+  },
+  {
+    "id": "brauneck-lenggries-isarwinkel-by-by",
+    "name": "Brauneck - Lenggries",
+    "province": "BY",
+    "region": "Bayern",
+    "country": "DE",
+    "location": "Brauneck - Lenggries (Isarwinkel - BY)",
+    "description": "La montagna di volo di Monaco di Baviera sulle prealpi bavaresi.",
+    "webcam": null,
+    "club": null,
+    "reliability": 92,
+    "takeoffs": [
+      {
+        "id": "brauneck-lenggries-isarwinkel-by-by-takeoff-1",
+        "name": "Brauneck Gipfel",
+        "coordinates": "47.661000, 11.523000",
+        "altitude": 1555,
+        "heading": 180,
+        "isPrimary": true,
+        "description": "Decollo sommitale con decolli esposti a Sud e a Nord.",
+        "hazards": "",
+        "reliability": 92
+      }
+    ],
+    "landings": [
+      {
+        "id": "brauneck-lenggries-isarwinkel-by-by-landing-1",
+        "name": "Lenggries Streidlhang",
+        "coordinates": "47.674000, 11.558000",
+        "altitude": 700,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio ufficiale adiacente alla stazione di valle della Brauneckbahn.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 92
+      }
+    ]
+  },
+  {
+    "id": "nebelhorn-oberstdorf-allgau-by-by",
+    "name": "Nebelhorn - Oberstdorf",
+    "province": "BY",
+    "region": "Bayern",
+    "country": "DE",
+    "location": "Nebelhorn - Oberstdorf (Allgäu - BY)",
+    "description": "Volo d'alta montagna nelle Alpi dell'Algovia con decollo oltre i 1900m.",
+    "webcam": null,
+    "club": null,
+    "reliability": 93,
+    "takeoffs": [
+      {
+        "id": "nebelhorn-oberstdorf-allgau-by-by-takeoff-1",
+        "name": "Nebelhorn Höfatsblick",
+        "coordinates": "47.418000, 10.339000",
+        "altitude": 1930,
+        "heading": 250,
+        "isPrimary": true,
+        "description": "Decollo alto vicino alla stazione intermedia della Nebelhornbahn.",
+        "hazards": "",
+        "reliability": 93
+      }
+    ],
+    "landings": [
+      {
+        "id": "nebelhorn-oberstdorf-allgau-by-by-landing-1",
+        "name": "Oberstdorf Oybele",
+        "coordinates": "47.408000, 10.292000",
+        "altitude": 820,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio ufficiale a monte dell'abitato di Oberstdorf.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 92
+      }
+    ]
+  }
+]

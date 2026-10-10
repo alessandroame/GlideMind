@@ -30,6 +30,11 @@
    - Styled `.gm-map-cluster-marker` in `css/theme.css` with dual-theme contrast, active tap scaling, and zero-FOUC box shadows.
    - Increased viewport culling limit `maxSpots` in `ui/views/SpotMapView.js` to 500 to allow broad continental coverage without thread blocking.
 
-4. **Testing & Verification**:
-   - Updated and expanded `tests/core/mapDataPartition.test.mjs` to validate `DEFAULT_MACRO_REGION = 'all'`, new macro-regions, and `clusterComprensori` behavior across zoom levels.
-   - Full test suite passing: 428/428 tests across 61 suites (`npm test`).
+4. **Continental France, Switzerland & European Spot Catalog Enrichment**:
+   - Enriched `data/locations.json` with 41 verified paragliding comprensori: 14 in continental France (Annecy, Chamonix, Saint-Hilaire, Passy, etc.), 18 in Switzerland (Interlaken, Grindelwald, Lauterbrunnen, Verbier, etc.), 6 in Austria, and 3 in Germany.
+   - Synchronized shards in `data/locations-index.json` (176 total spots) and `data/locations/` (`fr.json`: 25 spots, `ch.json`: 18 spots, `at.json`: 6 spots, `de.json`: 3 spots).
+   - Recentered `ALPS_WEST` to `lat: 46.2, lon: 7.2` (Franco-Swiss Alps) delivering 43 total spots in the filter.
+
+5. **Testing & Verification**:
+   - Updated and expanded `tests/core/mapDataPartition.test.mjs` and `tests/ui/locationsCatalogHydration.test.mjs` to validate `DEFAULT_MACRO_REGION = 'all'`, Alps West and Alps East filtering, and `clusterComprensori` behavior across zoom levels.
+   - Full test suite passing: 435/435 tests across 61 suites (`npm test`).

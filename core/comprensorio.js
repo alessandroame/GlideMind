@@ -702,7 +702,9 @@ export function evaluateComprensorio({
     });
 
     return {
+      id: comprensorio.id,
       comprensorioId: comprensorio.id,
+      comprensorio,
       name: comprensorio.name || comprensorio.location,
       province: comprensorio.province || '',
       region: comprensorio.region || '',
@@ -940,7 +942,9 @@ export function evaluateComprensorio({
   }
 
   return {
+    id: comprensorio.id,
     comprensorioId: comprensorio.id,
+    comprensorio,
     name: comprensorio.name || comprensorio.location,
     province: comprensorio.province || '',
     region: comprensorio.region || '',

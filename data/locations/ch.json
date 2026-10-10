@@ -1,0 +1,791 @@
+[
+  {
+    "id": "interlaken-beatenberg-be-be",
+    "name": "Interlaken - Beatenberg",
+    "province": "BE",
+    "region": "Berner Oberland",
+    "country": "CH",
+    "location": "Interlaken - Beatenberg (BE)",
+    "description": "Sito capitale del volo tandem e cross svizzero con vista su Eiger, Mönch e Jungfrau e atterraggio a Höhematte.",
+    "webcam": null,
+    "club": null,
+    "reliability": 96,
+    "takeoffs": [
+      {
+        "id": "interlaken-beatenberg-be-be-takeoff-1",
+        "name": "Amisbühl (Beatenberg)",
+        "coordinates": "46.701100, 7.788600",
+        "altitude": 1330,
+        "heading": 160,
+        "isPrimary": true,
+        "description": "Decollo erboso servito da autopostale con vista frontale sui laghi di Thun e Brienz.",
+        "hazards": "",
+        "reliability": 96
+      }
+    ],
+    "landings": [
+      {
+        "id": "interlaken-beatenberg-be-be-landing-1",
+        "name": "Höhematte (Interlaken)",
+        "coordinates": "46.686900, 7.859400",
+        "altitude": 565,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Grande prato comunale nel cuore di Interlaken riservato all'atterraggio dei parapendii.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 96
+      }
+    ]
+  },
+  {
+    "id": "grindelwald-first-pfingstegg-be-be",
+    "name": "Grindelwald - First & Pfingstegg",
+    "province": "BE",
+    "region": "Berner Oberland",
+    "country": "CH",
+    "location": "Grindelwald - First & Pfingstegg (BE)",
+    "description": "Volo spettacoloso sotto la parete Nord dell'Eiger con decolli panoramici a First e Pfingstegg.",
+    "webcam": null,
+    "club": null,
+    "reliability": 94,
+    "takeoffs": [
+      {
+        "id": "grindelwald-first-pfingstegg-be-be-takeoff-1",
+        "name": "Schreckfeld (First)",
+        "coordinates": "46.658043, 8.064975",
+        "altitude": 1955,
+        "heading": 200,
+        "isPrimary": true,
+        "description": "Decollo alto vicino alla stazione intermedia della cabinovia di First.",
+        "hazards": "",
+        "reliability": 94
+      },
+      {
+        "id": "grindelwald-first-pfingstegg-be-be-takeoff-2",
+        "name": "Pfingstegg",
+        "coordinates": "46.616049, 8.056452",
+        "altitude": 1390,
+        "heading": 310,
+        "isPrimary": false,
+        "description": "Decollo servito dalla funivia di Pfingstegg con orientamento Nord-Ovest.",
+        "hazards": "",
+        "reliability": 90
+      }
+    ],
+    "landings": [
+      {
+        "id": "grindelwald-first-pfingstegg-be-be-landing-1",
+        "name": "Bodmi (Grindelwald)",
+        "coordinates": "46.628684, 8.043164",
+        "altitude": 1020,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio ufficiale sopra Grindelwald ben collegato alla strada.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 93
+      }
+    ]
+  },
+  {
+    "id": "lauterbrunnen-murren-stechelberg-be-be",
+    "name": "Lauterbrunnen - Mürren & Stechelberg",
+    "province": "BE",
+    "region": "Berner Oberland",
+    "country": "CH",
+    "location": "Lauterbrunnen - Mürren & Stechelberg (BE)",
+    "description": "La valle delle 72 cascate: decollo dalla terrazza di Mürren e planata a picco sulle gole di Stechelberg.",
+    "webcam": null,
+    "club": null,
+    "reliability": 92,
+    "takeoffs": [
+      {
+        "id": "lauterbrunnen-murren-stechelberg-be-be-takeoff-1",
+        "name": "Mürren (Schilthornbahn)",
+        "coordinates": "46.559200, 7.893100",
+        "altitude": 1640,
+        "heading": 80,
+        "isPrimary": true,
+        "description": "Decollo erboso accanto alla stazione della funivia di Mürren.",
+        "hazards": "",
+        "reliability": 92
+      }
+    ],
+    "landings": [
+      {
+        "id": "lauterbrunnen-murren-stechelberg-be-be-landing-1",
+        "name": "Stechelberg",
+        "coordinates": "46.556391, 7.902635",
+        "altitude": 870,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio ufficiale alla base della funivia per lo Schilthorn.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 92
+      }
+    ]
+  },
+  {
+    "id": "niesen-spiez-be-be",
+    "name": "Niesen - Spiez",
+    "province": "BE",
+    "region": "Berner Oberland",
+    "country": "CH",
+    "location": "Niesen - Spiez (BE)",
+    "description": "La piramide del lago di Thun: dislivello di oltre 1700m con vista sui 4000 bernesi.",
+    "webcam": null,
+    "club": null,
+    "reliability": 91,
+    "takeoffs": [
+      {
+        "id": "niesen-spiez-be-be-takeoff-1",
+        "name": "Niesen Kulm",
+        "coordinates": "46.646400, 7.651700",
+        "altitude": 2340,
+        "heading": 10,
+        "isPrimary": true,
+        "description": "Decollo in quota sulla cresta sommitale raggiungibile con la storica funicolare.",
+        "hazards": "",
+        "reliability": 91
+      }
+    ],
+    "landings": [
+      {
+        "id": "niesen-spiez-be-be-landing-1",
+        "name": "Wimmis (Spiez)",
+        "coordinates": "46.671900, 7.638100",
+        "altitude": 630,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio in fondovalle con manica a vento adiacente all'uscita autostradale.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 91
+      }
+    ]
+  },
+  {
+    "id": "brienz-brienzer-rothorn-be-be",
+    "name": "Brienz - Brienzer Rothorn",
+    "province": "BE",
+    "region": "Berner Oberland",
+    "country": "CH",
+    "location": "Brienz - Brienzer Rothorn (BE)",
+    "description": "Cresta delle Alpi dell'Emmental con vista a 360° sul lago turchese di Brienz.",
+    "webcam": null,
+    "club": null,
+    "reliability": 89,
+    "takeoffs": [
+      {
+        "id": "brienz-brienzer-rothorn-be-be-takeoff-1",
+        "name": "Brienzer Rothorn",
+        "coordinates": "46.788855, 8.036461",
+        "altitude": 2260,
+        "heading": 170,
+        "isPrimary": true,
+        "description": "Decollo sommitale raggiungibile con il treno a vapore a cremagliera.",
+        "hazards": "",
+        "reliability": 89
+      }
+    ],
+    "landings": [
+      {
+        "id": "brienz-brienzer-rothorn-be-be-landing-1",
+        "name": "Hofstetten (Brienz)",
+        "coordinates": "46.755000, 8.052000",
+        "altitude": 570,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio pianeggiante con manica a vento nei pressi del museo all'aperto di Ballenberg.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 89
+      }
+    ]
+  },
+  {
+    "id": "schwarzsee-hohmattli-fr-be-be",
+    "name": "Schwarzsee - Hohmattli",
+    "province": "BE",
+    "region": "Berner Oberland",
+    "country": "CH",
+    "location": "Schwarzsee - Hohmattli (FR/BE)",
+    "description": "Prealpi friburghesi con decollo sopra il lago nero di Schwarzsee.",
+    "webcam": null,
+    "club": null,
+    "reliability": 88,
+    "takeoffs": [
+      {
+        "id": "schwarzsee-hohmattli-fr-be-be-takeoff-1",
+        "name": "Hohmattli",
+        "coordinates": "46.669790, 7.318206",
+        "altitude": 1780,
+        "heading": 270,
+        "isPrimary": true,
+        "description": "Decollo erboso sulle creste prealpine.",
+        "hazards": "",
+        "reliability": 88
+      }
+    ],
+    "landings": [
+      {
+        "id": "schwarzsee-hohmattli-fr-be-be-landing-1",
+        "name": "Schwarzsee Restaurant",
+        "coordinates": "46.668000, 7.285000",
+        "altitude": 1050,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio adiacente alla riva orientale del lago.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 88
+      }
+    ]
+  },
+  {
+    "id": "verbier-ruinettes-vs-vs",
+    "name": "Verbier - Ruinettes",
+    "province": "VS",
+    "region": "Valais",
+    "country": "CH",
+    "location": "Verbier - Ruinettes (VS)",
+    "description": "Comprensorio vallesano con forte attività termica e partenze per l'Aletsch e il Vallese centrale.",
+    "webcam": null,
+    "club": null,
+    "reliability": 94,
+    "takeoffs": [
+      {
+        "id": "verbier-ruinettes-vs-vs-takeoff-1",
+        "name": "Ruinettes",
+        "coordinates": "46.097500, 7.247200",
+        "altitude": 2200,
+        "heading": 220,
+        "isPrimary": true,
+        "description": "Decollo estivo e invernale con pendenza regolare servito da telecabina.",
+        "hazards": "",
+        "reliability": 94
+      },
+      {
+        "id": "verbier-ruinettes-vs-vs-takeoff-2",
+        "name": "Savoleyres",
+        "coordinates": "46.115800, 7.218900",
+        "altitude": 2350,
+        "heading": 170,
+        "isPrimary": false,
+        "description": "Decollo esposto a Sud con termiche precoci.",
+        "hazards": "",
+        "reliability": 91
+      }
+    ],
+    "landings": [
+      {
+        "id": "verbier-ruinettes-vs-vs-landing-1",
+        "name": "Le Châble (Villette)",
+        "coordinates": "46.082800, 7.186700",
+        "altitude": 820,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Grande atterraggio ufficiale nel fondovalle della val di Bagnes.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 94
+      }
+    ]
+  },
+  {
+    "id": "fiesch-aletsch-arena-vs-vs",
+    "name": "Fiesch - Aletsch Arena",
+    "province": "VS",
+    "region": "Valais",
+    "country": "CH",
+    "location": "Fiesch - Aletsch Arena (VS)",
+    "description": "L'autostrada delle Alpi: trampolino per i record mondiali di cross sopra il ghiacciaio dell'Aletsch.",
+    "webcam": null,
+    "club": null,
+    "reliability": 96,
+    "takeoffs": [
+      {
+        "id": "fiesch-aletsch-arena-vs-vs-takeoff-1",
+        "name": "Fiescheralp Kühboden",
+        "coordinates": "46.406900, 8.118900",
+        "altitude": 2220,
+        "heading": 180,
+        "isPrimary": true,
+        "description": "Decollo leggendario per voli di oltre 200-300km lungo la dorsale vallesana.",
+        "hazards": "",
+        "reliability": 96
+      }
+    ],
+    "landings": [
+      {
+        "id": "fiesch-aletsch-arena-vs-vs-landing-1",
+        "name": "Fiesch Landeplatz",
+        "coordinates": "46.398600, 8.133600",
+        "altitude": 1060,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio ufficiale con manica a vento a valle della stazione di partenza funivia.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 96
+      }
+    ]
+  },
+  {
+    "id": "monthey-chindonne-vs-vs",
+    "name": "Monthey - Chindonne",
+    "province": "VS",
+    "region": "Valais",
+    "country": "CH",
+    "location": "Monthey - Chindonne (VS)",
+    "description": "Porta d'accesso alla val d'Illiez e Dents du Midi.",
+    "webcam": null,
+    "club": null,
+    "reliability": 89,
+    "takeoffs": [
+      {
+        "id": "monthey-chindonne-vs-vs-takeoff-1",
+        "name": "Auberge de Chindonne",
+        "coordinates": "46.213729, 6.952761",
+        "altitude": 1690,
+        "heading": 330,
+        "isPrimary": true,
+        "description": "Decollo erboso con vista sulla valle del Rodano.",
+        "hazards": "",
+        "reliability": 89
+      }
+    ],
+    "landings": [
+      {
+        "id": "monthey-chindonne-vs-vs-landing-1",
+        "name": "Monthey Patinoire",
+        "coordinates": "46.262811, 6.959563",
+        "altitude": 420,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio in pianura a Monthey.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 89
+      }
+    ]
+  },
+  {
+    "id": "torgon-portes-du-soleil-vs-vs",
+    "name": "Torgon - Portes du Soleil",
+    "province": "VS",
+    "region": "Valais",
+    "country": "CH",
+    "location": "Torgon - Portes du Soleil (VS)",
+    "description": "Comprensorio alpino dell'alta valle del Rodano affacciato sul lago Lemano.",
+    "webcam": null,
+    "club": null,
+    "reliability": 88,
+    "takeoffs": [
+      {
+        "id": "torgon-portes-du-soleil-vs-vs-takeoff-1",
+        "name": "Torgon Virage",
+        "coordinates": "46.319514, 6.879857",
+        "altitude": 1480,
+        "heading": 290,
+        "isPrimary": true,
+        "description": "Decollo comodo con moquette.",
+        "hazards": "",
+        "reliability": 88
+      }
+    ],
+    "landings": [
+      {
+        "id": "torgon-portes-du-soleil-vs-vs-landing-1",
+        "name": "Vionnaz",
+        "coordinates": "46.316524, 6.900121",
+        "altitude": 395,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio in valle con manica a vento.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 88
+      }
+    ]
+  },
+  {
+    "id": "flims-laax-naraus-crap-sogn-gion-gr-gr",
+    "name": "Flims / Laax - Naraus & Crap Sogn Gion",
+    "province": "GR",
+    "region": "Graubünden",
+    "country": "CH",
+    "location": "Flims / Laax - Naraus & Crap Sogn Gion (GR)",
+    "description": "Altopiano retico sopra la gola del Reno (Ruinaulta) con termiche potenti.",
+    "webcam": null,
+    "club": null,
+    "reliability": 92,
+    "takeoffs": [
+      {
+        "id": "flims-laax-naraus-crap-sogn-gion-gr-gr-takeoff-1",
+        "name": "Crap Sogn Gion",
+        "coordinates": "46.837500, 9.215300",
+        "altitude": 2220,
+        "heading": 130,
+        "isPrimary": true,
+        "description": "Decollo in quota adiacente alla funivia di Laax.",
+        "hazards": "",
+        "reliability": 92
+      },
+      {
+        "id": "flims-laax-naraus-crap-sogn-gion-gr-gr-takeoff-2",
+        "name": "Naraus West",
+        "coordinates": "46.860811, 9.267589",
+        "altitude": 1840,
+        "heading": 190,
+        "isPrimary": false,
+        "description": "Decollo erboso sotto le pareti del Flimserstein.",
+        "hazards": "",
+        "reliability": 90
+      }
+    ],
+    "landings": [
+      {
+        "id": "flims-laax-naraus-crap-sogn-gion-gr-gr-landing-1",
+        "name": "Larnags (Flims)",
+        "coordinates": "46.831900, 9.278900",
+        "altitude": 1160,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio ufficiale su ampio prato alpino.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 91
+      }
+    ]
+  },
+  {
+    "id": "klosters-davos-gotschnagrat-gr-gr",
+    "name": "Klosters / Davos - Gotschnagrat",
+    "province": "GR",
+    "region": "Graubünden",
+    "country": "CH",
+    "location": "Klosters / Davos - Gotschnagrat (GR)",
+    "description": "Cresta alpina di collegamento tra la valle di Klosters e il bacino di Davos.",
+    "webcam": null,
+    "club": null,
+    "reliability": 91,
+    "takeoffs": [
+      {
+        "id": "klosters-davos-gotschnagrat-gr-gr-takeoff-1",
+        "name": "Gotschnagrat Nord",
+        "coordinates": "46.858922, 9.843938",
+        "altitude": 2280,
+        "heading": 350,
+        "isPrimary": true,
+        "description": "Decollo sommitale con partenza diretta verso Klosters.",
+        "hazards": "",
+        "reliability": 91
+      }
+    ],
+    "landings": [
+      {
+        "id": "klosters-davos-gotschnagrat-gr-gr-landing-1",
+        "name": "Klosters Selfranga",
+        "coordinates": "46.865300, 9.882200",
+        "altitude": 1200,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio ufficiale con manica a vento e parcheggio.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 91
+      }
+    ]
+  },
+  {
+    "id": "lenzerheide-scalottas-gr-gr",
+    "name": "Lenzerheide - Scalottas",
+    "province": "GR",
+    "region": "Graubünden",
+    "country": "CH",
+    "location": "Lenzerheide - Scalottas (GR)",
+    "description": "Balcone d'alta quota della valle dell'Albula con decollo dal Piz Scalottas.",
+    "webcam": null,
+    "club": null,
+    "reliability": 90,
+    "takeoffs": [
+      {
+        "id": "lenzerheide-scalottas-gr-gr-takeoff-1",
+        "name": "Piz Scalottas",
+        "coordinates": "46.721031, 9.510204",
+        "altitude": 2320,
+        "heading": 110,
+        "isPrimary": true,
+        "description": "Decollo raggiungibile con seggiovia con dislivello di oltre 800m.",
+        "hazards": "",
+        "reliability": 90
+      }
+    ],
+    "landings": [
+      {
+        "id": "lenzerheide-scalottas-gr-gr-landing-1",
+        "name": "Valbella",
+        "coordinates": "46.748000, 9.553000",
+        "altitude": 1500,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio sul fondo valle vicino al lago Heidsee.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 90
+      }
+    ]
+  },
+  {
+    "id": "sonchaux-montreux-lac-leman-vd-vd",
+    "name": "Sonchaux - Montreux / Lac Léman",
+    "province": "VD",
+    "region": "Vaud",
+    "country": "CH",
+    "location": "Sonchaux - Montreux / Lac Léman (VD)",
+    "description": "Uno dei panorami più suggestivi della Svizzera: decollo da Sonchaux a picco sul castello di Chillon e lago Lemano.",
+    "webcam": null,
+    "club": null,
+    "reliability": 94,
+    "takeoffs": [
+      {
+        "id": "sonchaux-montreux-lac-leman-vd-vd-takeoff-1",
+        "name": "Sonchaux",
+        "coordinates": "46.425800, 6.945800",
+        "altitude": 1430,
+        "heading": 280,
+        "isPrimary": true,
+        "description": "Decollo magnifico esposto a Ovest verso il lago di Ginevra.",
+        "hazards": "",
+        "reliability": 94
+      }
+    ],
+    "landings": [
+      {
+        "id": "sonchaux-montreux-lac-leman-vd-vd-landing-1",
+        "name": "Noville / Villeneuve",
+        "coordinates": "46.389605, 6.917414",
+        "altitude": 375,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Grande atterraggio alla foce del Rodano nel lago di Ginevra.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 94
+      }
+    ]
+  },
+  {
+    "id": "tete-de-ran-neuchatel-ne-ne",
+    "name": "Tête-de-Ran - Neuchâtel",
+    "province": "NE",
+    "region": "Jura",
+    "country": "CH",
+    "location": "Tête-de-Ran - Neuchâtel (NE)",
+    "description": "Volo di cresta lungo l'arco del Giura svizzero con vista su tre laghi e le Alpi sullo sfondo.",
+    "webcam": null,
+    "club": null,
+    "reliability": 91,
+    "takeoffs": [
+      {
+        "id": "tete-de-ran-neuchatel-ne-ne-takeoff-1",
+        "name": "Tête-de-Ran",
+        "coordinates": "47.050600, 6.871100",
+        "altitude": 1380,
+        "heading": 160,
+        "isPrimary": true,
+        "description": "Decollo erboso esposto a Sud con termodinamica generosa.",
+        "hazards": "",
+        "reliability": 91
+      }
+    ],
+    "landings": [
+      {
+        "id": "tete-de-ran-neuchatel-ne-ne-landing-1",
+        "name": "Les Hauts-Geneveys",
+        "coordinates": "47.042800, 6.892500",
+        "altitude": 980,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio ufficiale sui pascoli del Giura.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 91
+      }
+    ]
+  },
+  {
+    "id": "monte-lema-lugano-ti-ti",
+    "name": "Monte Lema - Lugano",
+    "province": "TI",
+    "region": "Ticino",
+    "country": "CH",
+    "location": "Monte Lema - Lugano (TI)",
+    "description": "La montagna del cross del Canton Ticino: decollo panoramico tra il lago Ceresio e il lago Maggiore.",
+    "webcam": null,
+    "club": null,
+    "reliability": 93,
+    "takeoffs": [
+      {
+        "id": "monte-lema-lugano-ti-ti-takeoff-1",
+        "name": "Monte Lema",
+        "coordinates": "46.023100, 8.831700",
+        "altitude": 1620,
+        "heading": 180,
+        "isPrimary": true,
+        "description": "Decollo raggiungibile con la funivia da Miglieglia, punto di partenza per voli verso il Sempione.",
+        "hazards": "",
+        "reliability": 93
+      }
+    ],
+    "landings": [
+      {
+        "id": "monte-lema-lugano-ti-ti-landing-1",
+        "name": "Miglieglia",
+        "coordinates": "46.027800, 8.861700",
+        "altitude": 710,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio alla base della funivia con club house e manica a vento.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 93
+      }
+    ]
+  },
+  {
+    "id": "monte-tamaro-ti-ti",
+    "name": "Monte Tamaro",
+    "province": "TI",
+    "region": "Ticino",
+    "country": "CH",
+    "location": "Monte Tamaro (TI)",
+    "description": "Balcone panoramico sulle Alpi Lepontine e pianura padana.",
+    "webcam": null,
+    "club": null,
+    "reliability": 91,
+    "takeoffs": [
+      {
+        "id": "monte-tamaro-ti-ti-takeoff-1",
+        "name": "Alpe Foppa (Tamaro)",
+        "coordinates": "46.108000, 8.918000",
+        "altitude": 1530,
+        "heading": 190,
+        "isPrimary": true,
+        "description": "Decollo accanto alla cappella di Mario Botta servito da telecabina.",
+        "hazards": "",
+        "reliability": 91
+      }
+    ],
+    "landings": [
+      {
+        "id": "monte-tamaro-ti-ti-landing-1",
+        "name": "Rivera Bironico",
+        "coordinates": "46.125000, 8.927000",
+        "altitude": 470,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio ufficiale in fondovalle con manica a vento.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 91
+      }
+    ]
+  },
+  {
+    "id": "beckenried-klewenalp-nw-nw",
+    "name": "Beckenried - Klewenalp",
+    "province": "NW",
+    "region": "Unterwalden",
+    "country": "CH",
+    "location": "Beckenried - Klewenalp (NW)",
+    "description": "Volo spettacolare sul lago dei Quattro Cantoni con decollo da Klewenalp.",
+    "webcam": null,
+    "club": null,
+    "reliability": 90,
+    "takeoffs": [
+      {
+        "id": "beckenried-klewenalp-nw-nw-takeoff-1",
+        "name": "Klewenalp",
+        "coordinates": "46.948000, 8.473000",
+        "altitude": 1600,
+        "heading": 330,
+        "isPrimary": true,
+        "description": "Decollo servito dalla funivia più lunga della Svizzera centrale.",
+        "hazards": "",
+        "reliability": 90
+      }
+    ],
+    "landings": [
+      {
+        "id": "beckenried-klewenalp-nw-nw-landing-1",
+        "name": "Beckenried Dorni",
+        "coordinates": "46.968000, 8.475000",
+        "altitude": 440,
+        "heading": null,
+        "runwayHeading": null,
+        "isPrimary": true,
+        "isOfficial": false,
+        "description": "Atterraggio sulla riva del lago con manica a vento.",
+        "hazards": "",
+        "rules": "",
+        "flightPlans": [],
+        "reliability": 90
+      }
+    ]
+  }
+]
