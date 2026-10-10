@@ -954,7 +954,7 @@ export function evaluateComprensorio({
       reason = `Rientro critico: efficienza richiesta 1:${glideMetrics.requiredGlideRatio} > 1:${glideMetrics.safeLimit}`;
     } else {
       reason = isTakeoffOverridden
-        ? `Alt. ${selectedTakeoff.name}: ${selectedTakeoffEval.statusText}`
+        ? (takeoffOverrideReason ? `${takeoffOverrideReason} • ${selectedTakeoffEval.statusText}` : `Alt. ${selectedTakeoff.name}: ${selectedTakeoffEval.statusText}`)
         : selectedTakeoffEval.statusText;
     }
   } else {
@@ -963,7 +963,15 @@ export function evaluateComprensorio({
     badgeColor = 'var(--gm-status-flyable)';
     badgeBg = 'var(--gm-status-flyable-bg)';
     if (isTakeoffOverridden) {
-      reason = `Alt. ${selectedTakeoff.name}: vento favorevole (${primaryTakeoffEval.takeoff.name} non volabile)`;
+      if (takeoffOverrideReason && takeoffOverrideReason.startsWith('Decollo manuale:')) {
+        const dirDetails = selectedTakeoffEval?.flyScore?.details?.direction;
+        const dirText = dirDetails && dirDetails.diffFromFront != null && dirDetails.diffFromFront <= 35
+          ? `in asse (${Math.round(windSpeed)} km/h da ${windDir}°)`
+          : `vento ${Math.round(windSpeed)} km/h da ${windDir}° (${getCardinalDirection(windDir)})`;
+        reason = `${takeoffOverrideReason}: ${dirText}`;
+      } else {
+        reason = `Alt. ${selectedTakeoff.name}: vento favorevole (${primaryTakeoffEval.takeoff.name} non volabile)`;
+      }
     } else if (selectedTakeoff?.heading != null) {
       const dirDetails = selectedTakeoffEval?.flyScore?.details?.direction;
       if (dirDetails && dirDetails.diffFromFront != null && dirDetails.diffFromFront <= 35) {

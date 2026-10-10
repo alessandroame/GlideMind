@@ -1143,9 +1143,62 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
   2. **Persistenza SSOT nello Store (`core/store.js`)**: Le chiavi `activeTakeoffId` e `activeLandingId` sono parte integrante dello stato reattivo e del set `persistedKeys`.
   3. **Zero Clutter UI & Standard Ergonomico Outdoor**: Nello sheet di ricerca spot e nell'header delle previsioni, i controlli di sub-selezione appaiono esclusivamente se `takeoffs.length > 1` o `landings.length > 1` (zero controlli ridondanti per spot singoli). Tutte le chip e pill interattive rispettano il floor touch $\ge 48\times 48\text{px}$, adottano `touch-action: pan-x` per scorrimento orizzontale a riga singola senza sovrapposizioni verticali e dichiarano semantica WAI-ARIA (`aria-checked="true"` / `aria-pressed="true"`).
 
+---
+
+## 95. Sincronizzazione Rigorosa della Scheda Overview Comprensorio con la Selezione di Decolli e Atterraggi Multipli
+- **Problema**: Selezionando un decollo o atterraggio specifico (dallo sheet del picker, dalle pill nell'header delle previsioni, dal dropdown di Livello 2 o dai pin della mini-mappa), la scheda principale dell'overview del comprensorio (`#forecast-summary-card`) non rifletteva la selezione oppure veniva rimpiazzata da una vista a punto singolo (`#forecast-specific-spot-card`) che oscurava l'atterraggio, l'efficienza del cono di planata 1:G e la sintesi aerologica complessiva. Inoltre, l'istruzione inline `onclick="event.stopPropagation();"` nello sheet bloccava la propagazione dell'evento tap al contenitore del foglio modale nei browser mobili reali.
+- **Causa Radice**: Disallineamento tra il dispatch degli eventi UI, la mancata idratazione di `activeTakeoffId`/`activeLandingId` nel ciclo di vita `mount()`/`store.subscribe`, e la frammentazione del contenitore della card `#forecast-spot-card-container` tra overview e specific subspot.
+- **Pattern Vincolante**:
+  1. **La Scheda Overview (`#forecast-summary-card`) è il Cardine Invariante del Comprensorio**: Il contenitore `#forecast-spot-card-container` renderizza sempre la card riassuntiva (`renderSummaryCard(evaluated)`). Quando un decollo o un atterraggio viene selezionato (o modificato dall'utente), viene passato a `evaluateComprensorio({ takeoffId, landingId })`, garantendo che quota, nome decollo, azimut pendio, scostamento del vento, atterraggio prescelto ed efficienza di planata 1:G siano sempre calcolati e visualizzati all'istante (<400ms) nella scheda principale dell'overview.
+  2. **Disaccoppiamento della Riferibilità Touch & Zero stopPropagation Inline**: Nello sheet dei comprensori, la riga principale del comprensorio (`.gm-picker-item-main` con `data-action="pick-spot"`) e il container delle chip (`.gm-picker-subselection`) devono essere elementi fratelli separati all'interno della card, eliminando categoricamente qualsiasi `stopPropagation()` inline.
+  3. **Sincronizzazione Reattiva Globale**: Qualsiasi modifica di decollo o atterraggio (pill, sheet, dropdown Livello 2 o mini-mappa) aggiorna `activeTakeoffId`/`activeLandingId` e mantiene la modalità overview (`selectedSubSpot = 'overview'`), persistendo nello store SSOT ed effettuando il refresh in background dei dati meteo per le coordinate e la quota del decollo specifico.
+
+---
+
+## 96. Priorità Metadati Vela nei Tracciati IGC, Catalogo Storico e Derivazione Classi Badge UI
+- **Problema**:
+  1. Durante l'importazione di una traccia IGC, sovrascrivere il modello della vela con quello della sessione attiva del pilota corrompe la veridicità storica del tracciato di volo (il volo è stato effettuato con la vela specificata nel log IGC).
+  2. Molti file IGC registrano la vela senza indicare esplicitamente la classe di certificazione (es. `Axis Compact 4`), provocando la ricaduta forzata su classe `Custom` e privando il pilota del badge semantico colorato (EN-A..EN-D).
+  3. Nel componente UI di rendering della card (`LogbookView.js`), l'omissione della derivazione della classe CSS per il badge (`classBadgeStyle`) scatena eccezioni `ReferenceError` a runtime.
+- **Causa Radice**: Mancata priorità dei record H IGC (`HFGTY`) rispetto allo stato di sessione, assenza di interrogazione del catalogo storico `POPULAR_GLIDERS` per i modelli senza suffisso di classe, e mancata definizione della variabile di stile CSS.
+- **Pattern Vincolante**:
+  1. **Priorità Vela IGC**: In `parseIgc()` e `importIgcTrack()`, la vela estratta dai record H (`parsed.gliderType`) ha la priorità assoluta; il glider attivo (`options.activeGlider`) interviene unicamente se il campo nel file IGC è assente o vuoto.
+  2. **Deduzione Istintiva da Catalogo (`deduceGliderClass`)**: Se il nome della vela non contiene un match regex esplicito (`EN-[A-D]`, `DHV [1-3]`, `CCC`), la funzione deve eseguire una scansione normalizzata su `POPULAR_GLIDERS` (`core/gliders.js`), mappando modelli noti alla rispettiva classe certificata.
+  3. **Normalizzazione Deterministica Classi CSS**: Nel controller UI, generare sempre `const classBadgeStyle = (gliderClass || '').toLowerCase().trim().replace(/[^a-z0-9-]/g, '')`, garantendo che valori come `EN-A` o `EN-B` si colleghino direttamente alle classi `.en-a`, `.en-b` con palette WCAG 2.1 AA dichiarate nel design system (`css/theme.css`).
+
+---
+
+## 97. Gestione dell'Esposizione del Decollo e dei Casi con Azimut Ignoto (Null Heading) nel Calcolo di Volabilità
+- **Problema**:
+  1. Nei comprensori o decolli in cui l'orientamento del pendio non è censito nel catalogo (`heading == null` o `undefined`), il sistema ricorreva a fallback arbitrari (es. `heading || 180` o coercizione a 0° Nord), introducendo azimut fittizi, alterando artificiosamente la volabilità e mostrando settori e notifiche di allineamento fuorvianti nella UI.
+  2. In `ForecastView.js`, la card del parametro "Vento in Decollo" calcolava lo stato in modo disaccoppiato dal motore di volabilità del comprensorio: con brezza calma (es. 2 km/h a Ciavanis da 101° con pendio 180°), etichettava il vento con un pallino rosso "Non Favorevole" a causa dello scostamento angolare $\Delta\theta = 79^\circ$, mentre la timeline in basso e l'algoritmo centrale lo valutavano correttamente verde "Volabile".
+- **Causa Radice**:
+  - Mancanza di gestione esplicita per decolli a esposizione non definita (`heading == null`).
+  - Calcolo privato e non armonizzato di `windStatus` in `ForecastView.js` privo della soglia di brezza debole ($\le 4\text{ km/h}$).
+- **Pattern Vincolante**:
+  1. **Preservazione Rigorosa di `heading == null` (Zero Fallback Fittizi)**: Non assumere mai 180° Sud o 0° Nord per decolli privi di orientamento noto. Se `heading == null`, `evaluateDirectionFlyability` restituisce `null` e il motore imposta `indicators.direction = { hasExposure: false, label: 'Esposiz. N/D', diffDegrees: null, severity: 0 }`. La volabilità complessiva del decollo viene determinata unicamente dall'intensità del vento, dalle raffiche e dai limiti di sicurezza della vela.
+  2. **Trasparenza Semantica e Grafica nella UI**: Quando `heading == null`:
+     - Visualizzare chiaramente `Esposizione N/D` / `Azimut Pendio: N/D` e `Scostamento Decollo: N/D (Esposizione non nota)`.
+     - Nel compasso SVG e nella mini-mappa, sopprimere il cono verde di apertura a 70° e la freccia azimutale di decollo, sostituendoli con un badge neutro o marker circolare neutro senza claim ingannevoli di allineamento.
+  3. **Armonizzazione del Vento Calmo ($\le 4\text{ km/h}$)**: Sia nel core (`core/flyability.js`, `core/comprensorio.js`) sia nella UI (`ForecastView.js`), venti $\le 4\text{ km/h}$ non devono mai essere penalizzati come "Non Favorevole" o "Traverso Marcato": la brezza debole e il gradiente sinottico trascurabile sono valutati `flyable` ("Vento Calmo"), con decollo dominato dalle brezze locali di pendio. Solo venti da dietro con $\Delta\theta > 90^\circ$ ad intensità moderata sollevano attenzione `caution` ("Brezza da Dietro").
 
 
 
 
 
 
+
+
+
+
+---
+
+## 98. Aggiornamento In-Place degli Accordion UI e Preservazione dello Scorrimento
+- **Problema**: Quando l'utente espandeva una card parametrica dell'accordion nelle previsioni (es. "Vento in Decollo", "Raffiche & Delta Vento", "Base Cumulo"), la pagina scattava tornando all'inizio (`scrollTop: 0`), disorientando il pilota e allontanando il contenuto appena svelato dal campo visivo.
+- **Causa Radice**: L'azione `toggle-param-card` invocava `this.render()`, che distruggeva l'intero albero DOM della vista (`this.containerEl.innerHTML = this.renderHtml()`). Il nuovo elemento `#forecast-scroll-container` veniva inserito con `scrollTop = 0` e la mini-mappa Leaflet veniva inutilmente distrutta e ricreata.
+- **Pattern Vincolante**:
+  1. **Mutazione Selettiva In-Place per Componenti Locali**: Le interazioni di svelamento progressivo (accordion, tab locali, toggle) non devono mai distruggere il contenitore di scorrimento principale. Se `#forecast-params-container` è presente nel DOM, aggiornare unicamente il markup dei parametri (`paramsContainer.innerHTML = this.renderParameterCards(...)`).
+  2. **Doppia Guardia di Preservazione `scrollTop` in `render()`**:
+     - Nel metodo generale `render({ resetScroll = false } = {})`, rilevare `prevScrollTop` prima di riassegnare `innerHTML`.
+     - Dopo `setupScrollListener()`, ripristinare `scrollTop = prevScrollTop` se `prevScrollTop > 0` e non è stato richiesto un reset esplicito.
+     - L'azzeramento dello scorrimento (`resetScroll: true`) è riservato esclusivamente a transizioni di cambio radicale del contesto (es. selezione di un comprensorio differente dallo sheet).

@@ -1005,6 +1005,32 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Consolidato il documento formale in [docs/plans/phase-6-flight-logbook-and-telemetry.md](file:///docs/plans/phase-6-flight-logbook-and-telemetry.md).
   - Registrata la Lezione Appresa #93 in [MEMORY.md](file:///MEMORY.md).
 
+---
+
+## 2026-10-10 - Fase 4: Armonizzazione Volabilità su Esposizione Decollo e Gestione Heading Null
+- **Tipo**: Bugfix / Algoritmo Aeronautico / Armonizzazione UI Core
+- **Dettagli**: [.agents/worklog.d/2026-10-10_takeoff-exposure-and-null-heading-flyability.md](file:///.agents/worklog.d/2026-10-10_takeoff-exposure-and-null-heading-flyability.md)
+- **Sintesi**:
+  - Risolta discrepanza tra la scheda analitica "Vento in Decollo" e la timeline oraria (regressione Ciavanis 1780m, ore 08:00, azimut 180°, vento 2 km/h da Est): neutralizzata la penalizzazione con vento calmo ($\le 4\text{ km/h}$), valutato come `flyable` ("Vento Calmo") sia nel core che nella UI.
+  - Rimossi tutti i fallback arbitrari `heading || 180` o `heading ?? 0` su decolli con orientamento non censito (`heading == null` o `undefined`), prevenendo azimut e settori fittizi.
+  - I decolli privi di orientamento sono valutati unicamente sull'intensità e raffiche rispetto alla classe della vela (`hasExposure: false`, `severity: 0`, `label: 'Esposiz. N/D'`).
+  - Nel compasso SVG e nella mini-mappa, soppressi cono verde e freccia di pendio in assenza di heading; esposti dettagli chiari: `Azimut Pendio: N/D`, `Scostamento Decollo: N/D (Esposizione non nota)`.
+  - Aggiunti test di regressione dedicati in `tests/core/flyability.test.mjs`, `tests/core/comprensorio.test.mjs` e `tests/ui/forecastView.test.mjs`.
+  - Verificato il passaggio di tutti i 497 test nativi (`npm test`).
+  - Registrata la Lezione Appresa #97 in [MEMORY.md](file:///MEMORY.md).
 
 
 
+
+
+---
+
+## 2026-10-10 - Fase 4: Risoluzione Scroll Jump nell'Espansione Accordion Previsioni
+- **Tipo**: Bugfix / Ergonomia UI
+- **Dettagli**: [.agents/worklog.d/2026-10-10_fix-forecast-accordion-scroll-jump.md](file:///.agents/worklog.d/2026-10-10_fix-forecast-accordion-scroll-jump.md)
+- **Sintesi**:
+  - Risolto lo scatto involontario verso l'alto (`scrollTop: 0`) all'apertura o chiusura delle schede parametriche accordion nelle previsioni (es. "Vento in Decollo", "Raffiche & Delta Vento", "Base Cumulo").
+  - Sostituita la distruzione completa della vista (`this.render()`) nell'azione `toggle-param-card` con l'aggiornamento selettivo in-place del markup dei parametri (`#forecast-params-container`), azzerando il layout thrashing e preservando il motore della mini-mappa.
+  - Implementata la doppia salvaguardia di scorrimento nel metodo `render({ resetScroll = false } = {})`, rilevando e ripristinando `prevScrollTop` sul contenitore di scorrimento, con reset a 0 controllato solo in caso di cambio radicale del comprensorio.
+  - Introdotti 2 test unitari dedicati in `tests/ui/forecastView.test.mjs`, con suite completa al 100% verde (499 test in 73 suite).
+  - Registrata la Lezione Appresa #98 in [MEMORY.md](file:///MEMORY.md).

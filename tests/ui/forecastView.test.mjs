@@ -810,6 +810,106 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.equal(controller.expandedCardId, null, 'Clicking active card again must collapse accordion');
   });
 
+  it('should update #forecast-params-container in place and preserve scroll position when toggling param card', () => {
+    const mockStore = createStore({ selectedSpot: DEFAULT_COMPRENSORI[0] });
+    const controller = new ForecastViewController({ store: mockStore });
+
+    let paramsHtml = '';
+    const mockScrollContainer = {
+      scrollTop: 350,
+      addEventListener() {},
+      removeEventListener() {}
+    };
+    const mockParamsContainer = {
+      set innerHTML(val) { paramsHtml = val; },
+      get innerHTML() { return paramsHtml; }
+    };
+    const mockContainer = {
+      innerHTML: '',
+      addEventListener() {},
+      removeEventListener() {},
+      querySelector(sel) {
+        if (sel === '#forecast-scroll-container') return mockScrollContainer;
+        if (sel === '#forecast-params-container') return mockParamsContainer;
+        return null;
+      }
+    };
+
+    controller.mount(mockContainer);
+    // Simulate scroll container already scrolled down to 350px
+    mockScrollContainer.scrollTop = 350;
+
+    let renderCalled = false;
+    const originalRender = controller.render.bind(controller);
+    controller.render = (...args) => {
+      renderCalled = true;
+      return originalRender(...args);
+    };
+
+    const mockActionEl = {
+      getAttribute(attr) {
+        if (attr === 'data-action') return 'toggle-param-card';
+        if (attr === 'data-card-id') return 'vento-decollo';
+        return null;
+      },
+      closest(sel) {
+        return sel === '[data-action]' ? this : null;
+      }
+    };
+
+    controller.handleClick({ target: mockActionEl });
+
+    assert.equal(controller.expandedCardId, 'vento-decollo');
+    assert.equal(renderCalled, false, 'Must NOT trigger full render() when #forecast-params-container is in DOM');
+    assert.equal(mockScrollContainer.scrollTop, 350, 'Scroll position must remain unchanged at 350px');
+    assert.ok(paramsHtml.includes('param-card-vento-decollo'), 'Must update parameter cards markup in-place');
+    assert.ok(paramsHtml.includes('expanded'), 'Expanded card must have expanded class');
+    assert.ok(paramsHtml.includes('aria-expanded="true"'), 'Expanded button must have aria-expanded="true"');
+
+    // Click again to collapse
+    controller.handleClick({ target: mockActionEl });
+    assert.equal(controller.expandedCardId, null);
+    assert.equal(renderCalled, false, 'Collapsing must also update in-place without calling full render()');
+    assert.equal(mockScrollContainer.scrollTop, 350, 'Scroll position must remain at 350px on collapse');
+    assert.ok(!paramsHtml.includes('aria-expanded="true"'), 'All cards should be collapsed');
+
+    controller.unmount();
+  });
+
+  it('should preserve and restore scrollTop across render() calls and reset when requested', () => {
+    const mockStore = createStore({ selectedSpot: DEFAULT_COMPRENSORI[0] });
+    const controller = new ForecastViewController({ store: mockStore });
+
+    const mockScrollContainer = {
+      scrollTop: 420,
+      addEventListener() {},
+      removeEventListener() {}
+    };
+    const mockContainer = {
+      innerHTML: '',
+      addEventListener() {},
+      removeEventListener() {},
+      querySelector(sel) {
+        if (sel === '#forecast-scroll-container') return mockScrollContainer;
+        return null;
+      }
+    };
+
+    controller.mount(mockContainer);
+    // Explicitly set scroll position
+    mockScrollContainer.scrollTop = 420;
+
+    // Full render without resetScroll
+    controller.render();
+    assert.equal(mockScrollContainer.scrollTop, 420, 'render() must preserve scrollTop of 420px');
+
+    // Full render with resetScroll: true
+    controller.render({ resetScroll: true });
+    assert.equal(mockScrollContainer.scrollTop, 0, 'render({ resetScroll: true }) must reset scrollTop to 0');
+
+    controller.unmount();
+  });
+
   it('should switch between Schede and Solo Grafici mode and render multi-trend charts stack', () => {
     const mockStore = createStore({ selectedSpot: DEFAULT_COMPRENSORI[0] });
     const controller = new ForecastViewController({ store: mockStore });
@@ -1782,7 +1882,366 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.equal(controller.activeLandingId, 'ld-2');
     assert.equal(mockStore.getState().activeLandingId, 'ld-2');
     assert.equal(rendered, true);
+
+    // Verify that the overview summary card (#forecast-summary-card) uses the selected takeoff and landing
+    const updatedHtml = controller.renderHtml();
+    assert.ok(updatedHtml.includes('id="forecast-summary-card"'), 'Must render #forecast-summary-card');
+    assert.ok(updatedHtml.includes('Decollo Basso'), 'Overview card must reflect selected takeoff Decollo Basso');
+    assert.ok(updatedHtml.includes('900m'), 'Overview card must reflect selected takeoff altitude 900m');
+    assert.ok(updatedHtml.includes('Atterraggio Lago'), 'Overview card must reflect selected landing Atterraggio Lago');
+    assert.ok(updatedHtml.includes('200m'), 'Overview card must reflect selected landing altitude 200m');
+  });
+
+  it('should update overview card when selecting takeoff and landing from spot picker sheet', () => {
+    const multiSpot = {
+      id: 'spot-multi-test-2',
+      name: 'Monte Cornizzolo',
+      province: 'CO',
+      region: 'Lombardia',
+      takeoffs: [
+        { id: 'corn-sud', name: 'Decollo Sud', altitude: 1050, heading: 180, isPrimary: true },
+        { id: 'corn-est', name: 'Decollo Est', altitude: 1100, heading: 90, isPrimary: false }
+      ],
+      landings: [
+        { id: 'suello-campone', name: 'Atterraggio Suello', altitude: 270, isPrimary: true, isOfficial: true },
+        { id: 'civate-campo', name: 'Atterraggio Civate', altitude: 220, isPrimary: false, isOfficial: false }
+      ]
+    };
+
+    const mockStore = createStore({
+      selectedSpot: multiSpot,
+      activeTakeoffId: 'corn-sud',
+      activeLandingId: 'suello-campone',
+      locationsCatalog: [multiSpot]
+    });
+    const controller = new ForecastViewController({ store: mockStore });
+    controller.comprensoriCatalog = [multiSpot];
+
+    // Check initial overview card
+    let html = controller.renderHtml();
+    assert.ok(html.includes('Decollo Sud'));
+    assert.ok(html.includes('1050m'));
+    assert.ok(html.includes('Suello'));
+
+    // Render picker sections and verify chips are rendered
+    const pickerHtml = controller.renderPickerSections();
+    assert.ok(pickerHtml.includes('data-action="pick-spot-takeoff"'));
+    assert.ok(pickerHtml.includes('data-action="pick-spot-landing"'));
+    assert.ok(pickerHtml.includes('data-action="pick-spot-apply"'));
+
+    // Simulate clicking takeoff chip 'corn-est' on the active spot item
+    const mockCard = {
+      getAttribute(attr) {
+        if (attr === 'data-takeoff-id') return this.takeoffId || 'corn-sud';
+        if (attr === 'data-landing-id') return this.landingId || 'suello-campone';
+        return null;
+      },
+      setAttribute(attr, val) {
+        if (attr === 'data-takeoff-id') this.takeoffId = val;
+        if (attr === 'data-landing-id') this.landingId = val;
+      },
+      classList: {
+        contains(cls) { return cls === 'active'; },
+        toggle() {}
+      },
+      querySelectorAll() { return []; }
+    };
+
+    const takeoffChipEvt = {
+      target: {
+        closest(sel) {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute(attr) {
+                if (attr === 'data-action') return 'pick-spot-takeoff';
+                if (attr === 'data-takeoff-id') return 'corn-est';
+                if (attr === 'data-spot-id') return 'spot-multi-test-2';
+                return null;
+              },
+              closest(s) {
+                if (s === '.gm-picker-item') return mockCard;
+                return null;
+              }
+            };
+          }
+          return null;
+        }
+      }
+    };
+    controller.handleClick(takeoffChipEvt);
+    assert.equal(controller.activeTakeoffId, 'corn-est');
+    assert.equal(mockStore.getState().activeTakeoffId, 'corn-est');
+
+    // Simulate clicking landing chip 'civate-campo'
+    const landingChipEvt = {
+      target: {
+        closest(sel) {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute(attr) {
+                if (attr === 'data-action') return 'pick-spot-landing';
+                if (attr === 'data-landing-id') return 'civate-campo';
+                if (attr === 'data-spot-id') return 'spot-multi-test-2';
+                return null;
+              },
+              closest(s) {
+                if (s === '.gm-picker-item') return mockCard;
+                return null;
+              }
+            };
+          }
+          return null;
+        }
+      }
+    };
+    controller.handleClick(landingChipEvt);
+    assert.equal(controller.activeLandingId, 'civate-campo');
+    assert.equal(mockStore.getState().activeLandingId, 'civate-campo');
+
+    // Simulate clicking apply
+    const applyEvt = {
+      target: {
+        closest(sel) {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute(attr) {
+                if (attr === 'data-action') return 'pick-spot-apply';
+                if (attr === 'data-spot-id') return 'spot-multi-test-2';
+                return null;
+              },
+              closest(s) {
+                if (s === '.gm-picker-item') return mockCard;
+                return null;
+              }
+            };
+          }
+          return null;
+        }
+      }
+    };
+    controller.handleClick(applyEvt);
+
+    // Verify overview card displays Cornizzolo Est and Civate
+    html = controller.renderHtml();
+    assert.ok(html.includes('id="forecast-summary-card"'));
+    assert.ok(html.includes('Decollo Est'));
+    assert.ok(html.includes('1100m'));
+    assert.ok(html.includes('Civate'));
+    assert.ok(html.includes('220m'));
+  });
+
+  it('should update overview card when selecting takeoff or landing from level-2 dropdown', () => {
+    const multiSpot = {
+      id: 'spot-multi-dropdown',
+      name: 'Monte Grappa',
+      province: 'TV',
+      region: 'Veneto',
+      takeoffs: [
+        { id: 'grappa-costalunga', name: 'Costalunga', altitude: 750, heading: 190, isPrimary: true },
+        { id: 'grappa-panettone', name: 'Panettone', altitude: 1550, heading: 170, isPrimary: false }
+      ],
+      landings: [
+        { id: 'semonzo-paradiso', name: 'Paradiso', altitude: 180, isPrimary: true, isOfficial: true },
+        { id: 'semonzo-garden', name: 'Garden Relais', altitude: 190, isPrimary: false, isOfficial: false }
+      ]
+    };
+
+    const mockStore = createStore({
+      selectedSpot: multiSpot,
+      activeTakeoffId: 'grappa-costalunga',
+      activeLandingId: 'semonzo-paradiso',
+      locationsCatalog: [multiSpot]
+    });
+    const controller = new ForecastViewController({ store: mockStore });
+    controller.comprensoriCatalog = [multiSpot];
+
+    // Select 'grappa-panettone' via change-subspot
+    controller.handleChange({
+      target: {
+        id: 'forecast-subspot-select',
+        value: 'grappa-panettone'
+      }
+    });
+
+    assert.equal(controller.activeTakeoffId, 'grappa-panettone');
+    assert.equal(mockStore.getState().activeTakeoffId, 'grappa-panettone');
+
+    let html = controller.renderHtml();
+    assert.ok(html.includes('id="forecast-summary-card"'));
+    assert.ok(html.includes('Panettone'));
+    assert.ok(html.includes('1550m'));
+
+    // Select 'semonzo-garden' via custom popover click
+    const selectPopoverEvt = {
+      target: {
+        closest(sel) {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute(attr) {
+                if (attr === 'data-action') return 'select-subspot';
+                if (attr === 'data-subspot-id') return 'semonzo-garden';
+                return null;
+              }
+            };
+          }
+          return null;
+        }
+      }
+    };
+    controller.handleClick(selectPopoverEvt);
+
+    assert.equal(controller.activeLandingId, 'semonzo-garden');
+    assert.equal(mockStore.getState().activeLandingId, 'semonzo-garden');
+
+    html = controller.renderHtml();
+    assert.ok(html.includes('id="forecast-summary-card"'));
+    assert.ok(html.includes('Garden Relais'));
+    assert.ok(html.includes('190m'));
+  });
+
+  describe('Takeoff Exposure and Calm Wind Regression Tests', () => {
+    const spotWithExp = {
+      id: 'ciavanis-spot',
+      name: 'Ciavanis',
+      takeoffs: [
+        { id: 'ciavanis-1780', name: 'Ciavanis', altitude: 1780, heading: 180, coordinates: '45.362, 7.501', spotType: 'takeoff' }
+      ],
+      landings: [
+        { id: 'ciavanis-land', name: 'Chialamberto', altitude: 600, coordinates: '45.360, 7.520', spotType: 'landing' }
+      ]
+    };
+
+    const spotWithoutExp = {
+      id: 'spot-no-heading',
+      name: 'Valle Segreta',
+      takeoffs: [
+        { id: 'takeoff-unknown', name: 'Decollo Ignoto', altitude: 1100, heading: null, coordinates: '46.000, 11.000', spotType: 'takeoff' }
+      ],
+      landings: [
+        { id: 'landing-standard', name: 'Atterraggio', altitude: 400, coordinates: '46.010, 11.010', spotType: 'landing' }
+      ]
+    };
+
+    it('evaluates Ciavanis 2 km/h calm wind (101° wind on 180° slope) as flyable and Vento Calmo in computeParamMetrics', () => {
+      const mockStore = createStore({
+        selectedSpot: spotWithExp,
+        activeTakeoffId: 'ciavanis-1780'
+      });
+      const controller = new ForecastViewController({ store: mockStore });
+      controller.selectedHour = 8;
+
+      const weatherData = {
+        hourly: {
+          time: Array.from({ length: 13 }, (_, i) => `2026-10-10T${String(i + 8).padStart(2, '0')}:00`),
+          wind_speed_10m: Array(13).fill(2),
+          wind_direction_10m: Array(13).fill(101),
+          wind_gusts_10m: Array(13).fill(4),
+          surface_pressure: Array(13).fill(1013),
+          cape: Array(13).fill(0),
+          precipitation: Array(13).fill(0),
+          cloud_cover: Array(13).fill(10)
+        }
+      };
+
+      const evalData = {
+        takeoff: spotWithExp.takeoffs[0],
+        landing: spotWithExp.landings[0],
+        status: 'flyable'
+      };
+
+      const { params } = controller.computeParamMetrics(
+        evalData,
+        weatherData,
+        spotWithExp,
+        GLIDER_CLASSES.EN_A,
+        spotWithExp.takeoffs[0]
+      );
+
+      const windParam = params.find(p => p.id === 'vento-decollo');
+      assert.ok(windParam, 'vento-decollo card must exist');
+      assert.equal(windParam.status, 'flyable');
+      assert.equal(windParam.statusLabel, 'Vento Calmo');
+      assert.ok(windParam.advice.includes('Vento debole o calmo'));
+    });
+
+    it('evaluates spot without heading accurately in computeParamMetrics without false alignment claims', () => {
+      const mockStore = createStore({
+        selectedSpot: spotWithoutExp,
+        activeTakeoffId: 'takeoff-unknown'
+      });
+      const controller = new ForecastViewController({ store: mockStore });
+      controller.selectedHour = 12;
+
+      const weatherData = {
+        hourly: {
+          time: Array.from({ length: 13 }, (_, i) => `2026-10-10T${String(i + 8).padStart(2, '0')}:00`),
+          wind_speed_10m: Array(13).fill(10),
+          wind_direction_10m: Array(13).fill(90),
+          wind_gusts_10m: Array(13).fill(12),
+          surface_pressure: Array(13).fill(1013),
+          cape: Array(13).fill(0),
+          precipitation: Array(13).fill(0),
+          cloud_cover: Array(13).fill(10)
+        }
+      };
+
+      const evalData = {
+        takeoff: spotWithoutExp.takeoffs[0],
+        landing: spotWithoutExp.landings[0],
+        status: 'flyable'
+      };
+
+      const { params } = controller.computeParamMetrics(
+        evalData,
+        weatherData,
+        spotWithoutExp,
+        GLIDER_CLASSES.EN_A,
+        spotWithoutExp.takeoffs[0]
+      );
+
+      const windParam = params.find(p => p.id === 'vento-decollo');
+      assert.ok(windParam);
+      assert.equal(windParam.status, 'flyable');
+      assert.equal(windParam.takeoffHeading, null);
+
+      const offsetDetail = windParam.details.find(d => d.label === 'Scostamento Decollo');
+      assert.ok(offsetDetail);
+      assert.equal(offsetDetail.value, 'N/D (Esposizione non nota)');
+      assert.ok(windParam.advice.includes('Esposizione del pendio non nota nel catalogo'));
+    });
+
+    it('renders Azimut Pendio: N/D in renderSpecificSpotMetrics when takeoff heading is null', () => {
+      const mockStore = createStore();
+      const controller = new ForecastViewController({ store: mockStore });
+      const html = controller.renderSpecificSpotMetrics(spotWithoutExp.takeoffs[0], {
+        takeoff: spotWithoutExp.takeoffs[0],
+        landing: spotWithoutExp.landings[0]
+      });
+
+      assert.ok(html.includes('Azimut Pendio:'));
+      assert.ok(html.includes('N/D'));
+      assert.ok(!html.includes('null°'));
+    });
+
+    it('renders Esposizione N/D and Azimut Decollo: N/D in renderWindCompass when heading is null', () => {
+      const mockStore = createStore();
+      const controller = new ForecastViewController({ store: mockStore });
+      const html = controller.renderWindCompass(spotWithoutExp, {
+        current: {
+          wind_speed_10m: 10,
+          wind_direction_10m: 90,
+          wind_gusts_10m: 12
+        }
+      }, null);
+
+      assert.ok(html.includes('Esposizione N/D'));
+      assert.ok(html.includes('Azimut Decollo'));
+      assert.ok(html.includes('N/D'));
+      assert.ok(!html.includes('rgba(34, 197, 94, 0.25)')); // No sector cone
+      assert.ok(!html.includes('y2="33"')); // No takeoff notch line (cy - radius + 8 = 100 - 75 + 8 = 33)
+    });
   });
 });
+
 
 

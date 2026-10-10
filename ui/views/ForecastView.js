@@ -447,8 +447,9 @@ export class ForecastViewController {
    */
   resolveActiveTakeoff(spot) {
     if (!spot || !Array.isArray(spot.takeoffs) || spot.takeoffs.length === 0) return null;
-    if (this.activeTakeoffId) {
-      const found = spot.takeoffs.find(t => t.id === this.activeTakeoffId);
+    const activeTakeoffId = this.activeTakeoffId || (this.store && this.store.getState()?.activeTakeoffId);
+    if (activeTakeoffId) {
+      const found = spot.takeoffs.find(t => t.id === activeTakeoffId);
       if (found) return found;
     }
     return spot.takeoffs.find(t => t.isPrimary) || spot.takeoffs[0] || null;
@@ -463,8 +464,9 @@ export class ForecastViewController {
    */
   resolveActiveLanding(spot) {
     if (!spot || !Array.isArray(spot.landings) || spot.landings.length === 0) return null;
-    if (this.activeLandingId) {
-      const found = spot.landings.find(l => l.id === this.activeLandingId);
+    const activeLandingId = this.activeLandingId || (this.store && this.store.getState()?.activeLandingId);
+    if (activeLandingId) {
+      const found = spot.landings.find(l => l.id === activeLandingId);
       if (found) return found;
     }
     return spot.landings.find(l => l.isPrimary || l.isOfficial) || spot.landings[0] || null;
@@ -555,7 +557,7 @@ export class ForecastViewController {
     this.networkStatus = 'loading';
     this.updateLiveStatusBadgeInDom();
 
-    const takeoff = (spot.takeoffs && spot.takeoffs[0]) ? spot.takeoffs[0] : { altitude: 1000, heading: 180 };
+    const takeoff = this.resolveActiveTakeoff(spot) || (spot.takeoffs && spot.takeoffs[0]) || { altitude: 1000, heading: null };
     const coords = parseCoordinates(takeoff.coordinates) || { lat: 45.833, lon: 9.302 };
 
     const fetchPromise = (async () => {
@@ -640,7 +642,10 @@ export class ForecastViewController {
     }
 
     // Check defaultWeatherCache
-    const takeoff = (spot.takeoffs && spot.takeoffs[0]) ? spot.takeoffs[0] : { altitude: 1000, heading: 180 };
+    const activeTakeoffId = this.store ? this.store.getState().activeTakeoffId : this.activeTakeoffId;
+    const takeoff = (spot.takeoffs && spot.takeoffs.find(t => t.id === activeTakeoffId))
+      || (spot.takeoffs && spot.takeoffs[0])
+      || { altitude: 1000, heading: null };
     const coords = parseCoordinates(takeoff.coordinates) || { lat: 45.833, lon: 9.302 };
     const cached = getCachedWeatherData(coords, dateStr, { weatherModel: 'best_match' });
     if (cached && !cached.isStale) {
@@ -652,18 +657,22 @@ export class ForecastViewController {
     }
 
     // Generate deterministic synthetic day for immediate 0ms offline rendering
+    const takeoffHeading = (takeoff && takeoff.heading != null && !isNaN(Number(takeoff.heading)))
+      ? Number(takeoff.heading)
+      : null;
+
     const synthetic = generateSyntheticWeather(
       coords,
       {
         targetDate: dateStr,
         days: 1,
         elevation: takeoff.altitude || 1000,
-        takeoffAzimuth: takeoff.heading || 180,
+        takeoffAzimuth: takeoffHeading,
         weatherModel: 'best_match'
       }
     );
     const enriched = enrichWeatherData(synthetic, dateStr, Date.now(), {
-      customHeading: takeoff.heading || 180
+      customHeading: takeoffHeading
     });
 
     this.cachedWeatherMap.set(key, enriched);
@@ -685,8 +694,15 @@ export class ForecastViewController {
       return this.cachedWeatherMap.get(key);
     }
 
-    const takeoff = (spot.takeoffs && spot.takeoffs[0]) ? spot.takeoffs[0] : { altitude: 1000, heading: 180 };
+    const activeTakeoffId = this.store ? this.store.getState().activeTakeoffId : this.activeTakeoffId;
+    const takeoff = (spot.takeoffs && spot.takeoffs.find(t => t.id === activeTakeoffId))
+      || (spot.takeoffs && spot.takeoffs[0])
+      || { altitude: 1000, heading: null };
     const coords = parseCoordinates(takeoff.coordinates) || { lat: 45.833, lon: 9.302 };
+
+    const takeoffHeading = (takeoff && takeoff.heading != null && !isNaN(Number(takeoff.heading)))
+      ? Number(takeoff.heading)
+      : null;
 
     const state = this.store ? this.store.getState() : {};
     let payload = null;
@@ -700,12 +716,12 @@ export class ForecastViewController {
           targetDate: todayIso,
           days,
           elevation: takeoff.altitude || 1000,
-          takeoffAzimuth: takeoff.heading || 180,
+          takeoffAzimuth: takeoffHeading,
           weatherModel: 'best_match'
         }
       );
       payload = enrichWeatherData(synthetic, todayIso, Date.now(), {
-        customHeading: takeoff.heading || 180
+        customHeading: takeoffHeading
       });
     }
 
@@ -727,6 +743,12 @@ export class ForecastViewController {
     if (state.activeDate) {
       this.activeDate = state.activeDate;
       this.selectedHour = this._resolveInitialHour(this.activeDate);
+    }
+    if (state.activeTakeoffId) {
+      this.activeTakeoffId = state.activeTakeoffId;
+    }
+    if (state.activeLandingId) {
+      this.activeLandingId = state.activeLandingId;
     }
 
     if (this.containerEl) {
@@ -760,6 +782,13 @@ export class ForecastViewController {
           this.activeDate = nextState.activeDate;
           this.selectedHour = this._resolveInitialHour(this.activeDate);
           needsWeatherFetch = true;
+        }
+        if (nextState.activeTakeoffId !== undefined && nextState.activeTakeoffId !== this.activeTakeoffId) {
+          this.activeTakeoffId = nextState.activeTakeoffId;
+          needsWeatherFetch = true;
+        }
+        if (nextState.activeLandingId !== undefined && nextState.activeLandingId !== this.activeLandingId) {
+          this.activeLandingId = nextState.activeLandingId;
         }
         if (nextState.ui && nextState.ui.theme && nextState.ui.theme !== this.activeTheme && this.miniMapEngine) {
           this.activeTheme = nextState.ui.theme;
@@ -889,15 +918,29 @@ export class ForecastViewController {
 
   /**
    * Renders the complete Forecast View HTML into the container and mounts the mini-map.
+   * Preserves and restores scroll position unless explicitly requested to reset.
+   * @param {object} [options]
+   * @param {boolean} [options.resetScroll=false]
    */
-  render() {
+  render({ resetScroll = false } = {}) {
     if (!this.containerEl) return;
+    const scrollContainer = this.containerEl.querySelector ? this.containerEl.querySelector('#forecast-scroll-container') : null;
+    const prevScrollTop = (!resetScroll && this.scrollContainerEl)
+      ? this.scrollContainerEl.scrollTop
+      : (!resetScroll && scrollContainer ? scrollContainer.scrollTop : 0);
     if (this.miniMapEngine) {
       this.miniMapEngine.destroy();
       this.miniMapEngine = null;
     }
     this.containerEl.innerHTML = this.renderHtml();
     this.setupScrollListener();
+    if (this.scrollContainerEl) {
+      if (resetScroll) {
+        this.scrollContainerEl.scrollTop = 0;
+      } else if (prevScrollTop > 0) {
+        this.scrollContainerEl.scrollTop = prevScrollTop;
+      }
+    }
     this.initMiniMap();
   }
 
@@ -912,20 +955,23 @@ export class ForecastViewController {
     const spot = this.getCurrentSpot();
     const glider = this.getActiveGlider();
     const weatherData = this.getWeatherData(spot, this.activeDate);
+    const activeSub = this.resolveActiveSubSpot(spot);
+    const effectiveTakeoffId = (activeSub && activeSub.spotType === 'takeoff') ? activeSub.id : this.activeTakeoffId;
+    const effectiveLandingId = (activeSub && activeSub.spotType === 'landing') ? activeSub.id : this.activeLandingId;
+
     const evaluated = evaluateComprensorio({
       comprensorio: spot,
       weatherData,
       hourIndex: this.selectedHour,
       glider,
       targetDate: this.activeDate,
-      takeoffId: this.activeTakeoffId,
-      landingId: this.activeLandingId
+      takeoffId: effectiveTakeoffId,
+      landingId: effectiveLandingId
     });
 
     const state = this.store ? this.store.getState() : {};
     const currentTheme = (state.ui && state.ui.theme) || 'dark';
 
-    const activeSub = this.resolveActiveSubSpot(spot);
     const subSpotType = activeSub ? activeSub.spotType : 'overview';
     const activeLayer = this.getActiveMapLayer();
 
@@ -945,7 +991,17 @@ export class ForecastViewController {
         weatherSnapshot: evaluated.weatherSnapshot,
         glideMetrics: evaluated.glideMetrics,
         onSelectSubSpot: (subSpotId) => {
-          this.selectedSubSpot = subSpotId;
+          const s = this.getCurrentSpot();
+          if (s) {
+            if (s.takeoffs?.some(t => t.id === subSpotId)) {
+              this.activeTakeoffId = subSpotId;
+              if (this.store) this.store.setState({ activeTakeoffId: subSpotId });
+            } else if (s.landings?.some(l => l.id === subSpotId)) {
+              this.activeLandingId = subSpotId;
+              if (this.store) this.store.setState({ activeLandingId: subSpotId });
+            }
+          }
+          this.selectedSubSpot = 'overview';
           this.render();
         }
       });
@@ -960,6 +1016,9 @@ export class ForecastViewController {
     const spot = this.getCurrentSpot();
     const glider = this.getActiveGlider();
     const weatherData = this.getWeatherData(spot, this.activeDate);
+    const activeSubSpotObj = this.resolveActiveSubSpot(spot);
+    const effectiveTakeoffId = (activeSubSpotObj && activeSubSpotObj.spotType === 'takeoff') ? activeSubSpotObj.id : this.activeTakeoffId;
+    const effectiveLandingId = (activeSubSpotObj && activeSubSpotObj.spotType === 'landing') ? activeSubSpotObj.id : this.activeLandingId;
 
     // Evaluate single takeoff and landing for active hour
     const evaluated = evaluateComprensorio({
@@ -968,12 +1027,9 @@ export class ForecastViewController {
       hourIndex: this.selectedHour,
       glider,
       targetDate: this.activeDate,
-      takeoffId: this.activeTakeoffId,
-      landingId: this.activeLandingId
+      takeoffId: effectiveTakeoffId,
+      landingId: effectiveLandingId
     });
-
-    // Check if a specific spot is selected in level-2 dropdown
-    const activeSubSpotObj = this.resolveActiveSubSpot(spot);
 
     // Generate Guido safety briefing
     const briefing = generateGuidoBriefing(spot, weatherData, this.activeDate, glider);
@@ -988,11 +1044,9 @@ export class ForecastViewController {
           <!-- 1. Header: Comprensorio Bar + Picker Trigger -->
           ${this.renderHeader(spot)}
 
-          <!-- 2. Spot Card: Dual Unico Binomio or Focused Sub-Spot Detail -->
+          <!-- 2. Spot Card: Dual Unico Binomio Overview Card -->
           <div id="forecast-spot-card-container">
-            ${this.selectedSubSpot === 'overview' 
-              ? this.renderSummaryCard(evaluated) 
-              : this.renderSpecificSpotCard(activeSubSpotObj, evaluated)}
+            ${this.renderSummaryCard(evaluated)}
           </div>
 
           <!-- Mode Toggle: Schede & Dettagli vs Solo Grafici (Trend) -->
@@ -1062,7 +1116,10 @@ export class ForecastViewController {
     const activeLanding = this.resolveActiveLanding(spot);
     if (activeSubSpot) {
       if (activeSubSpot.spotType === 'takeoff') {
-        subSpotLabel = `${activeSubSpot.name} (${activeSubSpot.altitude}m · ${getCardinalDirection(activeSubSpot.heading)})`;
+        const headingPart = activeSubSpot.heading != null && !isNaN(Number(activeSubSpot.heading))
+          ? ` · ${getCardinalDirection(activeSubSpot.heading)}`
+          : '';
+        subSpotLabel = `${activeSubSpot.name} (${activeSubSpot.altitude}m${headingPart})`;
       } else if (activeSubSpot.spotType === 'landing') {
         subSpotLabel = `${activeSubSpot.name} (${activeSubSpot.altitude}m)`;
       }
@@ -1161,7 +1218,9 @@ export class ForecastViewController {
     const hasMultiLandings = landings.length > 1;
 
     // Resolve active sub-spot label and monochrome vector SVG icon
-    let activeSubSpotLabel = 'Panoramica (Decollo Primario + Atterraggio)';
+    let activeSubSpotLabel = (activeTakeoff && activeLanding)
+      ? `Panoramica (${activeTakeoff.name} • ${activeLanding.name})`
+      : 'Panoramica (Decollo Primario + Atterraggio)';
     let activeSubSpotIcon = `
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
@@ -1173,7 +1232,10 @@ export class ForecastViewController {
     const activeSub = this.resolveActiveSubSpot(currentSpot);
     if (activeSub) {
       if (activeSub.spotType === 'takeoff') {
-        activeSubSpotLabel = `${activeSub.name} (${activeSub.altitude}m · ${activeSub.heading}° ${getCardinalDirection(activeSub.heading)})`;
+        const headingPart = activeSub.heading != null && !isNaN(Number(activeSub.heading))
+          ? ` · ${activeSub.heading}° ${getCardinalDirection(activeSub.heading)}`
+          : '';
+        activeSubSpotLabel = `${activeSub.name} (${activeSub.altitude}m${headingPart})`;
         activeSubSpotIcon = `
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="m8 3 4 8 5-5 5 15H2L8 3z"></path>
@@ -1235,15 +1297,20 @@ export class ForecastViewController {
             aria-hidden="true"
           >
             <option value="overview" ${this.selectedSubSpot === 'overview' ? 'selected' : ''}>
-              Panoramica (Decollo Primario + Atterraggio)
+              ${activeTakeoff && activeLanding ? `Panoramica (${escapeHtml(activeTakeoff.name)} • ${escapeHtml(activeLanding.name)})` : 'Panoramica (Decollo Primario + Atterraggio)'}
             </option>
             ${takeoffs.length > 0 ? `
               <optgroup label="Decolli">
-                ${takeoffs.map(t => `
-                  <option value="${t.id}" ${this.selectedSubSpot === t.id ? 'selected' : ''}>
-                    ${escapeHtml(t.name)} (${t.altitude}m · ${t.heading}° ${getCardinalDirection(t.heading)})
-                  </option>
-                `).join('')}
+                ${takeoffs.map(t => {
+                  const headingPart = t.heading != null && !isNaN(Number(t.heading))
+                    ? ` · ${t.heading}° ${getCardinalDirection(t.heading)}`
+                    : '';
+                  return `
+                    <option value="${t.id}" ${this.selectedSubSpot === t.id ? 'selected' : ''}>
+                      ${escapeHtml(t.name)} (${t.altitude}m${headingPart})
+                    </option>
+                  `;
+                }).join('')}
               </optgroup>
             ` : ''}
             ${landings.length > 0 ? `
@@ -1299,7 +1366,7 @@ export class ForecastViewController {
                       <polyline points="2 12 12 17 22 12"></polyline>
                     </svg>
                   </span>
-                  <span class="gm-subspot-item-name font-semibold">Panoramica (Decollo Primario + Atterraggio)</span>
+                  <span class="gm-subspot-item-name font-semibold">${activeTakeoff && activeLanding ? `Panoramica (${escapeHtml(activeTakeoff.name)} • ${escapeHtml(activeLanding.name)})` : 'Panoramica (Decollo Primario + Atterraggio)'}</span>
                 </div>
                 ${this.selectedSubSpot === 'overview' ? `
                   <span class="gm-subspot-item-check" aria-hidden="true">✓</span>
@@ -1329,7 +1396,7 @@ export class ForecastViewController {
                         <span class="gm-subspot-item-bullet" aria-hidden="true">•</span>
                         <div class="gm-subspot-item-text-group">
                           <span class="gm-subspot-item-name">${escapeHtml(t.name)}</span>
-                          <span class="gm-subspot-item-badge">${t.altitude}m · ${t.heading}° ${getCardinalDirection(t.heading)}</span>
+                          <span class="gm-subspot-item-badge">${t.altitude}m${t.heading != null && !isNaN(Number(t.heading)) ? ` · ${t.heading}° ${getCardinalDirection(t.heading)}` : ''}</span>
                         </div>
                       </div>
                       ${isSel ? `
@@ -1395,6 +1462,7 @@ export class ForecastViewController {
                 <div class="gm-spot-subselector-chips" role="radiogroup">
                   ${takeoffs.map(t => {
                     const isSel = activeTakeoff && activeTakeoff.id === t.id;
+                    const headingPart = t.heading != null && !isNaN(Number(t.heading)) ? ` · ${t.heading}°` : '';
                     return `
                       <button
                         type="button"
@@ -1403,7 +1471,7 @@ export class ForecastViewController {
                         data-takeoff-id="${escapeHtml(t.id)}"
                         aria-checked="${isSel ? 'true' : 'false'}"
                         role="radio"
-                        title="${escapeHtml(t.name)} (${t.altitude}m · ${t.heading ?? ''}°)"
+                        title="${escapeHtml(t.name)} (${t.altitude}m${headingPart})"
                       >
                         ▲ ${escapeHtml(t.name)} (${t.altitude}m)
                       </button>
@@ -1689,7 +1757,7 @@ export class ForecastViewController {
         ${isTakeoff ? `
           <div class="flex justify-between">
             <span>Azimut Pendio:</span>
-            <span class="font-bold text-[var(--gm-text-primary)] font-mono">${subSpot.heading}° (${getCardinalDirection(subSpot.heading)})</span>
+            <span class="font-bold text-[var(--gm-text-primary)] font-mono">${subSpot.heading != null && !isNaN(Number(subSpot.heading)) ? `${subSpot.heading}° (${getCardinalDirection(subSpot.heading)})` : 'N/D'}</span>
           </div>
         ` : `
           <div class="flex justify-between">
@@ -1754,11 +1822,13 @@ export class ForecastViewController {
   computeParamMetrics(evaluated, weatherData, spot, glider, activeSubSpotObj) {
     const takeoff = (activeSubSpotObj && activeSubSpotObj.spotType === 'takeoff')
       ? activeSubSpotObj
-      : (evaluated.takeoff || (spot.takeoffs && spot.takeoffs[0]) || { altitude: 1000, heading: 180 });
+      : (evaluated.takeoff || (spot.takeoffs && spot.takeoffs[0]) || { altitude: 1000, heading: null });
 
     const landing = (activeSubSpotObj && activeSubSpotObj.spotType === 'landing')
       ? activeSubSpotObj
-      : (evaluated.landing || (spot.landings && spot.landings[0]) || { altitude: 400, heading: 180 });
+      : (evaluated.landing || (spot.landings && spot.landings[0]) || { altitude: 400, heading: null });
+
+    const hasTakeoffHeading = typeof takeoff.heading === 'number' && !isNaN(takeoff.heading);
 
     const hourlyData = (weatherData && weatherData.hourly) || {};
     const times = hourlyData.time || [];
@@ -1802,7 +1872,9 @@ export class ForecastViewController {
       const lcl = calculateLCL(temp, dew, takeoff.altitude);
       const lclMsl = lcl ? lcl.lclMsl : (takeoff.altitude + 800);
       const deltaWind = Math.max(0, gust - speed);
-      const angleDelta = Math.abs(calculateAngularDifference(takeoff.heading, dir));
+      const angleDelta = hasTakeoffHeading
+        ? Math.abs(calculateAngularDifference(takeoff.heading, dir))
+        : null;
       const updraft = Math.max(0.5, Math.min(5.0, (temp - dew) * 0.22 + (cape > 300 ? (cape / 400) : 0)));
       const edr = Math.max(0.8, Math.min(4.5, deltaWind * 0.15 + (updraft > 2.5 ? 1.0 : 0.4)));
       const landingSpeed = Math.max(4, Math.round(speed * 0.75));
@@ -1834,18 +1906,77 @@ export class ForecastViewController {
     // 1. Vento in Decollo
     let windStatus = 'flyable';
     let windStatusLabel = 'Favorevole';
-    if (activePoint.speed <= maxWindLimit && activePoint.gust <= maxGustLimit && activePoint.angleDelta <= 45) {
-      windStatus = 'flyable';
-      windStatusLabel = 'Favorevole';
-    } else if (activePoint.speed <= maxWindLimit + 4 && activePoint.gust <= maxGustLimit + 5 && activePoint.angleDelta <= 75) {
-      windStatus = 'caution';
-      windStatusLabel = 'Attenzione';
-    } else if (activePoint.speed > maxWindLimit + 10 || activePoint.gust > 35 || activePoint.angleDelta > 105) {
-      windStatus = 'severe';
-      windStatusLabel = 'Pericoloso';
+
+    if (hasTakeoffHeading) {
+      if (activePoint.speed <= 4) {
+        if (activePoint.angleDelta > 90) {
+          windStatus = 'caution';
+          windStatusLabel = 'Brezza da Dietro';
+        } else {
+          windStatus = 'flyable';
+          windStatusLabel = 'Vento Calmo';
+        }
+      } else {
+        // Wind > 4 km/h
+        if (activePoint.speed > maxWindLimit + 10 || activePoint.gust > 35) {
+          windStatus = 'severe';
+          windStatusLabel = 'Pericoloso';
+        } else if (activePoint.angleDelta > 90) {
+          if (activePoint.speed > 18) {
+            windStatus = 'severe';
+            windStatusLabel = 'NO FLY: Sottovento';
+          } else {
+            windStatus = 'unflyable';
+            windStatusLabel = 'Vento da Dietro';
+          }
+        } else if (activePoint.angleDelta > 60) {
+          if (activePoint.speed > 14) {
+            windStatus = 'unflyable';
+            windStatusLabel = 'Traverso Marcato';
+          } else {
+            windStatus = 'caution';
+            windStatusLabel = 'Vento Traverso';
+          }
+        } else if (activePoint.angleDelta > 35) {
+          if (activePoint.speed > maxWindLimit || activePoint.gust > maxGustLimit) {
+            windStatus = 'caution';
+            windStatusLabel = 'Vento Sostenuto';
+          } else {
+            windStatus = 'caution';
+            windStatusLabel = 'Vento al Traverso';
+          }
+        } else {
+          // Frontal (<= 35°)
+          if (activePoint.speed > maxWindLimit + 4 || activePoint.gust > maxGustLimit + 5) {
+            windStatus = 'unflyable';
+            windStatusLabel = 'Vento Forte';
+          } else if (activePoint.speed > maxWindLimit || activePoint.gust > maxGustLimit) {
+            windStatus = 'caution';
+            windStatusLabel = 'Vento Sostenuto';
+          } else {
+            windStatus = 'flyable';
+            windStatusLabel = 'Favorevole';
+          }
+        }
+      }
     } else {
-      windStatus = 'unflyable';
-      windStatusLabel = 'Non Favorevole';
+      // Spot WITHOUT takeoff exposure
+      if (activePoint.speed > maxWindLimit + 10 || activePoint.gust > 35) {
+        windStatus = 'severe';
+        windStatusLabel = 'Pericoloso';
+      } else if (activePoint.speed > maxWindLimit + 4 || activePoint.gust > maxGustLimit + 5) {
+        windStatus = 'unflyable';
+        windStatusLabel = 'Vento Forte';
+      } else if (activePoint.speed > maxWindLimit || activePoint.gust > maxGustLimit) {
+        windStatus = 'caution';
+        windStatusLabel = 'Vento Sostenuto';
+      } else if (activePoint.speed <= 4) {
+        windStatus = 'flyable';
+        windStatusLabel = 'Vento Calmo';
+      } else {
+        windStatus = 'flyable';
+        windStatusLabel = 'Favorevole';
+      }
     }
 
     const windParam = {
@@ -1855,21 +1986,34 @@ export class ForecastViewController {
       value: `${Math.round(activePoint.speed)} km/h · ${Math.round(activePoint.dir)}° ${getCardinalDirection(activePoint.dir)}`,
       status: windStatus,
       statusLabel: windStatusLabel,
-      takeoffHeading: takeoff.heading,
+      takeoffHeading: hasTakeoffHeading ? takeoff.heading : null,
       takeoffAlt: takeoff.altitude,
       details: [
         { label: 'Velocità Media', value: `${Math.round(activePoint.speed)} km/h` },
         { label: 'Raffica di Picco', value: `${Math.round(activePoint.gust)} km/h` },
         { label: 'Direzione Vento', value: `${Math.round(activePoint.dir)}° (${getCardinalDirection(activePoint.dir)})` },
-        { label: 'Scostamento Decollo', value: `${Math.round(activePoint.angleDelta)}° (${activePoint.angleDelta <= 35 ? 'In Asse' : activePoint.angleDelta <= 75 ? 'Al Traverso' : 'Fuori Asse'})` }
+        {
+          label: 'Scostamento Decollo',
+          value: hasTakeoffHeading
+            ? `${Math.round(activePoint.angleDelta)}° (${activePoint.angleDelta <= 35 ? 'In Asse' : activePoint.angleDelta <= 75 ? 'Al Traverso' : 'Fuori Asse'})`
+            : 'N/D (Esposizione non nota)'
+        }
       ],
-      advice: windStatus === 'flyable'
-        ? 'Intensità e orientamento ottimali rispetto al decollo. Gonfiaggio regolare con ottimo controllo a terra.'
-        : windStatus === 'caution'
-        ? 'Vento sostenuto o al traverso rispetto al decollo. Richiesta attenzione nella fase di corsa e gonfiaggio.'
-        : windStatus === 'severe'
-        ? 'Vento tempestoso o raffiche violente. Pericolo critico di trascinamento e turbolenza orografica.'
-        : 'Vento oltre i limiti di sicurezza dell\'ala o con componente da dietro. Decollo fortemente sconsigliato.'
+      advice: !hasTakeoffHeading
+        ? (windStatus === 'severe' || windStatus === 'unflyable'
+            ? 'Velocità o raffiche oltre i limiti operativi dell\'ala. Esposizione decollo non censita: verificare attentamente sul posto.'
+            : 'Esposizione del pendio non nota nel catalogo. Intensità vento nei limiti: valutare l\'allineamento del decollo direttamente sul posto.')
+        : (windStatus === 'flyable'
+            ? (activePoint.speed <= 4
+                ? 'Vento debole o calmo. Influenza sinottica trascurabile, decollo dominato dalle brezze di pendio locali.'
+                : 'Intensità e orientamento ottimali rispetto al decollo. Gonfiaggio regolare con ottimo controllo a terra.')
+            : windStatus === 'caution'
+            ? (activePoint.speed <= 4
+                ? 'Brezza debole proveniente dal settore posteriore. Prestare attenzione alla fase di gonfiaggio.'
+                : 'Vento sostenuto o al traverso rispetto al decollo. Richiesta attenzione nella fase di corsa e gonfiaggio.')
+            : windStatus === 'severe'
+            ? 'Vento tempestoso, sottovento violento o raffiche pericolose. Pericolo critico di trascinamento e rotori.'
+            : 'Vento oltre i limiti di sicurezza dell\'ala o con componente posteriore marcata. Decollo sconsigliato.')
     };
 
     // 2. Raffiche & Delta Vento
@@ -2574,10 +2718,10 @@ export class ForecastViewController {
     const isChart = this.windPanelView === 'chart';
     const takeoff = (activeSubSpot && activeSubSpot.spotType === 'takeoff') 
       ? activeSubSpot 
-      : (evalData.takeoff || { altitude: 1000, heading: 180 });
+      : (evalData.takeoff || { altitude: 1000, heading: null });
 
     const weather = evalData.weatherSnapshot || {};
-    const takeoffAzimuth = takeoff.heading != null ? takeoff.heading : 180;
+    const takeoffAzimuth = (takeoff.heading != null && !isNaN(Number(takeoff.heading))) ? Number(takeoff.heading) : null;
     const windDir = weather.windDirection ?? weather.windDir ?? 180;
     const windSpeed = weather.windSpeed != null ? Math.round(weather.windSpeed) : 0;
     const windGust = weather.windGust != null ? Math.round(weather.windGust) : windSpeed;
@@ -2620,32 +2764,42 @@ export class ForecastViewController {
    * Renders the 360° Wind Compass (Synthetic state).
    */
   renderWindCompass(evalData, takeoffAzimuth, windDir, windSpeed, windGust) {
-    const diffFromFront = Math.abs(calculateAngularDifference(takeoffAzimuth, windDir));
-    let alignText = 'In Asse';
-    let alignColor = 'var(--gm-status-flyable)';
-    let alignBg = 'var(--gm-status-flyable-bg)';
+    const hasTakeoffHeading = typeof takeoffAzimuth === 'number' && !isNaN(takeoffAzimuth);
+    let alignText = 'Esposizione N/D';
+    let alignColor = 'var(--gm-text-muted)';
+    let alignBg = 'rgba(255, 255, 255, 0.05)';
 
-    if (diffFromFront <= 35) {
-      alignText = `In Asse col Decollo (${diffFromFront}°)`;
-      alignColor = 'var(--gm-status-flyable)';
-      alignBg = 'var(--gm-status-flyable-bg)';
-    } else if (diffFromFront <= 75) {
-      alignText = `Vento Traverso (${diffFromFront}°)`;
-      alignColor = 'var(--gm-status-caution)';
-      alignBg = 'var(--gm-status-caution-bg)';
+    if (hasTakeoffHeading) {
+      const diffFromFront = Math.abs(calculateAngularDifference(takeoffAzimuth, windDir));
+      if (diffFromFront <= 35) {
+        alignText = `In Asse col Decollo (${diffFromFront}°)`;
+        alignColor = 'var(--gm-status-flyable)';
+        alignBg = 'var(--gm-status-flyable-bg)';
+      } else if (diffFromFront <= 75) {
+        alignText = `Vento Traverso (${diffFromFront}°)`;
+        alignColor = 'var(--gm-status-caution)';
+        alignBg = 'var(--gm-status-caution-bg)';
+      } else {
+        alignText = `Sottovento / Fuori Asse (${diffFromFront}°)`;
+        alignColor = 'var(--gm-status-unflyable)';
+        alignBg = 'var(--gm-status-unflyable-bg)';
+      }
     } else {
-      alignText = `Sottovento / Fuori Asse (${diffFromFront}°)`;
-      alignColor = 'var(--gm-status-unflyable)';
-      alignBg = 'var(--gm-status-unflyable-bg)';
+      alignText = 'Esposizione N/D';
+      alignColor = windSpeed > 18 ? 'var(--gm-status-unflyable)' : windSpeed > 14 ? 'var(--gm-status-caution)' : 'var(--gm-status-flyable)';
+      alignBg = windSpeed > 18 ? 'var(--gm-status-unflyable-bg)' : windSpeed > 14 ? 'var(--gm-status-caution-bg)' : 'var(--gm-status-flyable-bg)';
     }
 
     const cx = 100;
     const cy = 100;
     const radius = 75;
 
-    const coneStartAngle = normalizeAngle(takeoffAzimuth - 35);
-    const coneEndAngle = normalizeAngle(takeoffAzimuth + 35);
-    const conePath = describeSectorArc(cx, cy, radius, coneStartAngle, coneEndAngle);
+    let conePath = '';
+    if (hasTakeoffHeading) {
+      const coneStartAngle = normalizeAngle(takeoffAzimuth - 35);
+      const coneEndAngle = normalizeAngle(takeoffAzimuth + 35);
+      conePath = describeSectorArc(cx, cy, radius, coneStartAngle, coneEndAngle);
+    }
 
     const ptN = polarToCartesian(cx, cy, radius - 12, 0);
     const ptE = polarToCartesian(cx, cy, radius - 12, 90);
@@ -2673,17 +2827,19 @@ export class ForecastViewController {
             <circle cx="${cx}" cy="${cy}" r="${radius}" fill="var(--gm-bg-base)" stroke="var(--gm-border-strong)" stroke-width="2" />
             <circle cx="${cx}" cy="${cy}" r="${radius - 20}" fill="none" stroke="var(--gm-border)" stroke-dasharray="3,3" />
 
-            <path d="${conePath}" fill="rgba(34, 197, 94, 0.25)" stroke="var(--gm-status-flyable)" stroke-width="1.5" />
+            ${hasTakeoffHeading ? `<path d="${conePath}" fill="rgba(34, 197, 94, 0.25)" stroke="var(--gm-status-flyable)" stroke-width="1.5" />` : ''}
 
             <text x="${ptN.x}" y="${ptN.y + 4}" font-size="11" font-weight="700" fill="var(--gm-text-muted)" text-anchor="middle">N</text>
             <text x="${ptE.x}" y="${ptE.y + 4}" font-size="11" font-weight="700" fill="var(--gm-text-muted)" text-anchor="middle">E</text>
             <text x="${ptS.x}" y="${ptS.y + 4}" font-size="11" font-weight="700" fill="var(--gm-text-muted)" text-anchor="middle">S</text>
             <text x="${ptW.x}" y="${ptW.y + 4}" font-size="11" font-weight="700" fill="var(--gm-text-muted)" text-anchor="middle">W</text>
 
-            <g transform="rotate(${takeoffAzimuth}, ${cx}, ${cy})">
-              <line x1="${cx}" y1="${cy - radius}" x2="${cx}" y2="${cy - radius + 8}" stroke="var(--gm-status-flyable)" stroke-width="3" />
-              <polygon points="${cx},${cy - radius - 2} ${cx - 4},${cy - radius + 6} ${cx + 4},${cy - radius + 6}" fill="var(--gm-status-flyable)" />
-            </g>
+            ${hasTakeoffHeading ? `
+              <g transform="rotate(${takeoffAzimuth}, ${cx}, ${cy})">
+                <line x1="${cx}" y1="${cy - radius}" x2="${cx}" y2="${cy - radius + 8}" stroke="var(--gm-status-flyable)" stroke-width="3" />
+                <polygon points="${cx},${cy - radius - 2} ${cx - 4},${cy - radius + 6} ${cx + 4},${cy - radius + 6}" fill="var(--gm-status-flyable)" />
+              </g>
+            ` : ''}
 
             <g transform="rotate(${windDir}, ${cx}, ${cy})">
               <line x1="${cx}" y1="${cy + 35}" x2="${cx}" y2="${cy - 35}" stroke="${alignColor}" stroke-width="3" stroke-linecap="round" />
@@ -2718,7 +2874,7 @@ export class ForecastViewController {
           <div class="gm-compass-stat">
             <span class="text-xs text-[var(--gm-text-muted)] font-semibold uppercase">Azimut Decollo</span>
             <span class="text-sm font-mono font-bold text-[var(--gm-status-flyable)]">
-              ${takeoffAzimuth}° (${getCardinalDirection(takeoffAzimuth)})
+              ${hasTakeoffHeading ? `${takeoffAzimuth}° (${getCardinalDirection(takeoffAzimuth)})` : 'N/D'}
             </span>
           </div>
         </div>
@@ -3102,6 +3258,10 @@ export class ForecastViewController {
     const isToday = this.activeDate === todayIso;
     const currentHour = now.getHours();
 
+    const activeSub = this.resolveActiveSubSpot(spot);
+    const effectiveTakeoffId = (activeSub && activeSub.spotType === 'takeoff') ? activeSub.id : this.activeTakeoffId;
+    const effectiveLandingId = (activeSub && activeSub.spotType === 'landing') ? activeSub.id : this.activeLandingId;
+
     const hours = [];
     for (let h = 8; h <= 20; h++) {
       const evalHour = evaluateComprensorio({
@@ -3110,8 +3270,8 @@ export class ForecastViewController {
         hourIndex: h,
         glider,
         targetDate: this.activeDate,
-        takeoffId: this.activeTakeoffId,
-        landingId: this.activeLandingId
+        takeoffId: effectiveTakeoffId,
+        landingId: effectiveLandingId
       });
       hours.push({
         hour: h,
@@ -3180,14 +3340,18 @@ export class ForecastViewController {
    * @returns {string}
    */
   renderStickyScrubber(spot, weatherData, glider) {
+    const activeSub = this.resolveActiveSubSpot(spot);
+    const effectiveTakeoffId = (activeSub && activeSub.spotType === 'takeoff') ? activeSub.id : this.activeTakeoffId;
+    const effectiveLandingId = (activeSub && activeSub.spotType === 'landing') ? activeSub.id : this.activeLandingId;
+
     const evalCurrent = spot ? evaluateComprensorio({
       comprensorio: spot,
       weatherData,
       hourIndex: this.selectedHour,
       glider,
       targetDate: this.activeDate,
-      takeoffId: this.activeTakeoffId,
-      landingId: this.activeLandingId
+      takeoffId: effectiveTakeoffId,
+      landingId: effectiveLandingId
     }) : { badge: 'N/D', status: 'unavailable' };
     const statusColor = (STATUS_COLORS && STATUS_COLORS[evalCurrent?.status]?.fill) || 'var(--gm-text-secondary)';
 
@@ -3268,30 +3432,33 @@ export class ForecastViewController {
       return `
         <div 
           class="gm-picker-item ${isActive ? 'active' : ''}" 
-          data-action="pick-spot" 
+          id="gm-picker-item-${escapeHtml(s.id)}"
           data-spot-id="${escapeHtml(s.id)}"
           data-takeoff-id="${escapeHtml(activeTId || '')}"
           data-landing-id="${escapeHtml(activeLId || '')}"
         >
-          <div class="gm-picker-item-main" data-action="pick-spot" data-spot-id="${escapeHtml(s.id)}" data-takeoff-id="${escapeHtml(activeTId || '')}" data-landing-id="${escapeHtml(activeLId || '')}">
-            <div class="flex items-center justify-between gap-2">
-              <div class="text-sm font-bold text-[var(--gm-text-primary)] truncate">${escapeHtml(s.name)} (${escapeHtml(s.province)})</div>
-              ${(hasMultiTakeoffs || hasMultiLandings) ? `
-                <span class="gm-picker-badge-count flex-shrink-0">
-                  ${hasMultiTakeoffs ? `${takeoffs.length} decolli` : '1 decollo'} · ${hasMultiLandings ? `${landings.length} atterraggi` : '1 atterraggio'}
-                </span>
-              ` : ''}
+          <div class="gm-picker-item-content flex-1 min-w-0">
+            <div class="gm-picker-item-main" data-action="pick-spot" data-spot-id="${escapeHtml(s.id)}" data-takeoff-id="${escapeHtml(activeTId || '')}" data-landing-id="${escapeHtml(activeLId || '')}">
+              <div class="flex items-center justify-between gap-2">
+                <div class="text-sm font-bold text-[var(--gm-text-primary)] truncate">${escapeHtml(s.name)} (${escapeHtml(s.province)})</div>
+                ${(hasMultiTakeoffs || hasMultiLandings) ? `
+                  <span class="gm-picker-badge-count flex-shrink-0">
+                    ${hasMultiTakeoffs ? `${takeoffs.length} decolli` : '1 decollo'} · ${hasMultiLandings ? `${landings.length} atterraggi` : '1 atterraggio'}
+                  </span>
+                ` : ''}
+              </div>
+              <div class="text-xs text-[var(--gm-text-muted)]">${escapeHtml(s.region)}</div>
             </div>
-            <div class="text-xs text-[var(--gm-text-muted)]">${escapeHtml(s.region)}</div>
 
             ${(hasMultiTakeoffs || hasMultiLandings) ? `
-              <div class="gm-picker-subselection mt-2 pt-2 border-t border-[var(--gm-border)] flex flex-col gap-2" onclick="event.stopPropagation();">
+              <div class="gm-picker-subselection mt-2 pt-2 border-t border-[var(--gm-border)] flex flex-col gap-2">
                 ${hasMultiTakeoffs ? `
                   <div class="gm-picker-subgroup" role="radiogroup" aria-label="Seleziona decollo per ${escapeHtml(s.name)}">
                     <span class="gm-picker-subgroup-label">Decollo:</span>
                     <div class="gm-picker-chips-row flex flex-wrap gap-1">
                       ${takeoffs.map(t => {
                         const isSel = activeTId === t.id;
+                        const headingPart = t.heading != null && !isNaN(Number(t.heading)) ? ` · ${t.heading}°` : '';
                         return `
                           <button
                             type="button"
@@ -3301,7 +3468,7 @@ export class ForecastViewController {
                             data-takeoff-id="${escapeHtml(t.id)}"
                             aria-checked="${isSel ? 'true' : 'false'}"
                             role="radio"
-                            title="${escapeHtml(t.name)} (${t.altitude}m · ${t.heading ?? ''}°)"
+                            title="${escapeHtml(t.name)} (${t.altitude}m${headingPart})"
                           >
                             ▲ ${escapeHtml(t.name)} (${t.altitude}m)
                           </button>
@@ -3588,14 +3755,18 @@ export class ForecastViewController {
         const spot = this.getCurrentSpot();
         const glider = this.getActiveGlider();
         const weatherData = this.getWeatherData(spot, this.activeDate);
+        const activeSub = this.resolveActiveSubSpot(spot);
+        const effectiveTakeoffId = (activeSub && activeSub.spotType === 'takeoff') ? activeSub.id : this.activeTakeoffId;
+        const effectiveLandingId = (activeSub && activeSub.spotType === 'landing') ? activeSub.id : this.activeLandingId;
+
         const evaluated = evaluateComprensorio({
           comprensorio: spot,
           weatherData,
           hourIndex: this.selectedHour,
           glider,
           targetDate: this.activeDate,
-          takeoffId: this.activeTakeoffId,
-          landingId: this.activeLandingId
+          takeoffId: effectiveTakeoffId,
+          landingId: effectiveLandingId
         });
         this.updateFlightAnalysisOverlay(evaluated);
       }
@@ -3605,16 +3776,19 @@ export class ForecastViewController {
     const spot = this.getCurrentSpot();
     const glider = this.getActiveGlider();
     const weatherData = this.getWeatherData(spot, this.activeDate);
+    const activeSubSpotObj = this.resolveActiveSubSpot(spot);
+    const effectiveTakeoffId = (activeSubSpotObj && activeSubSpotObj.spotType === 'takeoff') ? activeSubSpotObj.id : this.activeTakeoffId;
+    const effectiveLandingId = (activeSubSpotObj && activeSubSpotObj.spotType === 'landing') ? activeSubSpotObj.id : this.activeLandingId;
+
     const evaluated = evaluateComprensorio({
       comprensorio: spot,
       weatherData,
       hourIndex: this.selectedHour,
       glider,
       targetDate: this.activeDate,
-      takeoffId: this.activeTakeoffId,
-      landingId: this.activeLandingId
+      takeoffId: effectiveTakeoffId,
+      landingId: effectiveLandingId
     });
-    const activeSubSpotObj = this.resolveActiveSubSpot(spot);
 
     // 1. Update Active Slot in all timeline strips in place (zero layout thrashing)
     const strips = [
@@ -3897,6 +4071,25 @@ export class ForecastViewController {
       this.render();
     } else if (action === 'select-subspot') {
       const subSpotId = actionEl.getAttribute('data-subspot-id');
+      const spot = this.getCurrentSpot();
+      if (spot && subSpotId) {
+        const isT = spot.takeoffs?.some(t => t.id === subSpotId);
+        if (isT) {
+          this.activeTakeoffId = subSpotId;
+          if (this.store) this.store.setState({ activeTakeoffId: subSpotId });
+          this.fetchWeatherDataAsync(spot, this.activeDate);
+        }
+        const isL = spot.landings?.some(l => l.id === subSpotId);
+        if (isL) {
+          this.activeLandingId = subSpotId;
+          if (this.store) this.store.setState({ activeLandingId: subSpotId });
+        }
+        if (subSpotId === 'overview') {
+          this.activeTakeoffId = spot.takeoffs?.find(t => t.isPrimary)?.id || spot.takeoffs?.[0]?.id || null;
+          this.activeLandingId = spot.landings?.find(l => l.isPrimary || l.isOfficial)?.id || spot.landings?.[0]?.id || null;
+          if (this.store) this.store.setState({ activeTakeoffId: this.activeTakeoffId, activeLandingId: this.activeLandingId });
+        }
+      }
       this.selectedSubSpot = subSpotId || 'overview';
       this.isSubSpotMenuOpen = false;
       this.render();
@@ -3904,15 +4097,19 @@ export class ForecastViewController {
       const takeoffId = actionEl.getAttribute('data-takeoff-id');
       if (takeoffId && takeoffId !== this.activeTakeoffId) {
         this.activeTakeoffId = takeoffId;
+        this.selectedSubSpot = 'overview';
         if (this.store) {
           this.store.setState({ activeTakeoffId: takeoffId });
         }
         this.render();
+        const currentSpot = this.getCurrentSpot();
+        this.fetchWeatherDataAsync(currentSpot, this.activeDate);
       }
     } else if (action === 'set-active-landing') {
       const landingId = actionEl.getAttribute('data-landing-id');
       if (landingId && landingId !== this.activeLandingId) {
         this.activeLandingId = landingId;
+        this.selectedSubSpot = 'overview';
         if (this.store) {
           this.store.setState({ activeLandingId: landingId });
         }
@@ -3971,7 +4168,27 @@ export class ForecastViewController {
       const cardId = actionEl.getAttribute('data-card-id');
       if (cardId) {
         this.expandedCardId = this.expandedCardId === cardId ? null : cardId;
-        this.render();
+        const paramsContainer = this.containerEl ? this.containerEl.querySelector('#forecast-params-container') : null;
+        if (paramsContainer && this.forecastMode !== 'charts') {
+          const spot = this.getCurrentSpot();
+          const glider = this.getActiveGlider();
+          const weatherData = this.getWeatherData(spot, this.activeDate);
+          const activeSubSpotObj = this.resolveActiveSubSpot(spot);
+          const effectiveTakeoffId = (activeSubSpotObj && activeSubSpotObj.spotType === 'takeoff') ? activeSubSpotObj.id : this.activeTakeoffId;
+          const effectiveLandingId = (activeSubSpotObj && activeSubSpotObj.spotType === 'landing') ? activeSubSpotObj.id : this.activeLandingId;
+          const evaluated = evaluateComprensorio({
+            comprensorio: spot,
+            weatherData,
+            hourIndex: this.selectedHour,
+            glider,
+            targetDate: this.activeDate,
+            takeoffId: effectiveTakeoffId,
+            landingId: effectiveLandingId
+          });
+          paramsContainer.innerHTML = this.renderParameterCards(evaluated, weatherData, spot, glider, activeSubSpotObj);
+        } else {
+          this.render();
+        }
       }
     } else if (action === 'select-date') {
       const dateAttr = actionEl.getAttribute('data-date');
@@ -4065,12 +4282,12 @@ export class ForecastViewController {
           });
         }
         closeSheet();
-        this.render();
+        this.render({ resetScroll: true });
         this.fetchWeatherDataAsync(spot, this.activeDate);
       }
     } else if (action === 'pick-spot-takeoff') {
-      if (evt && typeof evt.stopPropagation === 'function') evt.stopPropagation();
       const takeoffId = actionEl.getAttribute('data-takeoff-id');
+      const spotId = actionEl.getAttribute('data-spot-id');
       const card = actionEl.closest ? actionEl.closest('.gm-picker-item') : null;
       if (card && takeoffId) {
         card.setAttribute('data-takeoff-id', takeoffId);
@@ -4085,9 +4302,16 @@ export class ForecastViewController {
           }
         });
       }
+      const currentSpot = this.getCurrentSpot();
+      if ((currentSpot && currentSpot.id === spotId) || (card && card.classList && card.classList.contains('active'))) {
+        this.activeTakeoffId = takeoffId;
+        if (this.store) {
+          this.store.setState({ activeTakeoffId: takeoffId });
+        }
+      }
     } else if (action === 'pick-spot-landing') {
-      if (evt && typeof evt.stopPropagation === 'function') evt.stopPropagation();
       const landingId = actionEl.getAttribute('data-landing-id');
+      const spotId = actionEl.getAttribute('data-spot-id');
       const card = actionEl.closest ? actionEl.closest('.gm-picker-item') : null;
       if (card && landingId) {
         card.setAttribute('data-landing-id', landingId);
@@ -4101,6 +4325,13 @@ export class ForecastViewController {
             btn.setAttribute('aria-checked', isMatch ? 'true' : 'false');
           }
         });
+      }
+      const currentSpot = this.getCurrentSpot();
+      if ((currentSpot && currentSpot.id === spotId) || (card && card.classList && card.classList.contains('active'))) {
+        this.activeLandingId = landingId;
+        if (this.store) {
+          this.store.setState({ activeLandingId: landingId });
+        }
       }
     } else if (action === 'toggle-pin-spot') {
       const spotId = actionEl.getAttribute('data-spot-id');
@@ -4160,7 +4391,13 @@ export class ForecastViewController {
     if (target.id === 'forecast-spot-select') {
       const spot = this.comprensoriCatalog.find(c => c.id === target.value);
       if (spot) {
-        this.store.setState({ selectedSpot: spot });
+        this.activeTakeoffId = spot.takeoffs?.find(t => t.isPrimary)?.id || spot.takeoffs?.[0]?.id || null;
+        this.activeLandingId = spot.landings?.find(l => l.isPrimary || l.isOfficial)?.id || spot.landings?.[0]?.id || null;
+        this.store.setState({ 
+          selectedSpot: spot,
+          activeTakeoffId: this.activeTakeoffId,
+          activeLandingId: this.activeLandingId
+        });
       }
       this.selectedSubSpot = 'overview';
       this.expandedCardId = null;
@@ -4170,12 +4407,17 @@ export class ForecastViewController {
       const spot = this.getCurrentSpot();
       if (spot) {
         const isT = spot.takeoffs?.some(t => t.id === target.value);
-        if (isT) this.activeTakeoffId = target.value;
+        if (isT) {
+          this.activeTakeoffId = target.value;
+          this.fetchWeatherDataAsync(spot, this.activeDate);
+        }
         const isL = spot.landings?.some(l => l.id === target.value);
-        if (isL) this.activeLandingId = target.value;
+        if (isL) {
+          this.activeLandingId = target.value;
+        }
         if (target.value === 'overview') {
-          this.activeTakeoffId = null;
-          this.activeLandingId = null;
+          this.activeTakeoffId = spot.takeoffs?.find(t => t.isPrimary)?.id || spot.takeoffs?.[0]?.id || null;
+          this.activeLandingId = spot.landings?.find(l => l.isPrimary || l.isOfficial)?.id || spot.landings?.[0]?.id || null;
         }
         if (this.store) {
           this.store.setState({ activeTakeoffId: this.activeTakeoffId, activeLandingId: this.activeLandingId });
@@ -4223,14 +4465,18 @@ export class ForecastViewController {
     const spot = this.getCurrentSpot();
     const glider = this.getActiveGlider();
     const weatherData = this.getWeatherData(spot, this.activeDate);
+    const activeSub = this.resolveActiveSubSpot(spot);
+    const effectiveTakeoffId = (activeSub && activeSub.spotType === 'takeoff') ? activeSub.id : this.activeTakeoffId;
+    const effectiveLandingId = (activeSub && activeSub.spotType === 'landing') ? activeSub.id : this.activeLandingId;
+
     const evalData = evaluateComprensorio({
       comprensorio: spot,
       weatherData,
       hourIndex: this.selectedHour,
       glider,
       targetDate: this.activeDate,
-      takeoffId: this.activeTakeoffId,
-      landingId: this.activeLandingId
+      takeoffId: effectiveTakeoffId,
+      landingId: effectiveLandingId
     });
     const takeoff = evalData?.takeoff || spot?.takeoffs?.[0] || {};
     const landing = evalData?.landing || spot?.landings?.[0] || {};

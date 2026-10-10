@@ -323,12 +323,26 @@ export class HeadlessMockMapEngine {
  * @param {object} [options={}] Optional configuration
  * @returns {string} Clean SVG markup
  */
-export function generateTakeoffSectorSvg(heading = 180, windDirection = null, altitude = null, options = {}) {
-  const H = normalizeAngle(heading);
+export function generateTakeoffSectorSvg(heading = null, windDirection = null, altitude = null, options = {}) {
   const size = options.size || 130;
   const center = size / 2; // 65
   const radius = options.radius || 46;
   const prefix = options.prefix || 'miniws-to-';
+
+  if (heading == null || isNaN(Number(heading))) {
+    return `
+      <svg class="gm-takeoff-sector-svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" aria-label="Decollo: esposizione non nota">
+        <circle cx="${center}" cy="${center}" r="${radius}" fill="none" stroke="var(--gm-border)" stroke-width="1.5" stroke-dasharray="3,3" />
+        <circle cx="${center}" cy="${center}" r="14" fill="var(--gm-bg-base)" stroke="var(--gm-border-strong)" stroke-width="1.5" />
+        <text x="${center}" y="${center + 3}" font-size="8" font-family="monospace" font-weight="700" fill="var(--gm-text-muted)" text-anchor="middle">N/D</text>
+        ${altitude != null ? `
+          <text x="${center}" y="${size - 4}" font-size="9" font-family="monospace" font-weight="700" fill="var(--gm-text-muted)" text-anchor="middle">${Math.round(altitude)}m</text>
+        ` : ''}
+      </svg>
+    `;
+  }
+
+  const H = normalizeAngle(heading);
 
   // Compute launch window: heading ± 35°
   const halfAngle = 35;
@@ -861,7 +875,7 @@ export class LeafletMapEngine {
     const gust = weather.windGust ?? (speed > 0 ? speed * 1.3 : 15);
     const dir = weather.windDirection ?? weather.windDir ?? 180;
     const turb = weather.turbulence ?? 0.1;
-    const tHeading = spotData.takeoff?.heading ?? 180;
+    const tHeading = spotData.takeoff?.heading ?? null;
     const tAlt = spotData.takeoff?.altitude || 1000;
     const lAlt = spotData.landing?.altitude || 300;
 
@@ -1012,7 +1026,7 @@ export class LeafletMapEngine {
 
     // 2. In-place update of Takeoff Exposure Sector alignment and color
     if (this.takeoffSectorMarker && this.activeMiniMapSpotData) {
-      const tHeading = this.activeMiniMapSpotData.takeoff?.heading ?? 180;
+      const tHeading = this.activeMiniMapSpotData.takeoff?.heading ?? null;
       const tAlt = this.activeMiniMapSpotData.takeoff?.altitude || 1000;
       const el = this.takeoffSectorMarker.getElement();
       if (el) {
@@ -1077,7 +1091,7 @@ export class LeafletMapEngine {
     const tGust = takeoffWeather.windGust ?? (tSpeed > 0 ? tSpeed * 1.3 : 15);
     const tDir = takeoffWeather.windDirection ?? takeoffWeather.windDir ?? 180;
     const tTurb = takeoffWeather.turbulence ?? 0.1;
-    const tHeading = data.takeoff?.heading ?? 180;
+    const tHeading = data.takeoff?.heading ?? null;
     const tAlt = data.takeoff?.altitude || 1000;
 
     const lSpeed = landingWeather.windSpeed ?? 10;
@@ -1218,7 +1232,7 @@ export class LeafletMapEngine {
 
     if (this.flightTakeoffSector && (options.takeoffWeather || options.weatherSnapshot)) {
       const weather = options.takeoffWeather || options.weatherSnapshot || {};
-      const tHeading = options.takeoff?.heading ?? this.activeFlightData?.takeoff?.heading ?? 180;
+      const tHeading = options.takeoff?.heading ?? this.activeFlightData?.takeoff?.heading ?? null;
       const tAlt = options.takeoff?.altitude || this.activeFlightData?.takeoff?.altitude || 1000;
       const dir = weather.windDirection ?? weather.windDir ?? 180;
       const el = this.flightTakeoffSector.getElement();

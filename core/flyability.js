@@ -869,7 +869,9 @@ export function calculateWeekOverview(payload, isTakeoffOverride = true, heading
         ? parseFloat(headingOverride)
         : (payload.meta && payload.meta.takeoff_azimuth != null && !isNaN(parseFloat(payload.meta.takeoff_azimuth)))
             ? parseFloat(payload.meta.takeoff_azimuth)
-            : null;
+            : (payload.takeoff_azimuth != null && !isNaN(parseFloat(payload.takeoff_azimuth)))
+                ? parseFloat(payload.takeoff_azimuth)
+                : null;
 
     payload.daily.time.forEach((dateStr, dIdx) => {
         const srStr = payload.daily.sunrise?.[dIdx] ? payload.daily.sunrise[dIdx].substring(11, 16) : '06:00';
@@ -1002,7 +1004,11 @@ export function calculateDailyFlyabilitySummary(weather, targetLocOverride = nul
         isTakeoff = isTakeoffSite(null, weather.meta);
     }
 
-    let azimuth = (weather.meta && weather.meta.takeoff_azimuth != null) ? parseFloat(weather.meta.takeoff_azimuth) : null;
+    let azimuth = (weather.meta && weather.meta.takeoff_azimuth != null)
+        ? parseFloat(weather.meta.takeoff_azimuth)
+        : (weather.takeoff_azimuth != null && !isNaN(parseFloat(weather.takeoff_azimuth)))
+            ? parseFloat(weather.takeoff_azimuth)
+            : null;
     if (targetLocOverride && targetLocOverride.heading != null && !isNaN(parseFloat(targetLocOverride.heading))) {
         azimuth = parseFloat(targetLocOverride.heading);
     }

@@ -429,4 +429,84 @@ describe('Flyability Engine - Waterfall Synthesis & Tie-Breaking', () => {
         const noFly = evaluateWindFlyability(40, 45, null, customTranslator);
         assert.equal(noFly.text, 'NO FLY: Extreme Wind');
     });
+
+    describe('Takeoff Exposure & Slope Aspect Handling', () => {
+        it('should handle spots without exposure (heading = null) without penalizing score or inventing azimuth', () => {
+            const dirEval = evaluateDirectionFlyability(12, 180, null, true);
+            assert.equal(dirEval, null);
+
+            const score = getFlyabilityScore(10, 12, 100, 0.1, 0, 90, null, true);
+            assert.equal(score.severity, 0, 'Score should remain flyable when wind and meteo are safe');
+            assert.equal(score.details.direction.hasExposure, false);
+            assert.equal(score.details.direction.severity, 0);
+            assert.equal(score.details.direction.diffFromFront, null);
+            assert.equal(score.details.direction.text, 'Esposizione N/D');
+            assert.ok(score.details.direction.desc.includes('Esposizione del decollo non nota'));
+        });
+
+        it('should correctly evaluate calm wind (<= 4 km/h) as flyable when diff <= 90 deg', () => {
+            // Ciavanis 180° with 2 km/h wind from 101° (79° delta)
+            const dirEval = evaluateDirectionFlyability(2, 101, 180, true);
+            assert.ok(dirEval);
+            assert.equal(dirEval.severity, 0);
+            assert.equal(dirEval.hasExposure, true);
+            assert.equal(dirEval.text, 'Vento Calmo');
+            assert.equal(dirEval.diffFromFront, 79);
+
+            const score = getFlyabilityScore(2, 4, 50, 0.05, 0, 101, 180, true);
+            assert.equal(score.severity, 0);
+            assert.equal(score.text, 'Condizioni Ottimali');
+        });
+
+        it('should mark calm wind (<= 4 km/h) with tailwind (diff > 90 deg) as caution', () => {
+            // Takeoff 180° with 3 km/h wind from 350° (170° delta)
+            const dirEval = evaluateDirectionFlyability(3, 350, 180, true);
+            assert.ok(dirEval);
+            assert.equal(dirEval.severity, 1);
+            assert.equal(dirEval.text, 'Brezza da Dietro');
+            assert.equal(dirEval.isLeeSide, true);
+        });
+
+        it('should escalate crosswind > 14 km/h to severity 2 (Vento Traverso)', () => {
+            const modCross = evaluateDirectionFlyability(12, 110, 180, true); // 70° diff, 12 km/h
+            assert.equal(modCross.severity, 1);
+            assert.equal(modCross.text, 'Vento Traverso');
+
+            const strongCross = evaluateDirectionFlyability(16, 110, 180, true); // 70° diff, 16 km/h
+            assert.equal(strongCross.severity, 2);
+            assert.equal(strongCross.text, 'Vento Traverso');
+            assert.equal(strongCross.bg, 'bg-red-500');
+        });
+
+        it('should escalate strong tailwind > 18 km/h to severity 3 (NO FLY: Sottovento Sostenuto)', () => {
+            const severeLee = evaluateDirectionFlyability(20, 0, 180, true); // 180° diff, 20 km/h
+            assert.equal(severeLee.severity, 3);
+            assert.equal(severeLee.text, 'NO FLY: Sottovento Sostenuto');
+            assert.equal(severeLee.bg, NO_FLY_BG);
+        });
+
+        it('should correctly process week overview and daily summary for takeoff without heading', () => {
+            const times = [];
+            const windspeed = [];
+            for (let h = 0; h < 24; h++) {
+                times.push(`2026-10-10T${String(h).padStart(2, '0')}:00`);
+                windspeed.push(8);
+            }
+            const payloadNoHeading = {
+                takeoff_azimuth: null,
+                hourly: {
+                    time: times,
+                    windspeed_10m: windspeed,
+                    windgusts_10m: windspeed,
+                    winddirection_10m: new Array(24).fill(90),
+                    cape: new Array(24).fill(100),
+                    precipitation: new Array(24).fill(0)
+                }
+            };
+
+            const summary = calculateDailyFlyabilitySummary(payloadNoHeading, { type: 'takeoff', heading: null }, null, 1);
+            assert.equal(summary.length, 1);
+            assert.equal(summary[0].status, 'flyable');
+        });
+    });
 });

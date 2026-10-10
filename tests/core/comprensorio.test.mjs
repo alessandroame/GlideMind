@@ -771,4 +771,100 @@ describe('GlideMind Comprensorio Locality & Dual Launch/Landing Evaluator', () =
       assert.ok(res.glideMetrics.distanceMeters > 0);
     });
   });
+
+  describe('Exposure Handling and Calm Wind Regression (Ciavanis)', () => {
+    const spotWithExposure = {
+      id: 'ciavanis',
+      name: 'Ciavanis',
+      province: 'TO',
+      takeoffs: [
+        { id: 'ciavanis-top', name: 'Ciavanis', altitude: 1780, heading: 180, coordinates: '45.362, 7.501' }
+      ],
+      landings: [
+        { id: 'ciavanis-landing', name: 'Atterraggio', altitude: 600, coordinates: '45.360, 7.520' }
+      ]
+    };
+
+    const spotWithoutExposure = {
+      id: 'spot-no-exp',
+      name: 'Spot Senza Esposizione',
+      province: 'TN',
+      takeoffs: [
+        { id: 'takeoff-no-exp', name: 'Decollo Libero', altitude: 1200, heading: null, coordinates: '46.000, 11.000' }
+      ],
+      landings: [
+        { id: 'landing-standard', name: 'Atterraggio', altitude: 300, coordinates: '46.010, 11.010' }
+      ]
+    };
+
+    it('evaluates calm wind (2 km/h from 101°) on South-facing takeoff (180°) as flyable without penalization', () => {
+      const calmWeather = {
+        current: {
+          wind_speed_10m: 2,
+          wind_direction_10m: 101,
+          wind_gusts_10m: 4,
+          precipitation: 0,
+          cloud_cover: 10,
+          cape: 0
+        },
+        hourly: {
+          time: ['2026-10-10T08:00'],
+          wind_speed_10m: [2],
+          wind_direction_10m: [101],
+          wind_gusts_10m: [4],
+          precipitation: [0],
+          cloud_cover: [10],
+          cape: [0]
+        }
+      };
+
+      const res = evaluateComprensorio({
+        comprensorio: spotWithExposure,
+        weatherData: calmWeather,
+        hour: 8,
+        glider: GLIDER_CLASSES.EN_A
+      });
+
+      assert.equal(res.status, 'flyable');
+      assert.equal(res.indicators.direction.severity, 0);
+      assert.ok(res.reason.includes('Brezza debole') || res.reason.includes('calmo'));
+    });
+
+    it('handles takeoff with missing exposure (heading == null) safely without penalization or false alignment', () => {
+      const moderateWeather = {
+        current: {
+          wind_speed_10m: 10,
+          wind_direction_10m: 90,
+          wind_gusts_10m: 12,
+          precipitation: 0,
+          cloud_cover: 20,
+          cape: 0
+        },
+        hourly: {
+          time: ['2026-10-10T12:00'],
+          wind_speed_10m: [10],
+          wind_direction_10m: [90],
+          wind_gusts_10m: [12],
+          precipitation: [0],
+          cloud_cover: [20],
+          cape: [0]
+        }
+      };
+
+      const res = evaluateComprensorio({
+        comprensorio: spotWithoutExposure,
+        weatherData: moderateWeather,
+        hour: 12,
+        glider: GLIDER_CLASSES.EN_A
+      });
+
+      assert.equal(res.status, 'flyable');
+      assert.equal(res.indicators.direction.hasExposure, false);
+      assert.equal(res.indicators.direction.label, 'Esposiz. N/D');
+      assert.equal(res.indicators.direction.diffDegrees, null);
+      assert.equal(res.indicators.direction.severity, 0);
+      assert.ok(res.reason.includes('Esposizione N/D'));
+    });
+  });
 });
+

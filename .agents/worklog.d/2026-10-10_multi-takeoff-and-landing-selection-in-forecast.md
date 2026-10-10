@@ -1,4 +1,4 @@
-# Multi-Takeoff & Multi-Landing Subspot Selection in Forecast & Spot Picker
+# Multi-Takeoff & Multi-Landing Subspot Selection & Overview Card Synchronization
 
 **Data**: 2026-10-10  
 **Autore**: GlideMind Agent  
@@ -6,16 +6,16 @@
 
 ---
 
-## 1. Contesto & Requisito Utente
-- **Richiesta**: *"nella scheda previsioni dalla lista degli spot voglio poter selezionare se ce n'è più di uno decollo e atterraggio"* (Nel tab previsioni, consentire la selezione del decollo e dell'atterraggio specifico se il comprensorio ne possiede più di uno).
-- **Contesto Operativo**: L'architettura comprensorio-centrica raggruppa decolli e atterraggi all'interno della medesima località (es. Monte Cornizzolo ha Decollo Risparmio e Decollo Centrale; Meduno ha 4 decolli e 3 atterraggi). Precedentemente `evaluateComprensorio` valutava sempre l'accoppiata automatica $T_{\text{best}}$ + $L_{\text{safe}}$.
+## 1. Contesto & Requisiti Utente
+1. *"nella scheda previsioni dalla lista degli spot voglio poter selezionare se ce n'è più di uno decollo e atterraggio"* (Nel tab previsioni, consentire la selezione del decollo e dell'atterraggio specifico se il comprensorio ne possiede più di uno).
+2. *"quando seleziono un docollo o atterraggio mi aspetto che sia quello usato nella scheda dell'overview del comprensorio"* (Quando seleziono un decollo o atterraggio, deve essere quello utilizzato e visualizzato nella scheda dell'overview del comprensorio `#forecast-summary-card`).
 
 ---
 
 ## 2. Decisioni Architetturali & Implementazione
 
 ### 2.1 Headless Core (`core/comprensorio.js`)
-- Arricchita la firma di `evaluateComprensorio`:
+- Firma estesa di `evaluateComprensorio`:
   ```javascript
   evaluateComprensorio({
     comprensorio,
@@ -37,19 +37,23 @@
 - Aggiunti `activeTakeoffId: null` e `activeLandingId: null` a `DEFAULT_INITIAL_STATE`.
 - Inseriti i campi nel set `persistedKeys` per salvaguardare la selezione tra sessioni e ricaricamenti.
 
-### 2.3 Livello UI (`ui/views/ForecastView.js`)
+### 2.3 Livello UI & Sincronizzazione Card Overview (`ui/views/ForecastView.js`)
+- **Cardine Unico della Scheda Overview (`#forecast-summary-card`)**:
+  - Il contenitore `#forecast-spot-card-container` renderizza costantemente la scheda di sintesi del comprensorio (`renderSummaryCard(evaluated)`), alimentata dai parametri `takeoffId` e `landingId` effettivi.
+  - La card mostra sempre il binomio decollo + atterraggio selezionato: quota decollo, azimut pendio, velocità e scostamento vento, quota atterraggio ed efficienza di planata 1:G con explainability testuale.
 - **Spot Picker Sheet (`renderPickerSections`)**:
-  - Per comprensori con `takeoffs.length > 1` o `landings.length > 1`, inserito container `.gm-picker-subselection` con chip di scelta rapida (`.gm-picker-chip[data-action="pick-spot-takeoff"]` e `.gm-picker-chip[data-action="pick-spot-landing"]`).
-  - Aggiunto badge conteggio (`.gm-picker-badge-count`, es. `2 decolli · 1 atterraggio`).
-  - Aggiunto pulsante esplicito `Visualizza Previsioni ›` (`.gm-picker-apply-btn[data-action="pick-spot-apply"]`).
-  - Per comprensori con 1 decollo e 1 atterraggio, nessun chip o badge viene renderizzato (Occam's razor).
+  - Rimossa l'istruzione inline `onclick="event.stopPropagation();"` che bloccava la propagazione degli eventi nei browser reali.
+  - Disaccoppiata la riga principale del comprensorio (`.gm-picker-item-main` con `data-action="pick-spot"`) dalla sezione di selezione sub-spot (`.gm-picker-subselection`).
+  - Per comprensori con sub-spot multipli, inseriti chip di selezione (`pick-spot-takeoff`, `pick-spot-landing`) con floor touch $\ge 48\text{px}$ e pulsante di applicazione esplicito `pick-spot-apply`.
+  - Cliccando su un chip di decollo o atterraggio per il comprensorio attivo, lo stato e lo store vengono aggiornati immediatamente. Cliccando su applica o su un comprensorio, `activeTakeoffId` e `activeLandingId` vengono commessi nello store e la card overview viene aggiornata.
 - **Header Forecast View (`renderHeader`)**:
-  - Quando il comprensorio selezionato ha sub-spot multipli, l'header mostra pill a riga singola con scorrimento orizzontale (`.gm-spot-subselection-container`, `.gm-spot-pill`) per commutare istantaneamente il decollo e l'atterraggio attivo.
-- **Gestione Eventi (`handleClick` & `handleChange`)**:
-  - Gestiti `pick-spot-takeoff` e `pick-spot-landing` per aggiornare lo stato del card nel picker prima del commit.
-  - Risolto un bug critico in cui la variabile evento era erroneamente referenziata come `e` anziché `evt`.
-  - Gestito `pick-spot-apply` per commettere nello store `selectedSpot`, `activeTakeoffId`, `activeLandingId` e chiudere il foglio.
-  - Gestiti `set-active-takeoff` e `set-active-landing` per aggiornare lo stato in tempo reale dall'header della vista.
+  - Pill a riga singola con scorrimento orizzontale (`.gm-spot-subselection-container`, `.gm-spot-pill`) per commutare istantaneamente il decollo (`set-active-takeoff`) e l'atterraggio attivo (`set-active-landing`).
+  - Dropdown di secondo livello (`forecast-subspot-select`) e popover custom (`select-subspot`): la selezione di un decollo o atterraggio aggiorna `activeTakeoffId` / `activeLandingId`, mantiene la modalità overview e aggiorna la label dinamica `Panoramica (<Decollo> • <Atterraggio>)`.
+- **Mini-Mappa Contestuale (`initMiniMap`)**:
+  - Il tap sui pin della mini-mappa (`onSelectSubSpot`) aggiorna `activeTakeoffId` o `activeLandingId` e mantiene la modalità overview, riflettendo la selezione direttamente sulla card di sintesi.
+- **Ciclo di Vita & Sincronizzazione Store (`mount`, `store.subscribe`)**:
+  - `mount()` idrata `activeTakeoffId` e `activeLandingId` dallo store.
+  - La sottoscrizione dello store reagisce alle variazioni di `activeTakeoffId` rieseguendo il fetch dei dati meteorologici per le coordinate e la quota del decollo specifico.
 
 ### 2.4 Ergonomia Outdoor & Design System (`css/theme.css`)
 - Dichiarati stili per `.gm-picker-subselection`, `.gm-picker-chip`, `.gm-picker-apply-btn`, `.gm-spot-pill`.
@@ -60,6 +64,6 @@
 ---
 
 ## 3. Test & Verifica
-- Aggiunti 6 test unitari in `tests/core/comprensorio.test.mjs` (totale suite: 32 test, 0 fallimenti).
-- Aggiunti 3 test di integrazione UI in `tests/ui/forecastView.test.mjs` (totale suite: 49 test, 0 fallimenti).
-- Eseguita l'intera suite del progetto (`npm test`): **457 test passati su 62 suite, 0 falliti**.
+- 32 test unitari in `tests/core/comprensorio.test.mjs` (inclusi 6 per pinning esplicito decolli/atterraggi).
+- 51 test di integrazione UI in `tests/ui/forecastView.test.mjs` (inclusi test per la sincronizzazione della card overview da pill, picker sheet, dropdown Livello 2 e mini-mappa).
+- Esecuzione completa della suite del progetto (`npm test`): **486 test passati su 70 suite, 0 falliti**.

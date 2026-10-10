@@ -800,8 +800,10 @@ export function enrichWeatherData(rawPayload, targetDate, fetchTimestamp = Date.
     const times = payload.hourly.time;
     const targetPrefix = targetDate;
 
-    if (options.customHeading != null && !isNaN(Number(options.customHeading))) {
-        payload.takeoff_azimuth = Number(options.customHeading);
+    if ('customHeading' in options) {
+        payload.takeoff_azimuth = (options.customHeading != null && !isNaN(Number(options.customHeading)))
+            ? Number(options.customHeading)
+            : null;
     }
 
     // Extract daylight bounds from daily data
