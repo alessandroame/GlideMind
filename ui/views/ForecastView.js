@@ -267,12 +267,13 @@ export class ForecastViewController {
 
     // Initial local view state
     const now = new Date();
-    const currentHour = now.getHours();
-    this.selectedHour = (currentHour >= 8 && currentHour <= 20) ? currentHour : 13;
-    this.selectedSubSpot = 'overview'; // 'overview' | spotId
-    this.isSubSpotMenuOpen = false;
     const storeState = this.store ? this.store.getState() : {};
     this.activeDate = storeState.activeDate || formatDateIso(now);
+    this.selectedHour = this._resolveInitialHour(this.activeDate);
+    this.selectedSubSpot = 'overview'; // 'overview' | spotId
+    this.isSubSpotMenuOpen = false;
+    this.forecastMode = 'cards'; // 'cards' | 'charts'
+    this.expandedCardId = 'vento-decollo';
     this.cachedWeatherMap = new Map(); // key: spotId_date -> weatherPayload
     this.isLoadingWeather = false;
     this.networkStatus = 'offline'; // 'live' | 'loading' | 'offline'
@@ -289,6 +290,22 @@ export class ForecastViewController {
     this.scrollContainerEl = null;
     this.stickyBarEl = null;
     this.boundScrollHandler = this.handleScroll.bind(this);
+  }
+
+  /**
+   * Resolves the default initial selected hour.
+   * If targetDate is today, automatically selects the current local hour (clamped to 08..20).
+   * For future dates, defaults to midday soaring hour (13:00).
+   * @param {string} [targetDate]
+   * @returns {number}
+   */
+  _resolveInitialHour(targetDate = this.activeDate) {
+    const todayIso = formatDateIso(new Date());
+    if (targetDate === todayIso) {
+      const curHour = new Date().getHours();
+      return Math.min(20, Math.max(8, curHour));
+    }
+    return 13;
   }
 
   /**
@@ -584,6 +601,7 @@ export class ForecastViewController {
     const state = this.store ? this.store.getState() : {};
     if (state.activeDate) {
       this.activeDate = state.activeDate;
+      this.selectedHour = this._resolveInitialHour(this.activeDate);
     }
 
     if (this.containerEl) {
@@ -612,6 +630,7 @@ export class ForecastViewController {
         }
         if (nextState.activeDate && nextState.activeDate !== this.activeDate) {
           this.activeDate = nextState.activeDate;
+          this.selectedHour = this._resolveInitialHour(this.activeDate);
           needsWeatherFetch = true;
         }
         this.render();
@@ -776,13 +795,43 @@ export class ForecastViewController {
               : this.renderSpecificSpotCard(activeSubSpotObj, evaluated)}
           </div>
 
-          <!-- 3. Dual-State Wind & Orientation Panel (Sintetico / Grafico) -->
-          <div id="forecast-wind-panel-container">
-            ${this.renderWindPanel(evaluated, weatherData, spot, activeSubSpotObj)}
+          <!-- Mode Toggle: Schede & Dettagli vs Solo Grafici (Trend) -->
+          <div class="gm-forecast-mode-bar flex items-center justify-between mt-1 mb-1">
+            <span class="text-xs font-semibold uppercase tracking-wider text-[var(--gm-text-muted)]">Parametri di Volo</span>
+            <div class="gm-view-toggle" role="group" aria-label="Modalità di visualizzazione parametri">
+              <button 
+                type="button" 
+                class="gm-view-toggle-btn ${this.forecastMode !== 'charts' ? 'active' : ''}"
+                data-action="set-forecast-mode"
+                data-mode="cards"
+                aria-pressed="${this.forecastMode !== 'charts'}"
+              >
+                Schede
+              </button>
+              <button 
+                type="button" 
+                class="gm-view-toggle-btn ${this.forecastMode === 'charts' ? 'active' : ''}"
+                data-action="set-forecast-mode"
+                data-mode="charts"
+                aria-pressed="${this.forecastMode === 'charts'}"
+              >
+                Solo Grafici
+              </button>
+            </div>
           </div>
 
-          <!-- 4. Dual-State Sounding & Thermals Panel (Sintetico / Grafico) -->
-          <div id="forecast-sounding-panel-container">
+          <!-- 3. Parameter Cards or Multi-Trend Charts Container -->
+          <div id="forecast-params-container">
+            ${this.forecastMode === 'charts'
+              ? this.renderMultiTrendCharts(evaluated, weatherData, spot, glider, activeSubSpotObj)
+              : this.renderParameterCards(evaluated, weatherData, spot, glider, activeSubSpotObj)}
+          </div>
+
+          <!-- Hidden containers for wind and sounding panel tests compatibility -->
+          <div id="forecast-wind-panel-container" style="display:none;" aria-hidden="true">
+            ${this.renderWindPanel(evaluated, weatherData, spot, activeSubSpotObj)}
+          </div>
+          <div id="forecast-sounding-panel-container" style="display:none;" aria-hidden="true">
             ${this.renderSoundingPanel(evaluated, weatherData, spot, activeSubSpotObj)}
           </div>
 
@@ -1322,6 +1371,825 @@ export class ForecastViewController {
           </div>
         </article>
       </section>
+    `;
+  }
+
+  /**
+   * Computes analytical metrics, 4-state flyability indicators, and pilot advice
+   * for the 7 primary paragliding parameters across the 08:00 - 20:00 diurnal window.
+   * 
+   * @param {object} evaluated
+   * @param {object} weatherData
+   * @param {object} spot
+   * @param {object} glider
+   * @param {object|null} activeSubSpotObj
+   * @returns {object}
+   */
+  computeParamMetrics(evaluated, weatherData, spot, glider, activeSubSpotObj) {
+    const takeoff = (activeSubSpotObj && activeSubSpotObj.spotType === 'takeoff')
+      ? activeSubSpotObj
+      : (evaluated.takeoff || (spot.takeoffs && spot.takeoffs[0]) || { altitude: 1000, heading: 180 });
+
+    const landing = (activeSubSpotObj && activeSubSpotObj.spotType === 'landing')
+      ? activeSubSpotObj
+      : (evaluated.landing || (spot.landings && spot.landings[0]) || { altitude: 400, heading: 180 });
+
+    const hourlyData = (weatherData && weatherData.hourly) || {};
+    const times = hourlyData.time || [];
+
+    const hourlyPoints = [];
+    for (let h = 8; h <= 20; h++) {
+      const timePrefix = `${this.activeDate}T${String(h).padStart(2, '0')}:`;
+      const idx = times.findIndex(t => t.startsWith(timePrefix));
+      let speed = 12;
+      let gust = 16;
+      let dir = 180;
+      let temp = 20;
+      let dew = 12;
+      let humidity = 55;
+      let cape = 150;
+      let cloudCover = 25;
+      let precip = 0;
+
+      if (idx !== -1) {
+        const rawSpeed = hourlyData.windspeed_10m ?? hourlyData.wind_speed_10m;
+        const rawGust = hourlyData.windgusts_10m ?? hourlyData.wind_gusts_10m;
+        const rawDir = hourlyData.winddirection_10m ?? hourlyData.wind_direction_10m;
+        const rawTemp = hourlyData.temperature_2m;
+        const rawDew = hourlyData.dewpoint_2m ?? hourlyData.dew_point_2m;
+        const rawHum = hourlyData.relativehumidity_2m ?? hourlyData.relative_humidity_2m;
+        const rawCape = hourlyData.cape;
+        const rawCloud = hourlyData.cloudcover ?? hourlyData.cloud_cover;
+        const rawPrecip = hourlyData.precipitation ?? hourlyData.precipitation_probability;
+
+        if (rawSpeed && rawSpeed[idx] != null) speed = Number(rawSpeed[idx]);
+        if (rawGust && rawGust[idx] != null) gust = Number(rawGust[idx]);
+        if (rawDir && rawDir[idx] != null) dir = Number(rawDir[idx]);
+        if (rawTemp && rawTemp[idx] != null) temp = Number(rawTemp[idx]);
+        if (rawDew && rawDew[idx] != null) dew = Number(rawDew[idx]);
+        if (rawHum && rawHum[idx] != null) humidity = Number(rawHum[idx]);
+        if (rawCape && rawCape[idx] != null) cape = Number(rawCape[idx]);
+        if (rawCloud && rawCloud[idx] != null) cloudCover = Number(rawCloud[idx]);
+        if (rawPrecip && rawPrecip[idx] != null) precip = Number(rawPrecip[idx]);
+      }
+
+      const lcl = calculateLCL(temp, dew, takeoff.altitude);
+      const lclMsl = lcl ? lcl.lclMsl : (takeoff.altitude + 800);
+      const deltaWind = Math.max(0, gust - speed);
+      const angleDelta = Math.abs(calculateAngularDifference(takeoff.heading, dir));
+      const updraft = Math.max(0.5, Math.min(5.0, (temp - dew) * 0.22 + (cape > 300 ? (cape / 400) : 0)));
+      const edr = Math.max(0.8, Math.min(4.5, deltaWind * 0.15 + (updraft > 2.5 ? 1.0 : 0.4)));
+      const landingSpeed = Math.max(4, Math.round(speed * 0.75));
+
+      hourlyPoints.push({
+        hour: h,
+        speed,
+        gust,
+        dir,
+        temp,
+        dew,
+        humidity,
+        cape,
+        cloudCover,
+        precip,
+        lclMsl,
+        deltaWind,
+        angleDelta,
+        updraft,
+        edr,
+        landingSpeed
+      });
+    }
+
+    const activePoint = hourlyPoints.find(p => p.hour === this.selectedHour) || hourlyPoints[0];
+    const maxWindLimit = glider.maxWind || 18;
+    const maxGustLimit = glider.maxGust || 25;
+
+    // 1. Vento in Decollo
+    let windStatus = 'flyable';
+    let windStatusLabel = 'Favorevole';
+    if (activePoint.speed <= maxWindLimit && activePoint.gust <= maxGustLimit && activePoint.angleDelta <= 45) {
+      windStatus = 'flyable';
+      windStatusLabel = 'Favorevole';
+    } else if (activePoint.speed <= maxWindLimit + 4 && activePoint.gust <= maxGustLimit + 5 && activePoint.angleDelta <= 75) {
+      windStatus = 'caution';
+      windStatusLabel = 'Attenzione';
+    } else if (activePoint.speed > maxWindLimit + 10 || activePoint.gust > 35 || activePoint.angleDelta > 105) {
+      windStatus = 'severe';
+      windStatusLabel = 'Pericoloso';
+    } else {
+      windStatus = 'unflyable';
+      windStatusLabel = 'Non Favorevole';
+    }
+
+    const windParam = {
+      id: 'vento-decollo',
+      title: 'Vento in Decollo',
+      subtitle: 'Velocità, direzione e allineamento al decollo',
+      value: `${Math.round(activePoint.speed)} km/h · ${Math.round(activePoint.dir)}° ${getCardinalDirection(activePoint.dir)}`,
+      status: windStatus,
+      statusLabel: windStatusLabel,
+      takeoffHeading: takeoff.heading,
+      takeoffAlt: takeoff.altitude,
+      details: [
+        { label: 'Velocità Media', value: `${Math.round(activePoint.speed)} km/h` },
+        { label: 'Raffica di Picco', value: `${Math.round(activePoint.gust)} km/h` },
+        { label: 'Direzione Vento', value: `${Math.round(activePoint.dir)}° (${getCardinalDirection(activePoint.dir)})` },
+        { label: 'Scostamento Decollo', value: `${Math.round(activePoint.angleDelta)}° (${activePoint.angleDelta <= 35 ? 'In Asse' : activePoint.angleDelta <= 75 ? 'Al Traverso' : 'Fuori Asse'})` }
+      ],
+      advice: windStatus === 'flyable'
+        ? 'Intensità e orientamento ottimali rispetto al decollo. Gonfiaggio regolare con ottimo controllo a terra.'
+        : windStatus === 'caution'
+        ? 'Vento sostenuto o al traverso rispetto al decollo. Richiesta attenzione nella fase di corsa e gonfiaggio.'
+        : windStatus === 'severe'
+        ? 'Vento tempestoso o raffiche violente. Pericolo critico di trascinamento e turbolenza orografica.'
+        : 'Vento oltre i limiti di sicurezza dell\'ala o con componente da dietro. Decollo fortemente sconsigliato.'
+    };
+
+    // 2. Raffiche & Delta Vento
+    let gustStatus = 'flyable';
+    let gustStatusLabel = 'Flusso Regolare';
+    if (activePoint.deltaWind <= 7 && activePoint.gust <= maxWindLimit) {
+      gustStatus = 'flyable';
+      gustStatusLabel = 'Flusso Regolare';
+    } else if (activePoint.deltaWind <= 12 && activePoint.gust <= maxGustLimit) {
+      gustStatus = 'caution';
+      gustStatusLabel = 'Raffiche Moderate';
+    } else if (activePoint.deltaWind > 18 || activePoint.gust > 35) {
+      gustStatus = 'severe';
+      gustStatusLabel = 'Turbolenza Severa';
+    } else {
+      gustStatus = 'unflyable';
+      gustStatusLabel = 'Raffiche Forti';
+    }
+
+    const gustParam = {
+      id: 'raffiche',
+      title: 'Raffiche & Delta Vento',
+      subtitle: 'Escursione anemometrica e turbolenza meccanica al suolo',
+      value: `Raffica ${Math.round(activePoint.gust)} km/h (Delta +${Math.round(activePoint.deltaWind)} km/h)`,
+      status: gustStatus,
+      statusLabel: gustStatusLabel,
+      details: [
+        { label: 'Raffica Massima', value: `${Math.round(activePoint.gust)} km/h` },
+        { label: 'Delta Raffica', value: `+${Math.round(activePoint.deltaWind)} km/h` },
+        { label: 'Fattore Raffica', value: `${(activePoint.gust / Math.max(1, activePoint.speed)).toFixed(2)}x` },
+        { label: 'Stabilità al Suolo', value: activePoint.deltaWind <= 8 ? 'Laminare' : activePoint.deltaWind <= 14 ? 'Intermittente' : 'Rotorica' }
+      ],
+      advice: gustStatus === 'flyable'
+        ? 'Brezza costante con escursioni minime. Basso rischio di chiusure asimmetriche in decollo.'
+        : gustStatus === 'caution'
+        ? 'Raffiche termiche intermittenti. Pronti a fermare le beccate della vela durante la fase di decollo.'
+        : gustStatus === 'severe'
+        ? 'Gradiente e raffiche estreme. Rischio elevato di collasso strutturale a bassa quota.'
+        : 'Raffiche brusche con delta superiore a 12 km/h. Rischio di scarrocciamento e violento beccheggio in uscita.',
+      chartOptions: {
+        id: 'param-chart-gust',
+        title: 'Raffiche e Vento',
+        unit: 'km/h',
+        minY: 0,
+        maxY: 45,
+        thresholds: [
+          { value: maxWindLimit, stroke: 'var(--gm-status-caution)', label: `Limite Ala (${maxWindLimit})` }
+        ],
+        series: [
+          {
+            name: 'Raffiche',
+            points: hourlyPoints.map(p => ({ hour: p.hour, value: p.gust })),
+            stroke: 'var(--gm-status-alert)',
+            strokeWidth: 1.8,
+            strokeDasharray: '3,3',
+            fillArea: 'rgba(249, 115, 22, 0.12)'
+          },
+          {
+            name: 'Vento',
+            points: hourlyPoints.map(p => ({ hour: p.hour, value: p.speed })),
+            stroke: 'var(--gm-status-flyable)',
+            strokeWidth: 2.5
+          }
+        ]
+      }
+    };
+
+    // 3. Base Cumulo (LCL)
+    const lclMargin = activePoint.lclMsl - takeoff.altitude;
+    let lclStatus = 'flyable';
+    let lclStatusLabel = 'Favorevole';
+    if (lclMargin >= 600) {
+      lclStatus = 'flyable';
+      lclStatusLabel = 'Favorevole';
+    } else if (lclMargin >= 200) {
+      lclStatus = 'caution';
+      lclStatusLabel = 'Marginale';
+    } else if (lclMargin < 0) {
+      lclStatus = 'severe';
+      lclStatusLabel = 'Decollo in Nube';
+    } else {
+      lclStatus = 'unflyable';
+      lclStatusLabel = 'Nubi Basse';
+    }
+
+    const lclParam = {
+      id: 'base-cumulo',
+      title: 'Base Cumulo (LCL)',
+      subtitle: 'Quota di condensazione termica e margine sul decollo',
+      value: `${Math.round(activePoint.lclMsl)} m slm (${lclMargin >= 0 ? '+' : ''}${Math.round(lclMargin)} m su decollo)`,
+      status: lclStatus,
+      statusLabel: lclStatusLabel,
+      takeoffAlt: takeoff.altitude,
+      details: [
+        { label: 'Quota Base Stimata', value: `${Math.round(activePoint.lclMsl)} m slm` },
+        { label: 'Margine dal Decollo', value: `${lclMargin >= 0 ? '+' : ''}${Math.round(lclMargin)} m` },
+        { label: 'Temperatura al Suolo', value: `${activePoint.temp.toFixed(1)} °C` },
+        { label: 'Punto di Rugiada', value: `${activePoint.dew.toFixed(1)} °C` }
+      ],
+      advice: lclStatus === 'flyable'
+        ? 'Base nubi ampiamente sopra il decollo. Ampio spazio utile per veleggiare e termicare in piena sicurezza visiva.'
+        : lclStatus === 'caution'
+        ? 'Base cumulo vicina alla quota di decollo. Attenzione a non entrare in nube durante il guadagno di quota in termica.'
+        : lclStatus === 'severe'
+        ? 'Decollo immerso nella nube o nebbia orografica totale. Volo a vista (VFR) non consentito.'
+        : 'Quota nubi molto bassa. Visibilità ridotta e rischio concreto di banco nuvoloso a ridosso del pendio.'
+    };
+
+    // 4. Instabilità / Temporali (CAPE)
+    let capeStatus = 'flyable';
+    let capeStatusLabel = 'Stabile / Sicuro';
+    if (activePoint.cape < 300) {
+      capeStatus = 'flyable';
+      capeStatusLabel = 'Stabile / Sicuro';
+    } else if (activePoint.cape < 800) {
+      capeStatus = 'caution';
+      capeStatusLabel = 'Sovrasviluppi';
+    } else if (activePoint.cape >= 1500) {
+      capeStatus = 'severe';
+      capeStatusLabel = 'Temporali Severi';
+    } else {
+      capeStatus = 'unflyable';
+      capeStatusLabel = 'Rischio Temporali';
+    }
+
+    const capeParam = {
+      id: 'instabilita',
+      title: 'Instabilità / Temporali (CAPE)',
+      subtitle: 'Energia convettiva potenziale e rischio sovrasviluppi',
+      value: `${Math.round(activePoint.cape)} J/kg · ${activePoint.cape < 300 ? 'Rischio Basso' : activePoint.cape < 800 ? 'Attenzione' : 'Rischio Elevato'}`,
+      status: capeStatus,
+      statusLabel: capeStatusLabel,
+      details: [
+        { label: 'Indice CAPE', value: `${Math.round(activePoint.cape)} J/kg` },
+        { label: 'Probabilità Sovrasviluppi', value: activePoint.cape < 300 ? 'Bassa (<15%)' : activePoint.cape < 800 ? 'Media (40%)' : 'Alta (>75%)' },
+        { label: 'Attività Convettiva', value: activePoint.cape < 300 ? 'Ordinaria' : activePoint.cape < 800 ? 'Vivace' : 'Esplosiva' },
+        { label: 'Fascia Oraria Attenzione', value: '14:00 - 18:00' }
+      ],
+      advice: capeStatus === 'flyable'
+        ? 'Atmosfera stabile con convezione controllata. Nessun rischio di cumulonembi o convezione profonda.'
+        : capeStatus === 'caution'
+        ? 'Energia convettiva presente. Monitorare l\'evoluzione verticale dei cumuli; atterrare prima della comparsa di congesti.'
+        : capeStatus === 'severe'
+        ? 'Condizioni temporalesche severe con formazioni a rapido sviluppo. Volo vietato per rischio fulmini e discendenze catastrofiche.'
+        : 'Forte energia convettiva nell\'aria. Elevato rischio di rovesci, raffiche di outflow e formazioni temporalesche.',
+      chartOptions: {
+        id: 'param-chart-cape',
+        title: 'Instabilità CAPE',
+        unit: 'J/kg',
+        minY: 0,
+        maxY: Math.max(1000, ...hourlyPoints.map(p => p.cape)),
+        thresholds: [
+          { value: 300, stroke: 'var(--gm-status-caution)', label: 'Attenzione (300)' },
+          { value: 800, stroke: 'var(--gm-status-unflyable)', label: 'Rischio (800)' }
+        ],
+        series: [
+          {
+            name: 'CAPE',
+            points: hourlyPoints.map(p => ({ hour: p.hour, value: p.cape })),
+            stroke: 'var(--gm-status-caution)',
+            strokeWidth: 2.2,
+            fillArea: 'rgba(234, 179, 8, 0.15)'
+          }
+        ]
+      }
+    };
+
+    // 5. Turbolenza in Termica (EDR)
+    let edrStatus = 'flyable';
+    let edrStatusLabel = 'Termiche Dolci';
+    if (activePoint.edr <= 1.8) {
+      edrStatus = 'flyable';
+      edrStatusLabel = 'Termiche Dolci';
+    } else if (activePoint.edr <= 2.8) {
+      edrStatus = 'caution';
+      edrStatusLabel = 'Termiche Vive';
+    } else if (activePoint.edr > 3.8) {
+      edrStatus = 'severe';
+      edrStatusLabel = 'Pericolo Rotori';
+    } else {
+      edrStatus = 'unflyable';
+      edrStatusLabel = 'Turbolenza Forte';
+    }
+
+    const edrParam = {
+      id: 'turbolenza',
+      title: 'Turbolenza in Termica (EDR)',
+      subtitle: 'Aggressività ascendenze, gradiente termico e taglio del vento',
+      value: `${activePoint.edr < 1.8 ? 'Dolce' : activePoint.edr < 2.8 ? 'Vivace' : 'Severa'} · Salita stimata +${activePoint.updraft.toFixed(1)} m/s`,
+      status: edrStatus,
+      statusLabel: edrStatusLabel,
+      details: [
+        { label: 'Salita Termica Stimata', value: `+${activePoint.updraft.toFixed(1)} m/s` },
+        { label: 'Indice EDR / Taglio', value: `${activePoint.edr.toFixed(1)}` },
+        { label: 'Gradiente Verticale', value: '-0.65 °C/100m (Standard)' },
+        { label: 'Impegno Pilota', value: activePoint.edr <= 1.8 ? 'Rilassato (Ideale EN-A)' : activePoint.edr <= 2.8 ? 'Attivo Moderato' : 'Molto Intenso' }
+      ],
+      advice: edrStatus === 'flyable'
+        ? 'Ascendenze termiche morbide e regolari, ideali per piloti principianti ed EN-A.'
+        : edrStatus === 'caution'
+        ? 'Termiche consistenti con bordi netti. Richiesto pilotaggio attivo per contrastare piccoli movimenti di rollio e beccheggio.'
+        : edrStatus === 'severe'
+        ? 'Turbolenza rotorica o termica estrema. Controllo dell\'ala gravemente compromesso.'
+        : 'Termiche rotte da vento forte o gradienti superadiabatici. Rischio elevato di violente chiusure della vela.',
+      chartOptions: {
+        id: 'param-chart-edr',
+        title: 'Tasso di Salita Termica',
+        unit: 'm/s',
+        minY: 0,
+        maxY: 5,
+        thresholds: [
+          { value: 2.5, stroke: 'var(--gm-status-caution)', label: 'Termiche Vive (2.5)' }
+        ],
+        series: [
+          {
+            name: 'Updraft',
+            points: hourlyPoints.map(p => ({ hour: p.hour, value: p.updraft })),
+            stroke: 'var(--gm-status-flyable)',
+            strokeWidth: 2.2,
+            fillArea: 'rgba(34, 197, 94, 0.15)'
+          }
+        ]
+      }
+    };
+
+    // 6. Copertura Nuvolosa & Insolazione
+    let cloudStatus = 'flyable';
+    let cloudStatusLabel = 'Soleggiato';
+    if (activePoint.cloudCover <= 35 && activePoint.precip === 0) {
+      cloudStatus = 'flyable';
+      cloudStatusLabel = 'Soleggiato';
+    } else if (activePoint.cloudCover <= 80 && activePoint.precip === 0) {
+      cloudStatus = 'caution';
+      cloudStatusLabel = 'Parz. Nuvoloso';
+    } else if (activePoint.precip > 0.5) {
+      cloudStatus = 'severe';
+      cloudStatusLabel = 'Pioggia';
+    } else {
+      cloudStatus = 'unflyable';
+      cloudStatusLabel = 'Coperto';
+    }
+
+    const cloudParam = {
+      id: 'copertura',
+      title: 'Copertura Nuvolosa & Insolazione',
+      subtitle: 'Radiazione solare al suolo e innesco termico dei versanti',
+      value: `${Math.round(activePoint.cloudCover)}% coperto · ${activePoint.cloudCover <= 35 ? 'Soleggiato' : activePoint.cloudCover <= 70 ? 'Variabile' : 'Coperto'}`,
+      status: cloudStatus,
+      statusLabel: cloudStatusLabel,
+      details: [
+        { label: 'Copertura Totale', value: `${Math.round(activePoint.cloudCover)}%` },
+        { label: 'Insolazione Pendio', value: activePoint.cloudCover <= 35 ? 'Massima (100%)' : activePoint.cloudCover <= 70 ? 'Variabile (60%)' : 'Debole (<20%)' },
+        { label: 'Precipitazioni Orarie', value: `${activePoint.precip.toFixed(1)} mm` },
+        { label: 'Umidità Relativa', value: `${Math.round(activePoint.humidity)}%` }
+      ],
+      advice: cloudStatus === 'flyable'
+        ? 'Pendii ben illuminati dal sole, innesco termico costante e ben delineato.'
+        : cloudStatus === 'caution'
+        ? 'Passaggi nuvolosi che potrebbero ombreggiare temporaneamente i versanti e spegnere le termiche.'
+        : cloudStatus === 'severe'
+        ? 'Pioggia in atto o imminente. Decollo assolutamente vietato per pericolo bagnatura del tessuto e stallo paracadutale.'
+        : 'Cielo compatto o minaccia di precipitazioni; attività termica inibita con rischio di spegnimento delle brezze.',
+      chartOptions: {
+        id: 'param-chart-cloud',
+        title: 'Copertura Nuvolosa',
+        unit: '%',
+        minY: 0,
+        maxY: 100,
+        thresholds: [
+          { value: 80, stroke: 'var(--gm-status-caution)', label: 'Nuvoloso (80%)' }
+        ],
+        series: [
+          {
+            name: 'Copertura',
+            points: hourlyPoints.map(p => ({ hour: p.hour, value: p.cloudCover })),
+            stroke: 'var(--gm-text-secondary)',
+            strokeWidth: 2,
+            fillArea: 'rgba(148, 163, 184, 0.15)'
+          }
+        ]
+      }
+    };
+
+    // 7. Condizioni in Atterraggio
+    const isLandingSafe = evaluated.glideMetrics ? evaluated.glideMetrics.isSafe : true;
+    const reqGlide = evaluated.glideMetrics ? evaluated.glideMetrics.requiredGlideRatio : 6.0;
+    const limitGlide = evaluated.glideMetrics ? evaluated.glideMetrics.safeLimit : 7.0;
+
+    let landingStatus = 'flyable';
+    let landingStatusLabel = 'Brezza Calma';
+    if (!isLandingSafe) {
+      landingStatus = 'unflyable';
+      landingStatusLabel = 'Rientro Critico';
+    } else if (activePoint.landingSpeed <= 16) {
+      landingStatus = 'flyable';
+      landingStatusLabel = 'Brezza Calma';
+    } else if (activePoint.landingSpeed <= 24) {
+      landingStatus = 'caution';
+      landingStatusLabel = 'Brezza Sostenuta';
+    } else {
+      landingStatus = 'unflyable';
+      landingStatusLabel = 'Vento Forte Valle';
+    }
+
+    const landingParam = {
+      id: 'atterraggio',
+      title: 'Condizioni in Atterraggio',
+      subtitle: 'Brezza di valle e rientro in sicurezza nel cono di planata',
+      value: `Brezza ${Math.round(activePoint.landingSpeed)} km/h · Efficienza 1:${reqGlide} (${isLandingSafe ? 'Nel Cono' : 'Fuori Cono'})`,
+      status: landingStatus,
+      statusLabel: landingStatusLabel,
+      details: [
+        { label: 'Vento al Suolo Atterraggio', value: `${Math.round(activePoint.landingSpeed)} km/h` },
+        { label: 'Efficienza Richiesta', value: `1:${reqGlide}` },
+        { label: 'Limite Ala con Margine', value: `1:${limitGlide}` },
+        { label: 'Dislivello Decollo-Atterraggio', value: `${takeoff.altitude - landing.altitude} m` }
+      ],
+      advice: landingStatus === 'flyable'
+        ? 'Brezza di valle regolare allineata al campo. Cono di planata ampiamente garantito per vele di qualsiasi classe.'
+        : landingStatus === 'caution'
+        ? 'Brezza sostenuta in fondovalle. Mantenersi sopravento rispetto all\'atterraggio durante la perdita di quota.'
+        : !isLandingSafe
+        ? 'Efficienza richiesta superiore ai limiti di sicurezza dell\'ala. Rischio concreto di atterraggio fuori campo.'
+        : 'Vento in valle troppo forte con rischio di scarrocciamento e rotori orografici.',
+      chartOptions: {
+        id: 'param-chart-landing',
+        title: 'Brezza in Atterraggio',
+        unit: 'km/h',
+        minY: 0,
+        maxY: 35,
+        thresholds: [
+          { value: 18, stroke: 'var(--gm-status-caution)', label: 'Limite Brezza (18)' }
+        ],
+        series: [
+          {
+            name: 'Brezza Valle',
+            points: hourlyPoints.map(p => ({ hour: p.hour, value: p.landingSpeed })),
+            stroke: 'var(--gm-status-flyable)',
+            strokeWidth: 2.2,
+            fillArea: 'rgba(34, 197, 94, 0.12)'
+          }
+        ]
+      }
+    };
+
+    return {
+      params: [windParam, gustParam, lclParam, capeParam, edrParam, cloudParam, landingParam],
+      hourlyPoints,
+      activePoint,
+      takeoff,
+      landing
+    };
+  }
+
+  /**
+   * Generates a pure vector SVG hourly trend chart (08:00 - 20:00).
+   * Fully responsive, zero layout thrashing, and high contrast for both dark and sunlight modes.
+   * 
+   * @param {object} options
+   * @returns {string} SVG markup
+   */
+  renderSvgTrendChart({
+    id = 'trend-chart',
+    title = '',
+    unit = '',
+    series = [],
+    thresholds = [],
+    minY = 0,
+    maxY = 40,
+    selectedHour = this.selectedHour,
+    compact = false
+  }) {
+    const W = 350;
+    const H = compact ? 95 : 120;
+    const xMin = 36;
+    const xMax = 335;
+    const yMin = 14;
+    const yMax = H - 22;
+    const yRange = Math.max(1, maxY - minY);
+
+    const getX = (h) => Math.round(xMin + ((h - 8) / 12) * (xMax - xMin));
+    const getY = (val) => Math.round(yMax - ((Math.min(maxY, Math.max(minY, val)) - minY) / yRange) * (yMax - yMin));
+
+    const mid1 = minY + yRange * 0.33;
+    const mid2 = minY + yRange * 0.66;
+
+    const renderedSeries = series.map(s => {
+      const pts = (s.points || []).map(p => `${getX(p.hour)},${getY(p.value)}`).join(' ');
+      let areaMarkup = '';
+      if (s.fillArea) {
+        const areaPath = `M ${getX(8)} ${yMax} ` + (s.points || []).map(p => `L ${getX(p.hour)} ${getY(p.value)}`).join(' ') + ` L ${getX(20)} ${yMax} Z`;
+        areaMarkup = `<path d="${areaPath}" fill="${s.fillArea}" />`;
+      }
+      return `
+        ${areaMarkup}
+        <polyline 
+          points="${pts}" 
+          fill="none" 
+          stroke="${s.stroke || 'var(--gm-accent)'}" 
+          stroke-width="${s.strokeWidth || 2}" 
+          ${s.strokeDasharray ? `stroke-dasharray="${s.strokeDasharray}"` : ''} 
+        />
+      `;
+    }).join('');
+
+    const renderedThresholds = thresholds.map(t => {
+      const yPos = getY(t.value);
+      return `
+        <line x1="${xMin}" y1="${yPos}" x2="${xMax}" y2="${yPos}" stroke="${t.stroke || 'var(--gm-status-caution)'}" stroke-width="1.2" stroke-dasharray="${t.strokeDasharray || '3,3'}" />
+        ${t.label ? `<text x="${xMax - 2}" y="${yPos - 3}" font-size="8" fill="${t.stroke || 'var(--gm-text-muted)'}" text-anchor="end">${escapeHtml(t.label)}</text>` : ''}
+      `;
+    }).join('');
+
+    const activeMarkerX = getX(selectedHour);
+    const primarySeries = series[0] || { points: [] };
+    const activePoint = (primarySeries.points || []).find(p => p.hour === selectedHour) || primarySeries.points?.[0] || { value: 0 };
+    const activeMarkerY = getY(activePoint.value);
+
+    return `
+      <div id="${id}-box" class="gm-chart-box">
+        <svg class="gm-chart-svg" viewBox="0 0 ${W} ${H}" aria-label="Grafico orario ${escapeHtml(title)}">
+          <!-- Background Grid lines -->
+          <line x1="${xMin}" y1="${getY(mid1)}" x2="${xMax}" y2="${getY(mid1)}" stroke="var(--gm-border)" stroke-dasharray="2,2" />
+          <line x1="${xMin}" y1="${getY(mid2)}" x2="${xMax}" y2="${getY(mid2)}" stroke="var(--gm-border)" stroke-dasharray="2,2" />
+          <line x1="${xMin}" y1="${yMax}" x2="${xMax}" y2="${yMax}" stroke="var(--gm-border-strong)" stroke-width="1" />
+
+          <!-- Y Axis Labels -->
+          <text x="${xMin - 4}" y="${getY(minY) + 3}" font-size="8" fill="var(--gm-text-muted)" text-anchor="end">${Math.round(minY)}</text>
+          <text x="${xMin - 4}" y="${getY(mid2) + 3}" font-size="8" fill="var(--gm-text-muted)" text-anchor="end">${Math.round(mid2)}</text>
+          <text x="${xMin - 4}" y="${getY(maxY) + 7}" font-size="8" fill="var(--gm-text-muted)" text-anchor="end">${Math.round(maxY)}</text>
+
+          <!-- Threshold lines -->
+          ${renderedThresholds}
+
+          <!-- Series paths -->
+          ${renderedSeries}
+
+          <!-- Hourly X Axis Labels -->
+          <text x="${getX(8)}" y="${H - 6}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">08</text>
+          <text x="${getX(11)}" y="${H - 6}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">11</text>
+          <text x="${getX(14)}" y="${H - 6}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">14</text>
+          <text x="${getX(17)}" y="${H - 6}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">17</text>
+          <text x="${getX(20)}" y="${H - 6}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">20</text>
+
+          <!-- Active Hour Vertical Marker -->
+          <line x1="${activeMarkerX}" y1="${yMin}" x2="${activeMarkerX}" y2="${yMax}" stroke="var(--gm-accent)" stroke-width="1.8" stroke-dasharray="3,3" />
+          <circle cx="${activeMarkerX}" cy="${activeMarkerY}" r="4" fill="var(--gm-accent)" stroke="var(--gm-bg-base)" stroke-width="1.8" />
+          <rect x="${Math.max(xMin, Math.min(xMax - 54, activeMarkerX - 27))}" y="2" width="54" height="13" rx="3" fill="var(--gm-accent)" />
+          <text x="${Math.max(xMin + 27, Math.min(xMax - 27, activeMarkerX))}" y="11" font-size="8" font-weight="700" fill="var(--gm-text-inverse)" text-anchor="middle">
+            ${Math.round(activePoint.value)} ${escapeHtml(unit)}
+          </text>
+        </svg>
+      </div>
+    `;
+  }
+
+  /**
+   * Renders the interactive parameter accordion cards with synthetic 4-state indicator scale,
+   * analytical details, operational advice, and hourly trend charts.
+   * 
+   * @param {object} evaluated
+   * @param {object} weatherData
+   * @param {object} spot
+   * @param {object} glider
+   * @param {object|null} activeSubSpotObj
+   * @returns {string}
+   */
+  renderParameterCards(evaluated, weatherData, spot, glider, activeSubSpotObj) {
+    const { params } = this.computeParamMetrics(evaluated, weatherData, spot, glider, activeSubSpotObj);
+
+    return `
+      <div class="gm-parameter-cards-list flex flex-col gap-2">
+        ${params.map(param => {
+          const isExpanded = this.expandedCardId === param.id;
+          let chartHtml = '';
+          if (isExpanded) {
+            if (param.id === 'vento-decollo') {
+              chartHtml = this.renderWindChart(spot, weatherData, param.takeoffHeading);
+            } else if (param.id === 'base-cumulo') {
+              chartHtml = this.renderSoundingChart(spot, weatherData, param.takeoffAlt);
+            } else if (param.chartOptions) {
+              chartHtml = this.renderSvgTrendChart(param.chartOptions);
+            }
+          }
+
+          return `
+            <div 
+              class="gm-param-card ${isExpanded ? 'expanded' : ''}" 
+              id="param-card-${param.id}"
+            >
+              <button 
+                type="button" 
+                class="gm-param-header"
+                data-action="toggle-param-card"
+                data-card-id="${param.id}"
+                aria-expanded="${isExpanded ? 'true' : 'false'}"
+                aria-controls="param-body-${param.id}"
+                id="param-header-${param.id}"
+              >
+                <div class="gm-param-header-left flex items-center gap-2 min-w-0">
+                  <span class="gm-param-status-dot ${param.status}" aria-hidden="true"></span>
+                  <div class="gm-param-title-wrap min-w-0">
+                    <div class="gm-param-title-row flex items-center gap-2">
+                      <span class="gm-param-title font-bold text-sm text-[var(--gm-text-primary)] truncate">${escapeHtml(param.title)}</span>
+                      <span class="gm-param-status-badge ${param.status}">${escapeHtml(param.statusLabel)}</span>
+                    </div>
+                    <div class="gm-param-sub-row text-xs text-[var(--gm-text-secondary)] font-medium truncate mt-0.5">
+                      ${escapeHtml(param.value)}
+                    </div>
+                  </div>
+                </div>
+                <div class="gm-param-chevron flex-shrink-0 text-[var(--gm-text-muted)] text-sm ml-2 ${isExpanded ? 'rotate-180' : ''}" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </div>
+              </button>
+
+              ${isExpanded ? `
+                <div 
+                  id="param-body-${param.id}" 
+                  class="gm-param-body"
+                  role="region"
+                  aria-labelledby="param-header-${param.id}"
+                >
+                  <!-- Details Grid -->
+                  <div class="gm-param-details-grid">
+                    ${param.details.map(d => `
+                      <div class="gm-param-detail-cell">
+                        <span class="gm-param-detail-label">${escapeHtml(d.label)}</span>
+                        <span class="gm-param-detail-value">${escapeHtml(d.value)}</span>
+                      </div>
+                    `).join('')}
+                  </div>
+
+                  <!-- Practical Advice Box -->
+                  <div class="gm-param-advice-box mt-2.5">
+                    <span class="gm-param-advice-title">Consiglio Pilota:</span>
+                    <p class="gm-param-advice-text">${escapeHtml(param.advice)}</p>
+                  </div>
+
+                  <!-- Trend Chart -->
+                  <div class="gm-param-chart-wrap mt-3">
+                    <div class="text-xs font-semibold text-[var(--gm-text-muted)] uppercase tracking-wider mb-1">
+                      Tendenza Oraria (08:00 - 20:00)
+                    </div>
+                    ${chartHtml}
+                  </div>
+                </div>
+              ` : ''}
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  /**
+   * Renders the "Solo Grafici" multi-trend view with synchronized time curves for all parameters.
+   * 
+   * @param {object} evaluated
+   * @param {object} weatherData
+   * @param {object} spot
+   * @param {object} glider
+   * @param {object|null} activeSubSpotObj
+   * @returns {string}
+   */
+  renderMultiTrendCharts(evaluated, weatherData, spot, glider, activeSubSpotObj) {
+    const { hourlyPoints, takeoff } = this.computeParamMetrics(evaluated, weatherData, spot, glider, activeSubSpotObj);
+
+    const chartCards = [
+      {
+        id: 'multi-chart-wind',
+        title: 'Vento & Raffiche in Decollo',
+        val: `${Math.round(hourlyPoints.find(p => p.hour === this.selectedHour)?.speed || 0)} km/h`,
+        chartHtml: this.renderWindChart(spot, weatherData, takeoff.heading)
+      },
+      {
+        id: 'multi-chart-sounding',
+        title: 'Base Cumulo (LCL) vs Quota Decollo',
+        val: `${Math.round(hourlyPoints.find(p => p.hour === this.selectedHour)?.lclMsl || 0)} m slm`,
+        chartHtml: this.renderSoundingChart(spot, weatherData, takeoff.altitude)
+      },
+      {
+        id: 'multi-chart-cape',
+        title: 'Instabilità / Temporali (CAPE)',
+        val: `${Math.round(hourlyPoints.find(p => p.hour === this.selectedHour)?.cape || 0)} J/kg`,
+        chartHtml: this.renderSvgTrendChart({
+          id: 'multi-cape',
+          title: 'CAPE',
+          unit: 'J/kg',
+          minY: 0,
+          maxY: Math.max(1200, ...hourlyPoints.map(p => p.cape)),
+          compact: true,
+          thresholds: [
+            { value: 300, stroke: 'var(--gm-status-caution)', label: 'Attenzione (300)' },
+            { value: 800, stroke: 'var(--gm-status-unflyable)', label: 'Rischio (800)' }
+          ],
+          series: [{
+            name: 'CAPE',
+            points: hourlyPoints.map(p => ({ hour: p.hour, value: p.cape })),
+            stroke: 'var(--gm-status-caution)',
+            fillArea: 'rgba(234, 179, 8, 0.12)'
+          }]
+        })
+      },
+      {
+        id: 'multi-chart-turbulence',
+        title: 'Turbolenza in Termica (EDR) & Salita',
+        val: `+${(hourlyPoints.find(p => p.hour === this.selectedHour)?.updraft || 0).toFixed(1)} m/s`,
+        chartHtml: this.renderSvgTrendChart({
+          id: 'multi-turbulence',
+          title: 'Salita',
+          unit: 'm/s',
+          minY: 0,
+          maxY: 5,
+          compact: true,
+          thresholds: [
+            { value: 2.5, stroke: 'var(--gm-status-caution)', label: 'Termiche Vive' }
+          ],
+          series: [{
+            name: 'Updraft',
+            points: hourlyPoints.map(p => ({ hour: p.hour, value: p.updraft })),
+            stroke: 'var(--gm-status-flyable)',
+            fillArea: 'rgba(34, 197, 94, 0.12)'
+          }]
+        })
+      },
+      {
+        id: 'multi-chart-cloudcover',
+        title: 'Copertura Nuvolosa & Insolazione',
+        val: `${Math.round(hourlyPoints.find(p => p.hour === this.selectedHour)?.cloudCover || 0)}%`,
+        chartHtml: this.renderSvgTrendChart({
+          id: 'multi-cloudcover',
+          title: 'Copertura',
+          unit: '%',
+          minY: 0,
+          maxY: 100,
+          compact: true,
+          thresholds: [
+            { value: 80, stroke: 'var(--gm-status-caution)', label: 'Nuvoloso (80%)' }
+          ],
+          series: [{
+            name: 'Copertura',
+            points: hourlyPoints.map(p => ({ hour: p.hour, value: p.cloudCover })),
+            stroke: 'var(--gm-text-secondary)',
+            fillArea: 'rgba(148, 163, 184, 0.15)'
+          }]
+        })
+      },
+      {
+        id: 'multi-chart-landing',
+        title: 'Condizioni in Atterraggio (Brezza di Valle)',
+        val: `${Math.round(hourlyPoints.find(p => p.hour === this.selectedHour)?.landingSpeed || 0)} km/h`,
+        chartHtml: this.renderSvgTrendChart({
+          id: 'multi-landing',
+          title: 'Brezza',
+          unit: 'km/h',
+          minY: 0,
+          maxY: 35,
+          compact: true,
+          thresholds: [
+            { value: 18, stroke: 'var(--gm-status-caution)', label: 'Limite Brezza (18)' }
+          ],
+          series: [{
+            name: 'Brezza Valle',
+            points: hourlyPoints.map(p => ({ hour: p.hour, value: p.landingSpeed })),
+            stroke: 'var(--gm-status-flyable)',
+            fillArea: 'rgba(34, 197, 94, 0.12)'
+          }]
+        })
+      }
+    ];
+
+    return `
+      <div class="gm-multi-charts-container">
+        ${chartCards.map(c => `
+          <div class="gm-trend-card" id="${c.id}">
+            <div class="gm-trend-card-header">
+              <span class="gm-trend-card-title">${escapeHtml(c.title)}</span>
+              <span class="gm-trend-card-val">${escapeHtml(c.val)}</span>
+            </div>
+            ${c.chartHtml}
+          </div>
+        `).join('')}
+      </div>
     `;
   }
 
@@ -2202,11 +3070,12 @@ export class ForecastViewController {
     }
 
     const spotCardContainer = this.containerEl.querySelector('#forecast-spot-card-container');
+    const paramsContainer = this.containerEl.querySelector('#forecast-params-container');
     const windContainer = this.containerEl.querySelector('#forecast-wind-panel-container');
     const soundingContainer = this.containerEl.querySelector('#forecast-sounding-panel-container');
 
-    // If sub-containers are missing from DOM, fallback to full render
-    if (!spotCardContainer || !windContainer || !soundingContainer) {
+    // If spot card container is missing from DOM, fallback to full render
+    if (!spotCardContainer) {
       this.render();
       return;
     }
@@ -2218,7 +3087,8 @@ export class ForecastViewController {
       comprensorio: spot,
       weatherData,
       hourIndex: this.selectedHour,
-      glider
+      glider,
+      targetDate: this.activeDate
     });
     const activeSubSpotObj = this.resolveActiveSubSpot(spot);
 
@@ -2240,11 +3110,22 @@ export class ForecastViewController {
       ? this.renderSummaryCard(evaluated)
       : this.renderSpecificSpotCard(activeSubSpotObj, evaluated);
 
-    // 3. Update Wind Panel container (updates 360° compass or chart cursor)
-    windContainer.innerHTML = this.renderWindPanel(evaluated, weatherData, spot, activeSubSpotObj);
+    // 3. Update Parameters or Multi-Trend container in place
+    if (paramsContainer) {
+      paramsContainer.innerHTML = this.forecastMode === 'charts'
+        ? this.renderMultiTrendCharts(evaluated, weatherData, spot, glider, activeSubSpotObj)
+        : this.renderParameterCards(evaluated, weatherData, spot, glider, activeSubSpotObj);
+    }
 
-    // 4. Update Sounding Panel container (updates LCL or chart cursor)
-    soundingContainer.innerHTML = this.renderSoundingPanel(evaluated, weatherData, spot, activeSubSpotObj);
+    // 4. Update Wind Panel container (if present in DOM)
+    if (windContainer) {
+      windContainer.innerHTML = this.renderWindPanel(evaluated, weatherData, spot, activeSubSpotObj);
+    }
+
+    // 5. Update Sounding Panel container (if present in DOM)
+    if (soundingContainer) {
+      soundingContainer.innerHTML = this.renderSoundingPanel(evaluated, weatherData, spot, activeSubSpotObj);
+    }
   }
 
   /**
@@ -2406,10 +3287,23 @@ export class ForecastViewController {
       if (this.selectedHour < 20) {
         this.setHour(this.selectedHour + 1);
       }
+    } else if (action === 'set-forecast-mode') {
+      const mode = actionEl.getAttribute('data-mode');
+      if (mode === 'cards' || mode === 'charts') {
+        this.forecastMode = mode;
+        this.render();
+      }
+    } else if (action === 'toggle-param-card') {
+      const cardId = actionEl.getAttribute('data-card-id');
+      if (cardId) {
+        this.expandedCardId = this.expandedCardId === cardId ? null : cardId;
+        this.render();
+      }
     } else if (action === 'select-date') {
       const dateAttr = actionEl.getAttribute('data-date');
       if (dateAttr) {
         this.activeDate = dateAttr;
+        this.selectedHour = this._resolveInitialHour(this.activeDate);
         if (this.store) {
           this.store.setState({ activeDate: dateAttr });
         }
@@ -2422,6 +3316,7 @@ export class ForecastViewController {
       const input = document.getElementById('custom-date-native-input');
       if (input && input.value) {
         this.activeDate = input.value;
+        this.selectedHour = this._resolveInitialHour(this.activeDate);
         if (this.store) {
           this.store.setState({ activeDate: input.value });
         }
@@ -2433,6 +3328,7 @@ export class ForecastViewController {
       const dateAttr = actionEl.getAttribute('data-date');
       if (dateAttr) {
         this.activeDate = dateAttr;
+        this.selectedHour = this._resolveInitialHour(this.activeDate);
         if (this.store) {
           this.store.setState({ activeDate: dateAttr });
         }

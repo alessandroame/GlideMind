@@ -727,5 +727,143 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
 
     controller.unmount();
   });
+
+  it('should automatically select current local hour (clamped 08..20) when date is today, and default to 13:00 for future dates', () => {
+    const mockStore = createStore();
+    const controller = new ForecastViewController({ store: mockStore });
+
+    const now = new Date();
+    const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const expectedTodayHour = Math.min(20, Math.max(8, now.getHours()));
+
+    assert.equal(controller._resolveInitialHour(todayIso), expectedTodayHour, 'Today must resolve to current local hour (clamped 08..20)');
+    assert.equal(controller._resolveInitialHour('2028-06-15'), 13, 'Future date must default to 13:00 soaring hour');
+  });
+
+  it('should render all 7 parameter cards at-a-glance with 4-state indicator scale', () => {
+    const mockStore = createStore({ selectedSpot: DEFAULT_COMPRENSORI[0] });
+    const controller = new ForecastViewController({ store: mockStore });
+    const html = controller.renderHtml();
+
+    // Verify mode toggle bar
+    assert.ok(html.includes('gm-forecast-mode-bar'), 'Must render mode toggle bar');
+    assert.ok(html.includes('data-mode="cards"'), 'Must provide Schede mode button');
+    assert.ok(html.includes('data-mode="charts"'), 'Must provide Solo Grafici button');
+
+    // Verify all 7 parameter cards
+    assert.ok(html.includes('id="param-card-vento-decollo"'), 'Must render Vento in Decollo card');
+    assert.ok(html.includes('id="param-card-raffiche"'), 'Must render Raffiche & Delta Vento card');
+    assert.ok(html.includes('id="param-card-base-cumulo"'), 'Must render Base Cumulo (LCL) card');
+    assert.ok(html.includes('id="param-card-instabilita"'), 'Must render Instabilità / Temporali (CAPE) card');
+    assert.ok(html.includes('id="param-card-turbolenza"'), 'Must render Turbolenza in Termica (EDR) card');
+    assert.ok(html.includes('id="param-card-copertura"'), 'Must render Copertura Nuvolosa & Insolazione card');
+    assert.ok(html.includes('id="param-card-atterraggio"'), 'Must render Condizioni in Atterraggio card');
+
+    // Verify 4-state indicator dots and badges
+    assert.ok(html.includes('gm-param-status-dot'), 'Must render status dots');
+    assert.ok(html.includes('gm-param-status-badge'), 'Must render status badges');
+  });
+
+  it('should render analytical details, pilot advice and trend chart inside expanded parameter card', () => {
+    const mockStore = createStore({ selectedSpot: DEFAULT_COMPRENSORI[0] });
+    const controller = new ForecastViewController({ store: mockStore });
+    controller.expandedCardId = 'vento-decollo';
+    const html = controller.renderHtml();
+
+    assert.ok(html.includes('id="param-body-vento-decollo"'), 'Must render expanded card body');
+    assert.ok(html.includes('gm-param-details-grid'), 'Must render analytical details grid');
+    assert.ok(html.includes('gm-param-advice-box'), 'Must render pilot operational advice box');
+    assert.ok(html.includes('Consiglio Pilota:'), 'Must display pilot advice header');
+    assert.ok(html.includes('forecast-wind-chart-box'), 'Must render trend chart inside expanded wind card');
+  });
+
+  it('should toggle expandedCardId and accordion body on toggle-param-card action', () => {
+    const mockStore = createStore({ selectedSpot: DEFAULT_COMPRENSORI[0] });
+    const controller = new ForecastViewController({ store: mockStore });
+
+    assert.equal(controller.expandedCardId, 'vento-decollo');
+
+    // Simulate clicking raffiche card header
+    const mockActionEl = {
+      getAttribute(attr) {
+        if (attr === 'data-action') return 'toggle-param-card';
+        if (attr === 'data-card-id') return 'raffiche';
+        return null;
+      },
+      closest(sel) {
+        return sel === '[data-action]' ? this : null;
+      }
+    };
+    controller.handleClick({ target: mockActionEl });
+    assert.equal(controller.expandedCardId, 'raffiche', 'Must toggle expandedCardId to raffiche');
+
+    // Click same card again -> collapses
+    controller.handleClick({ target: mockActionEl });
+    assert.equal(controller.expandedCardId, null, 'Clicking active card again must collapse accordion');
+  });
+
+  it('should switch between Schede and Solo Grafici mode and render multi-trend charts stack', () => {
+    const mockStore = createStore({ selectedSpot: DEFAULT_COMPRENSORI[0] });
+    const controller = new ForecastViewController({ store: mockStore });
+
+    assert.equal(controller.forecastMode, 'cards');
+
+    // Toggle to charts mode
+    const mockActionEl = {
+      getAttribute(attr) {
+        if (attr === 'data-action') return 'set-forecast-mode';
+        if (attr === 'data-mode') return 'charts';
+        return null;
+      },
+      closest(sel) {
+        return sel === '[data-action]' ? this : null;
+      }
+    };
+    controller.handleClick({ target: mockActionEl });
+    assert.equal(controller.forecastMode, 'charts', 'Must switch to charts mode');
+
+    const html = controller.renderHtml();
+    assert.ok(html.includes('gm-multi-charts-container'), 'Must render multi-charts container in Solo Grafici mode');
+    assert.ok(html.includes('id="multi-chart-wind"'), 'Must render wind trend card');
+    assert.ok(html.includes('id="multi-chart-sounding"'), 'Must render sounding trend card');
+    assert.ok(html.includes('id="multi-chart-cape"'), 'Must render CAPE trend card');
+    assert.ok(html.includes('id="multi-chart-turbulence"'), 'Must render turbulence trend card');
+    assert.ok(html.includes('id="multi-chart-cloudcover"'), 'Must render cloud cover trend card');
+    assert.ok(html.includes('id="multi-chart-landing"'), 'Must render landing trend card');
+  });
+
+  it('should update #forecast-params-container in place when setHour is called', () => {
+    const mockStore = createStore({ selectedSpot: DEFAULT_COMPRENSORI[0] });
+    const controller = new ForecastViewController({ store: mockStore });
+
+    let paramsHtml = '';
+    const mockSpotCard = { innerHTML: '' };
+    const mockParamsContainer = {
+      set innerHTML(val) { paramsHtml = val; },
+      get innerHTML() { return paramsHtml; }
+    };
+
+    const mockContainer = {
+      innerHTML: '',
+      addEventListener() {},
+      removeEventListener() {},
+      querySelector(sel) {
+        if (sel === '#forecast-spot-card-container') return mockSpotCard;
+        if (sel === '#forecast-params-container') return mockParamsContainer;
+        if (sel === '#forecast-timeline-strip') return null;
+        if (sel === '#forecast-wind-panel-container') return null;
+        if (sel === '#forecast-sounding-panel-container') return null;
+        return null;
+      }
+    };
+
+    controller.mount(mockContainer);
+    controller.setHour(16);
+
+    assert.equal(controller.selectedHour, 16);
+    assert.ok(paramsHtml.includes('param-card-vento-decollo'), 'Must update params container with parameter cards on hour change');
+
+    controller.unmount();
+  });
 });
 
