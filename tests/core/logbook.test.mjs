@@ -5,7 +5,9 @@ import {
   createFlightLogEntry,
   deduceFlightActivitiesFromTrack,
   DEFAULT_SEED_FLIGHTS,
-  FLIGHT_TYPES
+  FLIGHT_TYPES,
+  PILOT_CURRENCY_STATUS,
+  PILOT_CURRENCY_LABELS
 } from '../../core/logbook.js';
 
 describe('GlideMind Flight Logbook & Pilot Currency Analytics (Headless Core)', () => {
@@ -32,7 +34,9 @@ describe('GlideMind Flight Logbook & Pilot Currency Analytics (Headless Core)', 
     assert.equal(metrics.exerciseSessions, 1);
     assert.equal(metrics.totalSessions, 3);
     assert.equal(metrics.isCurrent, true);
-    assert.equal(metrics.currencyLabel, 'Attivo');
+    assert.equal(metrics.currencyStatus, 'active');
+    assert.equal(metrics.currencyLabel, 'In attività');
+    assert.equal(metrics.daysSinceLastFlight, 5);
   });
 
   it('should calculate accurate metrics for 365-day rolling window', () => {
@@ -56,7 +60,7 @@ describe('GlideMind Flight Logbook & Pilot Currency Analytics (Headless Core)', 
     assert.equal(metrics.isCurrent, true);
   });
 
-  it('should detect lapsed currency when no recent flights exist within 30 days', () => {
+  it('should detect reentry currency when flights exist within 36-90 days', () => {
     const oldFlights = [
       {
         id: 'old-1',
@@ -78,10 +82,37 @@ describe('GlideMind Flight Logbook & Pilot Currency Analytics (Headless Core)', 
     assert.equal(metrics.totalHours, 0);
     assert.equal(metrics.thermalSessions, 0);
     assert.equal(metrics.isCurrent, false);
-    assert.equal(metrics.currencyLabel, 'Da rinnovare');
+    assert.equal(metrics.currencyStatus, 'reentry');
+    assert.equal(metrics.currencyLabel, 'Ripresa graduale');
+    assert.equal(metrics.daysSinceLastFlight, 68);
   });
 
-  it('should handle empty or null flight arrays gracefully', () => {
+  it('should detect lapsed currency when flights are older than 90 days', () => {
+    const lapsedFlights = [
+      {
+        id: 'lapsed-1',
+        date: '2026-05-01',
+        site: 'Bassano del Grappa',
+        durationMinutes: 45,
+        hasThermals: true,
+        hasExercises: false
+      }
+    ];
+
+    const metrics = calculatePilotPeriodMetrics({
+      flights: lapsedFlights,
+      period: 'month',
+      referenceDate: refDate
+    });
+
+    assert.equal(metrics.totalMinutes, 0);
+    assert.equal(metrics.isCurrent, false);
+    assert.equal(metrics.currencyStatus, 'lapsed');
+    assert.equal(metrics.currencyLabel, 'Fermo prolungato');
+    assert.ok(metrics.daysSinceLastFlight > 90);
+  });
+
+  it('should handle empty or null flight arrays gracefully with no_flights currency', () => {
     const metrics = calculatePilotPeriodMetrics({
       flights: null,
       period: 'month',
@@ -93,6 +124,9 @@ describe('GlideMind Flight Logbook & Pilot Currency Analytics (Headless Core)', 
     assert.equal(metrics.thermalSessions, 0);
     assert.equal(metrics.exerciseSessions, 0);
     assert.equal(metrics.isCurrent, false);
+    assert.equal(metrics.currencyStatus, 'no_flights');
+    assert.equal(metrics.currencyLabel, 'Nessun volo');
+    assert.equal(metrics.daysSinceLastFlight, null);
     assert.equal(metrics.lastFlight, null);
   });
 

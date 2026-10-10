@@ -21,6 +21,20 @@ export const FLIGHT_TYPE_LABELS = Object.freeze({
   glide: 'Planata / Discesa'
 });
 
+export const PILOT_CURRENCY_STATUS = Object.freeze({
+  NO_FLIGHTS: 'no_flights',
+  ACTIVE: 'active',
+  REENTRY: 'reentry',
+  LAPSED: 'lapsed'
+});
+
+export const PILOT_CURRENCY_LABELS = Object.freeze({
+  no_flights: 'Nessun volo',
+  active: 'In attività',
+  reentry: 'Ripresa graduale',
+  lapsed: 'Fermo prolungato'
+});
+
 /**
  * Default realistic seed flights for pilot profiles.
  * Reflects real paragliding where a single flight can feature BOTH thermals AND exercises!
@@ -227,9 +241,39 @@ export function calculatePilotPeriodMetrics(options = {}) {
     }
   }
 
-  // Currency rule: Pilot is considered 'current' (active) if a flight occurred in the last 30 days
-  const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
-  const isCurrent = latestFlightTime >= (refTime - thirtyDaysMs);
+  // Flight Continuity & Currency:
+  // Categorizes flight recency into 4 operational tiers based on days since last flight:
+  // 1. NO_FLIGHTS: No flights in logbook -> 'Nessun volo' (Neutral)
+  // 2. ACTIVE: Last flight within 35 days -> 'In attività' (Flyable/Green)
+  // 3. REENTRY: Last flight between 36 and 90 days -> 'Ripresa graduale' (Caution/Amber)
+  // 4. LAPSED: Last flight older than 90 days -> 'Fermo prolungato' (Alert/Orange)
+  let daysSinceLastFlight = null;
+  let currencyStatus = PILOT_CURRENCY_STATUS.NO_FLIGHTS;
+  let currencyLabel = PILOT_CURRENCY_LABELS.no_flights;
+  let currencyDescription = 'Nessun volo registrato nel libretto. Registra il primo volo o carica un file IGC.';
+  let isCurrent = false;
+
+  if (latestFlight !== null && isFinite(latestFlightTime)) {
+    daysSinceLastFlight = Math.max(0, Math.floor((refTime - latestFlightTime) / (24 * 60 * 60 * 1000)));
+
+    if (daysSinceLastFlight <= 35) {
+      currencyStatus = PILOT_CURRENCY_STATUS.ACTIVE;
+      currencyLabel = PILOT_CURRENCY_LABELS.active;
+      isCurrent = true;
+      const daysText = daysSinceLastFlight === 0 ? 'oggi' : `${daysSinceLastFlight} ${daysSinceLastFlight === 1 ? 'giorno' : 'giorni'} fa`;
+      currencyDescription = `Ultimo volo effettuato ${daysText}. Continuità di volo ottimale.`;
+    } else if (daysSinceLastFlight <= 90) {
+      currencyStatus = PILOT_CURRENCY_STATUS.REENTRY;
+      currencyLabel = PILOT_CURRENCY_LABELS.reentry;
+      isCurrent = false;
+      currencyDescription = `Ultimo volo effettuato ${daysSinceLastFlight} giorni fa. Consigliata ripresa con condizioni tranquille.`;
+    } else {
+      currencyStatus = PILOT_CURRENCY_STATUS.LAPSED;
+      currencyLabel = PILOT_CURRENCY_LABELS.lapsed;
+      isCurrent = false;
+      currencyDescription = `Ultimo volo effettuato ${daysSinceLastFlight} giorni fa. Consigliata cautela, campetto di gonfiaggio o volo di ripresa.`;
+    }
+  }
 
   const totalHours = Number((totalMinutes / 60).toFixed(1));
   const formattedHours = totalHours >= 10 ? `${Math.round(totalHours)} h` : `${totalHours} h`;
@@ -244,9 +288,11 @@ export function calculatePilotPeriodMetrics(options = {}) {
     exerciseSessions,
     totalSessions: matchingFlightsCount,
     lastFlight: latestFlight,
+    daysSinceLastFlight,
     isCurrent,
-    currencyStatus: isCurrent ? 'active' : 'lapsed',
-    currencyLabel: isCurrent ? 'Attivo' : 'Da rinnovare'
+    currencyStatus,
+    currencyLabel,
+    currencyDescription
   };
 }
 

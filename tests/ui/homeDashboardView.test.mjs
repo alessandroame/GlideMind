@@ -439,6 +439,54 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     assert.ok(html.includes('EN-A'), 'Default glider class badge must be EN-A');
   });
 
+  it('should render 4-tier pilot continuity badges with explainability tooltips', () => {
+    const mockStore = createStore();
+    const controller = new HomeDashboardViewController({ store: mockStore });
+
+    // 1. Empty flights -> 'Nessun volo' with gm-badge-nd
+    mockStore.setState({ flights: [] });
+    let html = controller.renderHtml();
+    assert.ok(html.includes('gm-badge gm-badge-nd'));
+    assert.ok(html.includes('Nessun volo'));
+    assert.ok(html.includes('Nessun volo registrato nel libretto'));
+
+    // 2. Recent flight -> 'In attività' with gm-badge-flyable
+    mockStore.setState({
+      activeDate: '2026-10-10',
+      flights: [
+        { id: 'f-1', date: '2026-10-05', durationMinutes: 60 }
+      ]
+    });
+    html = controller.renderHtml();
+    assert.ok(html.includes('gm-badge gm-badge-flyable'));
+    assert.ok(html.includes('In attività'));
+    assert.ok(html.includes('Continuità di volo ottimale'));
+
+    // 3. Reentry (36-90 days) -> 'Ripresa graduale' with gm-badge-caution
+    mockStore.setState({
+      activeDate: '2026-10-10',
+      flights: [
+        { id: 'f-2', date: '2026-08-20', durationMinutes: 45 }
+      ]
+    });
+    html = controller.renderHtml();
+    assert.ok(html.includes('gm-badge gm-badge-caution'));
+    assert.ok(html.includes('Ripresa graduale'));
+    assert.ok(html.includes('Consigliata ripresa con condizioni tranquille'));
+
+    // 4. Lapsed (>90 days) -> 'Fermo prolungato' with gm-badge-alert
+    mockStore.setState({
+      activeDate: '2026-10-10',
+      flights: [
+        { id: 'f-3', date: '2026-05-10', durationMinutes: 45 }
+      ]
+    });
+    html = controller.renderHtml();
+    assert.ok(html.includes('gm-badge gm-badge-alert'));
+    assert.ok(html.includes('Fermo prolungato'));
+    assert.ok(html.includes('Consigliata cautela, campetto di gonfiaggio'));
+  });
+
   it('should open glider selection sheet and display all 4 certification classes (EN-A to EN-D)', async () => {
     const { initSheetManager } = await import('../../ui/sheetManager.js');
     let capturedHtml = '';

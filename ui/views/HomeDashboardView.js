@@ -1001,7 +1001,16 @@ export class HomeDashboardViewController {
     const activeGlider = state.activeGlider || state.glider || DEFAULT_GLIDER;
 
     const isMonth = this.pilotPeriod === 'month';
-    const badgeClass = metrics.isCurrent ? 'gm-badge-flyable' : 'gm-badge-caution';
+    let badgeClass = 'gm-badge-nd';
+    if (metrics.currencyStatus === 'active') {
+      badgeClass = 'gm-badge-flyable';
+    } else if (metrics.currencyStatus === 'reentry') {
+      badgeClass = 'gm-badge-caution';
+    } else if (metrics.currencyStatus === 'lapsed') {
+      badgeClass = 'gm-badge-alert';
+    } else {
+      badgeClass = 'gm-badge-nd';
+    }
 
     return `
       <div class="gm-pilot-card">
@@ -1009,8 +1018,8 @@ export class HomeDashboardViewController {
         <div class="gm-pilot-header">
           <div class="gm-pilot-title-group">
             <span class="gm-pilot-title">Attività Pilota</span>
-            <span class="gm-badge ${badgeClass}" style="padding: 1px 6px; font-size: 0.68rem;">
-              ${metrics.currencyLabel}
+            <span class="gm-badge ${badgeClass}" title="${escapeHtml(metrics.currencyDescription || metrics.currencyLabel)}" style="padding: 1px 6px; font-size: 0.68rem;">
+              ${escapeHtml(metrics.currencyLabel)}
             </span>
           </div>
 

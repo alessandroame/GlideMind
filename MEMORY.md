@@ -1202,3 +1202,48 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
      - Nel metodo generale `render({ resetScroll = false } = {})`, rilevare `prevScrollTop` prima di riassegnare `innerHTML`.
      - Dopo `setupScrollListener()`, ripristinare `scrollTop = prevScrollTop` se `prevScrollTop > 0` e non è stato richiesto un reset esplicito.
      - L'azzeramento dello scorrimento (`resetScroll: true`) è riservato esclusivamente a transizioni di cambio radicale del contesto (es. selezione di un comprensorio differente dallo sheet).
+
+
+---
+
+## 99. Separazione Computazionale tra Scheda di Dettaglio Telemetrico (0ms GPU) e Replay 3D della Traiettoria
+- **Problema**: Accorpare l'analisi telemetrica analitica (elenco termiche agganciate, rateo medio di salita, quote ingresso/uscita, deriva del vento, note personali e debriefing didattico) esclusivamente all'interno del motore di Replay 3D costringe il dispositivo mobile ad avviare un pesante contesto grafico WebGL/GPU anche solo per consultare dati numerici o prendere appunti, provocando latenze (>1-3s), battery drain e impossibilità di consultazione fluida su smartphone non recenti.
+- **Causa Radice**: Confusione tra consultazione statica/analitica post-volo (ispezione tabellare e debriefing) e rendering spaziale continuo ad alta frequenza (Replay 3D a 60 FPS).
+- **Pattern Vincolante**:
+  1. **Disaccoppiamento della Scheda Dettaglio (`FlightDetailSheet.js`)**: Realizzare la scheda analitica come Bottom Sheet a piena altezza (`100dvh`) montata tramite `sheetManager`. I dati telemetrici analitici (`analyzeFlightTelemetry`) vengono recuperati dal database a due livelli e renderizzati istantaneamente a 0ms GPU con grafici SVG leggeri e tabelle HTML sobrie.
+  2. **Persistenza Note in Background**: Le annotazioni personali del pilota vengono aggiornate e salvate direttamente nel record `flights_meta` su IndexedDB senza ricaricare la pagina o distruggere il DOM dello sheet.
+  3. **Ponte Ergonomico Verso il Replay 3D**: La scheda di dettaglio funge da trampolino verso il Replay 3D: il pulsante primario imposta `store.activeReplayFlightId` e naviga verso `#replay`, permettendo all'utente di passare al 3D solo su esplicita richiesta.
+
+---
+
+## 100. Ingestione Schemi Eterogenei ParaMeteo (V1/V2/Array) e Strategia Smart Merge Last-Write-Wins
+- **Problema**: L'importazione di backup storici da ParaMeteo (generati come Full Backup Package V2, vecchi export Logbook V1 o semplici array JSON di voli) presenta strutture disomogenee: tracce memorizzate in store dedicati `flightTracks` o incorporate in `flight.trackPoints`/`flight.track`, formati di data ISO o stringhe timestamp, e campi vela strutturati come `{ glider: '...' }` anziché `{ name: '...' }`. Inoltre, re-importare un backup identico non deve duplicare o sovrascrivere inutilmente i voli esistenti, ma deve consentire l'arricchimento incrementale (es. aggiungere la traccia GPS a un volo precedentemente registrato solo con metadati).
+- **Causa Radice**: Evoluzione dello schema di persistenza tra versioni applicative e disallineamento tra il formato di backup monolitico e l'architettura a 2 livelli (`flights_meta` + `flights_raw`) di GlideMind.
+- **Pattern Vincolante**:
+  1. **Parsing Polimorfico Deterministico (`core/parameteoImporter.js`)**: Riconoscere i 3 formati (V2 con `database`, V1 con `flights` e array grezzo), riconciliando le tracce in una mappa unificata `tracksMap` indicizzata per `flightId`.
+  2. **Normalizzazione verso Storage a 2 Livelli**: Generare sempre `{ meta, raw }`, derivando la classe vela da `gliderName` normalizzato (evitando fallimenti su oggetti `{ glider: '...' }`), generando sparkline SVG a 60 punti e decimazione LTTB a 1.500 punti per il Replay 3D.
+  3. **Smart Merge Last-Write-Wins**: In modalità `merge` (default), un volo esistente viene aggiornato se e solo se l'elemento in arrivo ha un timestamp `updatedAt` strettamente maggiore (`incomingUpdated > existingUpdated`) oppure se l'elemento in arrivo fornisce una traccia GPS che nel database locale era assente (`!existingHasTrack && incomingHasTrack`). Altrimenti, il record identico viene ignorato senza scritture ridondanti.
+  4. **Dropzone Polimorfa & Banner Informativo**: Estendere il file input e il drag & drop a `.igc,.json,application/json`, identificando il tipo dal contenuto o dall'estensione, con avanzamento deterministico e banner di riepilogo (`gm-import-summary-banner`).
+
+---
+
+## 101. Standard di Presentazione dei Report di Fine Task (Contenitori Collassati e Ultimo Aperto)
+- **Problema**: I report finali dettagliati inviati in chat possono risultare prolissi da scorrere se l'utente vuole verificare immediatamente le modifiche operative e le istruzioni di test senza dover scorrere decine di righe di specifiche architetturali e log di test.
+- **Causa Radice**: Assenza di una gerarchia di disclosure progressiva nella sintesi di consegna in chat.
+- **Pattern Vincolante**: Nei report finali di consegna, strutturare le sezioni analitiche (Architettura, Dettagli Tecnici, Evidenze Gate Shift-Left, File Modificati) all'interno di contenitori collassati (`<details><summary>...</summary>`), lasciando categoricamente aperto **solo ed esclusivamente l'ultimo contenitore** (`<details open><summary>Lavori Effettuati e Istruzioni di Test</summary>`), che riassume in modo operativo i lavori svolti e le modalità puntuali per collaudarli.
+
+---
+
+## 102. Disaccoppiamento tra Continuità di Volo Recente (Pilot Currency) e Scadenze Legali/Burocratiche
+- **Problema**: L'adozione del termine "Da rinnovare" per descrivere un pilota senza voli recenti o con libretto vuoto generava grave disorientamento ed errata percezione di scadenza burocratica (es. visita medica VDS, attestato AeCI, assicurazione). Inoltre, un modello binario a scatto di 30 giorni non riflette la realtà del volo libero, dove la continuità operativa si degrada gradualmente.
+- **Causa Radice**: Traduzione acritica del concetto anglosassone di *pilot currency* (recency di volo) e assenza di distinzione tra adempimenti legali e allenamento pratico ai comandi.
+- **Pattern Vincolante**:
+  1. **Separazione Documenti vs Allenamento**: Le scadenze burocratiche e legali (visita medica, assicurazione) appartengono esclusivamente al Profilo/Impostazioni (`SettingsView`). Il blocco Home Dashboard "Attività Pilota" misura unicamente la **continuità di volo operativa**.
+  2. **Modello a 4 Stati di Continuità (`core/logbook.js`)**:
+     - `no_flights`: libretto vuoto (`0 ore`, `0 voli`) -> `'Nessun volo'`, badge grigio neutro (`gm-badge-nd`).
+     - `active`: ultimo volo $\le 35\text{ gg}$ -> `'In attività'`, badge verde (`gm-badge-flyable`), continuità ottimale.
+     - `reentry`: ultimo volo tra 36 e 90 gg -> `'Ripresa graduale'`, badge ambra (`gm-badge-caution`), raccomandata ripresa con condizioni tranquille.
+     - `lapsed`: ultimo volo $> 90\text{ gg}$ -> `'Fermo prolungato'`, badge arancione (`gm-badge-alert`), raccomandata cautela, campetto di gonfiaggio o volo di ripresa.
+  3. **Explainability Diretta sul Badge**: Il badge include sempre un attributo `title` con il numero esatto di giorni trascorsi dall'ultimo volo e un suggerimento pratico di sicurezza per orientare il pilota.
+
+
