@@ -567,6 +567,70 @@ button, input, select, textarea {
   border: 1px dashed var(--gm-border);
 }
 
+/* Outdoor HMI Solid Pill Badges for Spot Headers (WCAG AA Sunlight Contrast >= 4.5:1) */
+.gm-spot-header .gm-badge {
+  font-weight: 800;
+  border-radius: var(--gm-radius-full);
+}
+
+.gm-spot-header .gm-badge-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  min-height: 26px;
+  padding: 0;
+  font-size: 0.82rem;
+  line-height: 1;
+  text-align: center;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.gm-spot-header .gm-badge-flyable {
+  background-color: #15803d;
+  color: #ffffff;
+  border: 1px solid #22c55e;
+}
+
+.gm-spot-header .gm-badge-caution {
+  background-color: #b45309;
+  color: #ffffff;
+  border: 1px solid #f59e0b;
+}
+
+.gm-spot-header .gm-badge-unflyable {
+  background-color: #b91c1c;
+  color: #ffffff;
+  border: 1px solid #ef4444;
+}
+
+.gm-spot-header .gm-badge-severe {
+  background-color: #450a0a;
+  color: #fecaca;
+  border: 1.5px solid #ef4444;
+}
+
+[data-theme="light"] .gm-spot-header .gm-badge-flyable {
+  background-color: #166534;
+  color: #ffffff;
+  border-color: #15803d;
+}
+
+[data-theme="light"] .gm-spot-header .gm-badge-caution {
+  background-color: #92400e;
+  color: #ffffff;
+  border-color: #b45309;
+}
+
+[data-theme="light"] .gm-spot-header .gm-badge-unflyable {
+  background-color: #991b1b;
+  color: #ffffff;
+  border-color: #b91c1c;
+}
+
 .gm-spot-card-unavailable {
   border-color: var(--gm-border);
   opacity: 0.94;
@@ -1300,8 +1364,9 @@ button, input, select, textarea {
 
 .gm-flight-alt {
   font-family: var(--gm-font-mono);
-  font-size: 0.72rem;
-  color: var(--gm-text-muted);
+  font-size: 0.78rem;
+  color: var(--gm-text-secondary);
+  font-weight: 500;
   flex-shrink: 0;
 }
 
@@ -1356,13 +1421,15 @@ button, input, select, textarea {
   }
 }
 
-/* Severity 0: Green (Flyable / Optimal) */
+/* Severity 0: Green (Flyable / Optimal) - De-emphasized to eliminate Christmas Tree noise */
 .gm-ind-flyable .gm-ind-dot {
-  background-color: var(--gm-status-flyable);
-  box-shadow: 0 0 5px rgba(34, 197, 94, 0.45);
+  background-color: #10b981;
+  box-shadow: none;
 }
-.gm-ind-flyable .gm-ind-label {
-  color: var(--gm-status-flyable);
+.gm-ind-flyable .gm-ind-label,
+.gm-ind-flyable span {
+  color: var(--gm-text-secondary);
+  font-weight: 500;
 }
 
 /* Severity 1: Yellow (Caution / Marginal) */
@@ -1515,6 +1582,61 @@ button, input, select, textarea {
   color: var(--gm-text-primary);
   background-color: var(--gm-bg-hover);
   outline: none;
+}
+
+/* Quick Flyability Filter Chips (Hick's Law & Baymard Facet Filtering) */
+.gm-filter-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.gm-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 4px 12px;
+  background-color: var(--gm-bg-elevated);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-full);
+  color: var(--gm-text-secondary);
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--gm-transition-fast), border-color var(--gm-transition-fast), color var(--gm-transition-fast);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.gm-filter-chip:hover {
+  background-color: var(--gm-bg-hover);
+  border-color: var(--gm-border-strong);
+  color: var(--gm-text-primary);
+}
+
+.gm-filter-chip.active {
+  background-color: var(--gm-accent);
+  border-color: var(--gm-accent);
+  color: var(--gm-text-inverse);
+  font-weight: 700;
+}
+
+.gm-filter-chip:focus-visible {
+  outline: 2px solid var(--gm-accent);
+  outline-offset: 2px;
+}
+
+[data-theme="light"] .gm-filter-chip {
+  background-color: var(--gm-bg-surface);
+  border-color: var(--gm-border);
+  color: var(--gm-text-secondary);
+}
+
+[data-theme="light"] .gm-filter-chip.active {
+  background-color: var(--gm-accent);
+  color: #ffffff;
 }
 
 /* Pilot Activity Currency Strip: compact, non-invasive fallback */
@@ -3844,5 +3966,649 @@ input.gm-input:focus {
   }
 }
 
+/* ==========================================================================
+   ForecastView Parameter Cards, Accordion & Multi-Chart Trends
+   ========================================================================== */
+.gm-forecast-mode-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 4px 2px;
+}
 
+.gm-param-card {
+  width: 100%;
+  background-color: var(--gm-bg-card);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-md);
+  margin-bottom: 8px;
+  overflow: hidden;
+  transition: border-color var(--gm-transition-fast), box-shadow var(--gm-transition-fast);
+}
+
+.gm-param-card:hover {
+  border-color: var(--gm-border-strong);
+}
+
+.gm-param-card.expanded {
+  border-color: var(--gm-accent);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+}
+
+.gm-param-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: var(--gm-touch-min, 48px);
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: pan-y;
+  box-sizing: border-box;
+}
+
+.gm-param-header:focus-visible {
+  outline: 2px solid var(--gm-accent);
+  outline-offset: -2px;
+}
+
+.gm-param-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.gm-param-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.gm-param-status-dot.flyable {
+  background-color: var(--gm-status-flyable);
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.4);
+}
+
+.gm-param-status-dot.caution {
+  background-color: var(--gm-status-caution);
+  box-shadow: 0 0 6px rgba(234, 179, 8, 0.4);
+}
+
+.gm-param-status-dot.unflyable {
+  background-color: var(--gm-status-unflyable);
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.4);
+}
+
+.gm-param-status-dot.severe {
+  background-color: var(--gm-status-severe);
+  box-shadow: 0 0 6px rgba(153, 27, 27, 0.6);
+}
+
+.gm-param-title-wrap {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.gm-param-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.gm-param-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--gm-text-primary);
+}
+
+.gm-param-status-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--gm-radius-full);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.gm-param-status-badge.flyable {
+  background-color: rgba(34, 197, 94, 0.15);
+  color: var(--gm-status-flyable);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.gm-param-status-badge.caution {
+  background-color: rgba(234, 179, 8, 0.15);
+  color: var(--gm-status-caution);
+  border: 1px solid rgba(234, 179, 8, 0.3);
+}
+
+.gm-param-status-badge.unflyable {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: var(--gm-status-unflyable);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.gm-param-status-badge.severe {
+  background-color: rgba(153, 27, 27, 0.3);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.gm-param-sub-row {
+  font-size: 0.76rem;
+  color: var(--gm-text-secondary);
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+.gm-param-chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gm-text-muted);
+  transition: transform var(--gm-transition-fast);
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+}
+
+.gm-param-chevron.rotate-180 {
+  transform: rotate(180deg);
+}
+
+.gm-param-body {
+  padding: 12px 14px 14px;
+  border-top: 1px solid var(--gm-border);
+  background-color: var(--gm-bg-surface);
+}
+
+.gm-param-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.gm-param-detail-cell {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--gm-bg-card);
+  padding: 8px 10px;
+  border-radius: var(--gm-radius-sm);
+  border: 1px solid var(--gm-border);
+  min-width: 0;
+}
+
+.gm-param-detail-label {
+  font-size: 0.70rem;
+  color: var(--gm-text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.gm-param-detail-value {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--gm-text-primary);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gm-param-advice-box {
+  background-color: var(--gm-bg-card);
+  border-left: 3px solid var(--gm-accent);
+  padding: 10px 12px;
+  border-radius: 0 var(--gm-radius-sm) var(--gm-radius-sm) 0;
+  border-top: 1px solid var(--gm-border);
+  border-right: 1px solid var(--gm-border);
+  border-bottom: 1px solid var(--gm-border);
+}
+
+.gm-param-advice-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--gm-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  display: block;
+}
+
+.gm-param-advice-text {
+  font-size: 0.80rem;
+  color: var(--gm-text-secondary);
+  line-height: 1.45;
+  margin-top: 3px;
+}
+
+.gm-param-chart-wrap {
+  width: 100%;
+}
+
+.gm-multi-charts-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.gm-trend-card {
+  width: 100%;
+  background-color: var(--gm-bg-card);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-md);
+  padding: 12px;
+  box-sizing: border-box;
+}
+
+.gm-trend-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.gm-trend-card-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--gm-text-primary);
+}
+
+.gm-trend-card-val {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--gm-accent);
+  background-color: var(--gm-bg-elevated);
+  padding: 2px 8px;
+  border-radius: var(--gm-radius-full);
+  border: 1px solid var(--gm-border);
+}
+
+/* Sunlight Light Mode Theme Overrides */
+[data-theme="light"] .gm-param-card.expanded {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .gm-param-status-badge.flyable {
+  background-color: #dcfce7;
+  color: #15803d;
+  border-color: #86efac;
+}
+
+[data-theme="light"] .gm-param-status-badge.caution {
+  background-color: #fef3c7;
+  color: #92400e;
+  border-color: #fde68a;
+}
+
+[data-theme="light"] .gm-param-status-badge.unflyable {
+  background-color: #fee2e2;
+  color: #991b1b;
+  border-color: #fca5a5;
+}
+
+[data-theme="light"] .gm-param-status-badge.severe {
+  background-color: #fee2e2;
+  color: #7f1d1d;
+  border-color: #ef4444;
+}
+
+/* ==========================================================================
+   GlideMind Phase 5: Spot Map View & Aeronautical Overlays
+   Outdoor Sunlight Resilient, Touch-Action Pan-X, Thumb-Zone Docked Scrubber
+   ========================================================================== */
+
+.gm-map-view {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.gm-map-canvas-container {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  background-color: var(--gm-bg-base);
+}
+
+/* Top Floating Action Bar (Non-blocking layout) */
+.gm-map-top-bar {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  left: 12px;
+  right: 12px;
+  z-index: 500;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gm-map-controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  pointer-events: none;
+}
+
+.gm-map-group-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.gm-map-group-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.gm-map-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--gm-touch-min, 48px);
+  padding: 6px 14px;
+  background: var(--gm-bg-card);
+  color: var(--gm-text-primary);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-full);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: var(--gm-shadow-sm);
+  transition: background-color var(--gm-transition-fast), border-color var(--gm-transition-fast);
+}
+
+.gm-map-pill-btn:hover {
+  background: var(--gm-bg-elevated);
+  border-color: var(--gm-border-focus);
+}
+
+.gm-map-top-spot-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--gm-touch-min, 48px);
+  padding: 6px 14px;
+  background: var(--gm-bg-elevated);
+  color: var(--gm-text-primary);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  border-radius: var(--gm-radius-full);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--gm-shadow-md);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  pointer-events: auto;
+  transition: transform var(--gm-transition-fast), border-color var(--gm-transition-fast);
+}
+
+.gm-map-top-spot-btn:hover {
+  transform: translateY(-1px);
+  border-color: var(--gm-accent);
+}
+
+.gm-top-spot-dot {
+  font-size: 0.85rem;
+  color: var(--gm-accent);
+  line-height: 1;
+}
+
+.gm-top-spot-title {
+  font-weight: 700;
+  color: var(--gm-text-primary);
+}
+
+.gm-top-spot-focus {
+  font-size: 0.85rem;
+  color: var(--gm-text-muted);
+}
+
+/* Bottom Docked Scrubber with >=24px thumb-zone clearance */
+.gm-map-scrubber-container {
+  position: absolute;
+  bottom: calc(var(--gm-nav-height, 64px) + 24px);
+  left: 12px;
+  right: 12px;
+  z-index: 500;
+  pointer-events: none;
+}
+
+.gm-map-scrubber-inner {
+  pointer-events: auto;
+  background: var(--gm-bg-card);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-md);
+  padding: 8px 10px;
+  box-shadow: var(--gm-shadow-md);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  touch-action: pan-x;
+}
+
+.gm-map-scrubber-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--gm-text-secondary);
+}
+
+.gm-map-scrubber-slots {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 4px;
+  width: 100%;
+}
+
+.gm-map-hour-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-height: var(--gm-touch-min, 48px);
+  padding: 4px 2px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--gm-radius-sm);
+  color: var(--gm-text-secondary);
+  font-size: 0.74rem;
+  font-family: var(--gm-font-mono);
+  cursor: pointer;
+  user-select: none;
+  transition: background-color var(--gm-transition-fast), border-color var(--gm-transition-fast);
+}
+
+.gm-map-hour-slot.active {
+  background: var(--gm-bg-elevated);
+  border-color: var(--gm-accent);
+  color: var(--gm-text-primary);
+  font-weight: 700;
+}
+
+.gm-map-hour-slot .gm-hour-fly-bar {
+  width: 100%;
+  height: 4px;
+  border-radius: var(--gm-radius-full);
+  background: var(--gm-border);
+}
+
+/* DivIcon Overlay Elements */
+.gm-map-div-icon {
+  background: transparent;
+  border: none;
+}
+
+.gm-map-dot-marker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: var(--gm-radius-full);
+  background: var(--gm-bg-card);
+  border: 1px solid var(--gm-border);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--gm-text-primary);
+  white-space: nowrap;
+  user-select: none;
+  cursor: pointer;
+}
+
+.gm-map-dot-glyph {
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.gm-map-dot-marker.gm-status-flyable .gm-map-dot-glyph { color: #22c55e; }
+.gm-map-dot-marker.gm-status-caution .gm-map-dot-glyph { color: #eab308; }
+.gm-map-dot-marker.gm-status-unflyable .gm-map-dot-glyph { color: #ef4444; }
+.gm-map-dot-marker.gm-status-severe .gm-map-dot-glyph { color: #18181b; }
+.gm-map-dot-marker.gm-status-unavailable .gm-map-dot-glyph { color: #64748b; }
+
+.gm-map-aureole-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: var(--gm-radius-full);
+  background: var(--gm-bg-card);
+  border: 1px solid var(--gm-border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--gm-text-primary);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.gm-aureole-alt {
+  font-size: 0.70rem;
+  font-family: var(--gm-font-mono);
+  color: var(--gm-text-muted);
+}
+
+.gm-map-takeoff-marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+}
+
+.gm-takeoff-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: var(--gm-radius-sm);
+  background: var(--gm-bg-card);
+  border: 1px solid var(--gm-border);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--gm-text-primary);
+  box-shadow: var(--gm-shadow-sm);
+}
+
+.gm-takeoff-icon {
+  font-size: 0.75rem;
+  color: var(--gm-accent);
+}
+
+.gm-takeoff-alt {
+  font-family: var(--gm-font-mono);
+  font-size: 0.70rem;
+  color: var(--gm-text-secondary);
+}
+
+.gm-wind-vector-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: var(--gm-radius-xs);
+  background: rgba(0, 0, 0, 0.75);
+  color: #ffffff;
+  font-size: 0.68rem;
+  font-family: var(--gm-font-mono);
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.gm-wind-level {
+  font-size: 0.62rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.gm-map-landing-marker {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: var(--gm-radius-sm);
+  background: var(--gm-bg-card);
+  border: 1px solid rgba(22, 163, 74, 0.4);
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--gm-text-primary);
+  cursor: pointer;
+  box-shadow: var(--gm-shadow-sm);
+}
+
+.gm-landing-icon {
+  font-size: 0.75rem;
+  color: #16a34a;
+}
+
+.gm-landing-alt {
+  font-family: var(--gm-font-mono);
+  font-size: 0.68rem;
+  color: var(--gm-text-secondary);
+}
+
+/* Light Theme Overrides for Map Elements */
+[data-theme="light"] .gm-wind-vector-tag {
+  background: rgba(15, 23, 42, 0.85);
+  color: #ffffff;
+}
+
+[data-theme="light"] .gm-map-pill-btn,
+[data-theme="light"] .gm-map-top-spot-btn,
+[data-theme="light"] .gm-map-scrubber-inner,
+[data-theme="light"] .gm-map-dot-marker,
+[data-theme="light"] .gm-map-aureole-badge,
+[data-theme="light"] .gm-takeoff-badge,
+[data-theme="light"] .gm-map-landing-marker {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
 
