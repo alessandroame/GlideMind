@@ -1261,196 +1261,76 @@ export class ForecastViewController {
 
     return `
       <header class="gm-forecast-header">
-        <!-- Level 1: Comprensorio Bar + Picker Trigger (Full Width, Zero Duplicate Home) -->
+        <!-- Unified Comprensorio & Spot Bar (Level 1 + Level 2 Unified, 48px Touch Target) -->
         <div 
-          class="gm-comprensorio-bar" 
+          class="gm-comprensorio-bar gm-unified-spot-bar" 
           data-action="open-picker-sheet" 
           role="button" 
           tabindex="0" 
-          aria-label="Cambia comprensorio, attualmente ${escapeHtml(currentSpot.name)}"
+          aria-label="Località attiva: ${escapeHtml(currentSpot.name)}, ${escapeHtml(activeSubSpotLabel)}. Tocca per cambiare comprensorio o punto di volo."
+          title="Tocca per cambiare comprensorio o punto di volo"
         >
           <div class="gm-comprensorio-bar-info">
             <span class="gm-comprensorio-pin" aria-hidden="true">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path>
-                <circle cx="12" cy="10" r="3"></circle>
-              </svg>
+              ${activeSubSpotIcon}
             </span>
-            <div class="gm-comprensorio-text">
-              <span class="gm-comprensorio-name">
-                ${escapeHtml(currentSpot.name)} (${escapeHtml(currentSpot.province)})
-              </span>
-              <div class="flex items-center gap-2 mt-0.5">
-                <span class="gm-comprensorio-sub">
-                  Tocca per cambiare comprensorio
+            <div class="gm-comprensorio-text min-w-0">
+              <div class="gm-comprensorio-title-row flex items-center justify-between gap-2">
+                <span class="gm-comprensorio-name truncate">
+                  ${escapeHtml(currentSpot.name)} (${escapeHtml(currentSpot.province)})
                 </span>
                 ${this.renderLiveWeatherBadge()}
               </div>
+              <div class="gm-comprensorio-subspot-row flex items-center gap-1.5 mt-0.5 min-w-0">
+                <span class="gm-unified-subspot-badge truncate" title="${escapeHtml(activeSubSpotLabel)}">
+                  ${escapeHtml(activeSubSpotLabel)}
+                </span>
+                <span class="gm-comprensorio-action-hint text-xs text-[var(--gm-text-muted)] flex-shrink-0">
+                  · Cambia
+                </span>
+              </div>
             </div>
           </div>
-          <span class="gm-comprensorio-chevron" aria-hidden="true">›</span>
+          <span class="gm-comprensorio-chevron flex-shrink-0" aria-hidden="true">›</span>
         </div>
 
-        <!-- Level 2: Sub-Spot Custom Dropdown (Strictly bounded, Zero Multi-color Emoji) -->
-        <div class="gm-subspot-dropdown-wrapper">
-          <label for="forecast-subspot-select" class="sr-only">Seleziona Punto di Volo o Panoramica</label>
-          <select 
-            id="forecast-subspot-select" 
-            class="gm-subspot-select sr-only" 
-            data-action="change-subspot" 
-            aria-label="Seleziona Punto o Panoramica del Comprensorio"
-            tabindex="-1"
-            aria-hidden="true"
-          >
-            <option value="overview" ${this.selectedSubSpot === 'overview' ? 'selected' : ''}>
-              ${activeTakeoff && activeLanding ? `Panoramica (${escapeHtml(activeTakeoff.name)} • ${escapeHtml(activeLanding.name)})` : 'Panoramica (Decollo Primario + Atterraggio)'}
-            </option>
-            ${takeoffs.length > 0 ? `
-              <optgroup label="Decolli">
-                ${takeoffs.map(t => {
-                  const headingPart = t.heading != null && !isNaN(Number(t.heading))
-                    ? ` · ${t.heading}° ${getCardinalDirection(t.heading)}`
-                    : '';
-                  return `
-                    <option value="${t.id}" ${this.selectedSubSpot === t.id ? 'selected' : ''}>
-                      ${escapeHtml(t.name)} (${t.altitude}m${headingPart})
-                    </option>
-                  `;
-                }).join('')}
-              </optgroup>
-            ` : ''}
-            ${landings.length > 0 ? `
-              <optgroup label="Atterraggi">
-                ${landings.map(l => `
-                  <option value="${l.id}" ${this.selectedSubSpot === l.id ? 'selected' : ''}>
-                    ${escapeHtml(l.name)} (${l.altitude}m${l.isOfficial ? ' · Ufficiale' : ''})
+        <!-- Semantic SR-Only Select for Screen Readers and Programmatic Automation -->
+        <label for="forecast-subspot-select" class="sr-only">Seleziona Punto di Volo o Panoramica</label>
+        <select 
+          id="forecast-subspot-select" 
+          class="gm-subspot-select sr-only" 
+          data-action="change-subspot" 
+          aria-label="Seleziona Punto o Panoramica del Comprensorio"
+          tabindex="-1"
+          aria-hidden="true"
+        >
+          <option value="overview" ${this.selectedSubSpot === 'overview' ? 'selected' : ''}>
+            ${activeTakeoff && activeLanding ? `Panoramica (${escapeHtml(activeTakeoff.name)} • ${escapeHtml(activeLanding.name)})` : 'Panoramica (Decollo Primario + Atterraggio)'}
+          </option>
+          ${takeoffs.length > 0 ? `
+            <optgroup label="Decolli">
+              ${takeoffs.map(t => {
+                const headingPart = t.heading != null && !isNaN(Number(t.heading))
+                  ? ` · ${t.heading}° ${getCardinalDirection(t.heading)}`
+                  : '';
+                return `
+                  <option value="${t.id}" ${this.selectedSubSpot === t.id ? 'selected' : ''}>
+                    ${escapeHtml(t.name)} (${t.altitude}m${headingPart})
                   </option>
-                `).join('')}
-              </optgroup>
-            ` : ''}
-          </select>
-
-          <button
-            type="button"
-            class="gm-subspot-trigger ${this.isSubSpotMenuOpen ? 'open' : ''}"
-            data-action="toggle-subspot-menu"
-            aria-expanded="${this.isSubSpotMenuOpen ? 'true' : 'false'}"
-            aria-haspopup="listbox"
-            aria-label="Seleziona punto o panoramica, attualmente ${escapeHtml(activeSubSpotLabel)}"
-          >
-            <div class="gm-subspot-trigger-info">
-              <span class="gm-subspot-trigger-icon" aria-hidden="true">
-                ${activeSubSpotIcon}
-              </span>
-              <span class="gm-subspot-trigger-text">
-                ${escapeHtml(activeSubSpotLabel)}
-              </span>
-            </div>
-            <span class="gm-subspot-trigger-chevron ${this.isSubSpotMenuOpen ? 'rotated' : ''}" aria-hidden="true">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
-            </span>
-          </button>
-
-          ${this.isSubSpotMenuOpen ? `
-            <div class="gm-subspot-popover" role="listbox" aria-label="Opzioni punto di volo">
-              <!-- Item Panoramica -->
-              <button
-                type="button"
-                class="gm-subspot-item ${this.selectedSubSpot === 'overview' ? 'active' : ''}"
-                data-action="select-subspot"
-                data-subspot-id="overview"
-                role="option"
-                aria-selected="${this.selectedSubSpot === 'overview' ? 'true' : 'false'}"
-              >
-                <div class="gm-subspot-item-left">
-                  <span class="gm-subspot-item-icon" aria-hidden="true">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                      <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-                      <polyline points="2 17 12 22 22 17"></polyline>
-                      <polyline points="2 12 12 17 22 12"></polyline>
-                    </svg>
-                  </span>
-                  <span class="gm-subspot-item-name font-semibold">${activeTakeoff && activeLanding ? `Panoramica (${escapeHtml(activeTakeoff.name)} • ${escapeHtml(activeLanding.name)})` : 'Panoramica (Decollo Primario + Atterraggio)'}</span>
-                </div>
-                ${this.selectedSubSpot === 'overview' ? `
-                  <span class="gm-subspot-item-check" aria-hidden="true">✓</span>
-                ` : ''}
-              </button>
-
-              <!-- Gruppo Decolli -->
-              ${takeoffs.length > 0 ? `
-                <div class="gm-subspot-group-header">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="m8 3 4 8 5-5 5 15H2L8 3z"></path>
-                  </svg>
-                  <span>Decolli</span>
-                </div>
-                ${takeoffs.map(t => {
-                  const isSel = this.selectedSubSpot === t.id;
-                  return `
-                    <button
-                      type="button"
-                      class="gm-subspot-item ${isSel ? 'active' : ''}"
-                      data-action="select-subspot"
-                      data-subspot-id="${escapeHtml(t.id)}"
-                      role="option"
-                      aria-selected="${isSel ? 'true' : 'false'}"
-                    >
-                      <div class="gm-subspot-item-left">
-                        <span class="gm-subspot-item-bullet" aria-hidden="true">•</span>
-                        <div class="gm-subspot-item-text-group">
-                          <span class="gm-subspot-item-name">${escapeHtml(t.name)}</span>
-                          <span class="gm-subspot-item-badge">${t.altitude}m${t.heading != null && !isNaN(Number(t.heading)) ? ` · ${t.heading}° ${getCardinalDirection(t.heading)}` : ''}</span>
-                        </div>
-                      </div>
-                      ${isSel ? `
-                        <span class="gm-subspot-item-check" aria-hidden="true">✓</span>
-                      ` : ''}
-                    </button>
-                  `;
-                }).join('')}
-              ` : ''}
-
-              <!-- Gruppo Atterraggi -->
-              ${landings.length > 0 ? `
-                <div class="gm-subspot-group-header">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <circle cx="12" cy="12" r="6"></circle>
-                    <circle cx="12" cy="12" r="2"></circle>
-                  </svg>
-                  <span>Atterraggi</span>
-                </div>
-                ${landings.map(l => {
-                  const isSel = this.selectedSubSpot === l.id;
-                  return `
-                    <button
-                      type="button"
-                      class="gm-subspot-item ${isSel ? 'active' : ''}"
-                      data-action="select-subspot"
-                      data-subspot-id="${escapeHtml(l.id)}"
-                      role="option"
-                      aria-selected="${isSel ? 'true' : 'false'}"
-                    >
-                      <div class="gm-subspot-item-left">
-                        <span class="gm-subspot-item-bullet" aria-hidden="true">•</span>
-                        <div class="gm-subspot-item-text-group">
-                          <span class="gm-subspot-item-name">${escapeHtml(l.name)}</span>
-                          <span class="gm-subspot-item-badge">${l.altitude}m${l.isOfficial ? ' · Ufficiale' : ''}</span>
-                        </div>
-                      </div>
-                      ${isSel ? `
-                        <span class="gm-subspot-item-check" aria-hidden="true">✓</span>
-                      ` : ''}
-                    </button>
-                  `;
-                }).join('')}
-              ` : ''}
-            </div>
+                `;
+              }).join('')}
+            </optgroup>
           ` : ''}
-        </div>
+          ${landings.length > 0 ? `
+            <optgroup label="Atterraggi">
+              ${landings.map(l => `
+                <option value="${l.id}" ${this.selectedSubSpot === l.id ? 'selected' : ''}>
+                  ${escapeHtml(l.name)} (${l.altitude}m${l.isOfficial ? ' · Ufficiale' : ''})
+                </option>
+              `).join('')}
+            </optgroup>
+          ` : ''}
+        </select>
 
         ${(hasMultiTakeoffs || hasMultiLandings) ? `
           <div class="gm-spot-subselection-container">
@@ -3539,6 +3419,111 @@ export class ForecastViewController {
       `;
     }
 
+    const renderCurrentSubspots = () => {
+      if (!currentSpot) return '';
+      const takeoffs = currentSpot.takeoffs || [];
+      const landings = currentSpot.landings || [];
+      const activeTakeoff = this.resolveActiveTakeoff(currentSpot);
+      const activeLanding = this.resolveActiveLanding(currentSpot);
+
+      return `
+        <div class="gm-picker-section gm-picker-current-spot-section">
+          <div class="flex items-center justify-between gap-2 mb-2">
+            <span class="gm-picker-section-title font-bold text-xs uppercase tracking-wider text-[var(--gm-text-muted)]">
+              Punto di Volo Attivo (${escapeHtml(currentSpot.name)})
+            </span>
+            <span class="gm-badge gm-badge-sm ${this.selectedSubSpot === 'overview' ? 'gm-badge-flyable' : ''}">
+              ${escapeHtml(this.selectedSubSpot === 'overview' ? 'Panoramica' : (this.resolveActiveSubSpot(currentSpot)?.name || 'Specifico'))}
+            </span>
+          </div>
+          <div class="gm-current-subspots-list flex flex-col gap-1.5 p-1.5 bg-[var(--gm-bg-surface)] rounded-[var(--gm-radius-md)] border border-[var(--gm-border)]">
+            <!-- Item Panoramica -->
+            <button
+              type="button"
+              class="gm-subspot-item ${this.selectedSubSpot === 'overview' ? 'active' : ''}"
+              data-action="select-subspot"
+              data-subspot-id="overview"
+              role="option"
+              aria-selected="${this.selectedSubSpot === 'overview' ? 'true' : 'false'}"
+            >
+              <div class="gm-subspot-item-left">
+                <span class="gm-subspot-item-icon text-[var(--gm-accent)]" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                    <polyline points="2 17 12 22 22 17"></polyline>
+                    <polyline points="2 12 12 17 22 12"></polyline>
+                  </svg>
+                </span>
+                <span class="gm-subspot-item-name font-semibold">
+                  ${activeTakeoff && activeLanding ? `Panoramica (${escapeHtml(activeTakeoff.name)} • ${escapeHtml(activeLanding.name)})` : 'Panoramica (Decollo Primario + Atterraggio)'}
+                </span>
+              </div>
+              ${this.selectedSubSpot === 'overview' ? '<span class="gm-subspot-item-check" aria-hidden="true">✓</span>' : ''}
+            </button>
+
+            <!-- Gruppo Decolli -->
+            ${takeoffs.map(t => {
+              const isSel = this.selectedSubSpot === t.id;
+              const headingPart = t.heading != null && !isNaN(Number(t.heading)) ? ` · ${t.heading}° ${getCardinalDirection(t.heading)}` : '';
+              return `
+                <button
+                  type="button"
+                  class="gm-subspot-item ${isSel ? 'active' : ''}"
+                  data-action="select-subspot"
+                  data-subspot-id="${escapeHtml(t.id)}"
+                  role="option"
+                  aria-selected="${isSel ? 'true' : 'false'}"
+                >
+                  <div class="gm-subspot-item-left">
+                    <span class="gm-subspot-item-icon text-[var(--gm-accent)]" aria-hidden="true">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m8 3 4 8 5-5 5 15H2L8 3z"></path>
+                      </svg>
+                    </span>
+                    <div class="gm-subspot-item-text-group">
+                      <span class="gm-subspot-item-name font-semibold">${escapeHtml(t.name)}</span>
+                      <span class="gm-subspot-item-badge">${t.altitude}m${headingPart}</span>
+                    </div>
+                  </div>
+                  ${isSel ? '<span class="gm-subspot-item-check" aria-hidden="true">✓</span>' : ''}
+                </button>
+              `;
+            }).join('')}
+
+            <!-- Gruppo Atterraggi -->
+            ${landings.map(l => {
+              const isSel = this.selectedSubSpot === l.id;
+              return `
+                <button
+                  type="button"
+                  class="gm-subspot-item ${isSel ? 'active' : ''}"
+                  data-action="select-subspot"
+                  data-subspot-id="${escapeHtml(l.id)}"
+                  role="option"
+                  aria-selected="${isSel ? 'true' : 'false'}"
+                >
+                  <div class="gm-subspot-item-left">
+                    <span class="gm-subspot-item-icon text-[var(--gm-accent)]" aria-hidden="true">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <circle cx="12" cy="12" r="6"></circle>
+                        <circle cx="12" cy="12" r="2"></circle>
+                      </svg>
+                    </span>
+                    <div class="gm-subspot-item-text-group">
+                      <span class="gm-subspot-item-name font-semibold">${escapeHtml(l.name)}</span>
+                      <span class="gm-subspot-item-badge">${l.altitude}m${l.isOfficial ? ' · Ufficiale' : ''}</span>
+                    </div>
+                  </div>
+                  ${isSel ? '<span class="gm-subspot-item-check" aria-hidden="true">✓</span>' : ''}
+                </button>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    };
+
     const pinnedSpots = allSpots.filter(s => this.isSpotPinned(s, pinnedIds));
     const recentSpots = recentIds
       .map(id => allSpots.find(s => s.id === id))
@@ -3547,6 +3532,7 @@ export class ForecastViewController {
     const otherSpots = allSpots.filter(s => !this.isSpotPinned(s, pinnedIds) && !recentSpots.some(r => r.id === s.id));
 
     return `
+      ${renderCurrentSubspots()}
       ${pinnedSpots.length > 0 ? `
         <div class="gm-picker-section">
           <span class="gm-picker-section-title">⭐ Preferiti (${pinnedSpots.length})</span>
@@ -4088,6 +4074,7 @@ export class ForecastViewController {
       }
       this.selectedSubSpot = subSpotId || 'overview';
       this.isSubSpotMenuOpen = false;
+      closeSheet();
       this.render();
     } else if (action === 'set-active-takeoff') {
       const takeoffId = actionEl.getAttribute('data-takeoff-id');

@@ -2247,6 +2247,74 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
       assert.ok(!html.includes('y2="33"')); // No takeoff notch line (cy - radius + 8 = 100 - 75 + 8 = 33)
     });
   });
+
+  describe('Unified Comprensorio and Sub-Spot Control Architecture', () => {
+    it('should render unified spot bar compressing comprensorio and subspot into single control', () => {
+      const mockStore = createStore({
+        selectedSpot: DEFAULT_COMPRENSORI[0] // Monte Cornizzolo
+      });
+      const controller = new ForecastViewController({ store: mockStore });
+      const html = controller.renderHtml();
+
+      assert.ok(html.includes('gm-unified-spot-bar'), 'Must render .gm-unified-spot-bar');
+      assert.ok(html.includes('data-action="open-picker-sheet"'), 'Must trigger open-picker-sheet on tap');
+      assert.ok(html.includes('Monte Cornizzolo'), 'Must display active comprensorio name');
+      assert.ok(html.includes('gm-unified-subspot-badge'), 'Must display active sub-spot badge');
+      assert.ok(html.includes('Panoramica'), 'Must default to Panoramica in sub-spot badge');
+      // Verify sr-only compatibility select is rendered
+      assert.ok(html.includes('id="forecast-subspot-select"'), 'Must retain accessible select for compatibility');
+    });
+
+    it('should render active sub-spots section in picker sheet for 1-tap switching', () => {
+      const mockStore = createStore({
+        selectedSpot: DEFAULT_COMPRENSORI[0]
+      });
+      const controller = new ForecastViewController({ store: mockStore });
+      const sheetHtml = controller.renderPickerSections('');
+
+      assert.ok(sheetHtml.includes('gm-picker-current-spot-section'), 'Picker sheet must render current sub-spots section');
+      assert.ok(sheetHtml.includes('Punto di Volo Attivo'), 'Must have descriptive section title');
+      assert.ok(sheetHtml.includes('data-action="select-subspot"'), 'Must have select-subspot buttons');
+      assert.ok(sheetHtml.includes('data-subspot-id="overview"'), 'Must include Panoramica option');
+      // Must include takeoffs from Cornizzolo
+      assert.ok(sheetHtml.includes('Risparmio') || sheetHtml.includes('Centrale'), 'Must list current takeoffs');
+      assert.ok(sheetHtml.includes('Suello'), 'Must list current landing');
+    });
+
+    it('should switch sub-spot when clicking sub-spot option in sheet and close sheet', () => {
+      const spot = DEFAULT_COMPRENSORI[0];
+      const takeoff = spot.takeoffs[0];
+      const mockStore = createStore({
+        selectedSpot: spot
+      });
+      const controller = new ForecastViewController({ store: mockStore });
+
+      let rendered = false;
+      controller.render = () => { rendered = true; };
+
+      const clickEvt = {
+        target: {
+          closest(sel) {
+            if (sel === '[data-action]') {
+              return {
+                getAttribute(attr) {
+                  if (attr === 'data-action') return 'select-subspot';
+                  if (attr === 'data-subspot-id') return takeoff.id;
+                  return null;
+                }
+              };
+            }
+            return null;
+          }
+        }
+      };
+
+      controller.handleClick(clickEvt);
+      assert.equal(controller.selectedSubSpot, takeoff.id);
+      assert.equal(controller.activeTakeoffId, takeoff.id);
+      assert.equal(rendered, true, 'Must trigger render after subspot selection');
+    });
+  });
 });
 
 
