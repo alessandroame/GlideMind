@@ -127,6 +127,9 @@ export class SpotMapView {
 
     // Synchronize initial state from store
     const state = store.getState();
+    if (Array.isArray(state.locationsCatalog) && state.locationsCatalog.length > 0) {
+      this.comprensoriCatalog = state.locationsCatalog;
+    }
     this.activeDate = state.activeDate || formatDateIso(new Date());
     if (typeof state.activeHourIndex === 'number' && state.activeHourIndex >= 9 && state.activeHourIndex <= 18) {
       this.activeHour = state.activeHourIndex;
@@ -144,46 +147,31 @@ export class SpotMapView {
     // Build DOM structure with external top bar placed outside and above map canvas
     this.container.innerHTML = `
       <section class="gm-map-view" aria-label="Mappa Comprensori e Volabilità">
-        <!-- Top External Filter Bar (Outside and above map canvas) -->
+        <!-- Top External Filter Bar (Single compact row, strictly outside and above map canvas) -->
         <header class="gm-map-top-bar" role="toolbar" aria-label="Filtri mappa e comprensori">
-          <div class="gm-map-controls-row">
-            <div class="gm-map-group-left">
-              <!-- Macro-Region Dropdown Button -->
-              <select id="gm-map-macro-region-select" class="gm-map-pill-btn" aria-label="Seleziona macro-regione">
+          <div class="gm-map-top-bar-inner">
+            <!-- Macro-Region Selector -->
+            <div class="gm-map-region-wrap">
+              <select id="gm-map-macro-region-select" class="gm-map-select" aria-label="Seleziona macro-regione">
                 ${Object.values(MACRO_REGIONS).map(r => `
                   <option value="${r.id}" ${r.id === this.activeMacroRegion ? 'selected' : ''}>
                     ${r.name}
                   </option>
                 `).join('')}
               </select>
+            </div>
 
-              <!-- Locality / Spot Direct Filter & Jump Selector -->
-              <select id="gm-map-spot-select" class="gm-map-pill-btn" aria-label="Filtro e selezione località di volo">
+            <!-- Locality / Spot Direct Filter & Jump Selector -->
+            <div class="gm-map-spot-wrap">
+              <select id="gm-map-spot-select" class="gm-map-select" aria-label="Filtro e selezione località di volo">
                 ${this.renderSpotSelectOptions()}
               </select>
-
-              <!-- Layer Switcher Dropdown Button -->
-              <select id="gm-map-layer-select" class="gm-map-pill-btn" aria-label="Seleziona layer cartografico">
-                <option value="dark" ${this.activeLayer === 'dark' ? 'selected' : ''}>Scuro</option>
-                <option value="topo" ${this.activeLayer === 'topo' ? 'selected' : ''}>OpenTopo</option>
-                <option value="satellite" ${this.activeLayer === 'satellite' ? 'selected' : ''}>Satellite</option>
-                <option value="streets" ${this.activeLayer === 'streets' ? 'selected' : ''}>CyclOSM</option>
-              </select>
             </div>
 
-            <div class="gm-map-group-right">
-              <!-- Live Data Freshness Badge -->
-              <span id="gm-map-network-badge" class="gm-badge gm-badge-flyable" style="font-size: 0.72rem; padding: 4px 8px;">
-                Live Open-Meteo
-              </span>
-
-              <!-- 1-Tap Top Spot Focus Recommendation Pill -->
-              <button type="button" id="gm-map-top-spot-btn" class="gm-map-top-spot-btn" aria-label="Centra sullo spot migliore">
-                <span class="gm-top-spot-dot">●</span>
-                <span class="gm-top-spot-title" id="gm-top-spot-name">Top Spot...</span>
-                <span class="gm-top-spot-focus" aria-hidden="true">›</span>
-              </button>
-            </div>
+            <!-- Discrete Live Weather Status Badge -->
+            <span id="gm-map-network-badge" class="gm-badge gm-badge-flyable" title="Stato connessione dati meteorologici Open-Meteo">
+              Live
+            </span>
           </div>
         </header>
 
@@ -191,6 +179,21 @@ export class SpotMapView {
         <div class="gm-map-canvas-wrapper">
           <!-- Map Canvas Mount Target -->
           <div id="gm-map-canvas" class="gm-map-canvas-container" role="application" aria-label="Cartografia interattiva decolli e comprensori"></div>
+
+          <!-- Top-Left Floating Control: 1-Tap Top Spot Recommendation Chip -->
+          <button type="button" id="gm-map-top-spot-btn" class="gm-map-top-spot-btn gm-map-floating-top-spot" aria-label="Centra sullo spot migliore">
+            <span class="gm-top-spot-dot">●</span>
+            <span class="gm-top-spot-title" id="gm-top-spot-name">Top Spot...</span>
+            <span class="gm-top-spot-focus" aria-hidden="true">›</span>
+          </button>
+
+          <!-- Top-Right Floating Control: Layer Switcher Micro-Capsule (Frosted Glass) -->
+          <select id="gm-map-layer-select" class="gm-map-floating-layer-select" aria-label="Seleziona layer cartografico">
+            <option value="dark" ${this.activeLayer === 'dark' ? 'selected' : ''}>Scuro</option>
+            <option value="topo" ${this.activeLayer === 'topo' ? 'selected' : ''}>OpenTopo</option>
+            <option value="satellite" ${this.activeLayer === 'satellite' ? 'selected' : ''}>Satellite</option>
+            <option value="streets" ${this.activeLayer === 'streets' ? 'selected' : ''}>CyclOSM</option>
+          </select>
 
           <!-- Bottom Docked Timeline Scrubber (Thumb Zone, Clearance >=24px) -->
           <div class="gm-map-scrubber-container" role="region" aria-label="Selettore orario volabilità">
@@ -711,7 +714,7 @@ export class SpotMapView {
 
     const badge = this.container?.querySelector('#gm-map-network-badge');
     if (badge) {
-      badge.textContent = '🟡 Aggiornamento...';
+      badge.textContent = 'Aggiornamento...';
       badge.className = 'gm-badge gm-badge-caution';
     }
 
@@ -733,7 +736,7 @@ export class SpotMapView {
       }
 
       if (badge) {
-        badge.textContent = '🟢 Live Open-Meteo';
+        badge.textContent = 'Live';
         badge.className = 'gm-badge gm-badge-flyable';
       }
 
@@ -741,7 +744,7 @@ export class SpotMapView {
     } catch (err) {
       console.warn('[GlideMind Map] Background weather batch fetch error:', err);
       if (badge) {
-        badge.textContent = '⚪ Modalità Offline';
+        badge.textContent = 'Offline';
         badge.className = 'gm-badge gm-badge-unflyable';
       }
     } finally {
