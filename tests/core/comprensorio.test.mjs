@@ -203,6 +203,43 @@ describe('GlideMind Comprensorio Locality & Dual Launch/Landing Evaluator', () =
       assert.equal(result.badge, 'Cautela');
       assert.ok(result.reason.includes('Rientro critico'), `Reason should explain landing risk: ${result.reason}`);
     });
+
+    it('should report both takeoff and landing hazards in reason when both are present (Tesler & NN/G #1)', () => {
+      // Unflyable takeoff due to strong wind + critical landing beyond safe ratio
+      const multiHazardComprensorio = {
+        id: 'spot-multi-hazard',
+        name: 'Spot Doppio Pericolo',
+        takeoffs: [
+          { id: 't1', name: 'Decollo Nord', altitude: 1000, heading: 0, coordinates: '45.800, 9.300' }
+        ],
+        landings: [
+          { id: 'l1', name: 'Atterraggio Lontano', altitude: 400, coordinates: '45.850, 9.300' }
+        ]
+      };
+
+      const mockSevereWeather = {
+        hourly: {
+          time: ['2026-10-08T14:00'],
+          wind_speed_10m: [35],
+          wind_gusts_10m: [50],
+          wind_direction_10m: [180], // Tailwind
+          precipitation: [0],
+          cape: [100],
+          turbulence_edr: [0.35],
+          temperature_2m: [16]
+        }
+      };
+
+      const result = evaluateComprensorio({
+        comprensorio: multiHazardComprensorio,
+        weatherData: mockSevereWeather,
+        hourIndex: 0,
+        glider: GLIDER_CLASSES.EN_A
+      });
+
+      assert.equal(result.status, 'unflyable');
+      assert.ok(result.reason.includes('Rientro fuori cono'), `Reason must not mask landing hazard: ${result.reason}`);
+    });
   });
 
   describe('Flyability-Sorted List of Comprensori', () => {

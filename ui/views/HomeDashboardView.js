@@ -104,6 +104,7 @@ export class HomeDashboardViewController {
     this.comprensoriCatalog = options.comprensoriCatalog || (this.store && typeof this.store.getState === 'function' ? this.store.getState().locationsCatalog : null) || [...DEFAULT_COMPRENSORI];
     this.isLoading = false;
     this.pilotPeriod = 'month';
+    this.flyabilityFilter = 'all'; // 'all' | 'flyable'
     this.networkStatus = 'offline'; // 'live' | 'loading' | 'offline'
     this.cachedWeatherMap = new Map(); // key: spotId -> weatherPayload
     this._customFetchFn = options.fetchFn || null;
@@ -387,9 +388,10 @@ export class HomeDashboardViewController {
 
   /**
    * Evaluates comprensori and sorts them dynamically by flyability.
+   * @param {boolean} [applyFlyFilter=true]
    * @returns {Array<object>}
    */
-  getEvaluatedComprensori() {
+  getEvaluatedComprensori(applyFlyFilter = true) {
     const state = this.store ? this.store.getState() : {};
     const weatherData = state.weatherData || null;
     const activeGlider = state.activeGlider || DEFAULT_GLIDER;
@@ -441,7 +443,11 @@ export class HomeDashboardViewController {
       evaluated.push(result);
     }
 
-    return sortEvaluatedComprensori(evaluated);
+    const sorted = sortEvaluatedComprensori(evaluated);
+    if (applyFlyFilter && this.flyabilityFilter === 'flyable') {
+      return sorted.filter(item => item.status === 'flyable' || item.status === 'caution');
+    }
+    return sorted;
   }
 
   /**
@@ -450,7 +456,12 @@ export class HomeDashboardViewController {
    */
   renderHtml() {
     const state = this.store ? this.store.getState() : {};
-    const evaluatedList = this.getEvaluatedComprensori();
+    const allEvaluated = this.getEvaluatedComprensori(false);
+    const evaluatedList = this.flyabilityFilter === 'flyable'
+      ? allEvaluated.filter(item => item.status === 'flyable' || item.status === 'caution')
+      : allEvaluated;
+    const totalCount = allEvaluated.length;
+    const flyableCount = allEvaluated.filter(item => item.status === 'flyable' || item.status === 'caution').length;
     const currentTheme = (state.ui && state.ui.theme) || 'dark';
     const themeMeta = {
       light: { label: 'Chiaro', icon: '☀️' },
@@ -584,6 +595,28 @@ export class HomeDashboardViewController {
                 <line x1="18" y1="6" x2="6" y2="18"></line>
                 <line x1="6" y1="6" x2="18" y2="18"></line>
               </svg>
+            </button>
+          </div>
+
+          <!-- Quick Flyability Filter Chips (Hick's Law & Baymard Benchmark) -->
+          <div class="gm-filter-chips" role="group" aria-label="Filtro volabilità">
+            <button 
+              type="button" 
+              class="gm-filter-chip ${this.flyabilityFilter === 'all' ? 'active' : ''}" 
+              data-action="set-fly-filter" 
+              data-filter="all"
+              aria-pressed="${this.flyabilityFilter === 'all'}"
+            >
+              Tutti (${totalCount})
+            </button>
+            <button 
+              type="button" 
+              class="gm-filter-chip ${this.flyabilityFilter === 'flyable' ? 'active' : ''}" 
+              data-action="set-fly-filter" 
+              data-filter="flyable"
+              aria-pressed="${this.flyabilityFilter === 'flyable'}"
+            >
+              Volabili / Cautela (${flyableCount})
             </button>
           </div>
 
@@ -735,6 +768,26 @@ export class HomeDashboardViewController {
           </div>
         `;
       }
+      if (this.flyabilityFilter === 'flyable') {
+        return `
+          <div id="home-spots-list" class="gm-spot-card text-center py-5 px-3 flex flex-col items-center gap-2">
+            <div class="text-xs font-semibold text-[var(--gm-text-primary)]">
+              Nessun sito attualmente volabile o in cautela
+            </div>
+            <p class="text-xs text-[var(--gm-text-muted)] max-w-xs">
+              Le condizioni meteo per la data selezionata non presentano finestre favorevoli tra i comprensori visualizzati.
+            </p>
+            <button 
+              type="button" 
+              class="gm-btn-compact-accent mt-1" 
+              data-action="set-fly-filter"
+              data-filter="all"
+            >
+              Mostra tutti i siti
+            </button>
+          </div>
+        `;
+      }
       return `
         <div id="home-spots-list" class="gm-spot-card text-center py-6 px-4 flex flex-col items-center gap-2">
           <div class="text-sm font-semibold text-[var(--gm-text-primary)]">
@@ -783,9 +836,22 @@ export class HomeDashboardViewController {
     const windDirStr = (!isUnavailable && weather.windDir != null) ? `${getCardinalDirection(weather.windDir)} (${weather.windDir}°)` : '';
 
     let badgeClass = 'gm-badge-flyable';
-    if (item.status === 'caution') badgeClass = 'gm-badge-caution';
-    else if (item.status === 'unflyable') badgeClass = 'gm-badge-unflyable';
-    else if (isUnavailable) badgeClass = 'gm-badge-nd';
+    let badgeIcon = '✓';
+    let badgeTitle = item.badge || 'Volabile';
+
+    if (item.status === 'caution') {
+      badgeClass = 'gm-badge-caution';
+      badgeIcon = '▲';
+    } else if (item.status === 'unflyable') {
+      badgeClass = 'gm-badge-unflyable';
+      badgeIcon = '✕';
+    } else if (item.status === 'severe') {
+      badgeClass = 'gm-badge-severe';
+      badgeIcon = '⚡';
+    } else if (isUnavailable) {
+      badgeClass = 'gm-badge-nd';
+      badgeIcon = '○';
+    }
 
     return `
       <article 
@@ -795,7 +861,7 @@ export class HomeDashboardViewController {
         data-id="${escapeHtml(item.comprensorioId)}"
         role="button"
         tabindex="0"
-        aria-label="${escapeHtml(item.name)}, stato ${escapeHtml(item.badge)}"
+        aria-label="${escapeHtml(item.name)}, stato ${escapeHtml(badgeTitle)}"
       >
         <!-- Line 1: Spot Name + Province + Live Flyability Badge + Navigation Affordance -->
         <div class="gm-spot-header">
@@ -804,8 +870,8 @@ export class HomeDashboardViewController {
             ${item.province ? `<span class="gm-spot-prov">${escapeHtml(item.province)}</span>` : ''}
           </div>
           <div class="flex items-center gap-2">
-            <span class="gm-badge ${badgeClass}">
-              ${escapeHtml(item.badge)}
+            <span class="gm-badge gm-badge-icon ${badgeClass}" title="${escapeHtml(badgeTitle)}" aria-label="${escapeHtml(badgeTitle)}">
+              <span aria-hidden="true">${badgeIcon}</span>
             </span>
             <svg class="gm-spot-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
               <polyline points="9 18 15 12 9 6"></polyline>
@@ -1615,6 +1681,12 @@ export class HomeDashboardViewController {
 
     if (action === 'clear-search') {
       this.clearSearch();
+    } else if (action === 'set-fly-filter') {
+      const filter = actionEl.getAttribute('data-filter') || 'all';
+      if (this.flyabilityFilter !== filter) {
+        this.flyabilityFilter = filter;
+        this.render();
+      }
     } else if (action === 'toggle-theme-menu') {
       this.toggleThemeMenu();
     } else if (action === 'set-theme') {

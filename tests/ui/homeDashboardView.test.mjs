@@ -1019,5 +1019,80 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     assert.ok(css.includes('.gm-theme-dropdown'), 'theme.css must declare .gm-theme-dropdown styles');
     assert.ok(css.includes('.gm-theme-menu-item'), 'theme.css must declare .gm-theme-menu-item styles');
   });
+
+  it('should render quick flyability filter chips and filter spots by flyable status (Hick\'s Law & Baymard Facet Filtering)', () => {
+    const mockStore = createStore();
+    const controller = new HomeDashboardViewController({ store: mockStore });
+
+    const html = controller.renderHtml();
+    assert.ok(html.includes('gm-filter-chips'), 'Must render gm-filter-chips container');
+    assert.ok(html.includes('data-filter="all"'), 'Must render Tutti filter chip');
+    assert.ok(html.includes('data-filter="flyable"'), 'Must render Volabili / Cautela filter chip');
+
+    // Default state: all spots
+    assert.equal(controller.flyabilityFilter, 'all');
+
+    // Simulate clicking "Volabili / Cautela"
+    const mockChipEvent = {
+      target: {
+        closest(sel) {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute(attr) {
+                if (attr === 'data-action') return 'set-fly-filter';
+                if (attr === 'data-filter') return 'flyable';
+                return null;
+              }
+            };
+          }
+          return null;
+        }
+      }
+    };
+
+    controller.handleClick(mockChipEvent);
+    assert.equal(controller.flyabilityFilter, 'flyable');
+
+    // Switch back to "all"
+    const mockAllEvent = {
+      target: {
+        closest(sel) {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute(attr) {
+                if (attr === 'data-action') return 'set-fly-filter';
+                if (attr === 'data-filter') return 'all';
+                return null;
+              }
+            };
+          }
+          return null;
+        }
+      }
+    };
+    controller.handleClick(mockAllEvent);
+    assert.equal(controller.flyabilityFilter, 'all');
+  });
+
+  it('should enforce solid pill badges for outdoor glanceability and calm nominal indicators in theme.css', () => {
+    const css = fs.readFileSync(path.resolve('css/theme.css'), 'utf-8');
+
+    // Verify solid pill styling on spot header badges (WCAG AA sunlight contrast)
+    assert.ok(css.includes('.gm-spot-header .gm-badge'), 'Must declare .gm-spot-header .gm-badge');
+    assert.ok(css.includes('.gm-spot-header .gm-badge-flyable'), 'Must declare solid green badge for flyable');
+    assert.ok(css.includes('.gm-spot-header .gm-badge-caution'), 'Must declare solid amber badge for caution');
+    assert.ok(css.includes('.gm-spot-header .gm-badge-unflyable'), 'Must declare solid red badge for unflyable');
+
+    // Verify light mode solid pill overrides
+    assert.ok(css.includes('[data-theme="light"] .gm-spot-header .gm-badge-flyable'), 'Must declare light mode flyable solid pill');
+    assert.ok(css.includes('[data-theme="light"] .gm-spot-header .gm-badge-unflyable'), 'Must declare light mode unflyable solid pill');
+
+    // Verify calm nominal indicators (no glow, secondary text)
+    assert.ok(css.includes('.gm-ind-flyable .gm-ind-dot'), 'Must declare calm emerald dot for flyable indicator');
+
+    // Verify filter chips styling
+    assert.ok(css.includes('.gm-filter-chips'), 'Must declare .gm-filter-chips layout styles');
+    assert.ok(css.includes('.gm-filter-chip.active'), 'Must declare active state for filter chips');
+  });
 });
 

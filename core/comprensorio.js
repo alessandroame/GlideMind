@@ -13,7 +13,7 @@
  */
 
 import { getFlyabilityScore, getCardinalDirection, DEFAULT_GLIDER } from './flyability.js';
-import { computeDistanceKm } from './geoSpatialMath.js';
+import { computeDistanceKm, calculateBearing, calculateWindCorrectedGlideRatio } from './geoSpatialMath.js';
 
 /**
  * Parses coordinate strings in formats like "45.8332, 9.3020" or [lat, lon].
@@ -475,7 +475,7 @@ export function normalizeLocationsCatalog(rawJson) {
  * @param {object} landing
  * @returns {{ distanceMeters: number, deltaAltitudeMeters: number, requiredGlideRatio: number, isSafe: boolean }}
  */
-export function calculateGlideToLanding(takeoff, landing, glider = null) {
+export function calculateGlideToLanding(takeoff, landing, glider = null, options = null) {
   const activeGlider = glider || DEFAULT_GLIDER;
   const tCoord = parseCoordinates(takeoff.coordinates);
   const lCoord = parseCoordinates(landing.coordinates);
@@ -505,6 +505,34 @@ export function calculateGlideToLanding(takeoff, landing, glider = null) {
   const tAlt = Number(takeoff.altitude) || 1000;
   const lAlt = Number(landing.altitude) || 300;
   const deltaAltitudeMeters = Math.max(10, tAlt - lAlt);
+
+  // If wind options are supplied, compute wind-corrected glide ratio
+  const windSpeed = options && (options.windSpeedKmh ?? options.windSpeed);
+  const windDir = options && (options.windDirDegrees ?? options.windDir);
+  if (typeof windSpeed === 'number' && typeof windDir === 'number') {
+    const bearing = calculateBearing(tCoord.lat, tCoord.lon, lCoord.lat, lCoord.lon);
+    const windCalc = calculateWindCorrectedGlideRatio(
+      distanceMeters,
+      deltaAltitudeMeters,
+      windSpeed,
+      windDir,
+      bearing,
+      activeGlider
+    );
+    return {
+      distanceMeters,
+      deltaAltitudeMeters,
+      requiredGlideRatio: windCalc.requiredGlideRatioWind,
+      requiredGlideRatioStill: windCalc.requiredGlideRatioStill,
+      effectiveGroundSpeedKmh: windCalc.effectiveGroundSpeedKmh,
+      headwindKmh: windCalc.headwindKmh,
+      safeLimit: windCalc.safeLimit,
+      isSafe: windCalc.isSafe,
+      severity: windCalc.severity,
+      statusText: windCalc.statusText,
+      bearing
+    };
+  }
 
   const requiredGlideRatio = Math.round((distanceMeters / deltaAltitudeMeters) * 10) / 10;
   const isSafe = requiredGlideRatio <= safeLimit;
@@ -851,25 +879,35 @@ export function evaluateComprensorio({
   let overallScore = selectedTakeoffEval ? selectedTakeoffEval.score : 50;
   let reason = '';
 
+  const isLandingUnsafe = Boolean(glideMetrics && !glideMetrics.isSafe);
+
   if (!selectedTakeoffEval || selectedTakeoffEval.severity >= 2) {
     status = 'unflyable';
     badge = 'Non Volabile';
     badgeColor = 'var(--gm-status-unflyable)';
     badgeBg = 'var(--gm-status-unflyable-bg)';
     overallScore = Math.min(overallScore, 20);
-    reason = selectedTakeoffEval ? selectedTakeoffEval.statusText : 'Nessun decollo praticabile';
-  } else if (selectedTakeoffEval.severity === 1 || (glideMetrics && !glideMetrics.isSafe)) {
+    const takeoffReason = selectedTakeoffEval ? selectedTakeoffEval.statusText : 'Nessun decollo praticabile';
+    if (isLandingUnsafe) {
+      reason = `${takeoffReason} • Rientro fuori cono (1:${glideMetrics.requiredGlideRatio} > 1:${glideMetrics.safeLimit})`;
+    } else {
+      reason = takeoffReason;
+    }
+  } else if (selectedTakeoffEval.severity === 1 || isLandingUnsafe) {
     status = 'caution';
     badge = 'Cautela';
     badgeColor = 'var(--gm-status-caution)';
     badgeBg = 'var(--gm-status-caution-bg)';
     overallScore = Math.min(overallScore, 65);
-    if (!glideMetrics || glideMetrics.isSafe) {
+    const takeoffCaution = selectedTakeoffEval.severity === 1;
+    if (takeoffCaution && isLandingUnsafe) {
+      reason = `${selectedTakeoffEval.statusText} • Rientro critico (1:${glideMetrics.requiredGlideRatio} > 1:${glideMetrics.safeLimit})`;
+    } else if (isLandingUnsafe) {
+      reason = `Rientro critico: efficienza richiesta 1:${glideMetrics.requiredGlideRatio} > 1:${glideMetrics.safeLimit}`;
+    } else {
       reason = isTakeoffOverridden
         ? `Alt. ${selectedTakeoff.name}: ${selectedTakeoffEval.statusText}`
         : selectedTakeoffEval.statusText;
-    } else {
-      reason = `Rientro critico: efficienza richiesta 1:${glideMetrics.requiredGlideRatio} > 1:${glideMetrics.safeLimit}`;
     }
   } else {
     status = 'flyable';
