@@ -919,7 +919,28 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
   3. **Trappola di Navigazione Mobile Risolta con `popstate`**: Pushare uno stato sintetico nell'history del browser (`history.pushState({ overlay: 'flight-analysis' }, '')`) all'apertura e intercettare l'evento `popstate` per chiudere l'overlay su gesture o pulsante indietro fisico senza uscire dall'app.
   4. **Doppio Tracciato Casing/Core per Polilinee di Volo (WCAG AA)**: Le polilinee delle procedure di volo devono sempre impiegare un doppio tracciato sovrapposto: casing a contrasto ($6\text{px}$) e core semantico colorato ($3\text{px}$) per garantire piena leggibilità su qualsiasi basemap (satellite, topo, dark, streets).
 
+---
 
+## 76. Sharding Geografico del Catalogo Comprensori, Macro-Regioni Alpine e Clustering a Zoom Macro
+- **Problema**: All'avvio della mappa o selezionando macro-aree transfrontaliere, apparivano solo 11 comprensori in Corsica senza alcuna località sulle Alpi francesi continentali o svizzere. Inoltre, caricare e renderizzare centinaia di marker DOM su una vista europea causava degrado di frame rate (<30 FPS) e affollamento visivo.
+- **Causa Radice**: Il catalogo legacy `locations.json` conteneva esclusivamente spot italiani e corsi (0 spot in Svizzera, Austria o Francia continentale). Inoltre, `DEFAULT_MACRO_REGION` era ancorato a `north-west` (51 spot) e non esisteva una logica di clustering a zoom continentale.
+- **Pattern Vincolante**:
+  1. **Enrichment Curato con Dual Launch/Landing**: Ogni comprensorio aggiunto deve includere obbligatoriamente il binomio decollo principale ($T_{\text{best}}$) e atterraggio di sicurezza ($L_{\text{safe}}$) con dislivello e orientamenti validati (es. Annecy, Chamonix, Saint-Hilaire, Interlaken, Verbier).
+  2. **Sharding Geografico Modulare**: Mantenere un indice leggero `locations-index.json` (coordinate, quote, nome, codice paese) e partizionare i dettagli completi per nazione in `data/locations/{it,fr,ch,at,de,si,hr}.json`.
+  3. **Centratura Baricentrica nelle Macro-Regioni**: Per macro-regioni estese come `ALPS_WEST` (43 spot), impostare il centro geografico sul baricentro alpino (`lat: 46.2, lon: 7.2`) e zoom 7, evitando che la mappa si posizioni al largo nel Mediterraneo.
+  4. **Clustering Headless a Zoom Macro (< 7.5)**: A scale continentali aggregare i punti in cluster semantici che sintetizzano il conteggio e la miglior volabilità, con animazione fluida al tap (`map.fitBounds(cluster.bounds)`).
 
+---
 
+## 77. Controlli Mappa Esterni al Canvas in Flusso Naturale e Sincronizzazione Bi-Direzionale del Selettore Località
+- **Problema**: Posizionare la barra di controllo e i filtri territoriali/località in sovrimpressione assoluta sopra il canvas Leaflet (`position: absolute; top: ...`) provocava l'occlusione delle tile settentrionali della mappa (in particolare le vallate alpine del Nord Italia, Svizzera e Francia) e collisioni visive con i marker sottostanti. Inoltre, l'assenza di un selettore esplicito delle singole località nella barra superiore costringeva il pilota a fare pan e zoom manuale continuo per cercare un decollo specifico.
+- **Causa Radice**: Adozione di un layout HUD "overlay-first" fluttuante sul canvas anziché una gerarchia a blocchi in flusso naturale (*in-flow header*), unita alla mancanza di una sincronizzazione bi-direzionale tra mappa e lista delle località.
+- **Pattern Vincolante**:
+  1. **Testata Esterna in Flusso Naturale (`.gm-map-top-bar`)**: La barra comandi è un elemento solido posizionato al di sopra del canvas nel naturale flusso del DOM (`position: relative; width: 100%; flex-shrink: 0; pointer-events: auto`), con sfondo a contrasto dual-theme e bordo/ombra di stacco.
+  2. **Contenitore Canvas Flessibile e Disaccoppiato (`.gm-map-canvas-wrapper`)**: Il canvas Leaflet è incapsulato in un wrapper dedicato a `flex: 1 1 0%; min-height: 0; width: 100%; overflow: hidden;`. La mappa inizia geometricamente al di sotto della barra superiore, garantendo visibilità integrale al 100% dell'orografia e delle etichette cartografiche settentrionali.
+  3. **Ricalcolo Geometrico Obbligatorio (`invalidateSize`)**: Nel ciclo di montaggio del controller, invocare `invalidateSize()` sul motore cartografico tramite microtask/timeout per garantire che Leaflet acquisisca le dimensioni corrette e centrate rispetto al nuovo bounding box netto.
+  4. **Selettore di Località a Due Vie (`#gm-map-spot-select`)**:
+     - *Dalla Barra alla Mappa*: Selezionando un comprensorio dal menu a tendina, la mappa esegue un volo/pan animato verso le coordinate del decollo, seleziona lo spot e apre il fumetto aeronautico (`L.popup`).
+     - *Dalla Mappa alla Barra*: Toccando un qualsiasi marker o cluster sulla mappa, il menu a tendina aggiorna automaticamente il proprio valore visivo per riflettere lo spot focalizzato.
+     - *Ripartizione Dinamica*: Al cambio di macro-regione, le opzioni del dropdown vengono rigenerate dinamicamente per mostrare esclusivamente i comprensori dell'area attiva, ordinati per nome con indicatore di quota e provincia.
 

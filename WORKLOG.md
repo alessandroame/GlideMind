@@ -798,7 +798,46 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Eliminata la shorthand `background:` nei modificatori di [css/theme.css](file:///css/theme.css) che azzerava `background-repeat: repeat` e sostituita con accorpamento esplicito multi-layer in `background-image: url(...), linear-gradient(...)`.
   - Blindata la direttiva `background-repeat: no-repeat, no-repeat !important;` e registrato il Gate 4 in [tests/ui/shiftLeftGovernance.test.mjs](file:///tests/ui/shiftLeftGovernance.test.mjs).
   - Presentate le capacità di audit UI specializzate (`laws-of-ux-audit`, `novice-pilot-auditor`, `outdoor-hmi-touch`, `a11y-debugging`).
+  - Presentate le capacità di audit UI specializzate (`laws-of-ux-audit`, `novice-pilot-auditor`, `outdoor-hmi-touch`, `a11y-debugging`).
   - Aggiornata la Lezione Appresa #74 in [MEMORY.md](file:///MEMORY.md). Test suite: 428/428 test superati con successo in 61 suite.
+
+---
+
+## 2026-10-10 - Espansione Pan-Europea, Macro-Regioni Alpine e Clustering a Zoom Macro
+- **Tipo**: Cartografia / Scalabilità / Data Architecture / Headless Clustering
+- **Dettagli**: [.agents/worklog.d/2026-10-10_pan-european-macro-regions-and-macro-zoom-clustering.md](file:///.agents/worklog.d/2026-10-10_pan-european-macro-regions-and-macro-zoom-clustering.md)
+- **Sintesi**:
+  - Esteso il catalogo comprensori a 176 località verificate sharded per nazione in `data/locations/` (Francia continentale, Svizzera, Austria, Germania, Slovenia, Croazia, Italia).
+  - Configurato `DEFAULT_MACRO_REGION = 'all'` ("Tutta Europa") e create le macro-regioni alpine transfrontaliere `ALPS_WEST` (43 comprensori FR/CH, centrata a 46.2, 7.2) e `ALPS_EAST` (AT, SI, HR, DE).
+  - Implementato l'algoritmo di clustering headless puro `clusterComprensori` in [core/mapDataPartition.js](file:///core/mapDataPartition.js) per zoom < 7.5 con transizione fluida `fitBounds` al tocco.
+  - Aggiornate le suite di test con 435/435 test superati.
+
+---
+
+## 2026-10-10 - Controlli Mappa Esterni in Flusso Naturale e Selettore di Località a Due Vie
+- **Tipo**: UI Layout / Ergonomia Cartografica / Two-Way State Binding
+- **Dettagli**: [.agents/worklog.d/2026-10-10_external-map-controls-and-spot-filter.md](file:///.agents/worklog.d/2026-10-10_external-map-controls-and-spot-filter.md)
+- **Sintesi**:
+  - Trasformata la barra comandi e filtri della mappa (`.gm-map-top-bar`) da elemento fluttuante in sovrimpressione assoluta a testata solida in flusso naturale del DOM (`position: relative; width: 100%; flex-shrink: 0;`), azzerando qualsiasi occlusione delle tile e delle etichette geografiche a Nord.
+  - Incapsulato il canvas Leaflet in `.gm-map-canvas-wrapper` (`flex: 1 1 0%; min-height: 0; overflow: hidden;`), garantendo che il canvas inizi rigorosamente al di sotto dell'header con ricalcolo delle dimensioni nette via `invalidateSize()`.
+  - Integrato il selettore a tendina delle singole località (`#gm-map-spot-select`) con sincronizzazione bi-direzionale (two-way binding): selezionando uno spot dal menu la mappa centra e apre il fumetto aeronautico (`L.popup`); toccando un marker sulla mappa il menu si allinea istantaneamente.
+  - Test suite completa con 436/436 test superati in 61 suite (`npm test`).
+  - Registrata la Lezione Appresa #77 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-10 - Fase 5-quinquies: Piano Architetturale Procedure Scuole di Volo, Zonizzazione Club & Drawing Engine
+- **Tipo**: Architettura / Planning / ADR / Didattica di Volo
+- **Dettagli**: [.agents/worklog.d/2026-10-10_flight-procedures-and-drawing-engine-plan.md](file:///.agents/worklog.d/2026-10-10_flight-procedures-and-drawing-engine-plan.md)
+- **Sintesi**:
+  - Risolta la provenienza del disegno landing circuit nello screenshot dell'utente: generato in tempo reale dal modulo [core/flightProcedures.js](file:///core/flightProcedures.js) e renderizzato da [ui/map/mapEngineAdapter.js](file:///ui/map/mapEngineAdapter.js).
+  - Condotta l'analisi comparativa con il precursore `ParaMeteo` (`routePlannerUi.js` per disegno polilinee libere con spline di Chaikin e Undo/Redo a 50 stati, e `spotContributionUi.js` per sketch guidato circuito a C in 3 click).
+  - Analizzate le fotografie sul campo della bacheca del Parapendio Club Cavallaria (Brosso/Lessolo), formalizzando lo standard di zonizzazione geometrica: area verde atterraggio delimitata da paletti gialli con bersaglio, zone rosse di divieto assoluto per contenziosi o pericoli, zona arancione di ripiegamento vele, zona azzurra parcheggio/viabilità e manica a vento fisica.
+  - Formalizzata l'architettura ibrida (Hybrid Procedural Engine) in `core/flightPlan.js` per fondere i vincoli geometrici del club con l'orientamento live del vento Open-Meteo, i corridoi di uscita in valle per allievi e il box di sicurezza per le manovre didattiche.
+  - Redatto e archiviato il Master Plan esecutivo in [docs/FLIGHT_PROCEDURES_DRAWING_PLAN.md](file:///docs/FLIGHT_PROCEDURES_DRAWING_PLAN.md).
+  - Aggiornata la matrice [DESIDERATA.md](file:///DESIDERATA.md) con la nuova Fase 5-quinquies programmata.
+
+
 
 
 
