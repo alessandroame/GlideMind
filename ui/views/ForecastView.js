@@ -623,13 +623,21 @@ export class ForecastViewController {
 
     this.render();
 
-    // Keyboard listener for accessible popovers (Escape to close)
+    // Keyboard listener for accessible popovers (Escape to close) and timeline stepping (Arrow keys)
     this.boundKeyHandler = (e) => {
       if (e.key === 'Escape' && this.isSubSpotMenuOpen) {
         this.isSubSpotMenuOpen = false;
         this.render();
         const trigger = this.containerEl ? this.containerEl.querySelector('.gm-subspot-trigger') : null;
         if (trigger && typeof trigger.focus === 'function') trigger.focus();
+      } else if (e.key === 'ArrowLeft' && !['INPUT', 'TEXTAREA'].includes(e.target?.tagName)) {
+        if (this.selectedHour > 8) {
+          this.setHour(this.selectedHour - 1);
+        }
+      } else if (e.key === 'ArrowRight' && !['INPUT', 'TEXTAREA'].includes(e.target?.tagName)) {
+        if (this.selectedHour < 20) {
+          this.setHour(this.selectedHour + 1);
+        }
       }
     };
     if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
@@ -1838,6 +1846,11 @@ export class ForecastViewController {
    * @returns {string}
    */
   renderStickyScrubber(spot, weatherData, glider) {
+    const now = new Date();
+    const todayIso = formatDateIso(now);
+    const isToday = this.activeDate === todayIso;
+    const currentHour = now.getHours();
+
     const hours = [];
     for (let h = 8; h <= 20; h++) {
       const evalHour = evaluateComprensorio({
@@ -1850,7 +1863,9 @@ export class ForecastViewController {
       hours.push({
         hour: h,
         eval: evalHour,
-        isActive: h === this.selectedHour
+        isActive: h === this.selectedHour,
+        isCurrentHour: isToday && (h === currentHour),
+        isPast: isToday && (h < currentHour)
       });
     }
 
@@ -1858,72 +1873,48 @@ export class ForecastViewController {
       <aside 
         id="forecast-timeline-scrubber" 
         class="gm-timeline-scrubber-sticky"
-        aria-label="Scrubber orario ancorato"
+        aria-label="Timeline oraria ancorata"
       >
-        <div class="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-[var(--gm-text-muted)] mb-1.5 px-0.5">
-          <span class="flex items-center gap-1.5 font-bold">
-            <span>Scrubber Orario</span>
-          </span>
-          <div class="flex items-center gap-1.5">
-            <button 
-              type="button" 
-              class="gm-stepper-btn" 
-              data-action="prev-hour" 
-              aria-label="Ora precedente" 
-              title="Ora precedente"
-              ${this.selectedHour <= 8 ? 'disabled' : ''}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <polyline points="15 18 9 12 15 6"></polyline>
-              </svg>
-            </button>
-            <span id="forecast-scrubber-hour-display" class="text-[var(--gm-accent)] font-mono font-bold">
-              Ore selezionate: ${String(this.selectedHour).padStart(2, '0')}:00
-            </span>
-            <button 
-              type="button" 
-              class="gm-stepper-btn" 
-              data-action="next-hour" 
-              aria-label="Ora successiva" 
-              title="Ora successiva"
-              ${this.selectedHour >= 20 ? 'disabled' : ''}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <polyline points="9 18 15 12 9 6"></polyline>
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        <div id="forecast-timeline-strip" class="gm-timeline-grid-13" role="tablist" aria-label="Scrubber orario">
+        <div id="forecast-timeline-strip" class="gm-timeline-grid-13" role="tablist" aria-label="Timeline oraria">
           ${hours.map(slot => {
             const h = slot.hour;
             const evalH = slot.eval;
             const weather = evalH.weatherSnapshot || {};
             const speed = Math.round(weather.windSpeed || 0);
 
-            let fillPct = 30;
+            let fillPct = 35;
             let fillColor = 'var(--gm-status-unflyable)';
+            let slotBgColor = 'var(--gm-status-unflyable-bg)';
             if (evalH.status === 'flyable') {
-              fillPct = 90;
+              fillPct = 100;
               fillColor = 'var(--gm-status-flyable)';
+              slotBgColor = 'var(--gm-status-flyable-bg)';
             } else if (evalH.status === 'caution') {
-              fillPct = 55;
+              fillPct = 65;
               fillColor = 'var(--gm-status-caution)';
+              slotBgColor = 'var(--gm-status-caution-bg)';
             }
+
+            const stateClasses = [
+              'gm-timeline-col gm-timeline-col-compact',
+              slot.isActive ? 'active' : '',
+              slot.isCurrentHour ? 'is-now' : '',
+              slot.isPast ? 'is-past' : ''
+            ].filter(Boolean).join(' ');
 
             return `
               <div 
-                class="gm-timeline-col gm-timeline-col-compact ${slot.isActive ? 'active' : ''}"
+                class="${stateClasses}"
                 data-action="select-hour"
                 data-hour="${h}"
                 role="tab"
                 aria-selected="${slot.isActive ? 'true' : 'false'}"
-                aria-label="Ore ${String(h).padStart(2, '0')}:00, ${evalH.badge}, Vento ${speed} km/h"
-                tabindex="0"
+                aria-label="Ore ${String(h).padStart(2, '0')}:00, ${evalH.badge}, Vento ${speed} km/h${slot.isCurrentHour ? ' (Ora attuale)' : ''}"
+                tabindex="${slot.isActive ? '0' : '-1'}"
               >
+                ${slot.isCurrentHour ? '<span class="compact-now-badge" aria-label="Ora attuale">ORA</span>' : ''}
                 <span class="compact-time">${String(h).padStart(2, '0')}</span>
-                <div class="compact-bar">
+                <div class="compact-bar" style="background-color: ${slotBgColor};">
                   <div class="compact-bar-fill" style="height: ${fillPct}%; background-color: ${fillColor};"></div>
                 </div>
               </div>
@@ -2231,17 +2222,7 @@ export class ForecastViewController {
     });
     const activeSubSpotObj = this.resolveActiveSubSpot(spot);
 
-    // 1. Update Scrubber Display & Active Slot in place (zero layout thrashing)
-    const hourDisplay = this.containerEl.querySelector('#forecast-scrubber-hour-display');
-    if (hourDisplay) {
-      hourDisplay.textContent = `Ore selezionate: ${String(this.selectedHour).padStart(2, '0')}:00`;
-    }
-
-    const prevBtn = this.containerEl.querySelector('[data-action="prev-hour"]');
-    const nextBtn = this.containerEl.querySelector('[data-action="next-hour"]');
-    if (prevBtn) prevBtn.disabled = this.selectedHour <= 8;
-    if (nextBtn) nextBtn.disabled = this.selectedHour >= 20;
-
+    // 1. Update Active Slot in timeline strip in place (zero layout thrashing)
     const strip = this.containerEl.querySelector('#forecast-timeline-strip');
     if (strip) {
       const cols = strip.querySelectorAll('.gm-timeline-col-compact');
@@ -2250,6 +2231,7 @@ export class ForecastViewController {
         const isActive = colHour === this.selectedHour;
         col.classList.toggle('active', isActive);
         col.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        col.setAttribute('tabindex', isActive ? '0' : '-1');
       });
     }
 
@@ -2275,6 +2257,16 @@ export class ForecastViewController {
     if (!strip.contains(evt.target) && evt.target !== strip) return;
 
     this.isScrubbing = true;
+    this.pointerStartX = evt.clientX != null ? evt.clientX : 0;
+    this.hasDraggedPointer = false;
+
+    // Immediately blur active element to prevent sticky focus/hover styling on initial touched slot
+    if (typeof document !== 'undefined' && document.activeElement && strip.contains(document.activeElement)) {
+      try {
+        document.activeElement.blur();
+      } catch (_) {}
+    }
+
     try {
       if (typeof strip.setPointerCapture === 'function' && evt.pointerId != null) {
         strip.setPointerCapture(evt.pointerId);
@@ -2293,6 +2285,10 @@ export class ForecastViewController {
     const strip = this.containerEl ? this.containerEl.querySelector('#forecast-timeline-strip') : null;
     if (!strip) return;
 
+    if (evt.clientX != null && Math.abs(evt.clientX - this.pointerStartX) > 4) {
+      this.hasDraggedPointer = true;
+    }
+
     this.updateHourFromPointer(evt, strip);
   }
 
@@ -2310,6 +2306,17 @@ export class ForecastViewController {
           strip.releasePointerCapture(evt.pointerId);
         }
       } catch (_) {}
+      // Clear lingering focus on the initial touch element
+      if (typeof document !== 'undefined' && document.activeElement && strip.contains(document.activeElement)) {
+        try {
+          document.activeElement.blur();
+        } catch (_) {}
+      }
+    }
+    if (this.hasDraggedPointer) {
+      setTimeout(() => {
+        this.hasDraggedPointer = false;
+      }, 100);
     }
   }
 
@@ -2381,6 +2388,9 @@ export class ForecastViewController {
       this.isSubSpotMenuOpen = false;
       this.render();
     } else if (action === 'select-hour') {
+      if (this.hasDraggedPointer) {
+        return;
+      }
       const hourAttr = actionEl.getAttribute('data-hour');
       if (hourAttr != null) {
         const hour = parseInt(hourAttr, 10);

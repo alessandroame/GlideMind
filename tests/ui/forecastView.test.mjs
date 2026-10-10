@@ -129,6 +129,35 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     );
   });
 
+  it('should render compact scrubber without redundant header and mark current hour with badge when activeDate is today', () => {
+    const mockStore = createStore({
+      selectedSpot: DEFAULT_COMPRENSORI[0]
+    });
+    const controller = new ForecastViewController({ store: mockStore });
+    const today = new Date();
+    const todayIso = today.toISOString().slice(0, 10);
+    controller.activeDate = todayIso;
+    controller.selectedHour = 12;
+
+    const html = controller.renderHtml();
+
+    // Verify redundant technical header is absent
+    assert.ok(!html.includes('<span>Scrubber Orario</span>'), 'Must not render redundant technical label');
+    assert.ok(!html.includes('id="forecast-scrubber-hour-display"'), 'Must not render redundant text header');
+
+    // If current time is within [8, 20], verify is-now and compact-now-badge
+    const currentHour = today.getHours();
+    if (currentHour >= 8 && currentHour <= 20) {
+      assert.ok(html.includes('is-now'), 'Must mark current hour slot with is-now class');
+      assert.ok(html.includes('compact-now-badge'), 'Must render ORA badge on current hour slot');
+      assert.ok(html.includes('>ORA</span>'), 'Must contain text ORA');
+    }
+
+    // Verify enhanced flyability bar with status-bg
+    assert.ok(html.includes('compact-bar'), 'Must render compact-bar');
+    assert.ok(html.includes('compact-bar-fill'), 'Must render compact-bar-fill');
+  });
+
   it('should render 360° wind compass with takeoff azimuth cone and alignment status', () => {
     const mockStore = createStore({
       selectedSpot: DEFAULT_COMPRENSORI[0] // Monte Cornizzolo (Takeoff azimuth 170°)
@@ -378,6 +407,25 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
       pointerId: 1
     });
     assert.equal(controller.isScrubbing, false, 'Scrubbing must be false on pointer up');
+
+    // 4. Trailing click from initial touch position (e.g. 10) must be ignored if pointer was dragged
+    controller.handleClick({
+      target: {
+        closest(sel) {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute(attr) {
+                if (attr === 'data-action') return 'select-hour';
+                if (attr === 'data-hour') return '10';
+                return null;
+              }
+            };
+          }
+          return null;
+        }
+      }
+    });
+    assert.equal(controller.selectedHour, 18, 'Selected hour must remain 18 and not jump back to 10 from trailing click');
   });
 
   it('should toggle wind and sounding views between summary and chart mode', () => {

@@ -1304,27 +1304,116 @@ button, input, select, textarea {
 
 .gm-flight-data {
   display: flex;
-  align-items: baseline;
-  gap: 5px;
-  font-size: 0.82rem;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+/* 4-State Aeronautical Indicator Pills (Glanceable, Outdoor Sunlight Resilient) */
+.gm-ind-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4.5px;
+  padding: 1.5px 7px;
+  border-radius: var(--gm-radius-full);
+  font-size: 0.70rem;
+  line-height: 1.3;
+  white-space: nowrap;
+  user-select: none;
+  transition: background-color var(--gm-transition-fast), border-color var(--gm-transition-fast);
+}
+
+.gm-ind-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.gm-ind-label {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.gm-ind-micro {
+  font-family: var(--gm-font-mono);
+  font-size: 0.67rem;
+  opacity: 0.85;
+}
+
+/* Severity 0: Green (Flyable / Optimal) */
+.gm-ind-flyable {
+  background-color: var(--gm-status-flyable-bg);
+  color: var(--gm-status-flyable);
+  border: 1px solid rgba(34, 197, 94, 0.32);
+}
+.gm-ind-flyable .gm-ind-dot {
+  background-color: var(--gm-status-flyable);
+  box-shadow: 0 0 4px var(--gm-status-flyable);
+}
+
+/* Severity 1: Yellow (Caution / Marginal) */
+.gm-ind-caution {
+  background-color: var(--gm-status-caution-bg);
+  color: var(--gm-status-caution);
+  border: 1px solid rgba(234, 179, 8, 0.35);
+}
+.gm-ind-caution .gm-ind-dot {
+  background-color: var(--gm-status-caution);
+  box-shadow: 0 0 4px var(--gm-status-caution);
+}
+
+/* Severity 2: Red (Unflyable / Critical) */
+.gm-ind-unflyable {
+  background-color: var(--gm-status-unflyable-bg);
+  color: var(--gm-status-unflyable);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+.gm-ind-unflyable .gm-ind-dot {
+  background-color: var(--gm-status-unflyable);
+  box-shadow: 0 0 4px var(--gm-status-unflyable);
+}
+
+/* Severity 3: Black (Severe / NO FLY) */
+.gm-ind-severe {
+  background-color: var(--gm-status-severe-bg);
+  color: var(--gm-status-severe-text);
+  border: 1px solid var(--gm-status-severe-border);
+}
+.gm-ind-severe .gm-ind-dot {
+  background-color: var(--gm-status-severe-border);
+  box-shadow: 0 0 5px var(--gm-status-severe-border);
+}
+
+/* Severity -1: Neutral / Unavailable */
+.gm-ind-nd {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--gm-text-muted);
+  border: 1px solid var(--gm-border);
+}
+.gm-ind-nd .gm-ind-dot {
+  background-color: var(--gm-text-muted);
 }
 
 .gm-flight-wind {
   font-weight: 700;
   font-family: var(--gm-font-mono);
-  color: var(--gm-text-primary);
 }
 
 .gm-flight-dir {
-  font-size: 0.72rem;
-  color: var(--gm-text-muted);
+  font-size: 0.68rem;
+  font-family: var(--gm-font-mono);
+  opacity: 0.85;
 }
 
 .gm-glide-label {
-  font-size: 0.72rem;
-  color: var(--gm-text-muted);
+  font-size: 0.68rem;
+  opacity: 0.85;
+  font-weight: 500;
+  margin-right: 2px;
 }
 
 .gm-glide-val {
@@ -2853,7 +2942,7 @@ input.gm-input:focus {
   background-color: var(--gm-bg-card);
   border-top: 1px solid var(--gm-border-strong);
   box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.3);
-  padding: 8px 12px 10px;
+  padding: 10px 8px 8px;
   box-sizing: border-box;
   touch-action: none;
   -webkit-user-select: none;
@@ -2924,6 +3013,7 @@ input.gm-input:focus {
   box-sizing: border-box;
   touch-action: none;
   cursor: ew-resize;
+  position: relative;
 }
 
 .gm-timeline-col-compact {
@@ -2932,18 +3022,32 @@ input.gm-input:focus {
   align-items: center;
   justify-content: space-between;
   padding: 6px 2px 5px;
-  min-height: 50px;
+  min-height: 52px;
   background-color: var(--gm-bg-card);
-  border: 1px solid var(--gm-border);
+  border: 1px solid var(--gm-border-strong);
   border-radius: 4px;
   cursor: pointer;
-  transition: border-color 100ms ease, background-color 100ms ease;
+  transition: border-color 100ms ease, background-color 100ms ease, transform 100ms ease;
   user-select: none;
   touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  position: relative;
+  outline: none;
 }
 
-.gm-timeline-col-compact:hover {
-  background-color: var(--gm-bg-hover);
+@media (hover: hover) and (pointer: fine) {
+  .gm-timeline-col-compact:hover {
+    background-color: var(--gm-bg-hover);
+  }
+}
+
+.gm-timeline-col-compact:focus {
+  outline: none;
+}
+
+.gm-timeline-col-compact:focus-visible {
+  outline: 2px solid var(--gm-accent);
+  outline-offset: -2px;
 }
 
 .gm-timeline-col-compact.active {
@@ -2951,6 +3055,36 @@ input.gm-input:focus {
   background-color: var(--gm-bg-surface);
   box-shadow: 0 0 10px var(--gm-accent-glow);
   transform: translateY(-2px);
+  z-index: 3;
+}
+
+/* Past hour styling when browsing today */
+.gm-timeline-col-compact.is-past:not(.active) {
+  opacity: 0.6;
+}
+
+/* Current hour highlight */
+.gm-timeline-col-compact.is-now {
+  border-top-color: var(--gm-accent);
+}
+
+.compact-now-badge {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: var(--gm-accent);
+  color: var(--gm-text-inverse);
+  font-size: 0.52rem;
+  font-weight: 800;
+  line-height: 1;
+  padding: 1.5px 3.5px;
+  border-radius: 3px;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  z-index: 5;
+  pointer-events: none;
 }
 
 .gm-timeline-col-compact .compact-time {
@@ -2964,13 +3098,19 @@ input.gm-input:focus {
   color: var(--gm-accent);
 }
 
+.gm-timeline-col-compact.is-now .compact-time {
+  font-weight: 800;
+}
+
 .gm-timeline-col-compact .compact-bar {
-  width: 9px;
-  height: 32px;
+  width: 14px;
+  height: 30px;
   background: var(--gm-bg-surface);
-  border-radius: 4px;
+  border: 1px solid var(--gm-border-strong);
+  border-radius: var(--gm-radius-xs);
   position: relative;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .gm-timeline-col-compact .compact-bar-fill {
@@ -2978,7 +3118,49 @@ input.gm-input:focus {
   bottom: 0;
   left: 0;
   right: 0;
-  border-radius: 4px;
+  border-radius: 2px;
+}
+
+/* High-Contrast Light Theme Overrides for Timeline Scrubber (WCAG 2.1 AA Non-Text Contrast >= 3:1) */
+[data-theme="light"] .gm-timeline-scrubber-sticky {
+  background-color: var(--gm-bg-card);
+  border-top: 1px solid rgba(0, 0, 0, 0.16);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .gm-timeline-col-compact {
+  background-color: var(--gm-bg-elevated);
+  border: 1px solid rgba(0, 0, 0, 0.16);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  [data-theme="light"] .gm-timeline-col-compact:hover {
+    background-color: var(--gm-bg-hover);
+  }
+}
+
+[data-theme="light"] .gm-timeline-col-compact.active {
+  background-color: var(--gm-bg-card);
+  border-color: var(--gm-accent-strong);
+  box-shadow: 0 0 0 1.5px var(--gm-accent-strong), 0 2px 8px var(--gm-accent-glow);
+}
+
+[data-theme="light"] .gm-timeline-col-compact .compact-time {
+  color: #1e293b;
+}
+
+[data-theme="light"] .gm-timeline-col-compact.active .compact-time {
+  color: var(--gm-accent-strong);
+}
+
+[data-theme="light"] .gm-timeline-col-compact .compact-bar {
+  border: 1px solid rgba(0, 0, 0, 0.28);
+}
+
+[data-theme="light"] .compact-now-badge {
+  background-color: var(--gm-accent-strong);
+  color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
 }
 
 /* Panel Header & Toggle Buttons (Sintetico / Grafico) */

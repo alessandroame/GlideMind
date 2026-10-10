@@ -45,14 +45,22 @@ describe('UI Integrity, Progressive Disclosure & Anti-Naked Data Audit', () => {
     );
   });
 
-  it('enforces presence of discrete stepper buttons in sticky scrubber for outdoor gloves ergonomics', () => {
+  it('enforces compact continuous scrubber without redundant stepper header and with current hour marker support', () => {
     assert.ok(
-      forecastViewSrc.includes('data-action="prev-hour"'),
-      'ForecastView must include prev-hour stepper button'
+      forecastViewSrc.includes('class="gm-timeline-grid-13"'),
+      'ForecastView must contain 13-slot timeline grid'
     );
     assert.ok(
-      forecastViewSrc.includes('data-action="next-hour"'),
-      'ForecastView must include next-hour stepper button'
+      forecastViewSrc.includes('is-now'),
+      'ForecastView must support current hour marker'
+    );
+    assert.ok(
+      !forecastViewSrc.includes('<span>Scrubber Orario</span>'),
+      'ForecastView must not expose technical internal label Scrubber Orario'
+    );
+    assert.ok(
+      !forecastViewSrc.includes('forecast-scrubber-hour-display'),
+      'ForecastView must eliminate redundant hour display header'
     );
   });
 

@@ -565,6 +565,36 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Rimossa la classe CSS non più utilizzata `.gm-kbd-badge` da [css/theme.css](file:///css/theme.css).
   - Test verificati con successo: 339/339 superati.
 
+---
+
+## 2026-10-10 - Ottimizzazione UX Scrubber Orario e Contrasto Sunlight WCAG AA
+- **Tipo**: UX Architecture / Visual Ergonomics / WCAG Compliance
+- **Dettagli**: [.agents/worklog.d/2026-10-10_timeline-scrubber-ux-refinement.md](file:///.agents/worklog.d/2026-10-10_timeline-scrubber-ux-refinement.md)
+- **Sintesi**:
+  - Rimosso l'header superiore dello scrubber orario in [ui/views/ForecastView.js](file:///ui/views/ForecastView.js) (label tecnica `Scrubber Orario`, pulsanti stepper `<` e `>` e visualizzazione ore selezionate), recuperando 36–40px verticali utili sul viewport mobile.
+  - Introdotto il marcatore situazionale "ORA" (`.is-now` con badge `.compact-now-badge`) per identificare l'ora corrente locale quando si consulta la data odierna (`today`), con attenuazione visiva (`.is-past`, opacità 0.6) per le ore già trascorse.
+  - Aggiunto supporto alla navigazione oraria tramite tastiera con i tasti `ArrowLeft` e `ArrowRight`.
+  - Incrementata la larghezza della capsula semaforica `.compact-bar` da 9px a 14px (+55%), con sfondo colorato di stato (`--gm-status-*-bg`) e riempimento solido ad alta glanceability (100% volabile, 65% cautela, 35% non volabile).
+  - Risolto il deficit di contrasto in modalità chiara (`[data-theme="light"]`) in [css/theme.css](file:///css/theme.css) introducendo un bordo esplicito `1px solid rgba(0, 0, 0, 0.28)` (contrasto $\ge 3:1$, WCAG 2.1 Non-Text Contrast) e colore testo orario ad alto contrasto (`#1e293b`, > 10:1).
+  - Aggiornate le asserzioni di test in [tests/ui/uiIntegrityAudit.test.mjs](file:///tests/ui/uiIntegrityAudit.test.mjs) e aggiunti test in [tests/ui/forecastView.test.mjs](file:///tests/ui/forecastView.test.mjs) (340/340 test superati).
+  - Registrata la Lezione Appresa #54 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-10 - Risoluzione Artefatto Sticky Hover e Focus Durante lo Swipe dello Scrubber
+- **Tipo**: Bug Fix / Mobile Touch Ergonomics
+- **Dettagli**: [.agents/worklog.d/2026-10-10_fix-scrubber-touch-swipe-sticky-hover.md](file:///.agents/worklog.d/2026-10-10_fix-scrubber-touch-swipe-sticky-hover.md)
+- **Sintesi**:
+  - Diagnosticata e risolta la permanenza visiva dello sfondo evidenziato (`#2e3549`) sulla colonna oraria in cui iniziava lo swipe del dito (es. toccando le 12:00 e trascinando alle 17:00).
+  - Causa radice: sui browser mobile, il tocco attiva la pseudo-classe `:hover`, che rimaneva permanentemente applicata all'elemento iniziale poiché le regole `:hover` non erano confinate a dispositivi con mouse.
+  - Confinate le regole `:hover` di `.gm-timeline-col-compact` sotto `@media (hover: hover) and (pointer: fine)` in [css/theme.css](file:///css/theme.css), azzerando l'effetto su touchscreen.
+  - Applicato il pattern Roving Tabindex (`tabindex="0"` solo sulla colonna attiva, `tabindex="-1"` sulle altre) e invocato il blur deterministico del focus residuo in `handlePointerDown` e `handlePointerUp` in [ui/views/ForecastView.js](file:///ui/views/ForecastView.js).
+  - Implementata la guardia anti-trailing click (`this.hasDraggedPointer`) per prevenire click sintetici spuri al termine del trascinamento.
+  - Aggiunti test di verifica in [tests/ui/forecastView.test.mjs](file:///tests/ui/forecastView.test.mjs) (340/340 test superati).
+  - Registrata la Lezione Appresa #55 in [MEMORY.md](file:///MEMORY.md).
+
+
+
 
 
 

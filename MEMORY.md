@@ -555,7 +555,38 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
 - **Pattern Vincolante**:
   1. **Garanzia di Opacità Attiva**: Qualsiasi stato attivo di un contenitore di overlay deve forzare esplicitamente `opacity: 1;` sia nella dichiarazione di default mobile (`#sheet-container.active .gm-sheet { transform: translateY(0); opacity: 1; }`) sia nelle varianti desktop centrate (`#sheet-container.active .gm-sheet { transform: scale(1); opacity: 1; }`).
   2. **Soppressione Controlli Touch Mobile su Desktop**: Nelle viste modali desktop, nascondere sempre elementi di trascinamento touch concepiti esclusivamente per smartphone (`.gm-sheet-handle-bar { display: none; }`).
-  3. **Test di Integrità Architetturale CSS**: Includere nella suite di test (`tests/ui/shellIntegrity.test.mjs`) asserzioni che verifichino la presenza contemporanea di `transform: scale(1)` e `opacity: 1` nelle media query desktop per prevenire regressioni visive silenti.
+---
+
+## 54. Ergonomia dello Scrubber Orario: Profilo Continuo Ultracompatto, Indicatore 'ORA' Situazionale e Contrasto WCAG 2.1 Non-Text
+- **Problema**:
+  1. Nello scrubber orario sticky di `ForecastView`, la presenza dell'header superiore con il testo "Scrubber Orario" e il controllo stepper `< ORE SELEZIONATE: 10:00 >` introduceva gergo tecnico interno, duplicava l'informazione già visibile nella colonna selezionata e consumava ~36-40px verticali preziosi su schermi smartphone a `100dvh`.
+  2. Quando l'utente consulta le previsioni del giorno stesso ("oggi"), mancava qualsiasi indicatore per distinguere l'ora reale corrente (`now`) dalle ore passate o future, degradando la *situational awareness*.
+  3. L'indicatore di volabilità era una barretta sottile (9px) a riempimento parziale (30% per non volabile = appena 9.6px di altezza), risultando invisibile all'aperto a distanza di braccio.
+  4. In modalità chiara (`[data-theme="light"]`), lo slot della capsula (`#e2e8f0`) su sfondo bianco card (`#ffffff`) aveva un contrasto di appena 1.27:1 (fallimento del requisito WCAG 2.1 SC 1.4.11 $\ge 3:1$ per componenti grafici/UI), scomparendo sotto luce solare diretta.
+- **Causa Radice**:
+  1. I controlli stepper erano stati concepiti come mitigazione per target discreti stretti prima che venisse implementato lo scorrimento continuo orizzontale a trascinamento (*drag/slide gesture* con pointer capture).
+  2. Mancanza di correlazione tra `this.activeDate` e l'orologio di sistema locale.
+  3. Approccio a colonnina di mercurio percentuale inadatto a comunicare un segnale qualitativo semaforico.
+  4. Assenza di bordo di contrasto e sfondo definito per lo slot della barra in tema chiaro.
+- **Pattern Vincolante**:
+  1. **Scrubber a Profilo Singolo Puro**: Rimuovere gli header tecnici e i controlli duplicati. La timeline oraria è un carosello continuo a 13 slot (08..20) interattivo via tocco e scorrimento a trascinamento orizzontale continuo, con supporto tastiera (frecce sinistra/destra).
+  2. **Marcatore Situazionale 'ORA' (Today)**: Quando `this.activeDate === formatDateIso(new Date())`, la colonna corrispondente a `currentHour` riceve la classe `.is-now` con badge assoluto `.compact-now-badge` ("ORA") posizionato a zero displacement flex, mentre le ore passate (`h < currentHour`) ricevono attenuazione visiva (`.is-past` a opacità 0.6 quando non attive).
+  3. **Visibilità Semaforica Potenziata**: Larghezza della capsula estesa da 9px a **14px**, con sfondo colorato abbinato allo stato (`var(--gm-status-*-bg)`) e riempimento solido ad alto contrasto (100% per volabile, 65% per cautela, 35% per non volabile).
+---
+
+## 55. Prevenzione Artefatti Sticky Hover & Focus su Scrubbers e Slider Touch (Pointer Capture)
+- **Problema**: Eseguendo lo swipe con il dito sullo scrubber orario (es. toccando l'ora 12 e trascinando fino all'ora 17), l'ora iniziale (12) manteneva uno sfondo evidenziato bluastro (`#2e3549`), facendo apparire contemporaneamente due colonne selezionate.
+- **Causa Radice**:
+  1. **Sticky Hover su Schermi Touch**: I browser mobile (WebKit/Blink) emulano gli eventi mouse al tocco. La regola `.gm-timeline-col-compact:hover { background-color: var(--gm-bg-hover); }` priva di media query faceva sì che l'elemento inizialmente toccato conservasse permanentemente la pseudo-classe `:hover` (`#2e3549`) anche dopo che il dito si era spostato su un'altra colonna.
+  2. **Stale Focus**: L'elemento iniziale con `tabindex="0"` riceveva il focus DOM al `pointerdown`, mantenendo lo stato `:focus` fino a un successivo tocco esterno.
+  3. **Rischio Synthetic Click**: Al rilascio del dito dopo il trascinamento (`pointerup`), il browser poteva emettere un evento sintetico `click` sull'elemento originario.
+- **Pattern Vincolante**:
+  1. **Hover Confinato a Dispositivi con Mouse**: Includere sempre qualsiasi regola `:hover` per elementi di scrubber/slider all'interno di `@media (hover: hover) and (pointer: fine)`. Su dispositivi touch (`hover: none`), l'hover è disattivato alla radice.
+  2. **Roving Tabindex**: Impostare `tabindex="0"` esclusivamente sulla colonna attiva (`isActive`), e `tabindex="-1"` su tutte le altre.
+  3. **Blur Deterministico al Pointer Interaction**: Invocare `document.activeElement.blur()` su `handlePointerDown` e `handlePointerUp` se il focus risiede all'interno del container della timeline.
+  4. **Guardia Anti-Trailing Click**: Tracciare lo spostamento orizzontale durante il pointer move (`hasDraggedPointer = true` se $\Delta x > 4\text{px}$) e sopprimere l'azione `select-hour` nei gestori di `click` sintetici successivi.
+
+
 
 
 
