@@ -86,8 +86,25 @@ function createMockElement(tagName = 'div', attributes = {}) {
     get: () => innerHTML,
     set: (html) => {
       innerHTML = html;
-      // Extract text content and basic child elements for query matching
       textContent = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+      children.length = 0;
+      const tagRegex = /<([a-z0-9]+)\b([^>]*)>/gi;
+      let match;
+      while ((match = tagRegex.exec(html)) !== null) {
+        const tag = match[1];
+        const rawAttrs = match[2];
+        const idMatch = /id=["']([^"']+)["']/i.exec(rawAttrs);
+        const classMatch = /class=["']([^"']+)["']/i.exec(rawAttrs);
+        if (idMatch || classMatch) {
+          const childAttrs = {};
+          if (idMatch) childAttrs.id = idMatch[1];
+          const childEl = createMockElement(tag, childAttrs);
+          if (classMatch) {
+            classMatch[1].split(/\s+/).filter(Boolean).forEach(c => childEl.classList.add(c));
+          }
+          children.push(childEl);
+        }
+      }
     }
   });
 
@@ -115,9 +132,28 @@ describe('Spot Map View - Controller & Cartography Contracts (UI Layer)', () => 
 
     assert.ok(mockContainer.innerHTML.includes('id="gm-map-canvas"'), 'Must contain map canvas mount point');
     assert.ok(mockContainer.innerHTML.includes('role="application"'), 'Map canvas must declare application role');
+    assert.ok(mockContainer.innerHTML.includes('gm-map-canvas-wrapper'), 'Must contain canvas wrapper below top bar');
     assert.ok(mockContainer.innerHTML.includes('id="gm-map-macro-region-select"'), 'Must contain macro-region selector');
+    assert.ok(mockContainer.innerHTML.includes('id="gm-map-spot-select"'), 'Must contain locality / spot selector');
     assert.ok(mockContainer.innerHTML.includes('id="gm-map-top-spot-btn"'), 'Must contain 1-tap top spot recommendation button');
     assert.ok(mockContainer.innerHTML.includes('gm-map-scrubber-slots'), 'Must contain hourly scrubber container');
+  });
+
+  it('should render locality filter in external top bar and allow selecting individual spots', () => {
+    spotMapView.mount(mockContainer);
+    assert.ok(mockContainer.innerHTML.includes('id="gm-map-spot-select"'), 'Must render locality select control');
+    assert.ok(mockContainer.innerHTML.includes('Tutte le località'), 'Must render all localities option');
+
+    // Test spot selection logic
+    const testSpot = DEFAULT_COMPRENSORI[0];
+    spotMapView.handleSpotFocus(testSpot);
+    assert.equal(spotMapView.focusedSpotId, testSpot.id, 'Must focus spot on selection');
+
+    // Test macro-region change updates activeMacroRegion and focused spot
+    spotMapView.setMacroRegion('north-west');
+    assert.equal(spotMapView.activeMacroRegion, 'north-west');
+    assert.ok(spotMapView.focusedSpotId, 'Macro-region change re-evaluates top spot');
+    assert.ok(mockContainer.innerHTML.includes('Piemonte') || mockContainer.innerHTML.includes('Cavallaria'));
   });
 
   it('should initialize a HeadlessMockMapEngine in pure Node.js runtime without DOM errors', () => {

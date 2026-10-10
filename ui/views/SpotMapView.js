@@ -60,7 +60,42 @@ export class SpotMapView {
     if (Array.isArray(catalog) && catalog.length > 0) {
       this.comprensoriCatalog = catalog;
       if (this.container) {
+        this.updateSpotSelectOptions();
         this.renderMapContent();
+      }
+    }
+  }
+
+  /**
+   * Generates options HTML for the spot/locality selector dropdown based on active macro-region.
+   * @returns {string}
+   */
+  renderSpotSelectOptions() {
+    const spots = filterComprensoriByMacroRegion(this.comprensoriCatalog, this.activeMacroRegion);
+    const sorted = [...spots].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'it', { sensitivity: 'base' }));
+    const defaultLabel = `Tutte le località (${sorted.length})`;
+    const options = [
+      `<option value="" ${!this.focusedSpotId ? 'selected' : ''}>${defaultLabel}</option>`
+    ];
+    for (const spot of sorted) {
+      const isSelected = this.focusedSpotId === spot.id;
+      const sub = spot.region || spot.country || '';
+      const label = sub ? `${spot.name} (${sub})` : spot.name;
+      options.push(`<option value="${spot.id}" ${isSelected ? 'selected' : ''}>${cleanUserText(label)}</option>`);
+    }
+    return options.join('');
+  }
+
+  /**
+   * Refreshes the spot/locality selector options in DOM.
+   */
+  updateSpotSelectOptions() {
+    if (!this.container) return;
+    const select = this.container.querySelector('#gm-map-spot-select');
+    if (select) {
+      select.innerHTML = this.renderSpotSelectOptions();
+      if (this.focusedSpotId) {
+        select.value = this.focusedSpotId;
       }
     }
   }
@@ -86,6 +121,10 @@ export class SpotMapView {
     this.container = containerEl;
     if (!this.container) return;
 
+    if (this.container.classList) {
+      this.container.classList.add('gm-view-map');
+    }
+
     // Synchronize initial state from store
     const state = store.getState();
     this.activeDate = state.activeDate || formatDateIso(new Date());
@@ -102,14 +141,11 @@ export class SpotMapView {
       this.activeMacroRegion = params.macroRegion;
     }
 
-    // Build DOM structure
+    // Build DOM structure with external top bar placed outside and above map canvas
     this.container.innerHTML = `
       <section class="gm-map-view" aria-label="Mappa Comprensori e Volabilità">
-        <!-- Map Canvas Mount Target -->
-        <div id="gm-map-canvas" class="gm-map-canvas-container" role="application" aria-label="Cartografia interattiva decolli e comprensori"></div>
-
-        <!-- Top Floating Controls Bar -->
-        <header class="gm-map-top-bar" role="toolbar" aria-label="Filtri mappa">
+        <!-- Top External Filter Bar (Outside and above map canvas) -->
+        <header class="gm-map-top-bar" role="toolbar" aria-label="Filtri mappa e comprensori">
           <div class="gm-map-controls-row">
             <div class="gm-map-group-left">
               <!-- Macro-Region Dropdown Button -->
@@ -119,6 +155,11 @@ export class SpotMapView {
                     ${r.name}
                   </option>
                 `).join('')}
+              </select>
+
+              <!-- Locality / Spot Direct Filter & Jump Selector -->
+              <select id="gm-map-spot-select" class="gm-map-pill-btn" aria-label="Filtro e selezione località di volo">
+                ${this.renderSpotSelectOptions()}
               </select>
 
               <!-- Layer Switcher Dropdown Button -->
@@ -146,57 +187,63 @@ export class SpotMapView {
           </div>
         </header>
 
-        <!-- Bottom Docked Timeline Scrubber (Thumb Zone, Clearance >=24px) -->
-        <div class="gm-map-scrubber-container" role="region" aria-label="Selettore orario volabilità">
-          <div class="gm-map-scrubber-inner">
-            <div class="gm-map-scrubber-header">
-              <div class="gm-map-scrubber-title-group">
-                <span class="gm-map-scrubber-title">Timeline Volabilità</span>
-                <span id="gm-map-scrubber-spot-pill" class="gm-map-scrubber-spot-pill">
-                  ${this.getFocusedSpotTitle()}
-                </span>
-              </div>
-              <div class="gm-map-scrubber-hour-display">
-                <span id="gm-map-active-hour-label" class="gm-flight-alt">Ore ${String(this.activeHour).padStart(2, '0')}:00</span>
-              </div>
-            </div>
+        <!-- Map Canvas Wrapper (Positioned below top bar, fills remaining height) -->
+        <div class="gm-map-canvas-wrapper">
+          <!-- Map Canvas Mount Target -->
+          <div id="gm-map-canvas" class="gm-map-canvas-container" role="application" aria-label="Cartografia interattiva decolli e comprensori"></div>
 
-            <div class="gm-map-scrubber-stepper-row">
-              <button
-                type="button"
-                id="gm-map-prev-hour-btn"
-                class="gm-map-stepper-btn"
-                aria-label="Ora precedente"
-                ${this.activeHour <= 9 ? 'disabled' : ''}
-              >
-                ‹
-              </button>
-
-              <div class="gm-map-scrubber-slots" role="radiogroup" aria-label="Ore disponibili">
-                ${this.hoursRange.map(h => `
-                  <button
-                    type="button"
-                    class="gm-map-hour-slot ${h === this.activeHour ? 'active' : ''}"
-                    data-hour="${h}"
-                    role="radio"
-                    aria-checked="${h === this.activeHour ? 'true' : 'false'}"
-                    aria-label="Ore ${h}:00"
-                  >
-                    <span class="gm-hour-text">${String(h).padStart(2, '0')}</span>
-                    <span class="gm-hour-fly-bar" data-slot-hour="${h}"></span>
-                  </button>
-                `).join('')}
+          <!-- Bottom Docked Timeline Scrubber (Thumb Zone, Clearance >=24px) -->
+          <div class="gm-map-scrubber-container" role="region" aria-label="Selettore orario volabilità">
+            <div class="gm-map-scrubber-inner">
+              <div class="gm-map-scrubber-header">
+                <div class="gm-map-scrubber-title-group">
+                  <span class="gm-map-scrubber-title">Timeline Volabilità</span>
+                  <span id="gm-map-scrubber-spot-pill" class="gm-map-scrubber-spot-pill">
+                    ${this.getFocusedSpotTitle()}
+                  </span>
+                </div>
+                <div class="gm-map-scrubber-hour-display">
+                  <span id="gm-map-active-hour-label" class="gm-flight-alt">Ore ${String(this.activeHour).padStart(2, '0')}:00</span>
+                </div>
               </div>
 
-              <button
-                type="button"
-                id="gm-map-next-hour-btn"
-                class="gm-map-stepper-btn"
-                aria-label="Ora successiva"
-                ${this.activeHour >= 18 ? 'disabled' : ''}
-              >
-                ›
-              </button>
+              <div class="gm-map-scrubber-stepper-row">
+                <button
+                  type="button"
+                  id="gm-map-prev-hour-btn"
+                  class="gm-map-stepper-btn"
+                  aria-label="Ora precedente"
+                  ${this.activeHour <= 9 ? 'disabled' : ''}
+                >
+                  ‹
+                </button>
+
+                <div class="gm-map-scrubber-slots" role="radiogroup" aria-label="Ore disponibili">
+                  ${this.hoursRange.map(h => `
+                    <button
+                      type="button"
+                      class="gm-map-hour-slot ${h === this.activeHour ? 'active' : ''}"
+                      data-hour="${h}"
+                      role="radio"
+                      aria-checked="${h === this.activeHour ? 'true' : 'false'}"
+                      aria-label="Ore ${h}:00"
+                    >
+                      <span class="gm-hour-text">${String(h).padStart(2, '0')}</span>
+                      <span class="gm-hour-fly-bar" data-slot-hour="${h}"></span>
+                    </button>
+                  `).join('')}
+                </div>
+
+                <button
+                  type="button"
+                  id="gm-map-next-hour-btn"
+                  class="gm-map-stepper-btn"
+                  aria-label="Ora successiva"
+                  ${this.activeHour >= 18 ? 'disabled' : ''}
+                >
+                  ›
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -222,6 +269,12 @@ export class SpotMapView {
       this.mapEngine.setLayer(this.activeLayer);
     }
 
+    if (this.mapEngine && typeof this.mapEngine.invalidateSize === 'function') {
+      setTimeout(() => {
+        if (this.mapEngine) this.mapEngine.invalidateSize();
+      }, 50);
+    }
+
     // Bind UI Event Listeners
     this.bindEvents();
 
@@ -245,6 +298,10 @@ export class SpotMapView {
         // Check selected spot change
         if (s.selectedSpotId && s.selectedSpotId !== this.focusedSpotId) {
           this.focusedSpotId = s.selectedSpotId;
+          const spotSelect = this.container?.querySelector('#gm-map-spot-select');
+          if (spotSelect && spotSelect.value !== s.selectedSpotId) {
+            spotSelect.value = s.selectedSpotId;
+          }
           this.renderMapContent();
         }
         // Check date change
@@ -268,6 +325,9 @@ export class SpotMapView {
    * Unbinds listeners and destroys the map engine upon route change.
    */
   unmount() {
+    if (this.container && this.container.classList) {
+      this.container.classList.remove('gm-view-map');
+    }
     if (this.moveDebounceTimer) {
       clearTimeout(this.moveDebounceTimer);
       this.moveDebounceTimer = null;
@@ -296,6 +356,38 @@ export class SpotMapView {
       regionSelect.addEventListener('change', (e) => {
         const newRegionId = e.target.value;
         this.setMacroRegion(newRegionId);
+      });
+    }
+
+    // Locality / Spot direct selector
+    const spotSelect = this.container.querySelector('#gm-map-spot-select');
+    if (spotSelect) {
+      spotSelect.addEventListener('change', (e) => {
+        const spotId = e.target.value;
+        if (!spotId) {
+          this.focusedSpotId = null;
+          const regionConfig = Object.values(MACRO_REGIONS).find(r => r.id === this.activeMacroRegion) || MACRO_REGIONS.ALL;
+          if (this.mapEngine) {
+            this.mapEngine.setView(regionConfig.defaultCenter, regionConfig.defaultZoom);
+          }
+          this.renderMapContent();
+          return;
+        }
+
+        const spot = this.comprensoriCatalog.find(s => s.id === spotId);
+        if (spot) {
+          this.focusedSpotId = spot.id;
+          const coords = getComprensorioCoordinates(spot);
+          if (coords && this.mapEngine) {
+            this.mapEngine.flyTo(coords, 12);
+            this.handleSpotFocus(spot);
+            if (typeof this.mapEngine.openSpotPopup === 'function') {
+              setTimeout(() => {
+                this.mapEngine.openSpotPopup(spot.id);
+              }, 300);
+            }
+          }
+        }
       });
     }
 
@@ -385,12 +477,14 @@ export class SpotMapView {
    */
   setMacroRegion(regionId) {
     this.activeMacroRegion = regionId;
+    this.focusedSpotId = null;
     const regionConfig = Object.values(MACRO_REGIONS).find(r => r.id === regionId) || MACRO_REGIONS.ALL;
 
     if (this.mapEngine) {
       this.mapEngine.setView(regionConfig.defaultCenter, regionConfig.defaultZoom);
     }
 
+    this.updateSpotSelectOptions();
     this.renderMapContent();
     this.syncMacroRegionWeather(regionId);
   }
@@ -663,10 +757,18 @@ export class SpotMapView {
     if (!spotEval) return;
     const spot = spotEval.comprensorio || spotEval;
     const spotId = spot.id || spotEval.id;
-    if (spotId && spotId !== this.focusedSpotId) {
+    if (spotId) {
       this.focusedSpotId = spotId;
       if (typeof store.setState === 'function') {
-        store.setState({ selectedSpotId: spotId });
+        if (store.getState().selectedSpotId !== spotId) {
+          store.setState({ selectedSpotId: spotId });
+        }
+      }
+    }
+    if (this.container) {
+      const spotSelect = this.container.querySelector('#gm-map-spot-select');
+      if (spotSelect && spotId && spotSelect.value !== spotId) {
+        spotSelect.value = spotId;
       }
     }
     this.updateScrubberBars(spotEval);

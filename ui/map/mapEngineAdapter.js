@@ -267,6 +267,20 @@ export class HeadlessMockMapEngine {
     this.isPaused = false;
   }
 
+  invalidateSize() {
+    return this;
+  }
+
+  centerOnComprensorio() {
+    this.centeredOnComprensorio = true;
+    return this;
+  }
+
+  showUserLocation(lat, lon) {
+    this.userLocation = { lat, lon };
+    return this;
+  }
+
   destroy() {
     this.destroyed = true;
     this.eventListeners.clear();
@@ -412,6 +426,8 @@ export class LeafletMapEngine {
     this.isMiniMap = Boolean(options.isMiniMap);
     this.canvasRenderer = null;
     this.renderedMode = 'circular';
+    this.lastComprensorioBounds = null;
+    this.userLocationMarker = null;
     this.init(containerEl, options);
   }
 
@@ -442,7 +458,7 @@ export class LeafletMapEngine {
 
     this.map = window.L.map(containerEl, mapOptions);
 
-    if (!this.isMiniMap) {
+    if (!this.isMiniMap && !this.options.isFlightAnalysis && this.options.zoomControl !== false) {
       // Add zoom control in top-right to preserve bottom Thumb Zone
       window.L.control.zoom({ position: 'topright' }).addTo(this.map);
     }
@@ -1033,20 +1049,25 @@ export class LeafletMapEngine {
     const lTurb = landingWeather.turbulence ?? 0.1;
     const lAlt = data.landing?.altitude || 300;
 
-    // 1. Takeoff Windsock Marker + Sector
+    // 1. Takeoff Pin + Windsock
     if (tCoord) {
-      const sectorSvg = generateTakeoffSectorSvg(tHeading, tDir, tAlt, { prefix: 'fl-to-sec-' });
-      const sectorIcon = window.L.divIcon({
-        className: 'gm-takeoff-sector-marker-container',
-        html: sectorSvg,
-        iconSize: [140, 140],
-        iconAnchor: [70, 70]
+      const takeoffName = (data.takeoff?.name || 'Decollo').replace(/^Decollo\s*/i, '');
+      const tIcon = window.L.divIcon({
+        className: 'gm-map-div-icon',
+        html: `
+          <div class="gm-mini-pin gm-mini-pin-takeoff gm-mini-pin-focused" title="Decollo ${takeoffName} (${tAlt}m)">
+            <span class="gm-mini-pin-glyph">▲</span>
+            <span class="gm-mini-pin-alt">${tAlt}m</span>
+          </div>
+        `,
+        iconSize: [60, 24],
+        iconAnchor: [30, 12]
       });
-      this.flightTakeoffSector = window.L.marker([tCoord.lat, tCoord.lon], {
-        icon: sectorIcon,
-        zIndexOffset: 300
+      this.flightTakeoffPin = window.L.marker([tCoord.lat, tCoord.lon], {
+        icon: tIcon,
+        zIndexOffset: 500
       });
-      this.overlayLayerGroup.addLayer(this.flightTakeoffSector);
+      this.overlayLayerGroup.addLayer(this.flightTakeoffPin);
 
       const wsTakeoffHtml = generateWindsockSvg(tSpeed, tGust, tDir, tTurb, { prefix: 'fl-to-ws-', scale: 0.5 });
       const wsTakeoffIcon = window.L.divIcon({
@@ -1062,7 +1083,7 @@ export class LeafletMapEngine {
       this.overlayLayerGroup.addLayer(this.flightTakeoffWindsock);
     }
 
-    // 2. Landing Windsock Marker + Landing Pin
+    // 2. Landing Pin + Windsock
     if (lCoord) {
       const landingName = (data.landing?.name || 'Atterraggio').replace(/^Atterraggio\s*/i, '');
       const lIcon = window.L.divIcon({
@@ -1096,119 +1117,33 @@ export class LeafletMapEngine {
       this.overlayLayerGroup.addLayer(this.flightLandingWindsock);
     }
 
-    // 3. Glide line between takeoff and landing
-    if (tCoord && lCoord) {
-      this.flightGlideLine = window.L.polyline(
-        [[tCoord.lat, tCoord.lon], [lCoord.lat, lCoord.lon]],
-        { color: '#16a34a', weight: 2.5, dashArray: '6, 8', opacity: 0.75 }
-      );
-      this.overlayLayerGroup.addLayer(this.flightGlideLine);
-    }
-
-    // 4. Vector Landing Circuit (Dual-track casing 6px + core 3px)
-    const circuit = data.circuitData;
-    const casingColor = (this.theme === 'dark' && this.currentLayerId === 'dark') ? '#ffffff' : '#000000';
+    // 3. Fit bounds strictly on authentic aeronautical points
     const allPoints = [];
     if (tCoord) allPoints.push([tCoord.lat, tCoord.lon]);
     if (lCoord) allPoints.push([lCoord.lat, lCoord.lon]);
 
-    if (circuit?.polylines) {
-      const isFig8 = circuit.circuitType === 'figure_eight';
-
-      const addDualPolyline = (key, pts, coreColor, isDashed = false) => {
-        if (!pts || pts.length < 2) return;
-        const casing = window.L.polyline(pts, {
-          color: casingColor,
-          weight: 6,
-          opacity: 0.85,
-          lineCap: 'round',
-          lineJoin: 'round'
-        });
-        const core = window.L.polyline(pts, {
-          color: coreColor,
-          weight: 3,
-          opacity: 0.95,
-          dashArray: isDashed ? '6, 6' : null,
-          lineCap: 'round',
-          lineJoin: 'round'
-        });
-        this.overlayLayerGroup.addLayer(casing);
-        this.overlayLayerGroup.addLayer(core);
-        this.circuitLayers[key + 'Casing'] = casing;
-        this.circuitLayers[key + 'Core'] = core;
-        pts.forEach(p => allPoints.push(p));
-      };
-
-      if (isFig8) {
-        addDualPolyline('fig8', circuit.polylines.figureEight, '#dc2626');
-      } else {
-        addDualPolyline('downwind', circuit.polylines.downwindLeg, '#b45309');
-        addDualPolyline('base', circuit.polylines.baseLeg, '#2563eb');
-        addDualPolyline('final', circuit.polylines.finalLeg, '#15803d');
-      }
-
-      if (circuit.holdingArea?.center && !isFig8) {
-        const hc = circuit.holdingArea.center;
-        this.circuitLayers.holdingCircle = window.L.circle([hc.lat, hc.lon], {
-          radius: circuit.holdingArea.radiusMeters || 75,
-          color: '#6366f1',
-          weight: 2,
-          dashArray: '4, 6',
-          fillColor: '#6366f1',
-          fillOpacity: 0.12
-        });
-        this.overlayLayerGroup.addLayer(this.circuitLayers.holdingCircle);
-        allPoints.push([hc.lat, hc.lon]);
-      }
-    }
-
-    // 5. Fit bounds
     if (allPoints.length >= 2) {
       const bounds = window.L.latLngBounds(allPoints);
-      this.map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+      this.lastComprensorioBounds = bounds;
+      this.map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
       if (typeof window !== 'undefined') {
         setTimeout(() => {
           if (this.map) {
             this.map.invalidateSize();
-            this.map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+            this.map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
           }
         }, 60);
       }
     } else if (lCoord) {
       this.map.setView([lCoord.lat, lCoord.lon], 15);
+    } else if (tCoord) {
+      this.map.setView([tCoord.lat, tCoord.lon], 15);
     }
 
     return this;
   }
 
   updateFlightProcedures(circuitData, options = {}) {
-    if (!circuitData) return;
-    this.lastCircuitData = circuitData;
-
-    const isFig8 = circuitData.circuitType === 'figure_eight';
-
-    const updateDual = (key, pts) => {
-      const casing = this.circuitLayers?.[key + 'Casing'];
-      const core = this.circuitLayers?.[key + 'Core'];
-      if (casing && core && pts) {
-        casing.setLatLngs(pts);
-        core.setLatLngs(pts);
-      }
-    };
-
-    if (isFig8) {
-      updateDual('fig8', circuitData.polylines?.figureEight);
-    } else {
-      updateDual('downwind', circuitData.polylines?.downwindLeg);
-      updateDual('base', circuitData.polylines?.baseLeg);
-      updateDual('final', circuitData.polylines?.finalLeg);
-    }
-
-    if (this.circuitLayers?.holdingCircle && circuitData.holdingArea?.center) {
-      const hc = circuitData.holdingArea.center;
-      this.circuitLayers.holdingCircle.setLatLng([hc.lat, hc.lon]);
-    }
-
     if (options.takeoffWeather && this.flightTakeoffWindsock) {
       const el = this.flightTakeoffWindsock.getElement();
       if (el) {
@@ -1232,11 +1167,65 @@ export class LeafletMapEngine {
     }
   }
 
+  invalidateSize() {
+    if (this.map && typeof this.map.invalidateSize === 'function') {
+      this.map.invalidateSize();
+    }
+    return this;
+  }
+
+  centerOnComprensorio() {
+    if (!this.map) return this;
+    if (this.lastComprensorioBounds) {
+      this.map.fitBounds(this.lastComprensorioBounds, { padding: [50, 50], maxZoom: 16 });
+    } else if (this.activeFlightData) {
+      const tCoord = parseCoordinates(this.activeFlightData.takeoff?.coordinates || this.activeFlightData.comprensorio?.takeoffs?.[0]?.coordinates);
+      const lCoord = parseCoordinates(this.activeFlightData.landing?.coordinates || this.activeFlightData.comprensorio?.landings?.[0]?.coordinates);
+      const pts = [];
+      if (tCoord) pts.push([tCoord.lat, tCoord.lon]);
+      if (lCoord) pts.push([lCoord.lat, lCoord.lon]);
+      if (pts.length >= 2 && window.L) {
+        this.map.fitBounds(window.L.latLngBounds(pts), { padding: [50, 50], maxZoom: 16 });
+      } else if (pts.length === 1) {
+        this.map.setView(pts[0], 15);
+      }
+    }
+    return this;
+  }
+
+  showUserLocation(lat, lon) {
+    if (typeof window === 'undefined' || !window.L || !this.map) return this;
+    if (!this.userLocationMarker) {
+      const userIcon = window.L.divIcon({
+        className: 'gm-user-gps-marker',
+        html: '<div class="gm-gps-pulse-outer"><div class="gm-gps-pulse-inner"></div></div>',
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+      });
+      this.userLocationMarker = window.L.marker([lat, lon], {
+        icon: userIcon,
+        zIndexOffset: 1500
+      }).addTo(this.map);
+    } else {
+      this.userLocationMarker.setLatLng([lat, lon]);
+    }
+    this.map.setView([lat, lon], Math.max(this.map.getZoom(), 14));
+    return this;
+  }
+
   destroy() {
     this.clearOverlays();
+    if (this.userLocationMarker) {
+      this.userLocationMarker.remove();
+      this.userLocationMarker = null;
+    }
     if (this.map) {
       this.map.remove();
       this.map = null;
+    }
+    if (this.flightTakeoffPin) {
+      this.flightTakeoffPin.remove();
+      this.flightTakeoffPin = null;
     }
     this.windsockMarker = null;
     this.takeoffSectorMarker = null;

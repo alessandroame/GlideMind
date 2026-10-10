@@ -254,7 +254,9 @@ button, input, select, textarea {
 }
 
 #main-view.gm-view-forecast,
-#main-view:has(.gm-forecast-view) {
+#main-view:has(.gm-forecast-view),
+#main-view.gm-view-map,
+#main-view:has(.gm-map-view) {
   padding: 0;
   overflow: hidden;
 }
@@ -268,7 +270,9 @@ button, input, select, textarea {
   }
 
   #main-view.gm-view-forecast,
-  #main-view:has(.gm-forecast-view) {
+  #main-view:has(.gm-forecast-view),
+  #main-view.gm-view-map,
+  #main-view:has(.gm-map-view) {
     padding: 0;
     max-width: 100%;
   }
@@ -4281,26 +4285,26 @@ input.gm-input:focus {
   flex-direction: column;
 }
 
-.gm-map-canvas-container {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 1;
-  background-color: var(--gm-bg-base);
-}
-
-/* Top Floating Action Bar (Non-blocking layout) */
+/* Top External Action & Filter Bar (Outside and above map canvas) */
 .gm-map-top-bar {
-  position: absolute;
-  top: calc(12px + env(safe-area-inset-top, 0px));
-  left: 12px;
-  right: 12px;
+  position: relative;
+  width: 100%;
+  flex-shrink: 0;
   z-index: 500;
-  pointer-events: none;
+  background: var(--gm-bg-surface);
+  border-bottom: 1px solid var(--gm-border);
+  padding: calc(8px + env(safe-area-inset-top, 0px)) 12px 8px 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
+  pointer-events: auto;
+}
+
+[data-theme="light"] .gm-map-top-bar {
+  background: #ffffff;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 .gm-map-controls-row {
@@ -4309,13 +4313,15 @@ input.gm-input:focus {
   justify-content: space-between;
   gap: 8px;
   flex-wrap: wrap;
-  pointer-events: none;
+  width: 100%;
+  pointer-events: auto;
 }
 
 .gm-map-group-left {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
   pointer-events: auto;
 }
 
@@ -4323,7 +4329,25 @@ input.gm-input:focus {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
   pointer-events: auto;
+}
+
+.gm-map-canvas-wrapper {
+  position: relative;
+  flex: 1 1 0%;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+.gm-map-canvas-container {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  background-color: var(--gm-bg-base);
 }
 
 .gm-map-pill-btn {
@@ -4343,11 +4367,37 @@ input.gm-input:focus {
   -webkit-backdrop-filter: blur(12px) saturate(160%);
   box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.35), var(--gm-shadow-sm);
   transition: background var(--gm-transition-fast), border-color var(--gm-transition-fast), transform var(--gm-transition-fast);
+  max-width: min(220px, 45vw);
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.gm-map-pill-btn option {
+  background-color: var(--gm-bg-surface);
+  color: var(--gm-text-primary);
+}
+
+[data-theme="light"] .gm-map-pill-btn {
+  background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
+  color: #0f172a;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .gm-map-pill-btn option {
+  background-color: #ffffff;
+  color: #0f172a;
 }
 
 .gm-map-pill-btn:hover {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.25) 0%, rgba(26, 33, 48, 0.82) 100%);
   border-color: rgba(56, 189, 248, 0.6);
+  color: var(--gm-accent);
+}
+
+[data-theme="light"] .gm-map-pill-btn:hover {
+  background: linear-gradient(135deg, #ffffff 0%, #e2e8f0 100%);
+  border-color: var(--gm-accent);
   color: var(--gm-accent);
 }
 
@@ -4396,7 +4446,7 @@ input.gm-input:focus {
 /* Bottom Docked Scrubber with solid backdrop and clear elevation */
 .gm-map-scrubber-container {
   position: absolute;
-  bottom: calc(var(--gm-nav-height, 64px) + 24px);
+  bottom: 16px;
   left: 12px;
   right: 12px;
   z-index: 600;
@@ -5539,28 +5589,24 @@ input.gm-input:focus {
 }
 
 .gm-flight-analysis-header {
-  position: absolute;
-  top: env(safe-area-inset-top, 8px);
-  left: 12px;
-  right: 12px;
-  z-index: 1060;
+  position: relative;
+  width: 100%;
+  flex-shrink: 0;
+  z-index: 500;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 8px 12px;
-  background: rgba(15, 23, 42, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: var(--gm-radius-lg, 12px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  gap: 12px;
+  padding: calc(8px + env(safe-area-inset-top, 0px)) 16px 8px 16px;
+  background: var(--gm-bg-surface);
+  border-bottom: 1px solid var(--gm-border);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
 }
 
 [data-theme="light"] .gm-flight-analysis-header {
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid rgba(15, 23, 42, 0.15);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  background: #ffffff;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 .gm-flight-analysis-title-group {
@@ -5597,22 +5643,102 @@ input.gm-input:focus {
   flex-shrink: 0;
 }
 
+/* Floating Map Controls (Overlaying Map Canvas) */
+.gm-flight-analysis-map-controls {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.gm-flight-analysis-controls-left,
+.gm-flight-analysis-controls-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.gm-flight-analysis-ctrl-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--gm-touch-min, 44px);
+  min-width: var(--gm-touch-min, 44px);
+  padding: 6px 12px;
+  font-size: var(--gm-font-xs, 12px);
+  font-weight: 600;
+  color: var(--gm-text-primary);
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--gm-radius-md, 8px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  transition: background var(--gm-transition-fast), border-color var(--gm-transition-fast), transform var(--gm-transition-fast);
+}
+
+[data-theme="light"] .gm-flight-analysis-ctrl-btn {
+  background: rgba(255, 255, 255, 0.92);
+  color: #0f172a;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.gm-flight-analysis-ctrl-btn:hover {
+  border-color: var(--gm-accent);
+  color: var(--gm-accent);
+}
+
+.gm-flight-analysis-ctrl-btn:active {
+  transform: scale(0.96);
+}
+
+.gm-flight-analysis-ctrl-btn.loading {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
 .gm-flight-analysis-layer-select {
-  height: 36px;
+  height: var(--gm-touch-min, 44px);
+  min-height: var(--gm-touch-min, 44px);
+  min-width: 44px;
   padding: 0 10px;
   font-size: var(--gm-font-xs, 12px);
   font-weight: 600;
   color: var(--gm-text-primary);
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: var(--gm-radius-md, 8px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
   cursor: pointer;
   outline: none;
 }
 
+.gm-flight-analysis-layer-select option {
+  background-color: var(--gm-bg-card, #12161f);
+  color: var(--gm-text-primary, #f8fafc);
+}
+
 [data-theme="light"] .gm-flight-analysis-layer-select {
-  background: rgba(0, 0, 0, 0.05);
-  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  color: var(--gm-text-primary, #0f172a);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .gm-flight-analysis-layer-select option {
+  background-color: var(--gm-bg-surface, #ffffff);
+  color: var(--gm-text-primary, #0f172a);
 }
 
 .gm-flight-analysis-close-btn {
@@ -5642,10 +5768,66 @@ input.gm-input:focus {
 }
 
 .gm-flight-analysis-map-container {
-  flex: 1;
+  flex: 1 1 0%;
+  min-height: 0;
   width: 100%;
-  height: 100%;
   position: relative;
+  overflow: hidden;
+}
+
+/* Leaflet zoom control safeguard: explicitly hide in flight analysis overlay */
+.gm-flight-analysis-overlay .leaflet-control-zoom {
+  display: none !important;
+}
+
+/* GPS User Location Marker */
+.gm-user-gps-marker {
+  position: relative;
+  width: 24px;
+  height: 24px;
+}
+
+.gm-gps-pulse-outer {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(56, 189, 248, 0.35);
+  animation: gm-gps-pulse 2s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gm-gps-pulse-inner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #38bdf8;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.8);
+}
+
+@keyframes gm-gps-pulse {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.8;
+  }
+  70% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gm-gps-pulse-outer {
+    animation: none;
+    transform: none;
+    opacity: 0.5;
+  }
 }
 
 .gm-flight-analysis-map {
@@ -5743,18 +5925,10 @@ input.gm-input:focus {
 }
 
 .gm-flight-analysis-scrubber {
-  display: flex;
-  align-items: stretch;
-  gap: 3px;
-  background: rgba(0, 0, 0, 0.25);
-  padding: 4px;
-  border-radius: var(--gm-radius-md, 8px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-[data-theme="light"] .gm-flight-analysis-scrubber {
-  background: rgba(0, 0, 0, 0.04);
-  border-color: rgba(0, 0, 0, 0.08);
+  width: 100%;
+  box-sizing: border-box;
+  padding: 2px 0 0;
+  touch-action: none;
 }
 
 .gm-flight-analysis-slot {

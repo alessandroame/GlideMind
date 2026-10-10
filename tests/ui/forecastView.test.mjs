@@ -1322,6 +1322,105 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.ok(themeCss.includes('.gm-flight-safety-warning-banner {'), 'Must declare flight safety warning banner');
     assert.ok(themeCss.includes('.gm-flight-analysis-slot {'), 'Must declare scrubber slots');
     assert.ok(themeCss.includes('touch-action: pan-x'), 'Scrubber must support single-row horizontal pan-x');
+    assert.ok(themeCss.includes('.gm-flight-analysis-map-controls {'), 'Must declare floating map controls');
+    assert.ok(themeCss.includes('.gm-flight-analysis-ctrl-btn {'), 'Must declare map control buttons');
+    assert.ok(themeCss.includes('.gm-user-gps-marker {'), 'Must declare GPS user marker');
+  });
+
+  it('should render locality title in top header outside map and map controls inside map container', () => {
+    const spot = DEFAULT_COMPRENSORI[0];
+    const mockStore = createStore({
+      selectedSpot: spot,
+      ui: { theme: 'dark', mapLayer: 'topo' }
+    });
+    const controller = new ForecastViewController({ store: mockStore });
+
+    controller.openFlightAnalysisOverlay();
+
+    assert.ok(controller.flightAnalysisMapEngine, 'Map engine must be initialized');
+    assert.equal(controller.flightAnalysisMapEngine.options.isFlightAnalysis, true, 'isFlightAnalysis must be true');
+    assert.equal(controller.flightAnalysisMapEngine.options.zoomControl, false, 'zoomControl must be false');
+
+    // Test center-comprensorio
+    let centerCalled = false;
+    controller.flightAnalysisMapEngine.centerOnComprensorio = () => { centerCalled = true; };
+    controller.handleClick({
+      target: {
+        closest: (sel) => (sel === '[data-action]' ? { getAttribute: () => 'center-comprensorio' } : null)
+      }
+    });
+    assert.strictEqual(centerCalled, true, 'Clicking center-comprensorio must invoke centerOnComprensorio');
+
+    // Test center-gps
+    let userLocationCalled = false;
+    controller.flightAnalysisMapEngine.showUserLocation = () => { userLocationCalled = true; };
+    assert.strictEqual(typeof controller.centerOnUserLocation, 'function');
+
+    controller.closeFlightAnalysisOverlay();
+  });
+
+  it('should support touch swipe scrubbing on both main and flight analysis strips with clientX normalization', () => {
+    const spot = DEFAULT_COMPRENSORI[0];
+    const mockStore = createStore({
+      selectedSpot: spot,
+      ui: { theme: 'dark', mapLayer: 'topo' }
+    });
+    const controller = new ForecastViewController({ store: mockStore });
+
+    // Open overlay
+    controller.openFlightAnalysisOverlay();
+
+    // Mock overlayStrip element for headless environment
+    const overlayStrip = {
+      id: 'flight-analysis-timeline-strip',
+      classList: { contains: () => false },
+      closest: (sel) => (sel === '.gm-timeline-grid-13' ? overlayStrip : null),
+      contains: (target) => target === overlayStrip,
+      getBoundingClientRect: () => ({ left: 100, width: 260 }),
+      querySelectorAll: () => []
+    };
+    controller.flightAnalysisOverlayEl = {
+      querySelector: (sel) => (sel === '#flight-analysis-timeline-strip' ? overlayStrip : null)
+    };
+
+    assert.ok(controller.findActiveTimelineStrip(overlayStrip), 'Active strip must be resolved from target');
+
+    // Simulate touchstart at 14:00 (hour index 6, relX = 120 -> clientX = 220)
+    // 8 + Math.floor((120 / 260) * 13) = 8 + Math.floor(6) = 14
+    controller.handlePointerDown({
+      target: overlayStrip,
+      touches: [{ clientX: 220 }],
+      cancelable: true,
+      preventDefault: () => {}
+    });
+
+    assert.strictEqual(controller.selectedHour, 14, 'Selected hour must update to 14 on touchstart swipe');
+    assert.strictEqual(controller.isScrubbing, true, 'Controller must enter scrubbing mode');
+
+    // Simulate touchmove at 16:00 (hour index 8, relX = 170 -> clientX = 270)
+    // 8 + Math.floor((170 / 260) * 13) = 8 + 8 = 16
+    controller.handlePointerMove({
+      touches: [{ clientX: 270 }],
+      cancelable: true,
+      preventDefault: () => {}
+    });
+
+    assert.strictEqual(controller.selectedHour, 16, 'Selected hour must update to 16 on touchmove swipe');
+
+    // Release swipe
+    controller.handlePointerUp({
+      changedTouches: [{ clientX: 270 }]
+    });
+
+    assert.strictEqual(controller.isScrubbing, false, 'Controller must exit scrubbing mode on touchend');
+
+    // Verify clientX normalization across Pointer, Touch, and Mouse events
+    assert.strictEqual(controller.getClientX({ clientX: 150 }), 150);
+    assert.strictEqual(controller.getClientX({ touches: [{ clientX: 180 }] }), 180);
+    assert.strictEqual(controller.getClientX({ changedTouches: [{ clientX: 210 }] }), 210);
+    assert.strictEqual(controller.getClientX({}), 0);
+
+    controller.closeFlightAnalysisOverlay();
   });
 });
 

@@ -337,7 +337,11 @@ export class ForecastViewController {
     this.boundPointerDown = this.handlePointerDown.bind(this);
     this.boundPointerMove = this.handlePointerMove.bind(this);
     this.boundPointerUp = this.handlePointerUp.bind(this);
+    this.boundTouchStart = (e) => this.handlePointerDown(e);
+    this.boundTouchMove = (e) => this.handlePointerMove(e);
+    this.boundTouchEnd = (e) => this.handlePointerUp(e);
     this.isScrubbing = false;
+    this.activeScrubStrip = null;
 
     // Initial local view state
     const now = new Date();
@@ -697,6 +701,7 @@ export class ForecastViewController {
       this.containerEl.addEventListener('click', this.boundClickHandler);
       this.containerEl.addEventListener('change', this.boundChangeHandler);
       this.containerEl.addEventListener('pointerdown', this.boundPointerDown);
+      this.containerEl.addEventListener('touchstart', this.boundTouchStart, { passive: false });
       this.containerEl.addEventListener('pointermove', this.boundPointerMove);
       this.containerEl.addEventListener('pointerup', this.boundPointerUp);
       this.containerEl.addEventListener('pointercancel', this.boundPointerUp);
@@ -781,6 +786,7 @@ export class ForecastViewController {
       this.containerEl.removeEventListener('click', this.boundClickHandler);
       this.containerEl.removeEventListener('change', this.boundChangeHandler);
       this.containerEl.removeEventListener('pointerdown', this.boundPointerDown);
+      this.containerEl.removeEventListener('touchstart', this.boundTouchStart);
       this.containerEl.removeEventListener('pointermove', this.boundPointerMove);
       this.containerEl.removeEventListener('pointerup', this.boundPointerUp);
       this.containerEl.removeEventListener('pointercancel', this.boundPointerUp);
@@ -2958,7 +2964,17 @@ export class ForecastViewController {
    * @param {object} glider
    * @returns {string}
    */
-  renderStickyScrubber(spot, weatherData, glider) {
+  /**
+   * Renders the 13-slot hourly flyability timeline grid (08:00 - 20:00).
+   * Shared between the bottom docked scrubber and the flight analysis overlay.
+   * 
+   * @param {object} spot
+   * @param {object} weatherData
+   * @param {object} glider
+   * @param {string} [stripId='forecast-timeline-strip']
+   * @returns {string}
+   */
+  renderTimelineGrid(spot, weatherData, glider, stripId = 'forecast-timeline-strip') {
     const now = new Date();
     const todayIso = formatDateIso(now);
     const isToday = this.activeDate === todayIso;
@@ -2983,57 +2999,70 @@ export class ForecastViewController {
     }
 
     return `
+      <div id="${stripId}" class="gm-timeline-grid-13" role="tablist" aria-label="Timeline oraria">
+        ${hours.map(slot => {
+          const h = slot.hour;
+          const evalH = slot.eval;
+          const weather = evalH.weatherSnapshot || {};
+          const speed = Math.round(weather.windSpeed || 0);
+
+          let fillPct = 35;
+          let fillColor = 'var(--gm-status-unflyable)';
+          let slotBgColor = 'var(--gm-status-unflyable-bg)';
+          if (evalH.status === 'flyable') {
+            fillPct = 100;
+            fillColor = 'var(--gm-status-flyable)';
+            slotBgColor = 'var(--gm-status-flyable-bg)';
+          } else if (evalH.status === 'caution') {
+            fillPct = 65;
+            fillColor = 'var(--gm-status-caution)';
+            slotBgColor = 'var(--gm-status-caution-bg)';
+          }
+
+          const stateClasses = [
+            'gm-timeline-col gm-timeline-col-compact',
+            slot.isActive ? 'active' : '',
+            slot.isCurrentHour ? 'is-now' : '',
+            slot.isPast ? 'is-past' : ''
+          ].filter(Boolean).join(' ');
+
+          return `
+            <div 
+              class="${stateClasses}"
+              data-action="select-hour"
+              data-hour="${h}"
+              role="tab"
+              aria-selected="${slot.isActive ? 'true' : 'false'}"
+              aria-label="Ore ${String(h).padStart(2, '0')}:00, ${evalH.badge}, Vento ${speed} km/h${slot.isCurrentHour ? ' (Ora attuale)' : ''}"
+              tabindex="${slot.isActive ? '0' : '-1'}"
+            >
+              ${slot.isCurrentHour ? '<span class="compact-now-badge" aria-label="Ora attuale">ORA</span>' : ''}
+              <span class="compact-time">${String(h).padStart(2, '0')}</span>
+              <div class="compact-bar" style="background-color: ${slotBgColor};">
+                <div class="compact-bar-fill" style="height: ${fillPct}%; background-color: ${fillColor};"></div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  /**
+   * Renders the bottom docked sticky scrubber container in ForecastView.
+   * @param {object} spot
+   * @param {object} weatherData
+   * @param {object} glider
+   * @returns {string}
+   */
+  renderStickyScrubber(spot, weatherData, glider) {
+    return `
       <aside 
         id="forecast-timeline-scrubber" 
         class="gm-timeline-scrubber-sticky"
         aria-label="Timeline oraria ancorata"
       >
-        <div id="forecast-timeline-strip" class="gm-timeline-grid-13" role="tablist" aria-label="Timeline oraria">
-          ${hours.map(slot => {
-            const h = slot.hour;
-            const evalH = slot.eval;
-            const weather = evalH.weatherSnapshot || {};
-            const speed = Math.round(weather.windSpeed || 0);
-
-            let fillPct = 35;
-            let fillColor = 'var(--gm-status-unflyable)';
-            let slotBgColor = 'var(--gm-status-unflyable-bg)';
-            if (evalH.status === 'flyable') {
-              fillPct = 100;
-              fillColor = 'var(--gm-status-flyable)';
-              slotBgColor = 'var(--gm-status-flyable-bg)';
-            } else if (evalH.status === 'caution') {
-              fillPct = 65;
-              fillColor = 'var(--gm-status-caution)';
-              slotBgColor = 'var(--gm-status-caution-bg)';
-            }
-
-            const stateClasses = [
-              'gm-timeline-col gm-timeline-col-compact',
-              slot.isActive ? 'active' : '',
-              slot.isCurrentHour ? 'is-now' : '',
-              slot.isPast ? 'is-past' : ''
-            ].filter(Boolean).join(' ');
-
-            return `
-              <div 
-                class="${stateClasses}"
-                data-action="select-hour"
-                data-hour="${h}"
-                role="tab"
-                aria-selected="${slot.isActive ? 'true' : 'false'}"
-                aria-label="Ore ${String(h).padStart(2, '0')}:00, ${evalH.badge}, Vento ${speed} km/h${slot.isCurrentHour ? ' (Ora attuale)' : ''}"
-                tabindex="${slot.isActive ? '0' : '-1'}"
-              >
-                ${slot.isCurrentHour ? '<span class="compact-now-badge" aria-label="Ora attuale">ORA</span>' : ''}
-                <span class="compact-time">${String(h).padStart(2, '0')}</span>
-                <div class="compact-bar" style="background-color: ${slotBgColor};">
-                  <div class="compact-bar-fill" style="height: ${fillPct}%; background-color: ${fillColor};"></div>
-                </div>
-              </div>
-            `;
-          }).join('')}
-        </div>
+        ${this.renderTimelineGrid(spot, weatherData, glider, 'forecast-timeline-strip')}
       </aside>
     `;
   }
@@ -3338,9 +3367,14 @@ export class ForecastViewController {
     });
     const activeSubSpotObj = this.resolveActiveSubSpot(spot);
 
-    // 1. Update Active Slot in timeline strip in place (zero layout thrashing)
-    const strip = this.containerEl.querySelector('#forecast-timeline-strip');
-    if (strip) {
+    // 1. Update Active Slot in all timeline strips in place (zero layout thrashing)
+    const strips = [
+      this.containerEl?.querySelector('#forecast-timeline-strip'),
+      this.flightAnalysisOverlayEl?.querySelector('#flight-analysis-timeline-strip'),
+      typeof document !== 'undefined' ? document.getElementById('flight-analysis-timeline-strip') : null
+    ].filter(Boolean);
+
+    strips.forEach(strip => {
       const cols = strip.querySelectorAll('.gm-timeline-col-compact');
       cols.forEach(col => {
         const colHour = parseInt(col.getAttribute('data-hour'), 10);
@@ -3349,7 +3383,7 @@ export class ForecastViewController {
         col.setAttribute('aria-selected', isActive ? 'true' : 'false');
         col.setAttribute('tabindex', isActive ? '0' : '-1');
       });
-    }
+    });
 
     // 2. Update Spot Card metrics container (safeguarding the mini-map from DOM destruction)
     if (metricsContainer) {
@@ -3385,19 +3419,53 @@ export class ForecastViewController {
     if (soundingContainer) {
       soundingContainer.innerHTML = this.renderSoundingPanel(evaluated, weatherData, spot, activeSubSpotObj);
     }
+
+    // 6. Update Flight Analysis Overlay if open
+    if (this.isFlightAnalysisOpen) {
+      this.updateFlightAnalysisOverlay(evaluated);
+    }
   }
 
   /**
-   * Handles pointerdown on scrubber timeline to start continuous slide selection.
-   * @param {PointerEvent} evt
+   * Discovers the active timeline strip element from an event target or open view.
+   * @param {EventTarget} [target]
+   * @returns {HTMLElement|null}
+   */
+  findActiveTimelineStrip(target) {
+    if (target && typeof target.closest === 'function') {
+      const closestStrip = target.closest('.gm-timeline-grid-13');
+      if (closestStrip) return closestStrip;
+    }
+    if (this.isFlightAnalysisOpen && this.flightAnalysisOverlayEl) {
+      return this.flightAnalysisOverlayEl.querySelector('#flight-analysis-timeline-strip');
+    }
+    return this.containerEl ? this.containerEl.querySelector('#forecast-timeline-strip') : null;
+  }
+
+  /**
+   * Normalizes clientX coordinate across PointerEvents, MouseEvents, and TouchEvents.
+   * @param {PointerEvent|TouchEvent|MouseEvent} evt
+   * @returns {number}
+   */
+  getClientX(evt) {
+    if (evt.clientX != null) return evt.clientX;
+    if (evt.touches && evt.touches.length > 0) return evt.touches[0].clientX;
+    if (evt.changedTouches && evt.changedTouches.length > 0) return evt.changedTouches[0].clientX;
+    return 0;
+  }
+
+  /**
+   * Handles pointerdown / touchstart on scrubber timeline to start continuous slide selection.
+   * @param {PointerEvent|TouchEvent} evt
    */
   handlePointerDown(evt) {
-    const strip = this.containerEl ? this.containerEl.querySelector('#forecast-timeline-strip') : null;
+    const strip = this.findActiveTimelineStrip(evt.target);
     if (!strip) return;
     if (!strip.contains(evt.target) && evt.target !== strip) return;
 
+    this.activeScrubStrip = strip;
     this.isScrubbing = true;
-    this.pointerStartX = evt.clientX != null ? evt.clientX : 0;
+    this.pointerStartX = this.getClientX(evt);
     this.hasDraggedPointer = false;
 
     // Immediately blur active element to prevent sticky focus/hover styling on initial touched slot
@@ -3413,36 +3481,59 @@ export class ForecastViewController {
       }
     } catch (_) {}
 
-    this.updateHourFromPointer(evt, strip);
-  }
-
-  /**
-   * Handles pointermove on scrubber timeline during active slide.
-   * @param {PointerEvent} evt
-   */
-  handlePointerMove(evt) {
-    if (!this.isScrubbing) return;
-    const strip = this.containerEl ? this.containerEl.querySelector('#forecast-timeline-strip') : null;
-    if (!strip) return;
-
-    if (evt.clientX != null && Math.abs(evt.clientX - this.pointerStartX) > 4) {
-      this.hasDraggedPointer = true;
+    // Attach global window listeners to seamlessly track scrubbing across entire screen
+    if (typeof window !== 'undefined') {
+      window.addEventListener('pointermove', this.boundPointerMove, { passive: false });
+      window.addEventListener('pointerup', this.boundPointerUp);
+      window.addEventListener('pointercancel', this.boundPointerUp);
+      window.addEventListener('touchmove', this.boundTouchMove, { passive: false });
+      window.addEventListener('touchend', this.boundTouchEnd);
+      window.addEventListener('touchcancel', this.boundTouchEnd);
     }
 
     this.updateHourFromPointer(evt, strip);
   }
 
   /**
-   * Handles pointerup/cancel to release scrubber pointer capture.
-   * @param {PointerEvent} evt
+   * Handles pointermove / touchmove on scrubber timeline during active slide.
+   * @param {PointerEvent|TouchEvent} evt
+   */
+  handlePointerMove(evt) {
+    if (!this.isScrubbing || !this.activeScrubStrip) return;
+    if (evt && typeof evt.preventDefault === 'function' && evt.cancelable) {
+      evt.preventDefault();
+    }
+
+    const curX = this.getClientX(evt);
+    if (Math.abs(curX - this.pointerStartX) > 3) {
+      this.hasDraggedPointer = true;
+    }
+
+    this.updateHourFromPointer(evt, this.activeScrubStrip);
+  }
+
+  /**
+   * Handles pointerup/cancel to release scrubber pointer capture and window listeners.
+   * @param {PointerEvent|TouchEvent} evt
    */
   handlePointerUp(evt) {
     if (!this.isScrubbing) return;
     this.isScrubbing = false;
-    const strip = this.containerEl ? this.containerEl.querySelector('#forecast-timeline-strip') : null;
+    const strip = this.activeScrubStrip;
+    this.activeScrubStrip = null;
+
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('pointermove', this.boundPointerMove);
+      window.removeEventListener('pointerup', this.boundPointerUp);
+      window.removeEventListener('pointercancel', this.boundPointerUp);
+      window.removeEventListener('touchmove', this.boundTouchMove);
+      window.removeEventListener('touchend', this.boundTouchEnd);
+      window.removeEventListener('touchcancel', this.boundTouchEnd);
+    }
+
     if (strip) {
       try {
-        if (typeof strip.releasePointerCapture === 'function' && evt.pointerId != null) {
+        if (typeof strip.releasePointerCapture === 'function' && evt?.pointerId != null) {
           strip.releasePointerCapture(evt.pointerId);
         }
       } catch (_) {}
@@ -3462,7 +3553,7 @@ export class ForecastViewController {
 
   /**
    * Computes the target hour from horizontal pointer coordinate and updates state.
-   * @param {PointerEvent} evt
+   * @param {PointerEvent|TouchEvent} evt
    * @param {HTMLElement} strip
    */
   updateHourFromPointer(evt, strip) {
@@ -3470,7 +3561,7 @@ export class ForecastViewController {
     const rect = typeof strip.getBoundingClientRect === 'function' ? strip.getBoundingClientRect() : null;
 
     if (rect && rect.width > 0) {
-      const clientX = evt.clientX != null ? evt.clientX : 0;
+      const clientX = this.getClientX(evt);
       const relX = Math.max(0, Math.min(rect.width - 1, clientX - rect.left));
       const fraction = relX / rect.width;
       const hourIndex = Math.min(12, Math.max(0, Math.floor(fraction * 13)));
@@ -3554,6 +3645,10 @@ export class ForecastViewController {
       this.openFlightAnalysisOverlay();
     } else if (action === 'close-flight-analysis') {
       this.closeFlightAnalysisOverlay();
+    } else if (action === 'center-comprensorio') {
+      this.centerOnComprensorio();
+    } else if (action === 'center-gps') {
+      this.centerOnUserLocation();
     } else if (action === 'flight-analysis-hour') {
       const hourAttr = actionEl.getAttribute('data-hour');
       if (hourAttr != null) {
@@ -3818,18 +3913,12 @@ export class ForecastViewController {
       overlayEl.innerHTML = `
         <header class="gm-flight-analysis-header">
           <div class="gm-flight-analysis-title-group">
-            <h1 class="gm-flight-analysis-title">${spot?.name || 'Analisi Comprensorio'}</h1>
+            <h1 class="gm-flight-analysis-title">${escapeHtml(spot?.name || 'Analisi Comprensorio')}</h1>
             <p class="gm-flight-analysis-subtitle">
-              ▲ ${takeoff.name || 'Decollo'} (${takeoff.altitude || 1000}m) • ⏚ ${landing.name || 'Atterraggio'} (${landing.altitude || 300}m)
+              ▲ ${escapeHtml(takeoff.name || 'Decollo')} (${takeoff.altitude || 1000}m) • ⏚ ${escapeHtml(landing.name || 'Atterraggio')} (${landing.altitude || 300}m)
             </p>
           </div>
           <div class="gm-flight-analysis-actions">
-            <select class="gm-flight-analysis-layer-select" data-action="set-flight-analysis-layer" aria-label="Seleziona layer cartografico">
-              <option value="topo" ${activeLayer === 'topo' ? 'selected' : ''}>OpenTopo</option>
-              <option value="satellite" ${activeLayer === 'satellite' ? 'selected' : ''}>Satellite</option>
-              <option value="dark" ${activeLayer === 'dark' ? 'selected' : ''}>Scuro</option>
-              <option value="streets" ${activeLayer === 'streets' ? 'selected' : ''}>CyclOSM</option>
-            </select>
             <button 
               type="button" 
               class="gm-flight-analysis-close-btn" 
@@ -3846,6 +3935,50 @@ export class ForecastViewController {
 
         <div class="gm-flight-analysis-map-container">
           <div id="forecast-flight-analysis-map" class="gm-flight-analysis-map"></div>
+
+          <!-- Floating Map Controls (Inside Map Canvas) -->
+          <div class="gm-flight-analysis-map-controls" role="toolbar" aria-label="Controlli mappa">
+            <div class="gm-flight-analysis-controls-left">
+              <select class="gm-flight-analysis-layer-select" data-action="set-flight-analysis-layer" aria-label="Seleziona layer cartografico">
+                <option value="topo" ${activeLayer === 'topo' ? 'selected' : ''}>OpenTopo</option>
+                <option value="satellite" ${activeLayer === 'satellite' ? 'selected' : ''}>Satellite</option>
+                <option value="dark" ${activeLayer === 'dark' ? 'selected' : ''}>Scuro</option>
+                <option value="streets" ${activeLayer === 'streets' ? 'selected' : ''}>CyclOSM</option>
+              </select>
+            </div>
+            <div class="gm-flight-analysis-controls-right">
+              <button 
+                type="button" 
+                class="gm-flight-analysis-ctrl-btn" 
+                data-action="center-comprensorio" 
+                aria-label="Centra sul comprensorio"
+                title="Centra sul decollo e atterraggio del comprensorio"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                </svg>
+                <span class="gm-ctrl-btn-text">Comprensorio</span>
+              </button>
+
+              <button 
+                type="button" 
+                class="gm-flight-analysis-ctrl-btn" 
+                data-action="center-gps" 
+                aria-label="Centra su posizione GPS"
+                title="Centra sulla tua posizione GPS attuale"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <circle cx="12" cy="12" r="3"></circle>
+                  <line x1="12" y1="2" x2="12" y2="6"></line>
+                  <line x1="12" y1="18" x2="12" y2="22"></line>
+                  <line x1="2" y1="12" x2="6" y2="12"></line>
+                  <line x1="18" y1="12" x2="22" y2="12"></line>
+                </svg>
+                <span class="gm-ctrl-btn-text">GPS</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         <section class="gm-flight-analysis-drawer" aria-label="Dettagli procedura e convenzioni">
@@ -3872,23 +4005,7 @@ export class ForecastViewController {
           </div>
 
           <div class="gm-flight-analysis-scrubber" role="toolbar" aria-label="Selettore orario continuo">
-            ${Array.from({ length: 13 }, (_, i) => {
-              const h = 8 + i;
-              const isActive = h === this.selectedHour;
-              return `
-                <button 
-                  type="button" 
-                  class="gm-flight-analysis-slot ${isActive ? 'active' : ''}" 
-                  data-action="flight-analysis-hour" 
-                  data-hour="${h}"
-                  aria-label="Ore ${h}:00"
-                  aria-pressed="${isActive}"
-                >
-                  <span class="gm-flight-analysis-slot-hour">${h}</span>
-                  <span class="gm-flight-analysis-slot-indicator"></span>
-                </button>
-              `;
-            }).join('')}
+            ${this.renderTimelineGrid(spot, weatherData, glider, 'flight-analysis-timeline-strip')}
           </div>
         </section>
       `;
@@ -3897,6 +4014,11 @@ export class ForecastViewController {
       this.flightAnalysisOverlayEl = overlayEl;
       overlayEl.addEventListener('click', this.boundClickHandler);
       overlayEl.addEventListener('change', this.boundChangeHandler);
+      overlayEl.addEventListener('pointerdown', this.boundPointerDown);
+      overlayEl.addEventListener('touchstart', this.boundTouchStart, { passive: false });
+      overlayEl.addEventListener('pointermove', this.boundPointerMove);
+      overlayEl.addEventListener('pointerup', this.boundPointerUp);
+      overlayEl.addEventListener('pointercancel', this.boundPointerUp);
 
       // Event listeners
       if (typeof window !== 'undefined') {
@@ -3912,7 +4034,9 @@ export class ForecastViewController {
       const mapEl = overlayEl.querySelector('#forecast-flight-analysis-map');
       this.flightAnalysisMapEngine = createMapEngine(mapEl, {
         theme: this.store?.getState?.()?.ui?.theme || 'dark',
-        layer: activeLayer
+        layer: activeLayer,
+        isFlightAnalysis: true,
+        zoomControl: false
       });
       this.flightAnalysisMapEngine.renderComprensorioFlightMap(mapEl, {
         comprensorio: spot,
@@ -3932,7 +4056,9 @@ export class ForecastViewController {
       // Pure Node.js headless environment
       this.flightAnalysisMapEngine = createMapEngine(null, {
         theme: this.store?.getState?.()?.ui?.theme || 'dark',
-        layer: activeLayer
+        layer: activeLayer,
+        isFlightAnalysis: true,
+        zoomControl: false
       });
       this.flightAnalysisMapEngine.renderComprensorioFlightMap(null, {
         comprensorio: spot,
@@ -3944,6 +4070,52 @@ export class ForecastViewController {
       });
     }
 
+    return this;
+  }
+
+  /**
+   * Centers the flight analysis map on the active comprensorio bounds.
+   */
+  centerOnComprensorio() {
+    if (this.flightAnalysisMapEngine && typeof this.flightAnalysisMapEngine.centerOnComprensorio === 'function') {
+      this.flightAnalysisMapEngine.centerOnComprensorio();
+    }
+    return this;
+  }
+
+  /**
+   * Centers the flight analysis map on the user's current GPS position.
+   */
+  centerOnUserLocation() {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      return this;
+    }
+    const gpsBtn = this.flightAnalysisOverlayEl?.querySelector('[data-action="center-gps"]');
+    if (gpsBtn) {
+      gpsBtn.classList.add('loading');
+      gpsBtn.setAttribute('aria-busy', 'true');
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        if (gpsBtn) {
+          gpsBtn.classList.remove('loading');
+          gpsBtn.removeAttribute('aria-busy');
+        }
+        const { latitude, longitude } = pos.coords;
+        if (this.flightAnalysisMapEngine && typeof this.flightAnalysisMapEngine.showUserLocation === 'function') {
+          this.flightAnalysisMapEngine.showUserLocation(latitude, longitude);
+        }
+      },
+      (err) => {
+        if (gpsBtn) {
+          gpsBtn.classList.remove('loading');
+          gpsBtn.removeAttribute('aria-busy');
+        }
+        console.warn('[GlideMind] Geolocation error:', err?.message || err);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+    );
     return this;
   }
 
@@ -3971,6 +4143,11 @@ export class ForecastViewController {
         if (typeof this.flightAnalysisOverlayEl.removeEventListener === 'function') {
           this.flightAnalysisOverlayEl.removeEventListener('click', this.boundClickHandler);
           this.flightAnalysisOverlayEl.removeEventListener('change', this.boundChangeHandler);
+          this.flightAnalysisOverlayEl.removeEventListener('pointerdown', this.boundPointerDown);
+          this.flightAnalysisOverlayEl.removeEventListener('touchstart', this.boundTouchStart);
+          this.flightAnalysisOverlayEl.removeEventListener('pointermove', this.boundPointerMove);
+          this.flightAnalysisOverlayEl.removeEventListener('pointerup', this.boundPointerUp);
+          this.flightAnalysisOverlayEl.removeEventListener('pointercancel', this.boundPointerUp);
         }
         this.flightAnalysisOverlayEl.remove();
         this.flightAnalysisOverlayEl = null;
@@ -3990,6 +4167,7 @@ export class ForecastViewController {
         this.flightAnalysisTriggerEl = null;
       }
     }
+    this.flightAnalysisOverlayEl = null;
 
     return this;
   }
