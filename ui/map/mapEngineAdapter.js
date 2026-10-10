@@ -77,7 +77,7 @@ export const STATUS_COLORS = Object.freeze({
   unflyable: {
     color: '#b91c1c',
     fill: '#ef4444',
-    badge: 'Chiuso',
+    badge: 'Non Volabile',
     icon: '✕'
   },
   severe: {
@@ -154,7 +154,9 @@ export class HeadlessMockMapEngine {
   }
 
   setTheme(theme) {
-    this.theme = theme === 'light' ? 'light' : 'dark';
+    const newTheme = theme === 'light' ? 'light' : 'dark';
+    if (this.theme === newTheme && this.currentLayerId) return;
+    this.theme = newTheme;
     this.currentLayerId = this.theme === 'light' ? 'topo' : 'dark';
   }
 
@@ -528,7 +530,9 @@ export class LeafletMapEngine {
   }
 
   setTheme(theme) {
-    this.theme = theme === 'light' ? 'light' : 'dark';
+    const newTheme = theme === 'light' ? 'light' : 'dark';
+    if (this.theme === newTheme && this.tileLayer) return;
+    this.theme = newTheme;
     this.setLayer(this.theme === 'light' ? 'topo' : 'dark');
   }
 

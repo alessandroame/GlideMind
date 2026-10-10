@@ -870,6 +870,56 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Sbloccata la priorità primaria in [DESIDERATA.md](file:///DESIDERATA.md) su **Fase 6: Modulo Logbook di Volo (`LogbookView.js` & `core/logbookDb.js`)** (`🔴 Prioritario`).
   - Registrata la Lezione Appresa #80 in [MEMORY.md](file:///MEMORY.md).
 
+---
+
+## 2026-10-10 - Unificazione Architetturale Timeline Scrubber tra Previsioni e Mappa Cartografica
+- **Tipo**: UI / Ergonomia Touch / Unificazione Design System / Controller
+- **Dettagli**: [.agents/worklog.d/2026-10-10_unified-timeline-scrubber-map-view.md](file:///.agents/worklog.d/2026-10-10_unified-timeline-scrubber-map-view.md)
+- **Sintesi**:
+  - Unificato lo scrubber orario in `SpotMapView.js` per adottare lo stesso identico componente continuo di `ForecastView.js` e del pannello di analisi comprensorio.
+  - Sostituita la precedente barra stepper a 10 slot discreti (9..18) con la griglia a 13 colonne (08:00 - 20:00) `.gm-timeline-grid-13` provvista di badge ora attuale "ORA", etichetta oraria `.compact-time` e barre verticali color-coded `.compact-bar-fill` basate sulla valutazione oraria del comprensorio focalizzato.
+  - Implementato il supporto multi-input per scrubbing continuo: trascinamento pointer/touch con `getClientX`, gestione coordinata di `pointerdown`, `pointermove`, `pointerup` e cattura puntatore su `window` con `touch-action: none;`.
+  - Ottimizzato l'aggiornamento in-place di classi `.active` e parametri ARIA al cambio d'ora senza distruzione del DOM, aggiornando gli overlay della mappa in RAM (<15ms).
+  - Adeguati gli stili in `css/theme.css` con centratura responsive su desktop (`max-width: 580px; left: 50%; transform: translateX(-50%)`).
+  - Aggiornata la suite di test in `tests/ui/spotMapView.test.mjs` con verifica della griglia a 13 slot e dell'interazione continua di scrubbing; 440/440 test passanti senza alcuna regressione.
+  - Registrata la Lezione Appresa #81 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-10 - Bonifica Header Mappa Cartografica ed Ergonomia Controlli Flottanti
+- **Tipo**: Cartografia / UI Shell / Design System / Ergonomia Touch Mobile
+- **Dettagli**: [.agents/worklog.d/2026-10-10_spot-map-top-bar-and-floating-controls-remediation.md](file:///.agents/worklog.d/2026-10-10_spot-map-top-bar-and-floating-controls-remediation.md)
+- **Sintesi**:
+  - Rimossa l'anomalia di wrapping multi-riga che generava un blocco scuro disordinato di ~160px sopra la mappa.
+  - Ricostruita la barra superiore esterna `.gm-map-top-bar` come riga singola rigida di 50px con `flex-wrap: nowrap;`, contenente unicamente il selettore macro-regione (118px), il selettore località ad espansione fluida (`flex: 1 1 0%`) e il badge compatto di stato rete (`Live`, `Sync...`, `Offline`).
+  - Armonizzati e uniformati i comandi di cartografia flottanti replicando fedelmente l'overlay a schermo intero della mini-mappa (`.gm-flight-analysis-map-controls` in `ForecastView.js`):
+    - Barra flottante superiore unificata (`.gm-map-canvas-controls`) a `top: 12px; left: 12px; right: 12px;`.
+    - A sinistra: selettore layer in card di vetro satinato scuro (`.gm-map-ctrl-select`, 44px min-height, 8px border radius, chevron SVG no-repeat).
+    - A destra: gruppo comandi azione (`.gm-map-ctrl-btn`) con pulsante Top Spot (icona target SVG + nome località) e pulsante centratura GPS utente (icona mirino GPS SVG, geolocalizzazione nativa e centratura mappa).
+    - Soppressi i controlli quadrati ridondanti di zoom Leaflet `+`/`-` in favore dei gesti touch fluidi nativi (pinch-to-zoom).
+  - Risolto il bug di idratazione asincrona che impostava `selectedIndex = -1` nel selettore località lasciandolo visivamente vuoto: garantita l'inizializzazione esplicita a 0 per mostrare costantemente l'etichetta selezionata.
+  - Validata la perfetta ergonomia visiva e l'assenza totale di overflow su viewport 390px e 360px con test visivi e geometrici (Chrome headless).
+  - Tutti i 442 test passati con successo su 61 test suite (`npm test`).
+  - Registrate le Lezioni Apprese #82 e #83 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-10 - Fase 5: Accorpamento Controlli Puntamento in Sottomenu Mirino e Unificazione Timeline Scrubber
+- **Tipo**: Cartografia / UI Shell / Ergonomia Touch Mobile / UX Unification
+- **Dettagli**: [.agents/worklog.d/2026-10-10_aim-submenu-and-timeline-unification.md](file:///.agents/worklog.d/2026-10-10_aim-submenu-and-timeline-unification.md)
+- **Sintesi**:
+  - Accorpati i due controlli separati di centratura mappa (`Comprensorio` e `GPS`) in un sottomenu a comparsa compatto (`.gm-aim-menu-wrap`), azionato da un pulsante trigger con icona a mirino (`crosshair`) e freccia indicatrice, coerente su `SpotMapView` e sull'overlay di analisi volo di `ForecastView`.
+  - Implementata la gestione accessibile del dropdown con auto-chiusura su click esterno e su tasto `Escape`, oltre alla chiusura automatica alla selezione della voce.
+  - Unificata la struttura grafica e informativa dell'header della timeline scrubber su tutte le viste dell'applicazione (`SpotMapView`, scrubber orario ancorato di `ForecastView` e scrubber continuo dell'overlay di analisi del circuito):
+    - Layout identico con classe `.gm-map-scrubber-header`.
+    - Titolo istituzionale `Timeline Volabilità` affiancato dalla pill con nome spot e badge semantico con colore reattivo alla volabilità calcolata.
+    - Indicatore orario compatto `Ore XX:00` allineato sulla destra.
+  - Aggiunti test di regressione dedicati in `tests/ui/spotMapView.test.mjs` e `tests/ui/forecastView.test.mjs`.
+  - 446 test passati con successo su 61 test suite (`npm test`) con zero regressioni.
+
+
+
+
 
 
 

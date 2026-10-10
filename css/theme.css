@@ -4312,15 +4312,15 @@ input.gm-input:focus {
 .gm-map-top-bar-inner {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
   flex-wrap: nowrap;
 }
 
 .gm-map-region-wrap {
-  flex: 0 0 130px;
-  min-width: 110px;
-  max-width: 145px;
+  flex: 0 0 118px;
+  min-width: 100px;
+  max-width: 125px;
 }
 
 .gm-map-spot-wrap {
@@ -4406,140 +4406,7 @@ input.gm-input:focus {
   background-color: var(--gm-bg-base);
 }
 
-/* Floating Controls Over Map Canvas */
-.gm-map-floating-top-spot,
-.gm-map-top-spot-btn {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  z-index: 400;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 28px;
-  padding: 0 10px;
-  border-radius: var(--gm-radius-full);
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.20) 0%, rgba(15, 23, 42, 0.78) 100%);
-  border: 1px solid rgba(34, 197, 94, 0.45);
-  color: var(--gm-text-primary);
-  font-family: var(--gm-font-sans, system-ui, sans-serif);
-  font-size: 0.74rem;
-  font-weight: 600;
-  backdrop-filter: blur(12px) saturate(180%);
-  -webkit-backdrop-filter: blur(12px) saturate(180%);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
-  cursor: pointer;
-  pointer-events: auto;
-  transition: transform var(--gm-transition-fast), background var(--gm-transition-fast);
-}
 
-.gm-map-floating-top-spot::before,
-.gm-map-top-spot-btn::before {
-  content: '';
-  position: absolute;
-  top: -8px;
-  bottom: -8px;
-  left: -8px;
-  right: -8px;
-}
-
-[data-theme="light"] .gm-map-floating-top-spot,
-[data-theme="light"] .gm-map-top-spot-btn {
-  background: linear-gradient(135deg, rgba(220, 252, 231, 0.95) 0%, rgba(240, 253, 244, 0.85) 100%);
-  border: 1px solid rgba(34, 197, 94, 0.6);
-  color: #14532d;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.10);
-}
-
-.gm-map-floating-top-spot:hover,
-.gm-map-top-spot-btn:hover {
-  transform: translateY(-1px);
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.30) 0%, rgba(26, 33, 48, 0.85) 100%);
-}
-
-.gm-top-spot-dot {
-  font-size: 0.85rem;
-  color: var(--gm-accent);
-  line-height: 1;
-}
-
-.gm-top-spot-title {
-  font-weight: 700;
-  color: var(--gm-text-primary);
-}
-
-[data-theme="light"] .gm-top-spot-title {
-  color: #14532d;
-}
-
-.gm-top-spot-focus {
-  font-size: 0.85rem;
-  color: var(--gm-text-muted);
-}
-
-.gm-map-floating-layer-select {
-  position: absolute;
-  top: 10px;
-  right: 52px;
-  z-index: 400;
-  height: 28px;
-  padding: 0 20px 0 10px;
-  background-color: transparent;
-  background-image: 
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' viewBox='0 0 24 24' fill='none' stroke='%23f8fafc' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, rgba(15, 23, 42, 0.72) 100%);
-  background-repeat: no-repeat, no-repeat !important;
-  background-position: right 6px center, 0 0 !important;
-  background-size: 9px 9px, 100% 100% !important;
-  -webkit-backdrop-filter: blur(12px) saturate(180%);
-  backdrop-filter: blur(12px) saturate(180%);
-  color: #f8fafc;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  border-radius: var(--gm-radius-full, 9999px);
-  font-family: var(--gm-font-sans, system-ui, sans-serif);
-  font-size: 0.74rem;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.35), 0 2px 8px rgba(0, 0, 0, 0.35);
-  outline: none;
-  appearance: none;
-  -webkit-appearance: none;
-  pointer-events: auto;
-  transition: border-color 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.gm-map-floating-layer-select::before {
-  content: '';
-  position: absolute;
-  top: -8px;
-  bottom: -8px;
-  left: -8px;
-  right: -8px;
-}
-
-.gm-map-floating-layer-select:hover {
-  border-color: rgba(56, 189, 248, 0.6);
-  color: var(--gm-accent, #38bdf8);
-}
-
-.gm-map-floating-layer-select option {
-  background-color: var(--gm-bg-card, #12161f);
-  color: var(--gm-text-primary, #f8fafc);
-}
-
-[data-theme="light"] .gm-map-floating-layer-select {
-  background-image: 
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' viewBox='0 0 24 24' fill='none' stroke='%230f172a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.85) 0%, rgba(240, 244, 248, 0.65) 100%);
-  border: 1px solid rgba(15, 23, 42, 0.20);
-  color: #0f172a;
-  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.95), 0 2px 8px rgba(15, 23, 42, 0.12);
-}
-
-[data-theme="light"] .gm-map-floating-layer-select option {
-  background-color: #ffffff;
-  color: #0f172a;
-}
 
 /* Bottom Docked Scrubber with solid backdrop and clear elevation */
 .gm-map-scrubber-container {
@@ -4551,16 +4418,25 @@ input.gm-input:focus {
   pointer-events: none;
 }
 
+@media (min-width: 768px) and (min-height: 550px) {
+  .gm-map-scrubber-container {
+    max-width: 580px;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+  }
+}
+
 .gm-map-scrubber-inner {
   pointer-events: auto;
   background: var(--gm-bg-card);
   border: 1px solid var(--gm-border);
   border-radius: var(--gm-radius-md);
-  padding: 8px 12px;
+  padding: 6px 8px 8px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  touch-action: pan-x;
+  touch-action: none;
 }
 
 .gm-map-scrubber-header {
@@ -4648,11 +4524,7 @@ input.gm-input:focus {
 }
 
 .gm-map-scrubber-slots {
-  display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  gap: 4px;
-  flex: 1;
-  min-width: 0;
+  width: 100%;
 }
 
 .gm-map-hour-slot {
@@ -5741,7 +5613,8 @@ input.gm-input:focus {
   flex-shrink: 0;
 }
 
-/* Floating Map Controls (Overlaying Map Canvas) */
+/* Floating Map Controls (Overlaying Map Canvas in both SpotMapView and Flight Analysis) */
+.gm-map-canvas-controls,
 .gm-flight-analysis-map-controls {
   position: absolute;
   top: 12px;
@@ -5755,6 +5628,8 @@ input.gm-input:focus {
   pointer-events: none;
 }
 
+.gm-map-controls-left,
+.gm-map-controls-right,
 .gm-flight-analysis-controls-left,
 .gm-flight-analysis-controls-right {
   display: flex;
@@ -5763,6 +5638,8 @@ input.gm-input:focus {
   pointer-events: auto;
 }
 
+.gm-map-ctrl-btn,
+.gm-map-top-spot-btn,
 .gm-flight-analysis-ctrl-btn {
   display: inline-flex;
   align-items: center;
@@ -5783,6 +5660,8 @@ input.gm-input:focus {
   transition: background var(--gm-transition-fast), border-color var(--gm-transition-fast), transform var(--gm-transition-fast);
 }
 
+[data-theme="light"] .gm-map-ctrl-btn,
+[data-theme="light"] .gm-map-top-spot-btn,
 [data-theme="light"] .gm-flight-analysis-ctrl-btn {
   background: rgba(255, 255, 255, 0.92);
   color: #0f172a;
@@ -5790,29 +5669,131 @@ input.gm-input:focus {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 }
 
+.gm-map-ctrl-btn:hover,
+.gm-map-top-spot-btn:hover,
 .gm-flight-analysis-ctrl-btn:hover {
   border-color: var(--gm-accent);
   color: var(--gm-accent);
 }
 
+.gm-map-ctrl-btn:active,
+.gm-map-top-spot-btn:active,
 .gm-flight-analysis-ctrl-btn:active {
   transform: scale(0.96);
 }
 
+.gm-map-ctrl-btn.loading,
+.gm-map-top-spot-btn.loading,
 .gm-flight-analysis-ctrl-btn.loading {
   opacity: 0.7;
   pointer-events: none;
 }
 
+/* Aiming & Centering Submenu (Crosshair / Mirino) */
+.gm-aim-menu-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.gm-aim-menu-trigger {
+  gap: 4px;
+  padding: 6px 8px;
+}
+
+.gm-aim-menu-trigger.open {
+  border-color: var(--gm-accent);
+}
+
+.gm-aim-chevron {
+  transition: transform var(--gm-transition-fast);
+}
+
+.gm-aim-menu-trigger.open .gm-aim-chevron {
+  transform: rotate(180deg);
+}
+
+.gm-aim-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 175px;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--gm-border-strong, rgba(255, 255, 255, 0.18));
+  border-radius: var(--gm-radius-md, 8px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+  padding: 4px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+[data-theme="light"] .gm-aim-dropdown {
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.gm-aim-dropdown.hidden {
+  display: none !important;
+}
+
+.gm-aim-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: var(--gm-touch-min, 44px);
+  padding: 8px 12px;
+  font-size: var(--gm-font-xs, 12px);
+  font-weight: 600;
+  text-align: left;
+  color: var(--gm-text-primary);
+  background: transparent;
+  border: none;
+  border-radius: var(--gm-radius-sm, 6px);
+  cursor: pointer;
+  transition: background var(--gm-transition-fast), color var(--gm-transition-fast);
+}
+
+.gm-aim-menu-item:hover,
+.gm-aim-menu-item:focus-visible {
+  background: var(--gm-bg-hover, rgba(255, 255, 255, 0.08));
+  color: var(--gm-accent);
+  outline: none;
+}
+
+[data-theme="light"] .gm-aim-menu-item {
+  color: #0f172a;
+}
+
+[data-theme="light"] .gm-aim-menu-item:hover,
+[data-theme="light"] .gm-aim-menu-item:focus-visible {
+  background: rgba(0, 0, 0, 0.06);
+  color: #0284c7;
+}
+
+.gm-aim-menu-item svg {
+  flex-shrink: 0;
+}
+
+
+.gm-map-ctrl-select,
 .gm-flight-analysis-layer-select {
   height: var(--gm-touch-min, 44px);
   min-height: var(--gm-touch-min, 44px);
   min-width: 44px;
-  padding: 0 10px;
+  padding: 0 24px 0 10px;
   font-size: var(--gm-font-xs, 12px);
   font-weight: 600;
   color: var(--gm-text-primary);
-  background: rgba(15, 23, 42, 0.85);
+  background-color: rgba(15, 23, 42, 0.85);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' viewBox='0 0 24 24' fill='none' stroke='%23f8fafc' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 9px 9px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: var(--gm-radius-md, 8px);
   backdrop-filter: blur(12px);
@@ -5820,20 +5801,26 @@ input.gm-input:focus {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
   cursor: pointer;
   outline: none;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
+.gm-map-ctrl-select option,
 .gm-flight-analysis-layer-select option {
   background-color: var(--gm-bg-card, #12161f);
   color: var(--gm-text-primary, #f8fafc);
 }
 
+[data-theme="light"] .gm-map-ctrl-select,
 [data-theme="light"] .gm-flight-analysis-layer-select {
-  background: rgba(255, 255, 255, 0.92);
+  background-color: rgba(255, 255, 255, 0.92);
   border: 1px solid rgba(0, 0, 0, 0.14);
   color: var(--gm-text-primary, #0f172a);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' viewBox='0 0 24 24' fill='none' stroke='%230f172a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 }
 
+[data-theme="light"] .gm-map-ctrl-select option,
 [data-theme="light"] .gm-flight-analysis-layer-select option {
   background-color: var(--gm-bg-surface, #ffffff);
   color: var(--gm-text-primary, #0f172a);
@@ -5873,7 +5860,8 @@ input.gm-input:focus {
   overflow: hidden;
 }
 
-/* Leaflet zoom control safeguard: explicitly hide in flight analysis overlay */
+/* Leaflet zoom control safeguard: explicitly hide in both full-screen map and spot map view */
+.gm-map-view .leaflet-control-zoom,
 .gm-flight-analysis-overlay .leaflet-control-zoom {
   display: none !important;
 }

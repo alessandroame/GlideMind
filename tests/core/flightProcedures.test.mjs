@@ -141,7 +141,7 @@ describe('Flight Procedures Engine - Landing Circuit Geometry & Safety Gate', ()
 
     assert.equal(extremeWind.isSafetyWarning, true);
     assert.equal(extremeWind.warningSeverity, 'severe');
-    assert.ok(extremeWind.warningReason.includes('pericoloso') || extremeWind.warningReason.includes('chiuso'));
+    assert.ok(extremeWind.warningReason.includes('pericoloso') || extremeWind.warningReason.includes('non praticabile'));
   });
 
   it('should honor flightPlan circuitHand convention if declared as right-hand', () => {

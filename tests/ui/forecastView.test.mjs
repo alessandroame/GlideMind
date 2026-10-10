@@ -1422,6 +1422,90 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
 
     controller.closeFlightAnalysisOverlay();
   });
+
+  it('should render and toggle aim sub-menu with crosshair icon inside flight analysis overlay', () => {
+    const spot = DEFAULT_COMPRENSORI[0];
+    const mockStore = createStore({
+      selectedSpot: spot,
+      ui: { theme: 'dark', mapLayer: 'topo' }
+    });
+    const controller = new ForecastViewController({ store: mockStore });
+
+    let triggerExpanded = 'false';
+    const classSet = new Set(['hidden']);
+    const mockTrigger = {
+      setAttribute: (k, v) => { if (k === 'aria-expanded') triggerExpanded = String(v); },
+      getAttribute: (k) => (k === 'aria-expanded' ? triggerExpanded : null),
+      classList: {
+        toggle: () => {}
+      }
+    };
+    const mockDropdown = {
+      classList: {
+        contains: (cls) => classSet.has(cls),
+        toggle: (cls, force) => {
+          if (force === undefined) {
+            if (classSet.has(cls)) classSet.delete(cls); else classSet.add(cls);
+          } else if (force) {
+            classSet.add(cls);
+          } else {
+            classSet.delete(cls);
+          }
+        }
+      }
+    };
+    const mockWrap = { classList: { toggle: () => {} } };
+
+    controller.flightAnalysisOverlayEl = {
+      querySelector: (sel) => {
+        if (sel === '.gm-aim-menu-wrap') return mockWrap;
+        if (sel.includes('toggle-aim-menu') || sel.includes('gm-aim-menu-trigger')) return mockTrigger;
+        if (sel === '.gm-aim-dropdown') return mockDropdown;
+        return null;
+      }
+    };
+
+    assert.strictEqual(controller.isFlightAnalysisAimMenuOpen, false);
+    assert.strictEqual(mockTrigger.getAttribute('aria-expanded'), 'false');
+    assert.strictEqual(mockDropdown.classList.contains('hidden'), true);
+
+    // Toggle open
+    controller.toggleFlightAnalysisAimMenu(true);
+    assert.strictEqual(controller.isFlightAnalysisAimMenuOpen, true);
+    assert.strictEqual(mockTrigger.getAttribute('aria-expanded'), 'true');
+    assert.strictEqual(mockDropdown.classList.contains('hidden'), false);
+
+    // Toggle close
+    controller.closeFlightAnalysisAimMenu();
+    assert.strictEqual(controller.isFlightAnalysisAimMenuOpen, false);
+    assert.strictEqual(mockTrigger.getAttribute('aria-expanded'), 'false');
+    assert.strictEqual(mockDropdown.classList.contains('hidden'), true);
+  });
+
+  it('should render unified timeline scrubber header with spot pill and active hour label in sticky scrubber and file source', () => {
+    const spot = DEFAULT_COMPRENSORI[0];
+    const mockStore = createStore({
+      selectedSpot: spot,
+      ui: { theme: 'dark', mapLayer: 'topo' }
+    });
+    const controller = new ForecastViewController({ store: mockStore });
+
+    // Verify sticky scrubber header in main view HTML
+    const html = controller.renderHtml();
+    assert.ok(html.includes('id="forecast-timeline-scrubber"'), 'Must render sticky scrubber');
+    assert.ok(html.includes('gm-map-scrubber-header'), 'Must contain gm-map-scrubber-header');
+    assert.ok(html.includes('Timeline Volabilità'), 'Must contain Timeline Volabilità title');
+    assert.ok(html.includes('id="forecast-scrubber-spot-pill"'), 'Must contain forecast-scrubber-spot-pill');
+    assert.ok(html.includes('id="forecast-active-hour-label"'), 'Must contain forecast-active-hour-label');
+
+    // Verify presence of unified timeline elements and aim menu in ForecastView.js source
+    const src = readFileSync(new URL('../../ui/views/ForecastView.js', import.meta.url), 'utf-8');
+    assert.ok(src.includes('id="flight-analysis-scrubber-spot-pill"'), 'Must define flight-analysis-scrubber-spot-pill');
+    assert.ok(src.includes('id="flight-analysis-active-hour-label"'), 'Must define flight-analysis-active-hour-label');
+    assert.ok(src.includes('data-action="toggle-aim-menu"'), 'Must define toggle-aim-menu trigger');
+    assert.ok(src.includes('data-action="center-comprensorio"'), 'Must define center-comprensorio item');
+    assert.ok(src.includes('data-action="center-gps"'), 'Must define center-gps item');
+  });
 });
 
 

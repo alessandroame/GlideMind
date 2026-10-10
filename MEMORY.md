@@ -989,5 +989,46 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
   3. **Disaccoppiamento tra Dati Territoriali e Motori CAD**: I vincoli di sicurezza dei club di volo devono essere integrati come arricchimento dati statico nel catalogo (`data/locations/*.json`) con visualizzazione passiva, senza subordinare la sicurezza del comprensorio alla complessità di un editor di disegno interattivo.
   4. **Tutela della Priorità del Core Domain**: L'implementazione delle funzionalità cardine di volo (Fase 6: Flight Logbook e Fase 7: Replay 3D) mantiene la precedenza assoluta rispetto a tooling CAD o editor grafici opzionali, che vanno posticipati come estensioni future.
 
+---
 
+## 81. Unificazione Architetturale dei Controlli Temporali (Cross-View Timeline Scrubber)
+- **Problema**: `SpotMapView` manteneva una barra stepper oraria discreta su 10 ore (9 - 18) con bottoni di navigazione `‹` e `›`, mentre `ForecastView` e il pannello di analisi comprensorio adottavano una strip continua a 13 ore (08:00 - 20:00) con swipe gestures e istogramma di volabilità colorato. La discrepanza frammentava l'esperienza d'uso e obbligava a mantenere stili e logiche di interazione divergenti.
+- **Causa Radice**: Evoluzione asincrona delle viste in cui `ForecastView` era stata aggiornata alle nuove specifiche di design system senza propagare immediatamente il componente continuo a `SpotMapView`.
+- **Pattern Vincolante**:
+  1. **SSOT del Componente Temporale**: Lo scrubber orario in tutte le viste che gestiscono la dimensione temporale di volo deve adottare lo standard a 13 ore (08:00 - 20:00) con le stesse classi semantiche (`.gm-timeline-grid-13`, `.gm-timeline-col-compact`, `.compact-now-badge`, `.compact-bar-fill`).
+  2. **Interazione Universale Multi-Input**: Supportare sia il tocco singolo sullo slot, sia lo scorrimento continuo pointer/touch con `touch-action: none;` per aggiornamento reattivo istantaneo a 60 FPS in RAM senza re-render distruttivo del DOM.
+  3. **Aggiornamento In-Place**: Al cambio di ora, aggiornare solo lo stato delle classi `.active` e i nodi di rendering minimi (overlay mappa Leaflet) in <15ms.
+
+---
+
+## 82. Top Bar Esterna Rigida (50px) e Separazione dei Controlli di Mappa Flottanti
+- **Problema**: Il posizionamento di controlli eterogenei (filtro territoriale, selettore layer, stato di rete, raccomandazione top-spot) in un unico blocco con `flex-wrap: wrap` sopra la mappa produceva un header scuro disordinato di ~160px su 3 righe, consumando il 40% del viewport mobile e soffocando la mappa. Inoltre, l'idratazione asincrona del catalogo senza assegnazione deterministica di `selectedIndex` rendeva il selettore località visivamente vuoto.
+- **Causa Radice**: Aggregazione promiscua di controlli applicativi esterni (navigazione territorio) con controlli specifici della cartografia (layer, centratura canvas) in un layout elastico non dimensionato rigidamente.
+- **Pattern Vincolante**:
+  1. **Top Bar a Riga Singola Rigida (50px)**: La barra superiore esterna al canvas deve avere altezza immutabile di 50px e contenere rigorosamente solo filtri territoriali (`#gm-map-macro-region-select`, `#gm-map-spot-select`) e indicatore di stato compatto (`Live` / `Sync...` / `Offline`). Nessun wrapping a capo consentito.
+  2. **Controlli di Canvas Flottanti**: I comandi che modificano la sola visualizzazione cartografica (selettore layer, 1-tap top spot) devono risiedere come micro-capsule flottanti in vetro satinato (`backdrop-filter: blur(12px)`) sovresse agli angoli del canvas, con touch floor di 44px garantito via pseudo-elemento `::before`.
+  3. **Inizializzazione Deterministica dei Select**: Alla rigenerazione dinamica di `select.innerHTML`, impostare sempre esplicitamente `select.value` e verificare `if (select.selectedIndex === -1 && select.options.length > 0) select.selectedIndex = 0;` per prevenire lo stato non selezionato (`-1`) nei motori di rendering Blink/WebKit.
+
+---
+
+## 83. Standardizzazione dei Controlli Flottanti su Mappa con l'Overlay a Schermo Intero
+- **Problema**: La schermata mappa principale (`SpotMapView`) presentava controlli flottanti disallineati (pillole ad hoc, pulsanti zoom quadrati di Leaflet visibili, assenza del pulsante GPS di geolocalizzazione) rispetto alla mini-mappa espansa a tutto schermo (`ForecastView.js` / `.gm-flight-analysis-map-controls`), producendo un'esperienza visiva e operativa incoerente tra le viste.
+- **Causa Radice**: Mancata adozione trasversale del pattern dei controlli cartografici già ingegnerizzato e collaudato per l'overlay di analisi volo.
+- **Pattern Vincolante**:
+  1. **Layout Flottante Unificato**: Barra dei controlli posizionata in testa al canvas a `top: 12px; left: 12px; right: 12px;` con `display: flex; justify-content: space-between; align-items: center; pointer-events: none;`.
+  2. **Sinistra - Selettore Layer Cartografico**: Card in vetro satinato scuro (`.gm-map-ctrl-select` / `.gm-flight-analysis-layer-select`, `rgba(15, 23, 42, 0.85)` / `blur(12px)`), raggio 8px, altezza touch 44px, chevron SVG integrato `no-repeat`.
+  3. **Destra - Gruppo Azioni Flottanti**: Card raggruppate (`.gm-map-ctrl-btn`) per Top Spot (icona target SVG + nome comprensorio) e centratura GPS utente (icona mirino GPS SVG + geolocalizzazione istantanea `navigator.geolocation` / `mapEngine.showUserLocation`).
+  4. **Occam's Razor & Clean Canvas**: Soppressione rigorosa dei pulsanti quadrati di zoom Leaflet `+` e `-` (`.gm-map-view .leaflet-control-zoom { display: none !important; }`), affidando interamente l'ingrandimento ai gesti touch fluidi nativi (pinch-to-zoom).
+
+---
+
+## 84. Accorpamento dei Controlli di Puntamento in Sottomenu Mirino e Unificazione Header Scrubber (Ergonomia Mobile & Uniformità Cross-View)
+- **Problema**: La presenza di due pulsanti affiancati per la centratura cartografica ("Comprensorio" e "GPS") occupava spazio orizzontale prezioso sulle testate della mappa, riducendo l'area visuale utile e rischiando tap accidentali sui piccoli schermi mobili (360px-390px). Inoltre, l'header della timeline scrubber presentava variazioni tra viste (discrepanze di layout, badge assenti o posizionamenti eterogenei dell'orario).
+- **Causa Radice**: Mancata applicazione della Legge di Hick (Choice Overload) e di Occam's Razor sull'interfaccia di puntamento mappa, unita all'evoluzione disgiunta delle viste `SpotMapView` e `ForecastView`.
+- **Pattern Vincolante**:
+  1. **Sottomenu di Puntamento Mirino (`.gm-aim-menu-wrap`)**: Accorpare le azioni di centratura in un unico trigger visivo rappresentato da un'icona a mirino (`crosshair`) SVG con chevron indicatore (`.gm-aim-menu-trigger`). Al tocco, espande un menu a tendina in vetro satinato (`.gm-aim-dropdown`) con le opzioni "Comprensorio" e "Posizione GPS", ciascuna con target $\ge 44\text{px}$.
+  2. **Dismissal Ergonomico & Accessibilità**: Il menu deve supportare `aria-haspopup="menu"`, `aria-expanded`, chiusura automatica al click esterno, su tasto `Escape` e all'attivazione di qualsiasi voce del sottomenu.
+  3. **Header Scrubber Unificato (`.gm-map-scrubber-header`)**: Su tutte le viste (`SpotMapView`, scrubber ancorato di `ForecastView`, modal di analisi volo), l'header deve presentare tassativamente:
+     - Gruppo titolo: `<span class="gm-map-scrubber-title">Timeline Volabilità</span>` affiancato dalla pillola spot (`.gm-map-scrubber-spot-pill`) con colore e badge reattivi alla volabilità oraria calcolata.
+     - Display orario: `<div class="gm-map-scrubber-hour-display"><span class="gm-flight-alt">Ore XX:00</span></div>`.
 

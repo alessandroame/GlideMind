@@ -4,8 +4,8 @@ import { spotMapView, SpotMapView } from '../../ui/views/SpotMapView.js';
 import { store } from '../../core/store.js';
 import { MACRO_REGIONS } from '../../core/mapDataPartition.js';
 import { DEFAULT_COMPRENSORI } from '../../core/comprensorio.js';
+import { STATUS_COLORS } from '../../ui/map/mapEngineAdapter.js';
 
-// Minimal mock DOM node generator for headless testing
 function createMockElement(tagName = 'div', attributes = {}) {
   const children = [];
   const classList = new Set();
@@ -19,16 +19,35 @@ function createMockElement(tagName = 'div', attributes = {}) {
     attributes: { ...attributes },
     dataset,
     style: {},
+    children,
+    parentElement: null,
     classList: {
       add: (...names) => names.forEach(n => classList.add(n)),
       remove: (...names) => names.forEach(n => classList.delete(n)),
-      contains: (n) => classList.contains(n),
+      contains: (n) => classList.has(n),
       toggle: (n) => classList.has(n) ? classList.delete(n) : classList.add(n)
     },
     getAttribute: (k) => el.attributes[k] ?? null,
     setAttribute: (k, v) => { el.attributes[k] = String(v); },
     hasAttribute: (k) => k in el.attributes,
     removeAttribute: (k) => { delete el.attributes[k]; },
+    contains: (target) => {
+      if (target === el) return true;
+      for (const c of children) {
+        if (c === target || (c.contains && c.contains(target))) return true;
+      }
+      return false;
+    },
+    closest: (selector) => {
+      let cur = el;
+      while (cur) {
+        if (selector.startsWith('.') && cur.classList?.contains(selector.slice(1))) return cur;
+        if (selector.startsWith('#') && cur.attributes?.id === selector.slice(1)) return cur;
+        cur = cur.parentElement;
+      }
+      return null;
+    },
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 390, height: 50, right: 390, bottom: 50 }),
     addEventListener: (type, fn) => {
       if (!eventListeners.has(type)) eventListeners.set(type, new Set());
       eventListeners.get(type).add(fn);
@@ -44,11 +63,11 @@ function createMockElement(tagName = 'div', attributes = {}) {
       return true;
     },
     appendChild: (child) => {
+      child.parentElement = el;
       children.push(child);
       return child;
     },
     querySelector: (selector) => {
-      // Basic mock selector matching for test inspection
       if (selector.startsWith('#')) {
         const id = selector.slice(1);
         if (el.attributes.id === id) return el;
@@ -58,8 +77,19 @@ function createMockElement(tagName = 'div', attributes = {}) {
         }
       }
       if (selector.startsWith('.')) {
-        const cls = selector.slice(1);
-        if (classList.has(cls)) return el;
+        const classes = selector.slice(1).split('.');
+        const matchesAll = classes.every(cls => classList.has(cls));
+        if (matchesAll) return el;
+        for (const c of children) {
+          const found = c.querySelector?.(selector);
+          if (found) return found;
+        }
+      }
+      if (selector.startsWith('[') && selector.endsWith(']')) {
+        const attrContent = selector.slice(1, -1);
+        const [k, v] = attrContent.split('=');
+        const cleanVal = v ? v.replace(/['"]/g, '') : null;
+        if (cleanVal !== null ? el.getAttribute(k) === cleanVal : el.hasAttribute(k)) return el;
         for (const c of children) {
           const found = c.querySelector?.(selector);
           if (found) return found;
@@ -70,8 +100,8 @@ function createMockElement(tagName = 'div', attributes = {}) {
     querySelectorAll: (selector) => {
       const results = [];
       if (selector.startsWith('.')) {
-        const cls = selector.slice(1);
-        if (classList.has(cls)) results.push(el);
+        const classes = selector.slice(1).split('.');
+        if (classes.every(cls => classList.has(cls))) results.push(el);
       }
       for (const c of children) {
         if (c.querySelectorAll) {
@@ -93,17 +123,18 @@ function createMockElement(tagName = 'div', attributes = {}) {
       while ((match = tagRegex.exec(html)) !== null) {
         const tag = match[1];
         const rawAttrs = match[2];
-        const idMatch = /id=["']([^"']+)["']/i.exec(rawAttrs);
-        const classMatch = /class=["']([^"']+)["']/i.exec(rawAttrs);
-        if (idMatch || classMatch) {
-          const childAttrs = {};
-          if (idMatch) childAttrs.id = idMatch[1];
-          const childEl = createMockElement(tag, childAttrs);
-          if (classMatch) {
-            classMatch[1].split(/\s+/).filter(Boolean).forEach(c => childEl.classList.add(c));
-          }
-          children.push(childEl);
+        const childAttrs = {};
+        const attrRegex = /([a-z0-9_-]+)=["']([^"']*)["']/gi;
+        let attrMatch;
+        while ((attrMatch = attrRegex.exec(rawAttrs)) !== null) {
+          childAttrs[attrMatch[1].toLowerCase()] = attrMatch[2];
         }
+        const childEl = createMockElement(tag, childAttrs);
+        childEl.parentElement = el;
+        if (childAttrs.class) {
+          childAttrs.class.split(/\s+/).filter(Boolean).forEach(c => childEl.classList.add(c));
+        }
+        children.push(childEl);
       }
     }
   });
@@ -137,6 +168,17 @@ describe('Spot Map View - Controller & Cartography Contracts (UI Layer)', () => 
     assert.ok(mockContainer.innerHTML.includes('id="gm-map-spot-select"'), 'Must contain locality / spot selector');
     assert.ok(mockContainer.innerHTML.includes('id="gm-map-top-spot-btn"'), 'Must contain 1-tap top spot recommendation button');
     assert.ok(mockContainer.innerHTML.includes('gm-map-scrubber-slots'), 'Must contain hourly scrubber container');
+  });
+
+  it('should render unified floating map canvas controls matching fullscreen overlay', () => {
+    spotMapView.mount(mockContainer);
+
+    assert.ok(mockContainer.innerHTML.includes('gm-map-canvas-controls'), 'Must contain floating canvas controls container');
+    assert.ok(mockContainer.innerHTML.includes('id="gm-map-layer-select"'), 'Must contain layer select dropdown');
+    assert.ok(mockContainer.innerHTML.includes('gm-map-ctrl-select'), 'Must have gm-map-ctrl-select class');
+    assert.ok(mockContainer.innerHTML.includes('id="gm-map-top-spot-btn"'), 'Must contain top spot button');
+    assert.ok(mockContainer.innerHTML.includes('id="gm-map-gps-btn"'), 'Must contain GPS location button');
+    assert.ok(mockContainer.innerHTML.includes('gm-map-ctrl-btn'), 'Must have gm-map-ctrl-btn class');
   });
 
   it('should render locality filter in external top bar and allow selecting individual spots', () => {
@@ -289,6 +331,138 @@ describe('Spot Map View - Controller & Cartography Contracts (UI Layer)', () => 
     );
   });
 
+  it('should render unified 13-slot continuous timeline scrubber (08:00 - 20:00) with colored bars', () => {
+    spotMapView.mount(mockContainer);
+
+    const strip = mockContainer.querySelector('#map-timeline-strip');
+    assert.ok(strip, 'Must contain #map-timeline-strip element');
+    assert.ok(strip.classList.contains('gm-timeline-grid-13'), 'Must declare gm-timeline-grid-13 class');
+
+    const cols = mockContainer.querySelectorAll('.gm-timeline-col-compact');
+    assert.equal(cols.length, 13, 'Must render exactly 13 hourly columns (08:00 to 20:00)');
+
+    // Verify first and last hours
+    assert.equal(cols[0].getAttribute('data-hour'), '8');
+    assert.equal(cols[12].getAttribute('data-hour'), '20');
+
+    // Verify presence of time labels and bar fills in every column
+    cols.forEach((col, idx) => {
+      const expectedHour = 8 + idx;
+      assert.equal(col.getAttribute('data-hour'), String(expectedHour));
+      assert.ok(mockContainer.innerHTML.includes(`data-slot-hour="${expectedHour}"`), `Column ${expectedHour} must contain bar fill`);
+    });
+  });
+
+  it('should handle pointer and touch swipe scrubbing continuously across hours', () => {
+    spotMapView.mount(mockContainer);
+
+    const strip = mockContainer.querySelector('#map-timeline-strip');
+    assert.ok(strip);
+
+    // Initial hour is defaulted or active (e.g. 12 or 14)
+    spotMapView.setActiveHour(8, true);
+    assert.equal(spotMapView.activeHour, 8);
+
+    // Start scrubbing with pointerdown
+    const downEvt = {
+      type: 'pointerdown',
+      target: strip,
+      clientX: 50,
+      pointerId: 1,
+      preventDefault: () => {}
+    };
+    spotMapView.handlePointerDown(downEvt);
+    assert.equal(spotMapView.isScrubbing, true);
+    assert.equal(spotMapView.activeScrubStrip, strip);
+
+    // Move pointer towards middle (width is 390 in mock, 195px is hour 14)
+    const moveEvt = {
+      type: 'pointermove',
+      target: strip,
+      clientX: 195,
+      preventDefault: () => {}
+    };
+    spotMapView.handlePointerMove(moveEvt);
+    assert.equal(spotMapView.activeHour, 14, 'Must continuously update active hour to 14 at 50% width');
+    assert.equal(store.getState().activeHourIndex, 14);
+
+    // Move pointer to the end (clientX = 380 -> hour 20)
+    const moveEndEvt = {
+      type: 'pointermove',
+      target: strip,
+      clientX: 380,
+      preventDefault: () => {}
+    };
+    spotMapView.handlePointerMove(moveEndEvt);
+    assert.equal(spotMapView.activeHour, 20, 'Must continuously update active hour to 20 near right edge');
+
+    // Release pointer
+    const upEvt = {
+      type: 'pointerup',
+      pointerId: 1
+    };
+    spotMapView.handlePointerUp(upEvt);
+    assert.equal(spotMapView.isScrubbing, false);
+    assert.equal(spotMapView.activeScrubStrip, null);
+  });
+
+  it('should enforce aeronautical flyability lexicon (Non Volabile instead of Chiuso)', () => {
+    assert.equal(STATUS_COLORS.unflyable.badge, 'Non Volabile');
+    assert.equal(STATUS_COLORS.flyable.badge, 'Volabile');
+
+    spotMapView.mount(mockContainer);
+
+    // Update scrubber with an unflyable spot evaluation
+    const mockUnflyableSpot = {
+      id: 'spot-test-unflyable',
+      name: 'Spot Test',
+      comprensorio: { id: 'spot-test-unflyable', name: 'Spot Test' },
+      status: 'unflyable',
+      score: 10
+    };
+    spotMapView.updateScrubberBars(mockUnflyableSpot);
+
+    const spotPill = mockContainer.querySelector('#gm-map-scrubber-spot-pill');
+    if (spotPill) {
+      assert.ok(spotPill.textContent.includes('Non Volabile'), 'Spot pill must display Non Volabile');
+      assert.equal(spotPill.textContent.includes('Chiuso'), false, 'Spot pill must never display Chiuso');
+    }
+
+    assert.equal(mockContainer.innerHTML.includes('Chiuso'), false, 'View container must never contain Chiuso');
+  });
+
+  it('should render and toggle aim sub-menu with crosshair icon for comprensorio and GPS', () => {
+    spotMapView.mount(mockContainer);
+
+    const trigger = mockContainer.querySelector('#gm-map-aim-trigger');
+    const dropdown = mockContainer.querySelector('#gm-map-aim-dropdown');
+    assert.ok(trigger, 'Must contain aim menu trigger');
+    assert.ok(dropdown, 'Must contain aim menu dropdown');
+    assert.equal(trigger.getAttribute('aria-expanded'), 'false');
+    assert.ok(dropdown.classList.contains('hidden'));
+
+    // Toggle open
+    spotMapView.toggleAimMenu();
+    assert.equal(spotMapView.isAimMenuOpen, true);
+    assert.equal(trigger.getAttribute('aria-expanded'), 'true');
+    assert.equal(dropdown.classList.contains('hidden'), false);
+
+    // Toggle close
+    spotMapView.closeAimMenu();
+    assert.equal(spotMapView.isAimMenuOpen, false);
+    assert.equal(trigger.getAttribute('aria-expanded'), 'false');
+    assert.equal(dropdown.classList.contains('hidden'), true);
+  });
+
+  it('should render unified timeline scrubber header with spot pill and active hour label', () => {
+    spotMapView.mount(mockContainer);
+
+    assert.ok(mockContainer.innerHTML.includes('gm-map-scrubber-header'), 'Must contain unified scrubber header');
+    assert.ok(mockContainer.innerHTML.includes('Timeline Volabilità'), 'Must contain Timeline Volabilità header');
+    assert.ok(mockContainer.innerHTML.includes('id="gm-map-scrubber-spot-pill"'), 'Must contain spot status pill');
+    assert.ok(mockContainer.innerHTML.includes('id="gm-map-active-hour-label"'), 'Must contain active hour label');
+  });
+
   it('should clean up on unmount without memory leaks', () => {
     spotMapView.mount(mockContainer);
     assert.ok(spotMapView.mapEngine);
@@ -300,3 +474,4 @@ describe('Spot Map View - Controller & Cartography Contracts (UI Layer)', () => 
     assert.equal(spotMapView.moveDebounceTimer, null);
   });
 });
+

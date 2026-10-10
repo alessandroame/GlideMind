@@ -121,7 +121,7 @@ describe('Map Data Partitioning & Geospatial Filtering (Headless Core)', () => {
       { id: 'spot-cautela', name: 'Spot Giallo', severity: 1, score: 60 },
       { id: 'spot-volabile-top', name: 'Spot Verde Top', severity: 0, score: 95 },
       { id: 'spot-volabile-mid', name: 'Spot Verde Mid', severity: 0, score: 80 },
-      { id: 'spot-chiuso', name: 'Spot Rosso', severity: 2, score: 15 }
+      { id: 'spot-non-volabile', name: 'Spot Rosso', severity: 2, score: 15 }
     ];
 
     const top = findTopFlyableSpot(evaluated);

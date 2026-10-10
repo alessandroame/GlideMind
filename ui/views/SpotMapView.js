@@ -49,7 +49,21 @@ export class SpotMapView {
     this.isFetchingWeather = false;
     this.storeUnsub = null;
     this.moveDebounceTimer = null;
-    this.hoursRange = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
+    this.hoursRange = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+    this.isScrubbing = false;
+    this.pointerStartX = 0;
+    this.hasDraggedPointer = false;
+    this.activeScrubStrip = null;
+    this.isAimMenuOpen = false;
+
+    this.boundPointerDown = this.handlePointerDown.bind(this);
+    this.boundPointerMove = this.handlePointerMove.bind(this);
+    this.boundPointerUp = this.handlePointerUp.bind(this);
+    this.boundTouchStart = (e) => this.handlePointerDown(e);
+    this.boundTouchMove = (e) => this.handlePointerMove(e);
+    this.boundTouchEnd = (e) => this.handlePointerUp(e);
+    this.boundDocumentClick = (e) => this.handleDocumentClick(e);
+    this.boundDocumentKey = (e) => this.handleDocumentKey(e);
   }
 
   /**
@@ -96,8 +110,25 @@ export class SpotMapView {
       select.innerHTML = this.renderSpotSelectOptions();
       if (this.focusedSpotId) {
         select.value = this.focusedSpotId;
+      } else {
+        select.value = '';
+      }
+      if (select.selectedIndex === -1 && select.options.length > 0) {
+        select.selectedIndex = 0;
       }
     }
+  }
+
+  /**
+   * Retrieves the currently focused spot or fallback to top spot / first comprensorio.
+   * @returns {object|null}
+   */
+  getFocusedSpot() {
+    if (this.focusedSpotId) {
+      const spot = this.comprensoriCatalog.find(s => s.id === this.focusedSpotId);
+      if (spot) return spot;
+    }
+    return this.topSpot?.comprensorio || this.topSpot || this.comprensoriCatalog[0] || null;
   }
 
   /**
@@ -105,11 +136,280 @@ export class SpotMapView {
    * @returns {string}
    */
   getFocusedSpotTitle() {
-    if (this.focusedSpotId) {
-      const spot = this.comprensoriCatalog.find(s => s.id === this.focusedSpotId);
-      if (spot) return spot.name;
+    const spot = this.getFocusedSpot();
+    if (spot) {
+      let weather = this.cachedWeatherMap.get(spot.id)?.weatherData;
+      if (!weather) {
+        const coords = getComprensorioCoordinates(spot);
+        if (coords) {
+          weather = generateSyntheticWeather({ lat: coords.lat, lon: coords.lon }, { days: 1, targetDate: this.activeDate });
+        }
+      }
+      const evalSpot = evaluateComprensorio({
+        comprensorio: spot,
+        weatherData: weather,
+        hourIndex: this.activeHour,
+        glider: store.getState().activeGlider,
+        allowSynthetic: true,
+        targetDate: this.activeDate
+      });
+      return `${spot.name} (${evalSpot?.badge || 'N/D'})`;
     }
-    return this.topSpot?.name || 'Osservazione Spot';
+    return 'Osservazione Spot';
+  }
+
+  /**
+   * Gets status color for the currently focused spot in scrubber header.
+   * @returns {string}
+   */
+  getFocusedSpotStatusColor() {
+    const spot = this.getFocusedSpot();
+    if (spot) {
+      let weather = this.cachedWeatherMap.get(spot.id)?.weatherData;
+      if (!weather) {
+        const coords = getComprensorioCoordinates(spot);
+        if (coords) {
+          weather = generateSyntheticWeather({ lat: coords.lat, lon: coords.lon }, { days: 1, targetDate: this.activeDate });
+        }
+      }
+      const evalSpot = evaluateComprensorio({
+        comprensorio: spot,
+        weatherData: weather,
+        hourIndex: this.activeHour,
+        glider: store.getState().activeGlider,
+        allowSynthetic: true,
+        targetDate: this.activeDate
+      });
+      return STATUS_COLORS[evalSpot?.status]?.fill || 'var(--gm-text-secondary)';
+    }
+    return 'var(--gm-text-secondary)';
+  }
+
+  /**
+   * Renders the continuous 13-hour timeline strip (08:00 - 20:00) with flyability indicators.
+   * Matches ForecastView and Comprensorio Flight Analysis overlay specification.
+   * 
+   * @param {object|null} spot
+   * @param {object|null} weatherData
+   * @param {object} glider
+   * @param {string} [stripId='map-timeline-strip']
+   * @returns {string}
+   */
+  renderTimelineGrid(spot, weatherData, glider, stripId = 'map-timeline-strip') {
+    const now = new Date();
+    const todayIso = formatDateIso(now);
+    const isToday = this.activeDate === todayIso;
+    const currentHour = now.getHours();
+
+    const hours = [];
+    for (let h = 8; h <= 20; h++) {
+      let evalHour = { status: 'unflyable', badge: 'Non Volabile' };
+      if (spot) {
+        evalHour = evaluateComprensorio({
+          comprensorio: spot,
+          weatherData,
+          hourIndex: h,
+          glider,
+          targetDate: this.activeDate,
+          allowSynthetic: true
+        });
+      }
+      hours.push({
+        hour: h,
+        eval: evalHour,
+        isActive: h === this.activeHour,
+        isCurrentHour: isToday && (h === currentHour),
+        isPast: isToday && (h < currentHour)
+      });
+    }
+
+    return `
+      <div id="${stripId}" class="gm-timeline-grid-13 gm-map-scrubber-slots" role="tablist" aria-label="Timeline oraria">
+        ${hours.map(slot => {
+          const h = slot.hour;
+          const evalH = slot.eval;
+          const weather = evalH.weatherSnapshot || {};
+          const speed = Math.round(weather.windSpeed || 0);
+
+          let fillPct = 35;
+          let fillColor = 'var(--gm-status-unflyable)';
+          let slotBgColor = 'var(--gm-status-unflyable-bg)';
+          if (evalH.status === 'flyable') {
+            fillPct = 100;
+            fillColor = 'var(--gm-status-flyable)';
+            slotBgColor = 'var(--gm-status-flyable-bg)';
+          } else if (evalH.status === 'caution') {
+            fillPct = 65;
+            fillColor = 'var(--gm-status-caution)';
+            slotBgColor = 'var(--gm-status-caution-bg)';
+          }
+
+          const stateClasses = [
+            'gm-timeline-col gm-timeline-col-compact',
+            slot.isActive ? 'active' : '',
+            slot.isCurrentHour ? 'is-now' : '',
+            slot.isPast ? 'is-past' : ''
+          ].filter(Boolean).join(' ');
+
+          return `
+            <div 
+              class="${stateClasses}"
+              data-action="select-hour"
+              data-hour="${h}"
+              role="tab"
+              aria-selected="${slot.isActive ? 'true' : 'false'}"
+              aria-label="Ore ${String(h).padStart(2, '0')}:00, ${evalH.badge}, Vento ${speed} km/h${slot.isCurrentHour ? ' (Ora attuale)' : ''}"
+              tabindex="${slot.isActive ? '0' : '-1'}"
+            >
+              ${slot.isCurrentHour ? '<span class="compact-now-badge" aria-label="Ora attuale">ORA</span>' : ''}
+              <span class="compact-time">${String(h).padStart(2, '0')}</span>
+              <div class="compact-bar" style="background-color: ${slotBgColor};">
+                <div class="compact-bar-fill" data-slot-hour="${h}" style="height: ${fillPct}%; background-color: ${fillColor};"></div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  /**
+   * Normalizes clientX coordinate across PointerEvents, MouseEvents, and TouchEvents.
+   * @param {PointerEvent|TouchEvent|MouseEvent} evt
+   * @returns {number}
+   */
+  getClientX(evt) {
+    if (evt.clientX != null) return evt.clientX;
+    if (evt.touches && evt.touches.length > 0) return evt.touches[0].clientX;
+    if (evt.changedTouches && evt.changedTouches.length > 0) return evt.changedTouches[0].clientX;
+    return 0;
+  }
+
+  /**
+   * Handles pointerdown / touchstart on scrubber timeline to start continuous slide selection.
+   * @param {PointerEvent|TouchEvent} evt
+   */
+  handlePointerDown(evt) {
+    const strip = evt.target?.closest ? evt.target.closest('.gm-timeline-grid-13') : this.container?.querySelector('#map-timeline-strip');
+    if (!strip) return;
+    if (!strip.contains(evt.target) && evt.target !== strip) return;
+
+    this.activeScrubStrip = strip;
+    this.isScrubbing = true;
+    this.pointerStartX = this.getClientX(evt);
+    this.hasDraggedPointer = false;
+
+    if (typeof document !== 'undefined' && document.activeElement && strip.contains(document.activeElement)) {
+      try {
+        document.activeElement.blur();
+      } catch (_) {}
+    }
+
+    try {
+      if (typeof strip.setPointerCapture === 'function' && evt.pointerId != null) {
+        strip.setPointerCapture(evt.pointerId);
+      }
+    } catch (_) {}
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('pointermove', this.boundPointerMove, { passive: false });
+      window.addEventListener('pointerup', this.boundPointerUp);
+      window.addEventListener('pointercancel', this.boundPointerUp);
+      window.addEventListener('touchmove', this.boundTouchMove, { passive: false });
+      window.addEventListener('touchend', this.boundTouchEnd);
+      window.addEventListener('touchcancel', this.boundTouchEnd);
+    }
+
+    this.updateHourFromPointer(evt, strip);
+  }
+
+  /**
+   * Handles pointermove / touchmove on scrubber timeline during active slide.
+   * @param {PointerEvent|TouchEvent} evt
+   */
+  handlePointerMove(evt) {
+    if (!this.isScrubbing || !this.activeScrubStrip) return;
+    if (evt && typeof evt.preventDefault === 'function' && evt.cancelable) {
+      evt.preventDefault();
+    }
+
+    const curX = this.getClientX(evt);
+    if (Math.abs(curX - this.pointerStartX) > 3) {
+      this.hasDraggedPointer = true;
+    }
+
+    this.updateHourFromPointer(evt, this.activeScrubStrip);
+  }
+
+  /**
+   * Handles pointerup/cancel to release scrubber pointer capture and window listeners.
+   * @param {PointerEvent|TouchEvent} evt
+   */
+  handlePointerUp(evt) {
+    if (!this.isScrubbing) return;
+    this.isScrubbing = false;
+    const strip = this.activeScrubStrip;
+    this.activeScrubStrip = null;
+
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('pointermove', this.boundPointerMove);
+      window.removeEventListener('pointerup', this.boundPointerUp);
+      window.removeEventListener('pointercancel', this.boundPointerUp);
+      window.removeEventListener('touchmove', this.boundTouchMove);
+      window.removeEventListener('touchend', this.boundTouchEnd);
+      window.removeEventListener('touchcancel', this.boundTouchEnd);
+    }
+
+    if (strip) {
+      try {
+        if (typeof strip.releasePointerCapture === 'function' && evt?.pointerId != null) {
+          strip.releasePointerCapture(evt.pointerId);
+        }
+      } catch (_) {}
+      if (typeof document !== 'undefined' && document.activeElement && strip.contains(document.activeElement)) {
+        try {
+          document.activeElement.blur();
+        } catch (_) {}
+      }
+    }
+    if (this.hasDraggedPointer) {
+      setTimeout(() => {
+        this.hasDraggedPointer = false;
+      }, 100);
+    }
+  }
+
+  /**
+   * Computes the target hour from horizontal pointer coordinate and updates state.
+   * @param {PointerEvent|TouchEvent} evt
+   * @param {HTMLElement} strip
+   */
+  updateHourFromPointer(evt, strip) {
+    if (!strip) return;
+    const rect = typeof strip.getBoundingClientRect === 'function' ? strip.getBoundingClientRect() : null;
+
+    if (rect && rect.width > 0) {
+      const clientX = this.getClientX(evt);
+      const relX = Math.max(0, Math.min(rect.width - 1, clientX - rect.left));
+      const fraction = relX / rect.width;
+      const hourIndex = Math.min(12, Math.max(0, Math.floor(fraction * 13)));
+      const targetHour = 8 + hourIndex;
+      if (targetHour !== this.activeHour) {
+        this.setActiveHour(targetHour, true);
+        if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+          try { navigator.vibrate(8); } catch (_) {}
+        }
+      }
+    } else {
+      const target = evt.target;
+      const col = target && typeof target.closest === 'function' ? target.closest('[data-hour]') : null;
+      if (col) {
+        const hour = parseInt(col.getAttribute('data-hour'), 10);
+        if (!isNaN(hour) && hour >= 8 && hour <= 20 && hour !== this.activeHour) {
+          this.setActiveHour(hour, true);
+        }
+      }
+    }
   }
 
   /**
@@ -131,17 +431,30 @@ export class SpotMapView {
       this.comprensoriCatalog = state.locationsCatalog;
     }
     this.activeDate = state.activeDate || formatDateIso(new Date());
-    if (typeof state.activeHourIndex === 'number' && state.activeHourIndex >= 9 && state.activeHourIndex <= 18) {
+    if (typeof state.activeHourIndex === 'number' && state.activeHourIndex >= 8 && state.activeHourIndex <= 20) {
       this.activeHour = state.activeHourIndex;
     } else {
       this.activeHour = 12;
     }
 
     this.activeLayer = (state.ui && state.ui.mapLayer) || 'dark';
+    this.activeTheme = (state.ui && state.ui.theme) || 'dark';
     this.focusedSpotId = state.selectedSpotId || null;
 
     if (params && params.macroRegion) {
       this.activeMacroRegion = params.macroRegion;
+    }
+
+    const activeGlider = state.activeGlider;
+    const initialSpot = (this.focusedSpotId && this.comprensoriCatalog.find(s => s.id === this.focusedSpotId))
+      || this.comprensoriCatalog[0]
+      || null;
+    let initialWeather = initialSpot ? this.cachedWeatherMap.get(initialSpot.id)?.weatherData : null;
+    if (initialSpot && !initialWeather) {
+      const coords = getComprensorioCoordinates(initialSpot);
+      if (coords) {
+        initialWeather = generateSyntheticWeather({ lat: coords.lat, lon: coords.lon }, { days: 1, targetDate: this.activeDate });
+      }
     }
 
     // Build DOM structure with external top bar placed outside and above map canvas
@@ -180,20 +493,78 @@ export class SpotMapView {
           <!-- Map Canvas Mount Target -->
           <div id="gm-map-canvas" class="gm-map-canvas-container" role="application" aria-label="Cartografia interattiva decolli e comprensori"></div>
 
-          <!-- Top-Left Floating Control: 1-Tap Top Spot Recommendation Chip -->
-          <button type="button" id="gm-map-top-spot-btn" class="gm-map-top-spot-btn gm-map-floating-top-spot" aria-label="Centra sullo spot migliore">
-            <span class="gm-top-spot-dot">●</span>
-            <span class="gm-top-spot-title" id="gm-top-spot-name">Top Spot...</span>
-            <span class="gm-top-spot-focus" aria-hidden="true">›</span>
-          </button>
+          <!-- Floating Map Controls (Inside Map Canvas, harmonized with Flight Analysis Overlay) -->
+          <div class="gm-map-canvas-controls" role="toolbar" aria-label="Controlli mappa">
+            <div class="gm-map-controls-left">
+              <select id="gm-map-layer-select" class="gm-map-ctrl-select" aria-label="Seleziona layer cartografico">
+                <option value="dark" ${this.activeLayer === 'dark' ? 'selected' : ''}>Scuro</option>
+                <option value="topo" ${this.activeLayer === 'topo' ? 'selected' : ''}>OpenTopo</option>
+                <option value="satellite" ${this.activeLayer === 'satellite' ? 'selected' : ''}>Satellite</option>
+                <option value="streets" ${this.activeLayer === 'streets' ? 'selected' : ''}>CyclOSM</option>
+              </select>
+            </div>
+            <div class="gm-map-controls-right">
+              <div class="gm-aim-menu-wrap" id="gm-map-aim-wrap">
+                <button 
+                  type="button" 
+                  id="gm-map-aim-trigger"
+                  class="gm-map-ctrl-btn gm-aim-menu-trigger" 
+                  data-action="toggle-aim-menu"
+                  aria-haspopup="menu"
+                  aria-expanded="false"
+                  aria-label="Opzioni di puntamento"
+                  title="Opzioni di puntamento e centratura mappa"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="8"></circle>
+                    <line x1="12" y1="2" x2="12" y2="6"></line>
+                    <line x1="12" y1="18" x2="12" y2="22"></line>
+                    <line x1="2" y1="12" x2="6" y2="12"></line>
+                    <line x1="18" y1="12" x2="22" y2="12"></line>
+                    <circle cx="12" cy="12" r="2" fill="currentColor"></circle>
+                  </svg>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="gm-aim-chevron" aria-hidden="true">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </button>
 
-          <!-- Top-Right Floating Control: Layer Switcher Micro-Capsule (Frosted Glass) -->
-          <select id="gm-map-layer-select" class="gm-map-floating-layer-select" aria-label="Seleziona layer cartografico">
-            <option value="dark" ${this.activeLayer === 'dark' ? 'selected' : ''}>Scuro</option>
-            <option value="topo" ${this.activeLayer === 'topo' ? 'selected' : ''}>OpenTopo</option>
-            <option value="satellite" ${this.activeLayer === 'satellite' ? 'selected' : ''}>Satellite</option>
-            <option value="streets" ${this.activeLayer === 'streets' ? 'selected' : ''}>CyclOSM</option>
-          </select>
+                <div id="gm-map-aim-dropdown" class="gm-aim-dropdown hidden" role="menu" aria-label="Opzioni di puntamento">
+                  <button 
+                    type="button" 
+                    id="gm-map-top-spot-btn" 
+                    class="gm-aim-menu-item" 
+                    data-action="center-comprensorio" 
+                    role="menuitem"
+                    title="Centra sul comprensorio o decollo"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                    </svg>
+                    <span id="gm-top-spot-name">Comprensorio</span>
+                  </button>
+
+                  <button 
+                    type="button" 
+                    id="gm-map-gps-btn" 
+                    class="gm-aim-menu-item" 
+                    data-action="center-gps" 
+                    role="menuitem"
+                    title="Centra sulla tua posizione GPS attuale"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <circle cx="12" cy="12" r="3"></circle>
+                      <line x1="12" y1="2" x2="12" y2="6"></line>
+                      <line x1="12" y1="18" x2="12" y2="22"></line>
+                      <line x1="2" y1="12" x2="6" y2="12"></line>
+                      <line x1="18" y1="12" x2="22" y2="12"></line>
+                    </svg>
+                    <span>Posizione GPS</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
 
           <!-- Bottom Docked Timeline Scrubber (Thumb Zone, Clearance >=24px) -->
           <div class="gm-map-scrubber-container" role="region" aria-label="Selettore orario volabilità">
@@ -201,7 +572,7 @@ export class SpotMapView {
               <div class="gm-map-scrubber-header">
                 <div class="gm-map-scrubber-title-group">
                   <span class="gm-map-scrubber-title">Timeline Volabilità</span>
-                  <span id="gm-map-scrubber-spot-pill" class="gm-map-scrubber-spot-pill">
+                  <span id="gm-map-scrubber-spot-pill" class="gm-map-scrubber-spot-pill" title="Tocca per aprire la scheda spot" style="color: ${this.getFocusedSpotStatusColor()};">
                     ${this.getFocusedSpotTitle()}
                   </span>
                 </div>
@@ -210,43 +581,7 @@ export class SpotMapView {
                 </div>
               </div>
 
-              <div class="gm-map-scrubber-stepper-row">
-                <button
-                  type="button"
-                  id="gm-map-prev-hour-btn"
-                  class="gm-map-stepper-btn"
-                  aria-label="Ora precedente"
-                  ${this.activeHour <= 9 ? 'disabled' : ''}
-                >
-                  ‹
-                </button>
-
-                <div class="gm-map-scrubber-slots" role="radiogroup" aria-label="Ore disponibili">
-                  ${this.hoursRange.map(h => `
-                    <button
-                      type="button"
-                      class="gm-map-hour-slot ${h === this.activeHour ? 'active' : ''}"
-                      data-hour="${h}"
-                      role="radio"
-                      aria-checked="${h === this.activeHour ? 'true' : 'false'}"
-                      aria-label="Ore ${h}:00"
-                    >
-                      <span class="gm-hour-text">${String(h).padStart(2, '0')}</span>
-                      <span class="gm-hour-fly-bar" data-slot-hour="${h}"></span>
-                    </button>
-                  `).join('')}
-                </div>
-
-                <button
-                  type="button"
-                  id="gm-map-next-hour-btn"
-                  class="gm-map-stepper-btn"
-                  aria-label="Ora successiva"
-                  ${this.activeHour >= 18 ? 'disabled' : ''}
-                >
-                  ›
-                </button>
-              </div>
+              ${this.renderTimelineGrid(initialSpot, initialWeather, activeGlider, 'map-timeline-strip')}
             </div>
           </div>
         </div>
@@ -285,9 +620,13 @@ export class SpotMapView {
     if (typeof store.subscribe === 'function') {
       this.storeUnsub = store.subscribe(() => {
         const s = store.getState();
-        // Check theme change
-        if (s.ui && s.ui.theme && this.mapEngine) {
-          this.mapEngine.setTheme(s.ui.theme);
+        // Check theme change (only when theme actually changes)
+        if (s.ui && s.ui.theme && s.ui.theme !== this.activeTheme && this.mapEngine) {
+          this.activeTheme = s.ui.theme;
+          this.mapEngine.setTheme(this.activeTheme);
+          this.activeLayer = (this.mapEngine.currentLayerId) || (this.activeTheme === 'light' ? 'topo' : 'dark');
+          const select = this.container?.querySelector('#gm-map-layer-select');
+          if (select) select.value = this.activeLayer;
         }
         // Check map layer change
         if (s.ui && s.ui.mapLayer && s.ui.mapLayer !== this.activeLayer && this.mapEngine) {
@@ -313,7 +652,7 @@ export class SpotMapView {
           this.renderMapContent();
         }
         // Check hour change
-        if (typeof s.activeHourIndex === 'number' && s.activeHourIndex !== this.activeHour && s.activeHourIndex >= 9 && s.activeHourIndex <= 18) {
+        if (typeof s.activeHourIndex === 'number' && s.activeHourIndex !== this.activeHour && s.activeHourIndex >= 8 && s.activeHourIndex <= 20) {
           this.setActiveHour(s.activeHourIndex, false);
         }
       });
@@ -328,6 +667,18 @@ export class SpotMapView {
    * Unbinds listeners and destroys the map engine upon route change.
    */
   unmount() {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('pointermove', this.boundPointerMove);
+      window.removeEventListener('pointerup', this.boundPointerUp);
+      window.removeEventListener('pointercancel', this.boundPointerUp);
+      window.removeEventListener('touchmove', this.boundTouchMove);
+      window.removeEventListener('touchend', this.boundTouchEnd);
+      window.removeEventListener('touchcancel', this.boundTouchEnd);
+    }
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('click', this.boundDocumentClick);
+      document.removeEventListener('keydown', this.boundDocumentKey);
+    }
     if (this.container && this.container.classList) {
       this.container.classList.remove('gm-view-map');
     }
@@ -365,6 +716,15 @@ export class SpotMapView {
     // Locality / Spot direct selector
     const spotSelect = this.container.querySelector('#gm-map-spot-select');
     if (spotSelect) {
+      if (this.focusedSpotId) {
+        spotSelect.value = this.focusedSpotId;
+      } else {
+        spotSelect.value = '';
+      }
+      if (spotSelect.selectedIndex === -1 && spotSelect.options.length > 0) {
+        spotSelect.selectedIndex = 0;
+      }
+
       spotSelect.addEventListener('change', (e) => {
         const spotId = e.target.value;
         if (!spotId) {
@@ -410,10 +770,25 @@ export class SpotMapView {
       });
     }
 
+    // Aim menu dropdown toggle
+    const aimTrigger = this.container.querySelector('#gm-map-aim-trigger');
+    if (aimTrigger) {
+      aimTrigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.toggleAimMenu();
+      });
+    }
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('click', this.boundDocumentClick);
+      document.addEventListener('keydown', this.boundDocumentKey);
+    }
+
     // Top spot focus button
     const topSpotBtn = this.container.querySelector('#gm-map-top-spot-btn');
     if (topSpotBtn) {
       topSpotBtn.addEventListener('click', () => {
+        this.closeAimMenu();
         if (this.topSpot) {
           this.focusedSpotId = this.topSpot.id || this.topSpot.comprensorio?.id;
           const coords = getComprensorioCoordinates(this.topSpot.comprensorio || this.topSpot);
@@ -430,6 +805,15 @@ export class SpotMapView {
       });
     }
 
+    // GPS location center button
+    const gpsBtn = this.container.querySelector('#gm-map-gps-btn');
+    if (gpsBtn) {
+      gpsBtn.addEventListener('click', () => {
+        this.closeAimMenu();
+        this.centerOnUserLocation();
+      });
+    }
+
     // Scrubber header spot pill (tap to open sheet)
     const spotPill = this.container.querySelector('#gm-map-scrubber-spot-pill');
     if (spotPill) {
@@ -443,11 +827,28 @@ export class SpotMapView {
       });
     }
 
-    // Stepper buttons for 1-hour jump
+    // Timeline scrubber continuous drag & touch swipe
+    const strip = this.container.querySelector('#map-timeline-strip') || this.container.querySelector('.gm-timeline-grid-13');
+    if (strip) {
+      strip.addEventListener('pointerdown', this.boundPointerDown);
+      strip.addEventListener('touchstart', this.boundTouchStart, { passive: false });
+      strip.addEventListener('click', (e) => {
+        if (this.hasDraggedPointer) return;
+        const col = e.target?.closest ? e.target.closest('[data-hour]') : null;
+        if (col) {
+          const hour = parseInt(col.getAttribute('data-hour'), 10);
+          if (!isNaN(hour) && hour >= 8 && hour <= 20) {
+            this.setActiveHour(hour, true);
+          }
+        }
+      });
+    }
+
+    // Keep backwards compatibility for stepper buttons if present
     const prevBtn = this.container.querySelector('#gm-map-prev-hour-btn');
     if (prevBtn) {
       prevBtn.addEventListener('click', () => {
-        if (this.activeHour > 9) {
+        if (this.activeHour > 8) {
           this.setActiveHour(this.activeHour - 1, true);
         }
       });
@@ -456,22 +857,102 @@ export class SpotMapView {
     const nextBtn = this.container.querySelector('#gm-map-next-hour-btn');
     if (nextBtn) {
       nextBtn.addEventListener('click', () => {
-        if (this.activeHour < 18) {
+        if (this.activeHour < 20) {
           this.setActiveHour(this.activeHour + 1, true);
         }
       });
     }
+  }
 
-    // Hourly Scrubber slot buttons
-    const scrubberSlots = this.container.querySelectorAll('.gm-map-hour-slot');
-    scrubberSlots.forEach(slot => {
-      slot.addEventListener('click', () => {
-        const hour = parseInt(slot.getAttribute('data-hour'), 10);
-        if (!isNaN(hour)) {
-          this.setActiveHour(hour, true);
+  /**
+   * Centers the map on the user's current GPS position.
+   * @returns {SpotMapView}
+   */
+  centerOnUserLocation() {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      return this;
+    }
+    const gpsBtn = this.container?.querySelector('#gm-map-gps-btn');
+    if (gpsBtn) {
+      gpsBtn.classList.add('loading');
+      gpsBtn.setAttribute('aria-busy', 'true');
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        if (gpsBtn) {
+          gpsBtn.classList.remove('loading');
+          gpsBtn.removeAttribute('aria-busy');
         }
-      });
-    });
+        const { latitude, longitude } = pos.coords;
+        if (this.mapEngine && typeof this.mapEngine.showUserLocation === 'function') {
+          this.mapEngine.showUserLocation(latitude, longitude);
+        }
+        if (this.mapEngine && typeof this.mapEngine.flyTo === 'function') {
+          this.mapEngine.flyTo({ lat: latitude, lon: longitude }, 12);
+        }
+      },
+      (err) => {
+        if (gpsBtn) {
+          gpsBtn.classList.remove('loading');
+          gpsBtn.removeAttribute('aria-busy');
+        }
+        console.warn('[GlideMind Map] Geolocation error:', err?.message || err);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+    );
+    return this;
+  }
+
+  /**
+   * Handles document click to close aim dropdown when clicking outside.
+   * @param {MouseEvent} e
+   */
+  handleDocumentClick(e) {
+    if (!this.isAimMenuOpen) return;
+    const wrap = this.container?.querySelector('#gm-map-aim-wrap');
+    if (wrap && !wrap.contains(e.target)) {
+      this.closeAimMenu();
+    }
+  }
+
+  /**
+   * Handles document keydown (Escape) to close aim dropdown.
+   * @param {KeyboardEvent} e
+   */
+  handleDocumentKey(e) {
+    if (e.key === 'Escape' && this.isAimMenuOpen) {
+      this.closeAimMenu();
+    }
+  }
+
+  /**
+   * Toggles or sets aim sub-menu open state.
+   * @param {boolean} [forceOpen]
+   */
+  toggleAimMenu(forceOpen) {
+    const wrap = this.container?.querySelector('#gm-map-aim-wrap');
+    const trigger = this.container?.querySelector('#gm-map-aim-trigger');
+    const dropdown = this.container?.querySelector('#gm-map-aim-dropdown');
+    if (!dropdown || !trigger) return;
+
+    const nextState = typeof forceOpen === 'boolean' ? forceOpen : !this.isAimMenuOpen;
+    this.isAimMenuOpen = nextState;
+
+    trigger.setAttribute('aria-expanded', String(nextState));
+    trigger.classList.toggle('active', nextState);
+    dropdown.classList.toggle('hidden', !nextState);
+    if (wrap) {
+      wrap.classList.toggle('active', nextState);
+    }
+  }
+
+  /**
+   * Closes aim sub-menu if open.
+   */
+  closeAimMenu() {
+    if (!this.isAimMenuOpen) return;
+    this.toggleAimMenu(false);
   }
 
   /**
@@ -498,6 +979,7 @@ export class SpotMapView {
    * @param {boolean} [updateStore=true]
    */
   setActiveHour(hour, updateStore = true) {
+    if (hour < 8 || hour > 20) return;
     if (this.activeHour === hour) return;
     this.activeHour = hour;
 
@@ -510,22 +992,22 @@ export class SpotMapView {
       if (activeLabel) activeLabel.textContent = `Ore ${String(hour).padStart(2, '0')}:00`;
 
       const prevBtn = this.container.querySelector('#gm-map-prev-hour-btn');
-      if (prevBtn) prevBtn.disabled = hour <= 9;
+      if (prevBtn) prevBtn.disabled = hour <= 8;
 
       const nextBtn = this.container.querySelector('#gm-map-next-hour-btn');
-      if (nextBtn) nextBtn.disabled = hour >= 18;
+      if (nextBtn) nextBtn.disabled = hour >= 20;
 
-      const slots = this.container.querySelectorAll('.gm-map-hour-slot');
-      slots.forEach(slot => {
-        const h = parseInt(slot.getAttribute('data-hour'), 10);
-        if (h === hour) {
-          slot.classList.add('active');
-          slot.setAttribute('aria-checked', 'true');
-        } else {
-          slot.classList.remove('active');
-          slot.setAttribute('aria-checked', 'false');
-        }
-      });
+      const strip = this.container.querySelector('#map-timeline-strip') || this.container.querySelector('.gm-timeline-grid-13');
+      if (strip) {
+        const cols = strip.querySelectorAll ? strip.querySelectorAll('.gm-timeline-col-compact') : [];
+        cols.forEach(col => {
+          const colHour = parseInt(col.getAttribute('data-hour'), 10);
+          const isActive = colHour === hour;
+          col.classList.toggle('active', isActive);
+          col.setAttribute('aria-selected', isActive ? 'true' : 'false');
+          col.setAttribute('tabindex', isActive ? '0' : '-1');
+        });
+      }
     }
 
     // Re-render overlays instantly in RAM (<15ms)
@@ -620,15 +1102,10 @@ export class SpotMapView {
       this.mapEngine.renderOverlays(displayOverlays, currentView.zoom, activeGlider, this.focusedSpotId);
     }
 
-    if (this.container && this.topSpot) {
+    if (this.container) {
       const topNameEl = this.container.querySelector('#gm-top-spot-name');
-      const topDotEl = this.container.querySelector('.gm-top-spot-dot');
       if (topNameEl) {
-        topNameEl.textContent = `${this.topSpot.name} (${this.activeHour}:00)`;
-      }
-      if (topDotEl) {
-        const style = STATUS_COLORS[this.topSpot.status] || STATUS_COLORS.flyable;
-        topDotEl.style.color = style.fill;
+        topNameEl.textContent = this.topSpot?.name || 'Top Spot';
       }
     }
 
@@ -644,24 +1121,54 @@ export class SpotMapView {
   updateScrubberBars(spotEvaluation) {
     if (!this.container || !spotEvaluation || !spotEvaluation.comprensorio) return;
     const spot = spotEvaluation.comprensorio;
-    const weather = this.cachedWeatherMap.get(spot.id)?.weatherData;
+    let weather = this.cachedWeatherMap.get(spot.id)?.weatherData;
+    if (!weather) {
+      const coords = getComprensorioCoordinates(spot);
+      if (coords) {
+        weather = generateSyntheticWeather({ lat: coords.lat, lon: coords.lon }, { days: 1, targetDate: this.activeDate });
+      }
+    }
     const activeGlider = store.getState().activeGlider;
 
-    this.hoursRange.forEach(h => {
-      const bar = this.container.querySelector(`[data-slot-hour="${h}"]`);
-      if (bar) {
-        const evalAtH = evaluateComprensorio({
-          comprensorio: spot,
-          weatherData: weather,
-          hourIndex: h,
-          glider: activeGlider,
-          allowSynthetic: true,
-          targetDate: this.activeDate
-        });
-        const style = STATUS_COLORS[evalAtH.status] || STATUS_COLORS.unavailable;
-        bar.style.backgroundColor = style.fill;
-      }
-    });
+    const strip = this.container.querySelector('#map-timeline-strip') || this.container.querySelector('.gm-timeline-grid-13');
+    if (strip) {
+      this.hoursRange.forEach(h => {
+        const col = strip.querySelector(`[data-hour="${h}"]`);
+        if (col) {
+          const evalAtH = evaluateComprensorio({
+            comprensorio: spot,
+            weatherData: weather,
+            hourIndex: h,
+            glider: activeGlider,
+            allowSynthetic: true,
+            targetDate: this.activeDate
+          });
+          let fillPct = 35;
+          let fillColor = 'var(--gm-status-unflyable)';
+          let slotBgColor = 'var(--gm-status-unflyable-bg)';
+          if (evalAtH.status === 'flyable') {
+            fillPct = 100;
+            fillColor = 'var(--gm-status-flyable)';
+            slotBgColor = 'var(--gm-status-flyable-bg)';
+          } else if (evalAtH.status === 'caution') {
+            fillPct = 65;
+            fillColor = 'var(--gm-status-caution)';
+            slotBgColor = 'var(--gm-status-caution-bg)';
+          }
+
+          const bar = col.querySelector('.compact-bar');
+          const fill = col.querySelector('.compact-bar-fill');
+          if (bar) bar.style.backgroundColor = slotBgColor;
+          if (fill) {
+            fill.style.height = `${fillPct}%`;
+            fill.style.backgroundColor = fillColor;
+          }
+
+          const speed = Math.round(evalAtH.weatherSnapshot?.windSpeed || 0);
+          col.setAttribute('aria-label', `Ore ${String(h).padStart(2, '0')}:00, ${evalAtH.badge}, Vento ${speed} km/h`);
+        }
+      });
+    }
 
     const spotPill = this.container.querySelector('#gm-map-scrubber-spot-pill');
     if (spotPill) {
@@ -714,7 +1221,7 @@ export class SpotMapView {
 
     const badge = this.container?.querySelector('#gm-map-network-badge');
     if (badge) {
-      badge.textContent = 'Aggiornamento...';
+      badge.textContent = 'Sync...';
       badge.className = 'gm-badge gm-badge-caution';
     }
 
@@ -854,7 +1361,7 @@ export class SpotMapView {
         <!-- Hazards warning if present -->
         ${takeoff?.hazards ? `
           <div style="font-size: 0.76rem; color: #f59e0b; background: rgba(245, 158, 11, 0.08); padding: 6px 10px; border-radius: var(--gm-radius-sm); border: 1px solid rgba(245, 158, 11, 0.2);">
-            ⚠️ <strong>Pericoli:</strong> ${cleanUserText(takeoff.hazards)}
+            <strong>Pericoli:</strong> ${cleanUserText(takeoff.hazards)}
           </div>
         ` : ''}
 

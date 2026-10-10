@@ -153,7 +153,7 @@ export function calculateLandingCircuit({
   if (isDangerousWind) {
     isSafetyWarning = true;
     warningSeverity = 'severe';
-    warningReason = `Vento al suolo pericoloso (${windSpeed} km/h > 22 km/h). Condizioni estreme fuori da qualsiasi margine di sicurezza. Atterraggio vietato/chiuso.`;
+    warningReason = `Vento al suolo pericoloso (${windSpeed} km/h > 22 km/h). Condizioni estreme fuori da qualsiasi margine di sicurezza. Atterraggio non praticabile.`;
   } else if (isStrongWind) {
     isSafetyWarning = true;
     warningSeverity = 'severe';

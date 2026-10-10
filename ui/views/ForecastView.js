@@ -20,7 +20,7 @@
 import { store } from '../../core/store.js';
 import { router } from '../router.js';
 import { openSheet, closeSheet } from '../sheetManager.js';
-import { createMapEngine } from '../map/mapEngineAdapter.js';
+import { createMapEngine, STATUS_COLORS } from '../map/mapEngineAdapter.js';
 import { calculateLandingCircuit } from '../../core/flightProcedures.js';
 import {
   DEFAULT_COMPRENSORI,
@@ -350,6 +350,7 @@ export class ForecastViewController {
     this.selectedHour = this._resolveInitialHour(this.activeDate);
     this.selectedSubSpot = 'overview'; // 'overview' | spotId
     this.isSubSpotMenuOpen = false;
+    this.isFlightAnalysisAimMenuOpen = false;
     this.forecastMode = 'cards'; // 'cards' | 'charts'
     this.expandedCardId = null; // All parameter accordion cards start collapsed
     this.cachedWeatherMap = new Map(); // key: spotId_date -> weatherPayload
@@ -713,6 +714,8 @@ export class ForecastViewController {
       this.sheetContainerEl.addEventListener('click', this.boundClickHandler);
     }
 
+    this.activeTheme = (this.store?.getState()?.ui?.theme) || 'dark';
+
     if (this.store) {
       this.unsubscribeStore = this.store.subscribe((nextState) => {
         let needsWeatherFetch = false;
@@ -724,7 +727,8 @@ export class ForecastViewController {
           this.selectedHour = this._resolveInitialHour(this.activeDate);
           needsWeatherFetch = true;
         }
-        if (nextState.ui && nextState.ui.theme && this.miniMapEngine) {
+        if (nextState.ui && nextState.ui.theme && nextState.ui.theme !== this.activeTheme && this.miniMapEngine) {
+          this.activeTheme = nextState.ui.theme;
           this.miniMapEngine.setTheme(nextState.ui.theme);
         }
         if (nextState.ui && nextState.ui.mapLayer && this.miniMapEngine) {
@@ -3056,12 +3060,32 @@ export class ForecastViewController {
    * @returns {string}
    */
   renderStickyScrubber(spot, weatherData, glider) {
+    const evalCurrent = spot ? evaluateComprensorio({
+      comprensorio: spot,
+      weatherData,
+      hourIndex: this.selectedHour,
+      glider,
+      targetDate: this.activeDate
+    }) : { badge: 'N/D', status: 'unavailable' };
+    const statusColor = (STATUS_COLORS && STATUS_COLORS[evalCurrent?.status]?.fill) || 'var(--gm-text-secondary)';
+
     return `
       <aside 
         id="forecast-timeline-scrubber" 
         class="gm-timeline-scrubber-sticky"
         aria-label="Timeline oraria ancorata"
       >
+        <div class="gm-map-scrubber-header">
+          <div class="gm-map-scrubber-title-group">
+            <span class="gm-map-scrubber-title">Timeline Volabilità</span>
+            <span id="forecast-scrubber-spot-pill" class="gm-map-scrubber-spot-pill" style="color: ${statusColor};">
+              ${spot?.name || 'Località'} (${evalCurrent?.badge || 'N/D'})
+            </span>
+          </div>
+          <div class="gm-map-scrubber-hour-display">
+            <span id="forecast-active-hour-label" class="gm-flight-alt">Ore ${String(this.selectedHour).padStart(2, '0')}:00</span>
+          </div>
+        </div>
         ${this.renderTimelineGrid(spot, weatherData, glider, 'forecast-timeline-strip')}
       </aside>
     `;
@@ -3420,7 +3444,28 @@ export class ForecastViewController {
       soundingContainer.innerHTML = this.renderSoundingPanel(evaluated, weatherData, spot, activeSubSpotObj);
     }
 
-    // 6. Update Flight Analysis Overlay if open
+    // 6. Update scrubber header labels in place if present
+    const forecastHourLabel = this.containerEl?.querySelector('#forecast-active-hour-label');
+    if (forecastHourLabel) {
+      forecastHourLabel.textContent = `Ore ${String(hour).padStart(2, '0')}:00`;
+    }
+    const forecastSpotPill = this.containerEl?.querySelector('#forecast-scrubber-spot-pill');
+    if (forecastSpotPill) {
+      forecastSpotPill.textContent = `${spot?.name || 'Località'} (${evaluated.badge})`;
+      forecastSpotPill.style.color = (STATUS_COLORS && STATUS_COLORS[evaluated.status]?.fill) || 'var(--gm-text-secondary)';
+    }
+
+    const faHourLabel = this.flightAnalysisOverlayEl?.querySelector('#flight-analysis-active-hour-label');
+    if (faHourLabel) {
+      faHourLabel.textContent = `Ore ${String(hour).padStart(2, '0')}:00`;
+    }
+    const faSpotPill = this.flightAnalysisOverlayEl?.querySelector('#flight-analysis-scrubber-spot-pill');
+    if (faSpotPill) {
+      faSpotPill.textContent = `${spot?.name || 'Comprensorio'} (${evaluated.badge})`;
+      faSpotPill.style.color = (STATUS_COLORS && STATUS_COLORS[evaluated.status]?.fill) || 'var(--gm-text-secondary)';
+    }
+
+    // 7. Update Flight Analysis Overlay if open
     if (this.isFlightAnalysisOpen) {
       this.updateFlightAnalysisOverlay(evaluated);
     }
@@ -3606,6 +3651,18 @@ export class ForecastViewController {
       }
     }
 
+    // Auto-close flight analysis aim menu if click is outside
+    if (this.isFlightAnalysisAimMenuOpen) {
+      const isInsideAimMenu = actionEl && (
+        actionEl.getAttribute('data-action') === 'toggle-aim-menu' ||
+        actionEl.getAttribute('data-action') === 'center-comprensorio' ||
+        actionEl.getAttribute('data-action') === 'center-gps'
+      );
+      if (!isInsideAimMenu) {
+        this.closeFlightAnalysisAimMenu();
+      }
+    }
+
     if (!actionEl) return;
 
     const action = actionEl.getAttribute('data-action');
@@ -3645,9 +3702,13 @@ export class ForecastViewController {
       this.openFlightAnalysisOverlay();
     } else if (action === 'close-flight-analysis') {
       this.closeFlightAnalysisOverlay();
+    } else if (action === 'toggle-aim-menu') {
+      this.toggleFlightAnalysisAimMenu();
     } else if (action === 'center-comprensorio') {
+      this.closeFlightAnalysisAimMenu();
       this.centerOnComprensorio();
     } else if (action === 'center-gps') {
+      this.closeFlightAnalysisAimMenu();
       this.centerOnUserLocation();
     } else if (action === 'flight-analysis-hour') {
       const hourAttr = actionEl.getAttribute('data-hour');
@@ -3947,36 +4008,62 @@ export class ForecastViewController {
               </select>
             </div>
             <div class="gm-flight-analysis-controls-right">
-              <button 
-                type="button" 
-                class="gm-flight-analysis-ctrl-btn" 
-                data-action="center-comprensorio" 
-                aria-label="Centra sul comprensorio"
-                title="Centra sul decollo e atterraggio del comprensorio"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
-                </svg>
-                <span class="gm-ctrl-btn-text">Comprensorio</span>
-              </button>
+              <div class="gm-aim-menu-wrap">
+                <button 
+                  type="button" 
+                  class="gm-flight-analysis-ctrl-btn gm-aim-menu-trigger" 
+                  data-action="toggle-aim-menu" 
+                  aria-haspopup="menu"
+                  aria-expanded="false"
+                  aria-label="Opzioni di puntamento"
+                  title="Opzioni di puntamento e centratura mappa"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="8"></circle>
+                    <line x1="12" y1="2" x2="12" y2="6"></line>
+                    <line x1="12" y1="18" x2="12" y2="22"></line>
+                    <line x1="2" y1="12" x2="6" y2="12"></line>
+                    <line x1="18" y1="12" x2="22" y2="12"></line>
+                    <circle cx="12" cy="12" r="2" fill="currentColor"></circle>
+                  </svg>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="gm-aim-chevron" aria-hidden="true">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </button>
 
-              <button 
-                type="button" 
-                class="gm-flight-analysis-ctrl-btn" 
-                data-action="center-gps" 
-                aria-label="Centra su posizione GPS"
-                title="Centra sulla tua posizione GPS attuale"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <circle cx="12" cy="12" r="3"></circle>
-                  <line x1="12" y1="2" x2="12" y2="6"></line>
-                  <line x1="12" y1="18" x2="12" y2="22"></line>
-                  <line x1="2" y1="12" x2="6" y2="12"></line>
-                  <line x1="18" y1="12" x2="22" y2="12"></line>
-                </svg>
-                <span class="gm-ctrl-btn-text">GPS</span>
-              </button>
+                <div class="gm-aim-dropdown hidden" role="menu" aria-label="Opzioni di puntamento">
+                  <button 
+                    type="button" 
+                    class="gm-aim-menu-item" 
+                    data-action="center-comprensorio" 
+                    role="menuitem"
+                    title="Centra sul decollo e atterraggio del comprensorio"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                    </svg>
+                    <span>Comprensorio</span>
+                  </button>
+
+                  <button 
+                    type="button" 
+                    class="gm-aim-menu-item" 
+                    data-action="center-gps" 
+                    role="menuitem"
+                    title="Centra sulla tua posizione GPS attuale"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <circle cx="12" cy="12" r="3"></circle>
+                      <line x1="12" y1="2" x2="12" y2="6"></line>
+                      <line x1="12" y1="18" x2="12" y2="22"></line>
+                      <line x1="2" y1="12" x2="6" y2="12"></line>
+                      <line x1="18" y1="12" x2="22" y2="12"></line>
+                    </svg>
+                    <span>Posizione GPS</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -4005,6 +4092,17 @@ export class ForecastViewController {
           </div>
 
           <div class="gm-flight-analysis-scrubber" role="toolbar" aria-label="Selettore orario continuo">
+            <div class="gm-map-scrubber-header">
+              <div class="gm-map-scrubber-title-group">
+                <span class="gm-map-scrubber-title">Timeline Volabilità</span>
+                <span id="flight-analysis-scrubber-spot-pill" class="gm-map-scrubber-spot-pill" style="color: ${(STATUS_COLORS && STATUS_COLORS[circuitData.isSafetyWarning ? 'caution' : 'flyable']?.fill) || 'var(--gm-text-secondary)'};">
+                  ${spot?.name || 'Comprensorio'} (${circuitData.isSafetyWarning ? 'Attenzione' : 'Volabile'})
+                </span>
+              </div>
+              <div class="gm-map-scrubber-hour-display">
+                <span id="flight-analysis-active-hour-label" class="gm-flight-alt">Ore ${String(this.selectedHour).padStart(2, '0')}:00</span>
+              </div>
+            </div>
             ${this.renderTimelineGrid(spot, weatherData, glider, 'flight-analysis-timeline-strip')}
           </div>
         </section>
@@ -4090,17 +4188,17 @@ export class ForecastViewController {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
       return this;
     }
-    const gpsBtn = this.flightAnalysisOverlayEl?.querySelector('[data-action="center-gps"]');
-    if (gpsBtn) {
-      gpsBtn.classList.add('loading');
-      gpsBtn.setAttribute('aria-busy', 'true');
+    const triggerBtn = this.flightAnalysisOverlayEl?.querySelector('.gm-aim-menu-trigger') || this.flightAnalysisOverlayEl?.querySelector('[data-action="center-gps"]');
+    if (triggerBtn) {
+      triggerBtn.classList.add('loading');
+      triggerBtn.setAttribute('aria-busy', 'true');
     }
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        if (gpsBtn) {
-          gpsBtn.classList.remove('loading');
-          gpsBtn.removeAttribute('aria-busy');
+        if (triggerBtn) {
+          triggerBtn.classList.remove('loading');
+          triggerBtn.removeAttribute('aria-busy');
         }
         const { latitude, longitude } = pos.coords;
         if (this.flightAnalysisMapEngine && typeof this.flightAnalysisMapEngine.showUserLocation === 'function') {
@@ -4108,9 +4206,9 @@ export class ForecastViewController {
         }
       },
       (err) => {
-        if (gpsBtn) {
-          gpsBtn.classList.remove('loading');
-          gpsBtn.removeAttribute('aria-busy');
+        if (triggerBtn) {
+          triggerBtn.classList.remove('loading');
+          triggerBtn.removeAttribute('aria-busy');
         }
         console.warn('[GlideMind] Geolocation error:', err?.message || err);
       },
@@ -4120,10 +4218,41 @@ export class ForecastViewController {
   }
 
   /**
+   * Toggles the Flight Analysis Overlay aiming/centering dropdown menu.
+   * @param {boolean} [forceOpen]
+   */
+  toggleFlightAnalysisAimMenu(forceOpen) {
+    this.isFlightAnalysisAimMenuOpen = typeof forceOpen === 'boolean' ? forceOpen : !this.isFlightAnalysisAimMenuOpen;
+    if (this.flightAnalysisOverlayEl) {
+      const trigger = this.flightAnalysisOverlayEl.querySelector('[data-action="toggle-aim-menu"], .gm-aim-menu-trigger');
+      const dropdown = this.flightAnalysisOverlayEl.querySelector('.gm-aim-dropdown');
+      if (trigger) {
+        trigger.setAttribute('aria-expanded', this.isFlightAnalysisAimMenuOpen ? 'true' : 'false');
+        trigger.classList?.toggle('open', this.isFlightAnalysisAimMenuOpen);
+      }
+      if (dropdown) {
+        dropdown.classList?.toggle('hidden', !this.isFlightAnalysisAimMenuOpen);
+      }
+    }
+    return this;
+  }
+
+  /**
+   * Closes the Flight Analysis Overlay aiming dropdown menu.
+   */
+  closeFlightAnalysisAimMenu() {
+    if (this.isFlightAnalysisAimMenuOpen) {
+      this.toggleFlightAnalysisAimMenu(false);
+    }
+    return this;
+  }
+
+  /**
    * Closes the Comprensorio Flight Inspector Overlay.
    */
   closeFlightAnalysisOverlay() {
     this.isFlightAnalysisOpen = false;
+    this.isFlightAnalysisAimMenuOpen = false;
 
     if (this.flightAnalysisMapEngine) {
       this.flightAnalysisMapEngine.destroy();
@@ -4178,6 +4307,11 @@ export class ForecastViewController {
    */
   handleFlightAnalysisKey(e) {
     if (e.key === 'Escape' && this.isFlightAnalysisOpen) {
+      if (this.isFlightAnalysisAimMenuOpen) {
+        e.preventDefault();
+        this.closeFlightAnalysisAimMenu();
+        return;
+      }
       e.preventDefault();
       this.closeFlightAnalysisOverlay();
     }
@@ -4249,12 +4383,23 @@ export class ForecastViewController {
         explanationEl.textContent = circuitData.explanation;
       }
 
-      const scrubberSlots = this.flightAnalysisOverlayEl.querySelectorAll('.gm-flight-analysis-slot');
+      const faHourLabel = this.flightAnalysisOverlayEl.querySelector('#flight-analysis-active-hour-label');
+      if (faHourLabel) {
+        faHourLabel.textContent = `Ore ${String(this.selectedHour).padStart(2, '0')}:00`;
+      }
+      const faSpotPill = this.flightAnalysisOverlayEl.querySelector('#flight-analysis-scrubber-spot-pill');
+      if (faSpotPill) {
+        faSpotPill.textContent = `${spot?.name || 'Comprensorio'} (${evaluated?.badge || (circuitData.isSafetyWarning ? 'Attenzione' : 'Volabile')})`;
+        faSpotPill.style.color = (STATUS_COLORS && STATUS_COLORS[circuitData.isSafetyWarning ? 'caution' : (evaluated?.status || 'flyable')]?.fill) || 'var(--gm-text-secondary)';
+      }
+
+      const scrubberSlots = this.flightAnalysisOverlayEl.querySelectorAll('.gm-timeline-col-compact, .gm-flight-analysis-slot');
       scrubberSlots.forEach(slot => {
         const h = parseInt(slot.getAttribute('data-hour'), 10);
         const isActive = h === this.selectedHour;
         slot.classList.toggle('active', isActive);
-        slot.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        slot.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        slot.setAttribute('tabindex', isActive ? '0' : '-1');
       });
     }
   }
