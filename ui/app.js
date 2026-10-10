@@ -19,7 +19,7 @@ import { APP_VERSION, APP_BUILD } from '../core/version.js';
 export async function loadLocationsCatalog() {
   if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
     try {
-      const response = await window.fetch('/data/locations.json');
+      const response = await window.fetch('./data/locations.json');
       if (response.ok) {
         const rawJson = await response.json();
         const normalized = normalizeLocationsCatalog(rawJson);

@@ -42,7 +42,7 @@ describe('Master Locations Catalog Hydration & Runtime Integration', () => {
     // Mock browser environment
     globalThis.window = {
       fetch: async (url) => {
-        if (url === '/data/locations.json') {
+        if (url === './data/locations.json' || url === '/data/locations.json') {
           return {
             ok: true,
             status: 200,
