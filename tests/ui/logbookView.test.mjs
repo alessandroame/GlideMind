@@ -264,6 +264,27 @@ describe('LogbookView Controller & Outdoor Ergonomics (UI Layer)', () => {
     // Top Sites and Gliders
     assert.ok(html.includes('Decolli Più Frequentati'));
     assert.ok(html.includes('Vele Utilizzate'));
+
+    // Monthly Activity SVG Chart
+    assert.ok(html.includes('Attività Mensile'));
+    assert.ok(html.includes('gm-chart-card'));
+    assert.ok(html.includes('gm-chart-svg'));
+    assert.ok(html.includes('data-action="toggle-stats-metric"'));
+
+    // Toggle metric to flights
+    const fakeToggleBtn = {
+      getAttribute(attr) {
+        if (attr === 'data-action') return 'toggle-stats-metric';
+        if (attr === 'data-metric') return 'flights';
+        return null;
+      },
+      closest(sel) {
+        return (sel && sel.includes('data-action')) ? this : null;
+      }
+    };
+    await controller.handleClick({ target: fakeToggleBtn });
+    assert.equal(controller.statsMetric, 'flights');
+    assert.ok(container.innerHTML.includes('voli negli ultimi 12 mesi'));
   });
 
   it('should adhere to Laws of UX (Von Restorff, Fitts >= 48px, WAI-ARIA and no banned emojis)', async () => {
