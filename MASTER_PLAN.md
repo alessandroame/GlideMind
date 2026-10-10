@@ -211,13 +211,26 @@ The new application will deliver:
   - **Auto-Sync & Dirty Tracking**: Rilevamento in memoria delle modifiche pendenti non archiviate (`syncDirtyTracker`), notifica discreta nella Thumb Zone (se trascorsi >14 giorni o $\ge 3$ nuovi voli) come barriera proattiva anti-eviction, e predisposizione architetturale per adapter di cloud sync (Google Drive / remote folder).
 
 ### Phase 7: 3D Flight Replay with Synced Telemetry (Dual-Engine Architecture) (⚪ Pianificato)
-- [ ] Implement `ui/views/FlightReplayView.js`:
-  - **Interfaccia Astratta del Motore 3D (`IReplay3dEngine`)**:
-    - Disaccoppiamento totale tra controller UI, controlli playback (play, pause, scrub, velocità 1x-20x, camera follow modes) e rendering 3D.
-    - **Telemetria 2D Indipendente su Canvas**: HUD e strip del profilo/variometro (gradiente FAI e decimazione LTTB) renderizzati su `HTMLCanvasElement` 2D separato e reattivo a 60 FPS, totalmente autonomo dal motore WebGL per azzerare frame drop e sopravvivere a crash GPU.
-    - **Gestione Ciclo di Vita WebGL & Degradazione Offline**: Intercettazione esplicita degli eventi `webglcontextlost` e `webglcontextrestored`; fallback immediato a rendering vettoriale spaziale 3D su griglia cartesiana piana senza crash in caso di mancanza di rete per le tile DEM o perdita di contesto grafico.
-  - **Engine Primario**: MapLibre GL 3D + Three.js CustomLayer (conforme a `geodesy_webgl_3d_spec.md` con decodifica DEM Terrarium e modello parapendio `.glb` in `data/models/`).
-  - **Engine di Fallback Consolidato**: CesiumJS (con coordinate cartesiane WGS84 native, come empiricamente verificato nei test ParaMeteo), pronto a intervenire senza riscritture dell'interfaccia o della telemetria in caso di anomalie sul layer MapLibre.
+- [ ] Piano architetturale e audit di fase: [docs/plans/phase-7-3d-flight-replay.md](file:///docs/plans/phase-7-3d-flight-replay.md).
+- [ ] **Decomposizione Modulare Anti-Monolite (Zero Monoliti > 600 righe)**:
+  - Superamento del monolite legacy da 6.326 righe di ParaMeteo tramite scomposizione rigorosa in 6 moduli con responsabilità singola: Core Math, Interfaccia Adapter, MapLibre Engine, Cesium Fallback, Headless Mock e Telemetry Canvas.
+- [ ] **Headless Domain Core (`core/flightReplayMath.js`)**:
+  - Modulo matematico puro privo di dipendenze DOM/WebGL: calcolo rollio coordinato aerodinamico $\theta = -\arctan((v \cdot \omega) / g)$, beccheggio cinematico dinamico, interpolazione temporale Hermite a 60 FPS sui campioni LTTB e scala minima proiettiva dell'avatar 3D. 100% testabile in Node.js nativo.
+- [ ] **Integrazione Router & Reactive Store**:
+  - Registrazione della rotta `'replay'` in `ui/router.js` (`VALID_ROUTES`) per risolvere il vicolo cieco dal pulsante *"Visualizza Replay 3D"* di `FlightDetailSheet.js`.
+  - Definizione della slice reattiva `activeReplayFlightId` e `replay: { isPlaying, progress, currentTimeSec, speed, cameraMode }` in `core/store.js`.
+- [ ] **Caricamento Asincrono On-Demand delle Librerie 3D (`core/scriptLoader.js`)**:
+  - Iniezione dinamica differita di Three.js r128 e MapLibre GL 4.7.1 al primo accesso alla vista `#replay`, preservando il bootstrap ultraleggero della shell (<100 KB) e il rispetto della soglia Doherty (<400ms) all'avvio.
+- [ ] **Interfaccia Astratta del Motore 3D (`IReplay3dEngine`) & Doppio Engine**:
+  - Disaccoppiamento totale tra controller UI, controlli playback (play, pause, scrub, velocità 1x-20x, camera follow modes) e rendering 3D.
+  - **Engine Primario**: MapLibre GL 3D + Three.js CustomLayer (conforme a `geodesy_webgl_3d_spec.md` con decodifica DEM Terrarium RGB, single-shot origin $P_0$ e compensazione altimetrica $\Delta H$).
+  - **Engine di Fallback Consolidato**: CesiumJS (con coordinate cartesiane WGS84 native), pronto a intervenire su GPU mobili degradate.
+  - **Mock Headless (`HeadlessReplayEngine.js`)**: Adapter di test a 0ms per l'automazione CI/Node.js senza dipendenze grafiche.
+- [ ] **Telemetria 2D Indipendente su Canvas (60 FPS)**:
+  - HUD, variometro FAI e strip del profilo altimetrico renderizzati su `<canvas>` 2D separato e reattivo a 60 FPS, totalmente autonomo dal thread GPU WebGL per azzerare frame drop durante lo scrubbing.
+- [ ] **Gestione Ciclo di Vita WebGL & Asset 3D**:
+  - Intercettazione esplicita degli eventi `webglcontextlost` e `webglcontextrestored` con degradazione spaziale vettoriale cartesiana piana offline senza tile DEM.
+  - Creazione della directory `data/models/` con asset binario `paraglider.glb` (scala 1:1) e fallback procedurale Three.js immediato.
 
 ### Phase 8: PWA, Multilingual (i18n) & Offline Hardening (⚪ Pianificato)
 - [ ] Service worker (`sw.js`) con architettura di caching a isolamento:
