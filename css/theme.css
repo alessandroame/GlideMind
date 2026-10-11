@@ -4209,29 +4209,32 @@ input.gm-input:focus {
 }
 
 .gm-param-body {
-  padding: 12px 14px 14px;
+  padding: 10px 12px 12px;
   border-top: 1px solid var(--gm-border);
-  background-color: var(--gm-bg-surface);
+  background-color: var(--gm-bg-card);
 }
 
 .gm-param-details-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
+  gap: 6px 12px;
+  background-color: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-sm);
+  padding: 6px 10px;
 }
 
 .gm-param-detail-cell {
   display: flex;
   flex-direction: column;
-  background-color: var(--gm-bg-card);
-  padding: 8px 10px;
-  border-radius: var(--gm-radius-sm);
-  border: 1px solid var(--gm-border);
+  background: transparent;
+  padding: 2px 0;
+  border: none;
   min-width: 0;
 }
 
 .gm-param-detail-label {
-  font-size: 0.70rem;
+  font-size: 0.65rem;
   color: var(--gm-text-muted);
   font-weight: 600;
   text-transform: uppercase;
@@ -4242,25 +4245,25 @@ input.gm-input:focus {
   font-size: 0.82rem;
   font-weight: 700;
   color: var(--gm-text-primary);
-  margin-top: 2px;
+  margin-top: 1px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .gm-param-advice-box {
-  background-color: var(--gm-bg-card);
+  background-color: rgba(234, 179, 8, 0.06);
   border-left: 3px solid var(--gm-accent);
-  padding: 10px 12px;
+  padding: 8px 12px;
   border-radius: 0 var(--gm-radius-sm) var(--gm-radius-sm) 0;
-  border-top: 1px solid var(--gm-border);
-  border-right: 1px solid var(--gm-border);
-  border-bottom: 1px solid var(--gm-border);
+  border-top: none;
+  border-right: none;
+  border-bottom: none;
 }
 
 .gm-param-advice-title {
-  font-size: 0.72rem;
-  font-weight: 700;
+  font-size: 0.70rem;
+  font-weight: 800;
   color: var(--gm-accent);
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -4268,14 +4271,21 @@ input.gm-input:focus {
 }
 
 .gm-param-advice-text {
-  font-size: 0.80rem;
+  font-size: 0.78rem;
   color: var(--gm-text-secondary);
-  line-height: 1.45;
-  margin-top: 3px;
+  line-height: 1.4;
+  margin-top: 2px;
 }
 
 .gm-param-chart-wrap {
   width: 100%;
+}
+
+.gm-param-chart-wrap .gm-chart-box {
+  background: transparent !important;
+  border: none !important;
+  padding: 2px 0 0 !important;
+  box-shadow: none !important;
 }
 
 .gm-multi-charts-container {

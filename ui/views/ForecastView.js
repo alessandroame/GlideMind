@@ -2315,11 +2315,24 @@ export class ForecastViewController {
           let chartHtml = '';
           if (isExpanded) {
             if (param.id === 'vento-decollo') {
-              chartHtml = this.renderWindChart(spot, weatherData, param.takeoffHeading);
+              chartHtml = this.renderWindChart(spot, weatherData, param.takeoffHeading, {
+                compact: true,
+                hideTooltip: true,
+                hideFooter: true
+              });
             } else if (param.id === 'base-cumulo') {
-              chartHtml = this.renderSoundingChart(spot, weatherData, param.takeoffAlt);
+              chartHtml = this.renderSoundingChart(spot, weatherData, param.takeoffAlt, {
+                compact: true,
+                hideTooltip: true,
+                hideFooter: true
+              });
             } else if (param.chartOptions) {
-              chartHtml = this.renderSvgTrendChart(param.chartOptions);
+              chartHtml = this.renderSvgTrendChart({
+                ...param.chartOptions,
+                compact: true,
+                hideTooltip: true,
+                hideThresholdLabels: true
+              });
             }
           }
 
