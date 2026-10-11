@@ -1367,3 +1367,83 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
   2. **Accesso Rapido Nello Sheet con Raggruppamento Semantico**: La selezione e il cambio di decollo/atterraggio risiedono unicamente all'interno della prima sezione dello sheet (`.gm-picker-current-spot-section`), strutturata in 3 gruppi chiari con icone dedicate: `Panoramica`, `Decolli (N)` e `Atterraggi (N)`.
   3. **Zero Controlli Duplicati In-Page**: Vietato inserire container di chip orizzontali o pillole di sub-selezione tra l'header e la barra delle date (`.gm-date-tabs`), massimizzando la vertical clearance per i dati meteorologici e i grafici orari.
 
+---
+
+## 111. Integrazione 3D MapLibre GL & Three.js CustomLayer: Allineamento Geodetico P0 a Singolo Scatto e Resilienza WebGL Context
+- **Problema**: L'integrazione di scene Three.js su cartografia MapLibre GL 3D può causare jitter o sfarfallio delle geometrie ad alto zoom se le coordinate locali Three.js vengono riproiettate a ogni frame o se l'origine viene spostata dinamicamente. Inoltre, la perdita del contesto grafico WebGL (`webglcontextlost`) sui dispositivi mobili congela l'applicazione se non intercettata.
+- **Causa Radice**: Precisione limitata dei float a 32-bit nelle GPU su coordinate globali Mercator estese, e rilascio forzato del contesto WebGL da parte dei browser mobile in background.
+- **Pattern Vincolante**:
+  1. **Single-Shot Origin Alignment ($P_0$)**: Calcolare l'origine topocentrica Three.js $P_0 = (\text{lon}_0, \text{lat}_0, \text{alt}_0)$ una sola volta al caricamento della traccia (`loadTrack`). La matrice di trasformazione $\mathbf{M}_{\text{coordTransform}}$ converte le coordinate locali Three.js (X: Est, Y: Zenit, Z: Sud) nello spazio Mercator MapLibre (X: Est, Y: Sud, Z: Zenit) scambiando gli assi Y e Z, scalando per `meterScale` e traslando alle coordinate Mercatore di $P_0$.
+  2. **Pipeline di Fallback e Resilienza WebGL**: Registrare sempre `webglcontextlost` (`event.preventDefault()`) e `webglcontextrestored` per ricreare la scena Three.js senza memory leak o crash. In assenza di WebGL o librerie esterne, garantire la degradazione automatica a motore headless.
+  3. **Asset 3D Standardizzati & Fallback Procedurale**: Il caricamento degli avatar 3D (`loadParagliderModel`) deve tentare l'asset binario `data/models/paraglider.glb` e ricorrere immediatamente a mesh procedurale parametrica in Three.js in caso di errore di rete o offline, senza bloccare la riproduzione.
+
+---
+
+## 112. Resilienza di Apertura Dettaglio Volo: Fallback a Tre Livelli (IndexedDB → Store → Seed), Sintesi Altimetrica e Trasparenza Eventi Card
+- **Problema**: Il tap su una card di volo nel Libretto (`LogbookView`) non apriva la vista di dettaglio a tutto schermo (`FlightDetailSheet`) nel caso di voli seed/demo iniziali (`fl-1` Monte Cornizzolo) o voli memorizzati unicamente nella cache reattiva dello store prima dell'importazione della traccia IGC in IndexedDB. Inoltre, i click su elementi interni alla card potevano essere intercettati da container SVG sparkline privi di trasparenza agli eventi puntatore.
+- **Causa Radice**:
+  1. `openFlightDetailView` interrogava esclusivamente `logbookManager.getFlightDetail(flightId)`. Poiché i voli predefiniti risiedono nello store reattivo (`state.flights` / `DEFAULT_SEED_FLIGHTS`) e non nel database IndexedDB fino a importazione fisica, la chiamata restituiva `null`, interrompendo silenziosamente il flusso senza mostrare l'overlay.
+  2. Mancava l'handler da tastiera per accessibilità WCAG (`handleKeyDown` su `article[tabindex="0"]` con tasti Enter/Space).
+  3. L'istanza di store passata o iniettata nel controller non veniva propagata alla vista di dettaglio, causando il mancato aggiornamento di `activeReplayFlightId` in fase di avvio replay.
+- **Pattern Vincolante**:
+  1. **Fallback a Tre Livelli e Sintesi Altimetrica**: Le funzioni di apertura dettaglio (`openFlightDetailView`) devono risolvere il volo tramite catena gerarchica: IndexedDB $\to$ `store.getState().flights` $\to$ `DEFAULT_SEED_FLIGHTS`. Qualora i punti della traccia (`decimatedPoints`) siano assenti o inferiori a 2, sintetizzare dinamicamente un tracciato altimetrico e una telemetria plausibile, garantendo che il grafico SVG e le metriche si renderizzino sempre correttamente.
+  2. **Trasparenza Eventi Card (`pointer-events`)**: Per consentire a `target.closest('[data-action]')` di intercettare affidabilmente l'evento tap/click su qualsiasi punto della card, assegnare `pointer-events: none` a tutti gli elementi decorativi e testuali interni (`.gm-flight-sparkline-wrap`, `.gm-flight-metrics-row`, `.gm-flight-title-group`, `.gm-flight-card-sub`), isolando con `pointer-events: auto` e `stopPropagation` solo i pulsanti di azione dedicati (es. `.gm-flight-delete-btn`).
+  3. **Accessibilità Tastiera (WCAG 2.1 AA)**: Associare sempre un ascoltatore `keydown` per i tasti `Enter` e `Space` sulle card marcate `tabindex="0"`, aprendo la vista di dettaglio in modo simmetrico al tocco.
+  4. **Test Headless d'Integrazione Completo**: Coprire il ciclo di vita dell'interazione con test headless che simulano il tap sulla card, sui child element, l'eliminazione, i tasti Enter/Space, il tasto Back, Escape e la navigazione a 3D Replay.
+
+---
+
+## 113. Eliminazione Watermark "API KEY REQUIRED" nel Rendering 3D: Migrazione a Basemap Keyless Esri/OpenTopo e Selettore Dinamico Multi-Layer
+- **Problema**: Durante il rendering del terreno orografico nel Replay 3D (`FlightReplayView` e `MapLibreThreeEngine`), i tile del suolo mostravano una filigrana diagonale continua recante la dicitura *"API KEY REQUIRED carto.com/basemaps/apikey"*, degradando la visibilità della texture superficiale e dell'altimetria DEM. Inoltre, l'interfaccia 3D non permetteva al pilota di commutare la cartografia su ortofoto satellitare o rilievo topografico.
+- **Causa Radice**:
+  1. CARTO ha imposto l'obbligo di autenticazione API su tutti gli endpoint raster di `basemaps.cartocdn.com` (`dark_all`, `rastertiles/voyager`), restituendo tile degradate con filigrana impressa a qualsiasi richiesta non autenticata.
+  2. Lo stile predefinito di `ui/3d/MapLibreThreeEngine.js` richiedeva in modo cablato `https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png`.
+  3. Mancava un selettore di layer per il motore 3D e la sincronizzazione con `store.getState().ui.mapLayer`.
+- **Pattern Vincolante**:
+  1. **Bando Totale di Endpoint Raster CARTO Non Autenticati**: Vietare l'uso di `basemaps.cartocdn.com` in tutti i moduli cartografici 2D e 3D.
+  2. **Adozione di Basemap Raster Keyless ad Alta Affidabilità (`BASEMAP_LAYERS_3D`)**:
+     - *Dark Cockpit*: Esri World Dark Gray Base (`https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}`)
+     - *Satellite Ortofoto*: Esri World Imagery (`https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}`)
+     - *Rilievo Topografico*: OpenTopoMap (`https://a.tile.opentopomap.org/{z}/{x}/{y}.png`)
+     - *Stradale OpenStreetMap*: OpenStreetMap (`https://tile.openstreetmap.org/{z}/{x}/{y}.png`)
+  3. **Preservazione dei CustomLayer Three.js al Cambio Layer (`setMapLayer`)**: Nel ricaricare la sorgente raster o lo stile di MapLibre, preservare i layer WebGL 3D custom (`threejs-flight-layer`) e la sorgente di elevazione Terrarium (`terrain-source`), evitando il teardown distruttivo del contesto Three.js.
+  4. **Selettore Frosted Glass Uniforme nella Top-Bar 3D**: La vista `FlightReplayView` include un controllo `<select id="gm-replay-layer-select">` sincronizzato bidirezionalmente con `store.ui.mapLayer`, consentendo il passaggio immediato tra visualizzazione notturna, satellitare, topografica e stradale durante la navigazione della traccia.
+  5. **Governance di Test Continua**: La suite `tests/ui/mapLibreThreeEngine.test.mjs` valida staticamente e a runtime l'assenza di URL CARTO e l'indipendenza da parametri chiave (`key=` o `token=`).
+
+---
+
+## 114. Persistenza delle Preferenze di Comunicazione e Confini di Sessione (Codificazione in AGENTS.md)
+- **Problema**: Le preferenze di interazione e presentazione dei report (es. organizzazione in sezioni collassate `<details><summary>` con solo l'ultimo blocco di test aperto) concordate durante una conversazione decadono all'avvio di una nuova sessione di chat o a seguito del compattamento del contesto.
+- **Causa Radice**: Le direttive impartite unicamente via chat risiedono nel buffer conversazionale effimero. L'avvio di una nuova chat resetta la finestra di contesto caricando unicamente il system prompt, i file di regola (`AGENTS.md`) e le memorie di progetto.
+- **Pattern Vincolante**: Ogni accordo operativo o vincolo di presentazione dell'output deve essere codificato esplicitamente nel file `AGENTS.md` del repository (es. Sezione 3). L'iniezione deterministica a livello di system prompt garantisce la conservazione della direttiva attraverso tutti i turni e le future sessioni indipendenti. In particolare, il blocco aperto finale deve essere orientato all'esperienza dell'utente finale (lavori svolti e procedura di test passo-passo nell'interfaccia grafica), confinando dettagli implementativi, percorsi file e log di test nei blocchi collassati.
+
+---
+
+## 115. Spessore Volumetrico Traiettoria 3D (Diamond Tube) e Aderenza Altimetrica DEM nel Replay WebGL
+- **Problema**: Nel Replay 3D dei voli (`FlightReplayView` e `MapLibreThreeEngine`), la traccia appariva "molto sottile" e "molto staccata dal terreno" (fluttuante nel vuoto a centinaia di metri dal rilievo orografico).
+- **Causa Radice**:
+  1. *Traccia Piatta 2D vista di taglio*: Un nastro planare puramente orizzontale ($\Delta y = 0$), osservato con l'inclinazione prospettica radente della telecamera MapLibre (pitch 62°–80°), collassa visivamente in una linea impercettibile priva di spessore verticale.
+  2. *Dislocazione d'Innesco e Quota Eccessiva*: Il decollo di prova presentava un disallineamento trigonometrico iniziale di 350m a est della cresta, collocando il punto di riferimento sopra una gola e sollevando l'intera origine; inoltre il modello di salita allontanava il pilota dalla montagna mentre guadagnava quota, facendolo volare a 1500m sopra una valle di 250m (oltre 1200m di vuoto).
+  3. *Mancata Calibrazione Altimetrica DEM*: Mancava la compensazione automatica del delta tra quota ellissoidica/barometrica GPS e altimetria del raster DEM Terrarium sul punto di decollo.
+- **Pattern Vincolante**:
+  1. *Tubo 3D Volumetrico Prismatico a 4 Vertici*: Sostituire il nastro piatto con un prisma romboidale tridimensionale (Top $+Y$, Right $+X/Z$, Bottom $-Y$, Left $-X/Z$) largo 20m e alto 14m. Questo garantisce uno spessore solido, bold e volumetricamente costante da qualsiasi angolazione o pitch della visuale.
+  2. *Auto-Snapping Rigid-Origin al DEM*: Calcolare `terrainDelta = terrainElev - origin.alt` tramite `map.queryTerrainElevation([lon0, lat0])` e applicarlo rigidamente a `coordTransform` per ancorare millimetricamente il decollo $P_0$ alla mesh del terreno 3D.
+  3. *Cinematica di Volo Aderente al Crinale*: La traiettoria simulata deve partire rigorosamente dalle coordinate esatte del decollo, veleggiare a ridosso del pendio montuoso ($50\text{--}150\text{m}$ sopra la cresta) durante la termica, e discendere in planata progressiva con efficienza 8:1 fino al contatto al suolo sull'atterraggio.
+
+---
+
+## 116. Compensazione della Quota del Perno Terreno DEM (map.transform.elevation) nei CustomLayer WebGL e Salvaguardie 3D
+- **Problema**: Nel Replay 3D dei voli, la traccia appare disconnessa dal terreno montuoso. Avanzando verso una montagna (in salita) la traccia sembra sprofondare verso il suolo; avanzando verso fondovalle (in discesa) la traccia sembra salire e fluttuare in aria. Ruotando o zoomando a 360°, la traccia oscilla vistosamente. Su terreno piatto o a quota costante, il fenomeno non si verifica.
+- **Causa Radice**:
+  1. *Omissione di `this.elevation` in `customLayerMatrix()`*: In MapLibre GL JS v4 (`_calcMatrices()`), la matrice di proiezione interna del terreno (`modelViewProjectionMatrix`) applica una traslazione verticale `[0, 0, -this.elevation]` per posizionare il perno focale della vista alla quota del terreno al centro dello schermo (`H_center`). Tuttavia, il metodo `customLayerMatrix()` passato al `CustomLayer` restituisce `this.mercatorMatrix`, calcolata **prima** di applicare `-this.elevation`.
+  2. *Disallineamento dei Sistemi di Riferimento*: Poiché il secondo argomento di `render(gl, matrix)` ignora `this.elevation`, Three.js renderizza la traiettoria con il perno a livello del mare ($0\text{ m}$), mentre MapLibre renderizza le montagne con il perno alla quota reale del rilievo ($H_{\text{center}}$). Al variare della pendenza sotto il centro della vista, la prospettiva relativa tra montagna e traccia diverge.
+- **Pattern Vincolante**:
+  1. *Sincronizzazione della Quota del Perno*: Nel metodo `render(gl, matrix, args)` del CustomLayer, compensare obbligatoriamente l'elevazione del perno al centro:
+     $$\Delta Z_{\text{render}} = (\text{alt}_{\text{effettiva}} - \text{map.transform.elevation}) \cdot \text{meterScale}$$
+     oppure adottare direttamente `args.modelViewProjectionMatrix` fornito nel terzo parametro da MapLibre v4.
+  2. *Prevenzione Z-Fighting a Terra*: Nei punti di decollo e atterraggio, configurare `polygonOffset: true, polygonOffsetFactor: -1.0, polygonOffsetUnits: -1.0` sui materiali Three.js della traccia e dei drop curtain per prevenire lo sfarfallio dei pixel a contatto con la superficie DEM.
+  3. *Aggancio DEM Robusto al Decollo*: Non calcolare mai `terrainDelta` al frame iniziale; attendere l'evento `map.once('idle')` e validare che `queryTerrainElevation` restituisca una quota numerica strettamente positiva.
+  4. *Protezione Pitch Estremo & Puntamento Orizzonte*: Se la visuale supera pitch $75^\circ$ o punta sopra l'orizzonte verso il cielo (`map.transform.elevation` non valida o $\le 0$), congelare il valore sull'ultima quota valida (*Last Known Good Elevation*).
+  5. *LOD Smoothing*: Smussare le variazioni discrete di quota durante il caricamento di tile DEM ad alta risoluzione tramite filtro esponenziale (EMA, $\alpha \approx 0.2$).
+  6. *Recupero del Contesto WebGL su Mobile*: Gestire `webglcontextlost` (invocando `event.preventDefault()`) e `webglcontextrestored`, ricreando renderer e scene senza crash o ricaricamento della PWA.
+  7. *Zero Allocazioni nel Render Loop*: Nessuna allocazione di oggetti (`Vector3`, `Matrix4`, geometrie) a 60 FPS; preallocare buffer e aggiornare unicamente indici di disegno (`setDrawRange`) e pose matriciali.
