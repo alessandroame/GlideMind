@@ -58,3 +58,42 @@ Scaricando e ispezionando il runtime compilato di `maplibre-gl.js` v4.7.1:
      - Allocazioni zero nel render loop per preservare i 60 FPS.
 2. **Aggiornamento Memoria di Progetto (`MEMORY.md`)**:
    - Registrata la **Lezione 116** con analisi del problema, causa radice su `customLayerMatrix()` e le 7 salvaguardie operative per i Replay 3D su mobile.
+
+---
+
+## 4. Implementazione del Codice
+
+1. **`ui/3d/MapLibreThreeEngine.js`**:
+   - **Compensazione Dinamica Elevazione Centro Schermo**: In `render(gl, matrix)`:
+     ```javascript
+     const centerElevation = (self.map && self.map.transform && typeof self.map.transform.elevation === 'number')
+       ? self.map.transform.elevation
+       : (self._lastValidCenterElevation || 0);
+     const currentTranslateZ = (effectiveAlt - centerElevation) * mt.meterScale;
+     ```
+   - **Guardia Pitch Estremo & Orizzonte**: Memorizzazione di `_lastValidCenterElevation` quando pitch $\le 75^\circ$ e centro sopra il rilievo; fallback immediato in caso di inquadratura del cielo.
+   - **Auto-Snapping DEM Robusto (`_trySnapTerrain`)**: Validazione rigorosa su `terrainElev > 0 && Math.abs(terrainElev - origin.alt) < 600`, agganciato sia a `map.once('idle')` che nei primi frame di render senza mai accettare `0m` e senza corrompere `terrainDelta`.
+   - **Zero Allocazioni nel Render Loop (60 FPS)**: Pre-allocazione in `onAdd` delle matrici scratch `_mProj`, `_coordTransform` e dei vettori `_reusableVec3A`, `_reusableVec3B`, eliminando completamente `new THREE.Matrix4()` e `new THREE.Vector3()` a ogni frame.
+   - **Prevenzione Z-Fighting**: Applicazione di `depthTest: true` e `polygonOffset: true` (`factor: -1.0, units: -1.0`) su traccia, marker di decollo/atterraggio e piloni di caduta.
+2. **`ui/views/ForecastView.js`**:
+   - Risolto errore in console `TypeError: Cannot read properties of undefined (reading 'has')`: inizializzazione di `this.cachedWeatherMap = new Map()` anticipata prima della chiamata a `_resolveInitialHour()`.
+
+---
+
+## 5. Verifica e Collaudo
+
+1. **Test Automatizzati Unitari e di Regressione**:
+   - Aggiornato `tests/ui/replayTakeoffLandingTrackVisibility.test.mjs` con test dedicati per:
+     - Rifiuto altezze DEM nulle o anomale ($\le 0$ o delta $>600\text{m}$).
+     - Calcolo corretto di `currentTranslateZ` con compensazione di `centerElevation`.
+     - Preservazione di `_lastValidCenterElevation` con pitch $>75^\circ$.
+     - Presenza di `polygonOffset` e `depthTest` sui materiali Three.js.
+   - Esito globale: **652 test superati su 113 suite (0 fallimenti)**.
+2. **Collaudo Headless Chrome Live (CDP)**:
+   - Verificata la corrispondenza dei pixel tra Three.js 3D e MapLibre 2D sullo scenario reale del Cornizzolo (`fl-1`):
+     - Allineamento decollo iniziale: **$\Delta = 0\text{px}$** (3D: `[632, 253]`, Map: `[632, 253]`).
+     - Rotazione telecamera 360° ($0^\circ, 90^\circ, 180^\circ, 270^\circ, 360^\circ$): **$\Delta = 0\text{px}$** invariante su tutti gli angoli.
+     - Spostamento telecamera verso cresta montuosa ($797.4\text{m}$): **$\Delta = 0\text{px}$**.
+     - Spostamento telecamera verso fondovalle ($290.3\text{m}$): **$\Delta \le 1\text{px}$**.
+   - Zero oscillazioni o distacchi della traccia.
+

@@ -29,7 +29,8 @@ export const PilotExperienceLevel = Object.freeze({
  * Standard FAI/EN Paraglider Certification Classes & Aerodynamic Baselines.
  */
 import { GLIDER_CLASSES, DEFAULT_GLIDER } from './gliders.js';
-export { GLIDER_CLASSES, DEFAULT_GLIDER };
+import { resolveDaylightHours } from './daylight.js';
+export { GLIDER_CLASSES, DEFAULT_GLIDER, resolveDaylightHours };
 
 export const PriorityWeights = Object.freeze({
     direction: 50,
@@ -778,25 +779,8 @@ export function calculateTimelineScores(weather, isTakeoffOverride = null, headi
         azimuth = parseFloat(headingOverride);
     }
 
-    let srHour = 6;
-    let ssHour = 20;
-    if (weather.meta && weather.meta.sunrise && typeof weather.meta.sunrise === 'string' && weather.meta.sunrise.includes(':')) {
-        const parsed = parseInt(weather.meta.sunrise.split(':')[0], 10);
-        if (!isNaN(parsed) && parsed >= 0 && parsed <= 23) srHour = parsed;
-    }
-    if (weather.meta && weather.meta.sunset && typeof weather.meta.sunset === 'string' && weather.meta.sunset.includes(':')) {
-        const parsed = parseInt(weather.meta.sunset.split(':')[0], 10);
-        if (!isNaN(parsed) && parsed >= 0 && parsed <= 23) ssHour = parsed;
-    }
-    if (srHour > ssHour) {
-        srHour = 6;
-        ssHour = 20;
-    }
-
-    const daytimeHours = [];
-    for (let h = srHour; h <= ssHour; h++) {
-        daytimeHours.push(h);
-    }
+    const daylight = resolveDaylightHours(weather, null, weather.meta);
+    const daytimeHours = daylight.hours;
 
     return daytimeHours.map(hour => {
         const hourFmt = hour.toString().padStart(2, '0');

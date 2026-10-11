@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "test": "node --test",
-    "dev": "node scripts/serve.js"
+    "dev": "node scripts/serve.js",
+    "build:models": "node scripts/generate_3d_models.js"
   },
   "keywords": [
     "paragliding",

@@ -17,6 +17,7 @@
 
 import { logbookManager } from '../../core/logbookDb.js';
 import { store } from '../../core/store.js';
+import { DEFAULT_SEED_FLIGHTS } from '../../core/logbook.js';
 import { closeSheet } from '../sheetManager.js';
 import {
   generateFlightPhaseGradient,
@@ -174,7 +175,7 @@ export function renderFlightDetailHtml(bundle) {
   const raw = bundle.raw || {};
   const tel = bundle.telemetry || {};
 
-  const flightId = meta.id || '';
+  const flightId = String(meta.id || meta.flightId || '');
   const siteTitle = meta.siteName || meta.site || 'Volo Libero';
   const siteSub = meta.site && meta.site !== siteTitle ? meta.site : '';
   const dateFormatted = meta.date || 'Data N/D';
@@ -506,7 +507,61 @@ export function closeFlightDetailView() {
 export async function openFlightDetailView(flightId, options = {}) {
   if (!flightId) return;
 
-  const bundle = await logbookManager.getFlightDetail(flightId);
+  const targetStore = options.store || store;
+
+  let bundle = null;
+  try {
+    bundle = await logbookManager.getFlightDetail(flightId);
+  } catch (err) {
+    console.warn('[FlightDetailView] Errore DB nel recupero volo:', err);
+  }
+
+  // Fallback to reactive store state or default seed flights if flight is not persisted in DB
+  if (!bundle || !bundle.meta) {
+    const state = (targetStore && typeof targetStore.getState === 'function') ? targetStore.getState() : {};
+    let cachedFlight = Array.isArray(state.flights)
+      ? state.flights.find((f) => f && (String(f.id) === String(flightId) || String(f.flightId) === String(flightId)))
+      : null;
+
+    if (!cachedFlight && Array.isArray(DEFAULT_SEED_FLIGHTS)) {
+      cachedFlight = DEFAULT_SEED_FLIGHTS.find((f) => f && (String(f.id) === String(flightId) || String(f.flightId) === String(flightId)));
+    }
+
+    if (cachedFlight) {
+      const takeoffAlt = cachedFlight.takeoffAltMsl || cachedFlight.takeoffAlt || 1000;
+      const maxAlt = cachedFlight.maxAltMsl || (cachedFlight.maxGainMeters ? takeoffAlt + cachedFlight.maxGainMeters : (takeoffAlt + 450));
+      const durationSec = (cachedFlight.durationMinutes || 30) * 60;
+
+      // Synthesize realistic track points if absent for smooth altimetric chart and replay
+      let decimatedPoints = cachedFlight.decimatedPoints || cachedFlight.points || [];
+      if (!Array.isArray(decimatedPoints) || decimatedPoints.length < 2) {
+        const count = 30;
+        decimatedPoints = new Array(count);
+        for (let i = 0; i < count; i++) {
+          const frac = i / (count - 1);
+          decimatedPoints[i] = {
+            timeSeconds: Math.round(frac * durationSec),
+            alt: Math.round(takeoffAlt + (maxAlt - takeoffAlt) * Math.sin(frac * Math.PI)),
+            vario: Math.round(Math.cos(frac * Math.PI) * 2.5 * 10) / 10
+          };
+        }
+      }
+
+      bundle = {
+        meta: cachedFlight,
+        raw: {
+          id: cachedFlight.id || cachedFlight.flightId || flightId,
+          decimatedPoints
+        },
+        telemetry: cachedFlight.telemetry || {
+          thermals: cachedFlight.thermalsCount ? [{ thermalIndex: 1, altGain: cachedFlight.maxGainMeters || 300, avgClimbRate: cachedFlight.maxClimbRate || 1.8 }] : [],
+          dominantWindDrift: null,
+          maneuvers: []
+        }
+      };
+    }
+  }
+
   if (!bundle || !bundle.meta) {
     console.warn('[FlightDetailView] Volo non trovato:', flightId);
     return;
@@ -515,6 +570,14 @@ export async function openFlightDetailView(flightId, options = {}) {
   // Close any active drawer/sheet first (Single Active Modal / Overlay Policy)
   closeSheet(true);
   closeFlightDetailView();
+
+  // Clean up any lingering overlay in DOM
+  if (typeof document !== 'undefined') {
+    const existing = document.getElementById('flight-detail-overlay');
+    if (existing && existing.parentNode) {
+      existing.parentNode.removeChild(existing);
+    }
+  }
 
   const siteTitle = bundle.meta.siteName || bundle.meta.site || 'Dettaglio Volo';
   const dateFormatted = bundle.meta.date || '';
@@ -610,7 +673,10 @@ export async function openFlightDetailView(flightId, options = {}) {
   const replayBtn = overlayEl.querySelector('#btn-replay-from-detail');
   if (replayBtn) {
     replayBtn.addEventListener('click', () => {
-      if (store && typeof store.setState === 'function') {
+      if (targetStore && typeof targetStore.setState === 'function') {
+        targetStore.setState({ activeReplayFlightId: flightId });
+      }
+      if (store && store !== targetStore && typeof store.setState === 'function') {
         store.setState({ activeReplayFlightId: flightId });
       }
       closeFlightDetailView();

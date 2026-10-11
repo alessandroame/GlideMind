@@ -1077,4 +1077,77 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Verificato il passaggio al 100% dei test (`npm test`, 557/557 test superati su 89 suite native).
   - Registrata la Lezione Appresa #110 in [MEMORY.md](file:///MEMORY.md).
 
+---
 
+## 2026-10-10 - Fase 7: Visualizzatore 3D Traiettoria (FlightReplayView, 3D Engine & Telemetria 2D)
+- **Tipo**: Nuova Funzionalità / WebGL / Cartografia 3D / Ergonomia Outdoor
+- **Dettagli**: [.agents/worklog.d/2026-10-10_phase-7-2-replay-ui-shell-and-telemetry-canvas.md](file:///.agents/worklog.d/2026-10-10_phase-7-2-replay-ui-shell-and-telemetry-canvas.md), [.agents/worklog.d/2026-10-10_phase-7-3-maplibre-three-engine-and-paraglider-3d-model.md](file:///.agents/worklog.d/2026-10-10_phase-7-3-maplibre-three-engine-and-paraglider-3d-model.md)
+- **Sintesi**:
+  - Implementata la matematica cinematica ed aerodinamica pura headless in `core/flightReplayMath.js` (rollio coordinato, beccheggio cinematico, proiezione topocentrica su $P_0$, interpolazione Hermite e Catmull-Rom, scala avatar anti-subpixel).
+  - Progettata l'interfaccia formale ad adapter `ui/3d/IReplay3dEngine.js` e il mock `HeadlessReplayEngine.js` per esecuzione a 0ms in Node.js.
+  - Costruito il componente `ui/3d/ReplayTelemetryCanvas.js`: canvas 2D disaccoppiato dal loop WebGL a 60 FPS, profilo altimetrico a gradiente variometrico FAI (`sampleVarioRgb`), HUD glanceable e scrubber touch interattivo con `setPointerCapture`.
+  - Implementato il controller vista full-screen `100dvh` `ui/views/FlightReplayView.js` con top-bar di ritorno `← Libretto` $\ge 48\text{px}$, chip modalità telecamera, dock controlli thumb-zone (Play/Pausa, velocità 1x-20x, toggle quota terreno) e routing SPA `#replay`.
+  - Implementato il motore 3D primario `ui/3d/MapLibreThreeEngine.js`: integrazione MapLibre GL 3D (v4.7.1) + Three.js (r128) CustomLayer con allineamento geodetico $P_0$ a singolo scatto e terreno DEM Terrarium RGB; nastro 3D a gradiente FAI, piloni di caduta verticale a terra, cinematica telecamera (Insegui, Pilota, Libera) e gestione del ciclo di vita `webglcontextlost`/`restored`.
+  - Creata la pipeline asset 3D: script `scripts/generate_3d_models.js` (`npm run build:models`) che compila `data/models/paraglider.glb` (23.8 KB) e modulo `ui/3d/models/paragliderModel.js` con caricamento GLB e fallback procedurale immediato.
+  - Caricamento dinamico on-demand delle librerie pesanti (`ui/scriptLoader.js`) con 0ms di impatto all'avvio della Home.
+  - Suite di test completa: 106 suite e 619 test passati al 100% con successo.
+  - Registrata la Lezione Appresa #111 in [MEMORY.md](file:///MEMORY.md) e aggiornato [DESIDERATA.md](file:///DESIDERATA.md) marcando Fase 7 come `🟢 Completato`.
+
+---
+
+## 2026-10-10 - Fase 6: Risoluzione Tap Card Volo, Fallback a Tre Livelli e Test Headless Dettaglio Volo
+- **Tipo**: Bug Fix / Resilienza UI / Accessibilità WCAG / Test Headless
+- **Dettagli**: [.agents/worklog.d/2026-10-10_fix-logbook-flight-detail-tap-interaction.md](file:///.agents/worklog.d/2026-10-10_fix-logbook-flight-detail-tap-interaction.md)
+- **Sintesi**:
+  - Risolto il difetto di apertura mancata della vista debriefing/dettaglio volo (`FlightDetailSheet`) al tocco sulle card del Libretto (`LogbookView`), causato dalla mancata presenza dei voli seed/demo in IndexedDB.
+  - Introdotta in `FlightDetailSheet.js` la catena di risoluzione resiliente a tre livelli: `IndexedDB` $\to$ `store.getState().flights` $\to$ `DEFAULT_SEED_FLIGHTS`, con sintesi automatica di punti traccia (`decimatedPoints`) e telemetria termica plausibile per garantire il rendering del profilo altimetrico SVG e del debriefing dell'Istruttore Guido anche sui dati non ancora persistiti su disco.
+  - Implementata l'accessibilità da tastiera WCAG 2.1 AA (`handleKeyDown` con tasti Enter/Space) sulle card con `tabindex="0"`.
+  - Applicate le guardie CSS `pointer-events: none` sui discendenti interni decorativi delle card e `pointer-events: auto` con `stopPropagation` sul pulsante di eliminazione.
+  - Realizzata la suite di test d'integrazione headless `tests/ui/logbookFlightDetailInteraction.test.mjs` con 9 test nativi indipendenti, che copre l'intero ciclo di vita (tap card, tap inner element, tastiera Enter/Space, eliminazione isolata, Back button, Escape, navigazione 3D Replay e tracce IndexedDB).
+  - Verificato il passaggio al 100% dell'intera suite di test del progetto (`npm test`, 628/628 test superati su 107 suite native).
+  - Registrata la Lezione Appresa #112 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-10 - Fase 7: Eliminazione Watermark CARTO nel Rendering 3D e Selettore Multi-Layer Keyless
+- **Tipo**: Bug Fix / Cartografia 3D / Resilienza Basemap / UI Replay
+- **Dettagli**: [.agents/worklog.d/2026-10-10_remove-carto-keyless-3d-basemaps.md](file:///.agents/worklog.d/2026-10-10_remove-carto-keyless-3d-basemaps.md)
+- **Sintesi**:
+  - Risolta la visualizzazione del watermark filigranato "API KEY REQUIRED carto.com/basemaps/apikey" che appariva sul terreno 3D durante la riproduzione traccia in `FlightReplayView`.
+  - Sostituito l'endpoint raster CARTO con basemap keyless ad alta affidabilità in `BASEMAP_LAYERS_3D` (`ui/3d/MapLibreThreeEngine.js`): Esri World Dark Gray Base (tema scuro/cockpit predefinito), Esri World Imagery (ortofoto satellitare), OpenTopoMap (rilievo orografico con curve di livello) e OpenStreetMap (stradale).
+  - Aggiunto il metodo `setMapLayer(layerId)` a `MapLibreThreeEngine` con preservazione dinamica del layer 3D Three.js e del terreno DEM Terrarium.
+  - Integrato il controllo `<select id="gm-replay-layer-select">` nella top-bar di `FlightReplayView.js`, sincronizzato reattivamente con `store.ui.mapLayer` e con stili frosted glass in `css/theme.css`.
+  - Aggiunti test di regressione in `tests/ui/mapLibreThreeEngine.test.mjs`, verificando l'assenza totale di URL CARTO e di parametri chiave.
+  - Verificato il passaggio al 100% dei test (`npm test`, 630/630 test superati su 107 suite native).
+  - Registrata la Lezione Appresa #113 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-10 - Fase 7: Spessore Volumetrico Traiettoria 3D (Diamond Tube) e Aderenza Altimetrica DEM
+- **Tipo**: Bug Fix / Geodesia 3D / Rendering WebGL / Telemetria
+- **Dettagli**: [.agents/worklog.d/2026-10-10_fix-3d-flight-track-rendering-and-site-alignment.md](file:///.agents/worklog.d/2026-10-10_fix-3d-flight-track-rendering-and-site-alignment.md)
+- **Sintesi**:
+  - Risolta la percezione di traccia "molto sottile" e "molto staccata dal terreno" segnalata nel Replay 3D di `FlightReplayView` e `MapLibreThreeEngine`.
+  - Convertita la geometria da nastro piatto 2D a tubo 3D volumetrico a prisma romboidale a 4 vertici largo 20m e alto 14m, garantendo spessore visivo solido da qualsiasi angolo o pitch di telecamera.
+  - Implementato l'auto-snapping del decollo $P_0$ all'altimetria effettiva del raster DEM Terrarium via `map.queryTerrainElevation([lon0, lat0])`, azzerando qualsiasi stacco o vuoto iniziale dal suolo.
+  - Ricalibrata la cinematica del volo dimostrativo con aderenza orografica millimetrica: partenza rigorosa dal decollo, veleggiamento a $50\text{--}150\text{m}$ sopra il crinale montuoso del Cornizzolo/Birone (quota max 1280m anziché 1510m), e planata progressiva con efficienza 8:1 fino al contatto al suolo sull'atterraggio di Suello (260m).
+  - Verificato il passaggio al 100% dei test (`npm test`, 630/630 test superati su 107 suite native).
+  - Registrata la Lezione Appresa #115 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-11 - Fase 7: Compensazione del Perno Terreno DEM (map.transform.elevation) nel Replay 3D WebGL
+- **Tipo**: Bug Fix / Geodesia 3D / Rendering WebGL / Sincronizzazione Matrici MapLibre-Three.js
+- **Dettagli**: [.agents/worklog.d/2026-10-11_geospatial-3d-dem-pivot-and-replay-safeguards.md](file:///.agents/worklog.d/2026-10-11_geospatial-3d-dem-pivot-and-replay-safeguards.md)
+- **Sintesi**:
+  - Risolto il difetto di deriva altimetrica della traccia 3D rispetto al terreno montuoso durante pan, tilt e rotazioni a 360° nel Replay 3D (`MapLibreThreeEngine.js`).
+  - Identificata e dimostrata la causa radice nel runtime MapLibre GL JS v4.7.1 (`_calcMatrices()`): la matrice interna `modelViewProjectionMatrix` applica una traslazione `[0, 0, -this.elevation]` per posizionare il perno focale sulla superficie del rilievo sotto il centro dello schermo, mentre `customLayerMatrix()` esporta la matrice non traslata, lasciando Three.js disallineato di una quota pari a $H_{\text{center}}$.
+  - Implementata in `ui/3d/MapLibreThreeEngine.js` la compensazione dinamica dell'elevazione del perno: `currentTranslateZ = (effectiveAlt - centerElevation) * mt.meterScale`.
+  - Introdotta la salvaguardia per pitch elevato ($>75^\circ$) verso l'orizzonte con fallback su `_lastValidCenterElevation`.
+  - Rinforzato l'auto-snapping al DEM (`_trySnapTerrain`) con validazione `terrainElev > 0 && Math.abs(terrainElev - origin.alt) < 600`, prevenendo race condition su tile non ancora decodificate (`0m`).
+  - Ottimizzato il render loop a 60 FPS con pre-allocazione in `onAdd` di matrici scratch `_mProj`, `_coordTransform` e vettori, azzerando le allocazioni per frame.
+  - Applicate le proprietà `depthTest: true` e `polygonOffset: true` (`factor: -1.0, units: -1.0`) sui materiali Three.js per azzerare lo Z-fighting con la mesh del terreno.
+  - Risolta l'eccezione `TypeError` in `ForecastView.js` anticipando l'inizializzazione di `this.cachedWeatherMap = new Map()`.
+  - Estesa la suite di test in `tests/ui/replayTakeoffLandingTrackVisibility.test.mjs` (14/14 test passati) e collaudo live CDP su Chrome con deviazione tra Three.js e MapLibre di 0px su rotazioni a 360° e panning tra crinale e fondovalle.
+  - Verificato il passaggio al 100% dell'intera suite di test (`npm test`, 652/652 test superati su 113 suite).
+  - Registrata la Lezione Appresa #116 in [MEMORY.md](file:///MEMORY.md).

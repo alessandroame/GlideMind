@@ -3,7 +3,7 @@
  * 
  * Capabilities:
  * 1. 2-Level Spot Hierarchy: Comprensorio switcher with dedicated Picker Sheet
- *    (Preferiti ⭐, Recenti 🕒, Ricerca Globale) and Sub-Spot selector (Panoramica Binomio | Decolli | Atterraggi).
+ *    (Preferiti, Recenti, Ricerca Globale) and Sub-Spot selector (Panoramica Binomio | Decolli | Atterraggi).
  * 2. Unico Binomio or Focused Spot View: Renders dual launch/landing synthesis in overview mode,
  *    or dedicated aeronautical telemetry (altitude, heading, coordinates, wind limits) when a specific spot is selected.
  * 3. Bottom Sticky Scrubber: 13-slot hourly flyability timeline (08:00 - 20:00) anchored at the bottom
@@ -34,6 +34,7 @@ import {
   GLIDER_CLASSES,
   calculateDailyFlyabilitySummary
 } from '../../core/flyability.js';
+import { resolveDaylightHours } from '../../core/daylight.js';
 import {
   calculateDewPoint,
   calculateLCL,
@@ -232,12 +233,13 @@ export function generateGuidoBriefing(spot, weatherData, dateStr, glider = DEFAU
   }
 
   const hours = [];
-  for (let h = 8; h <= 19; h++) {
+  for (let h = 8; h <= 20; h++) {
     const evalResult = evaluateComprensorio({
       comprensorio: spot,
       weatherData,
       hourIndex: h,
-      glider
+      glider,
+      targetDate: dateStr
     });
     hours.push({
       hour: h,
@@ -344,6 +346,7 @@ export class ForecastViewController {
     this.activeScrubStrip = null;
 
     // Initial local view state
+    this.cachedWeatherMap = new Map(); // key: spotId_date -> weatherPayload
     const now = new Date();
     const storeState = this.store ? this.store.getState() : {};
     this.activeDate = storeState.activeDate || formatDateIso(now);
@@ -355,7 +358,6 @@ export class ForecastViewController {
     this.isFlightAnalysisAimMenuOpen = false;
     this.forecastMode = 'cards'; // 'cards' | 'charts'
     this.expandedCardId = null; // All parameter accordion cards start collapsed
-    this.cachedWeatherMap = new Map(); // key: spotId_date -> weatherPayload
     this.isLoadingWeather = false;
     this.networkStatus = 'offline'; // 'live' | 'loading' | 'offline'
     this._networkFailed = false;
@@ -385,19 +387,36 @@ export class ForecastViewController {
   }
 
   /**
-   * Resolves the default initial selected hour.
-   * If targetDate is today, automatically selects the current local hour (clamped to 08..20).
-   * For future dates, defaults to midday soaring hour (13:00).
+   * Returns the active diurnal daylight window for the current spot, date, and weather payload.
+   * @param {object} [spot]
+   * @param {object} [weatherData]
    * @param {string} [targetDate]
+   * @returns {{ sunriseHour: number, sunsetHour: number, sunriseStr: string, sunsetStr: string, hours: number[] }}
+   */
+  getDaylightWindow(spot = null, weatherData = null, targetDate = null) {
+    const activeSpot = spot || this.getCurrentSpot();
+    const date = targetDate || this.activeDate;
+    const weather = weatherData || (activeSpot ? this.getWeatherData(activeSpot, date) : null);
+    return resolveDaylightHours(weather, date, activeSpot);
+  }
+
+  /**
+   * Resolves the default initial selected hour strictly bounded between sunrise and sunset.
+   * If targetDate is today, automatically selects current local hour clamped to daylight bounds.
+   * For other dates, defaults to solar midday soaring hour (clamped to daylight bounds).
+   * @param {string} [targetDate]
+   * @param {object} [weatherData]
+   * @param {object} [spot]
    * @returns {number}
    */
-  _resolveInitialHour(targetDate = this.activeDate) {
+  _resolveInitialHour(targetDate = this.activeDate, weatherData = null, spot = null) {
+    const daylight = this.getDaylightWindow(spot, weatherData, targetDate);
     const todayIso = formatDateIso(new Date());
     if (targetDate === todayIso) {
       const curHour = new Date().getHours();
-      return Math.min(20, Math.max(8, curHour));
+      return Math.min(daylight.sunsetHour, Math.max(daylight.sunriseHour, curHour));
     }
-    return 13;
+    return Math.min(daylight.sunsetHour, Math.max(daylight.sunriseHour, 13));
   }
 
   /**
@@ -742,9 +761,10 @@ export class ForecastViewController {
     const state = this.store ? this.store.getState() : {};
     if (state.activeDate) {
       this.activeDate = state.activeDate;
-      if (typeof state.activeHourIndex === 'number' && state.activeHourIndex >= 8 && state.activeHourIndex <= 20) {
+      const daylight = this.getDaylightWindow();
+      if (typeof state.activeHourIndex === 'number' && state.activeHourIndex >= daylight.sunriseHour && state.activeHourIndex <= daylight.sunsetHour) {
         this.selectedHour = state.activeHourIndex;
-      } else if (typeof state.selectedHour === 'number' && state.selectedHour >= 8 && state.selectedHour <= 20) {
+      } else if (typeof state.selectedHour === 'number' && state.selectedHour >= daylight.sunriseHour && state.selectedHour <= daylight.sunsetHour) {
         this.selectedHour = state.selectedHour;
       } else {
         this.selectedHour = this._resolveInitialHour(this.activeDate);
@@ -822,11 +842,13 @@ export class ForecastViewController {
         const trigger = this.containerEl ? this.containerEl.querySelector('.gm-subspot-trigger') : null;
         if (trigger && typeof trigger.focus === 'function') trigger.focus();
       } else if (e.key === 'ArrowLeft' && !['INPUT', 'TEXTAREA'].includes(e.target?.tagName)) {
-        if (this.selectedHour > 8) {
+        const daylight = this.getDaylightWindow();
+        if (this.selectedHour > daylight.sunriseHour) {
           this.setHour(this.selectedHour - 1);
         }
       } else if (e.key === 'ArrowRight' && !['INPUT', 'TEXTAREA'].includes(e.target?.tagName)) {
-        if (this.selectedHour < 20) {
+        const daylight = this.getDaylightWindow();
+        if (this.selectedHour < daylight.sunsetHour) {
           this.setHour(this.selectedHour + 1);
         }
       }
@@ -1650,8 +1672,9 @@ export class ForecastViewController {
       ? times[0].slice(0, 10)
       : this.activeDate;
 
+    const daylight = this.getDaylightWindow(spot, weatherData, this.activeDate);
     const hourlyPoints = [];
-    for (let h = 8; h <= 20; h++) {
+    for (let h = daylight.sunriseHour; h <= daylight.sunsetHour; h++) {
       const timePrefix = `${baseDate}T${String(h).padStart(2, '0')}:`;
       const idx = times.findIndex(t => t.startsWith(timePrefix));
       let speed = 12;
@@ -2203,7 +2226,9 @@ export class ForecastViewController {
     selectedHour = this.selectedHour,
     compact = false,
     hideTooltip = false,
-    hideThresholdLabels = false
+    hideThresholdLabels = false,
+    startHour = null,
+    endHour = null
   }) {
     const W = 350;
     const H = compact ? 85 : 120;
@@ -2213,7 +2238,13 @@ export class ForecastViewController {
     const yMax = H - (compact ? 18 : 22);
     const yRange = Math.max(1, maxY - minY);
 
-    const getX = (h) => Math.round(xMin + ((h - 8) / 12) * (xMax - xMin));
+    const primarySeries = series[0] || { points: [] };
+    const daylight = this.getDaylightWindow();
+    const sH = (typeof startHour === 'number') ? startHour : (primarySeries.points?.[0]?.hour ?? daylight.sunriseHour);
+    const eH = (typeof endHour === 'number') ? endHour : (primarySeries.points?.[primarySeries.points.length - 1]?.hour ?? daylight.sunsetHour);
+    const hRange = Math.max(1, eH - sH);
+
+    const getX = (h) => Math.round(xMin + ((h - sH) / hRange) * (xMax - xMin));
     const getY = (val) => Math.round(yMax - ((Math.min(maxY, Math.max(minY, val)) - minY) / yRange) * (yMax - yMin));
 
     const mid1 = minY + yRange * 0.33;
@@ -2250,9 +2281,15 @@ export class ForecastViewController {
     }).join('');
 
     const activeMarkerX = getX(selectedHour);
-    const primarySeries = series[0] || { points: [] };
     const activePoint = (primarySeries.points || []).find(p => p.hour === selectedHour) || primarySeries.points?.[0] || { value: 0 };
     const activeMarkerY = getY(activePoint.value);
+
+    const labelStep = Math.max(2, Math.round(hRange / 4));
+    const labelHours = [];
+    for (let lh = sH; lh < eH; lh += labelStep) {
+      labelHours.push(lh);
+    }
+    if (!labelHours.includes(eH)) labelHours.push(eH);
 
     return `
       <div id="${id}-box" class="gm-chart-box">
@@ -2274,11 +2311,9 @@ export class ForecastViewController {
           ${renderedSeries}
 
           <!-- Hourly X Axis Labels -->
-          <text x="${getX(8)}" y="${H - 4}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">08</text>
-          <text x="${getX(11)}" y="${H - 4}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">11</text>
-          <text x="${getX(14)}" y="${H - 4}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">14</text>
-          <text x="${getX(17)}" y="${H - 4}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">17</text>
-          <text x="${getX(20)}" y="${H - 4}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">20</text>
+          ${labelHours.map(lh => `
+            <text x="${getX(lh)}" y="${H - 4}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">${String(lh).padStart(2, '0')}</text>
+          `).join('')}
 
           <!-- Active Hour Vertical Marker -->
           <line x1="${activeMarkerX}" y1="${yMin}" x2="${activeMarkerX}" y2="${yMax}" stroke="var(--gm-accent)" stroke-width="1.8" stroke-dasharray="3,3" />
@@ -2765,8 +2800,13 @@ export class ForecastViewController {
       ? times[0].slice(0, 10)
       : this.activeDate;
 
-    // Map 13 points from 08:00 to 20:00
-    for (let h = 8; h <= 20; h++) {
+    const daylight = this.getDaylightWindow(spot, weatherData, this.activeDate);
+    const sH = daylight.sunriseHour;
+    const eH = daylight.sunsetHour;
+    const hRange = Math.max(1, eH - sH);
+
+    // Map points from sunrise to sunset
+    for (let h = sH; h <= eH; h++) {
       const timePrefix = `${baseDate}T${String(h).padStart(2, '0')}:`;
       const idx = times.findIndex(t => t.startsWith(timePrefix));
       let speed = 12;
@@ -2788,7 +2828,7 @@ export class ForecastViewController {
     const yMax = H - (compact ? 18 : 25);
     const maxVal = 40; // Max Y axis 40 km/h
 
-    const getX = (h) => Math.round(xMin + ((h - 8) / 12) * (xMax - xMin));
+    const getX = (h) => Math.round(xMin + ((h - sH) / hRange) * (xMax - xMin));
     const getY = (val) => Math.round(yMax - (Math.min(maxVal, Math.max(0, val)) / maxVal) * (yMax - yMin));
 
     // Smooth curves for speed & gust
@@ -2802,6 +2842,13 @@ export class ForecastViewController {
     const activeMarkerX = getX(this.selectedHour);
     const activeData = hours.find(h => h.hour === this.selectedHour) || hours[0];
     const activeMarkerY = getY(activeData.speed);
+
+    const labelStep = Math.max(2, Math.round(hRange / 4));
+    const labelHours = [];
+    for (let lh = sH; lh < eH; lh += labelStep) {
+      labelHours.push(lh);
+    }
+    if (!labelHours.includes(eH)) labelHours.push(eH);
 
     return `
       <div id="forecast-wind-chart-box" class="gm-chart-box">
@@ -2830,11 +2877,9 @@ export class ForecastViewController {
           <path d="${speedPath}" fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
 
           <!-- Hourly X Axis Labels -->
-          <text x="${getX(8)}" y="${H - 4}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">08</text>
-          <text x="${getX(11)}" y="${H - 4}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">11</text>
-          <text x="${getX(14)}" y="${H - 4}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">14</text>
-          <text x="${getX(17)}" y="${H - 4}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">17</text>
-          <text x="${getX(20)}" y="${H - 4}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">20</text>
+          ${labelHours.map(lh => `
+            <text x="${getX(lh)}" y="${H - 4}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">${String(lh).padStart(2, '0')}</text>
+          `).join('')}
 
           <!-- ACTIVE HOUR VERTICAL MARKER -->
           <line x1="${activeMarkerX}" y1="${yMin}" x2="${activeMarkerX}" y2="${yMax}" stroke="var(--gm-accent)" stroke-width="1.8" stroke-dasharray="3,3" />
@@ -2976,7 +3021,12 @@ export class ForecastViewController {
       ? times[0].slice(0, 10)
       : this.activeDate;
 
-    for (let h = 8; h <= 20; h++) {
+    const daylight = this.getDaylightWindow(spot, weatherData, this.activeDate);
+    const sH = daylight.sunriseHour;
+    const eH = daylight.sunsetHour;
+    const hRange = Math.max(1, eH - sH);
+
+    for (let h = sH; h <= eH; h++) {
       const timePrefix = `${baseDate}T${String(h).padStart(2, '0')}:`;
       const idx = times.findIndex(t => t.startsWith(timePrefix));
       let temp = 20;
@@ -3000,7 +3050,7 @@ export class ForecastViewController {
     const yMax = H - (compact ? 18 : 25);
     const maxAlt = 3000; // Max altitude 3000m MSL
 
-    const getX = (h) => Math.round(xMin + ((h - 8) / 12) * (xMax - xMin));
+    const getX = (h) => Math.round(xMin + ((h - sH) / hRange) * (xMax - xMin));
     const getY = (alt) => Math.round(yMax - (Math.min(maxAlt, Math.max(0, alt)) / maxAlt) * (yMax - yMin));
 
     const lclCoords = hours.map(p => ({ x: getX(p.hour), y: getY(p.lclMsl) }));
@@ -3012,6 +3062,13 @@ export class ForecastViewController {
     const activeMarkerX = getX(this.selectedHour);
     const activeData = hours.find(h => h.hour === this.selectedHour) || hours[0];
     const activeLclY = getY(activeData.lclMsl);
+
+    const labelStep = Math.max(2, Math.round(hRange / 4));
+    const labelHours = [];
+    for (let lh = sH; lh < eH; lh += labelStep) {
+      labelHours.push(lh);
+    }
+    if (!labelHours.includes(eH)) labelHours.push(eH);
 
     return `
       <div id="forecast-sounding-chart-box" class="gm-chart-box">
@@ -3038,11 +3095,9 @@ export class ForecastViewController {
           <path d="${lclPath}" fill="none" stroke="var(--gm-accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
 
           <!-- Hourly X Axis Labels -->
-          <text x="${getX(8)}" y="${H - 4}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">08</text>
-          <text x="${getX(11)}" y="${H - 4}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">11</text>
-          <text x="${getX(14)}" y="${H - 4}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">14</text>
-          <text x="${getX(17)}" y="${H - 4}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">17</text>
-          <text x="${getX(20)}" y="${H - 4}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">20</text>
+          ${labelHours.map(lh => `
+            <text x="${getX(lh)}" y="${H - 4}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">${String(lh).padStart(2, '0')}</text>
+          `).join('')}
 
           <!-- ACTIVE HOUR VERTICAL MARKER -->
           <line x1="${activeMarkerX}" y1="${yMin}" x2="${activeMarkerX}" y2="${yMax}" stroke="var(--gm-accent)" stroke-width="1.8" stroke-dasharray="3,3" />
@@ -3176,7 +3231,7 @@ export class ForecastViewController {
     }
 
     return `
-      <div id="${stripId}" class="gm-timeline-grid-13" role="tablist" aria-label="Timeline oraria">
+      <div id="${stripId}" class="gm-timeline-grid-13" style="--gm-timeline-slots: ${hours.length}; grid-template-columns: repeat(${hours.length}, 1fr);" role="tablist" aria-label="Timeline oraria">
         ${hours.map(slot => {
           const h = slot.hour;
           const evalH = slot.eval;
@@ -3416,7 +3471,7 @@ export class ForecastViewController {
       const filtered = allSpots.filter(s => this.matchComprensorioSearch(s, q));
       return `
         <div class="gm-picker-section">
-          <span class="gm-picker-section-title">🔍 Risultati Ricerca (${filtered.length})</span>
+          <span class="gm-picker-section-title">Risultati Ricerca (${filtered.length})</span>
           <div class="gm-picker-list">
             ${filtered.length > 0 
               ? filtered.map(renderItem).join('') 
@@ -3578,7 +3633,7 @@ export class ForecastViewController {
       ${renderCurrentSubspots()}
       ${pinnedSpots.length > 0 ? `
         <div class="gm-picker-section">
-          <span class="gm-picker-section-title">⭐ Preferiti (${pinnedSpots.length})</span>
+          <span class="gm-picker-section-title">Preferiti (${pinnedSpots.length})</span>
           <div class="gm-picker-list">
             ${pinnedSpots.map(renderItem).join('')}
           </div>
@@ -3587,7 +3642,7 @@ export class ForecastViewController {
 
       ${recentSpots.length > 0 ? `
         <div class="gm-picker-section">
-          <span class="gm-picker-section-title">🕒 Recenti (${recentSpots.length})</span>
+          <span class="gm-picker-section-title">Recenti (${recentSpots.length})</span>
           <div class="gm-picker-list">
             ${recentSpots.map(renderItem).join('')}
           </div>
@@ -3596,7 +3651,7 @@ export class ForecastViewController {
 
       <div class="gm-picker-section">
         <span class="gm-picker-section-title">
-          🗺️ ${(pinnedSpots.length > 0 || recentSpots.length > 0) ? 'Altri Comprensori' : 'Tutti i Comprensori'} (${(pinnedSpots.length > 0 || recentSpots.length > 0) ? otherSpots.length : allSpots.length})
+          ${(pinnedSpots.length > 0 || recentSpots.length > 0) ? 'Altri Comprensori' : 'Tutti i Comprensori'} (${(pinnedSpots.length > 0 || recentSpots.length > 0) ? otherSpots.length : allSpots.length})
         </span>
         <div class="gm-picker-list">
           ${((pinnedSpots.length > 0 || recentSpots.length > 0) ? otherSpots : allSpots).map(renderItem).join('')}
@@ -4028,13 +4083,22 @@ export class ForecastViewController {
   updateHourFromPointer(evt, strip) {
     if (!strip) return;
     const rect = typeof strip.getBoundingClientRect === 'function' ? strip.getBoundingClientRect() : null;
+    const cols = strip.querySelectorAll ? strip.querySelectorAll('.gm-timeline-col-compact') : null;
 
     if (rect && rect.width > 0) {
       const clientX = this.getClientX(evt);
       const relX = Math.max(0, Math.min(rect.width - 1, clientX - rect.left));
       const fraction = relX / rect.width;
-      const hourIndex = Math.min(12, Math.max(0, Math.floor(fraction * 13)));
-      const targetHour = 8 + hourIndex;
+      let targetHour = this.selectedHour;
+
+      if (cols && cols.length > 0) {
+        const colIdx = Math.min(cols.length - 1, Math.max(0, Math.floor(fraction * cols.length)));
+        targetHour = parseInt(cols[colIdx].getAttribute('data-hour'), 10);
+      } else {
+        const hourIndex = Math.min(12, Math.max(0, Math.floor(fraction * 13)));
+        targetHour = 8 + hourIndex;
+      }
+
       if (targetHour !== this.selectedHour) {
         this.setHour(targetHour);
         if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {

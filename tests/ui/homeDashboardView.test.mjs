@@ -867,19 +867,19 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
   it('should enforce Fitts\'s Law touch target floor and focus-visible states in theme.css', () => {
     const cssContent = fs.readFileSync(path.resolve('css/theme.css'), 'utf-8');
 
-    // Check search input touch height >= 44px
+    // Check search input touch height >= 44px / 48px
     assert.ok(
       cssContent.includes('.gm-search-input {\n  width: 100%;\n  height: 44px;') ||
       cssContent.includes('.gm-search-input {\r\n  width: 100%;\r\n  height: 44px;') ||
-      /\.gm-search-input\s*\{[^}]*min-height:\s*44px/.test(cssContent),
+      /\.gm-search-input\s*\{[^}]*min-height:\s*(?:var\(--gm-touch-min|44px|48px)/.test(cssContent),
       '.gm-search-input must enforce >= 44px touch height'
     );
 
-    // Check search clear button touch size 44x44px
+    // Check search clear button touch size >= 44x44px / 48x48px
     assert.ok(
-      /\.gm-search-clear\s*\{[^}]*width:\s*44px/.test(cssContent) &&
-      /\.gm-search-clear\s*\{[^}]*height:\s*44px/.test(cssContent),
-      '.gm-search-clear must enforce 44x44px touch area'
+      /\.gm-search-clear\s*\{[^}]*width:\s*(?:var\(--gm-touch-min|44px|48px)/.test(cssContent) &&
+      /\.gm-search-clear\s*\{[^}]*height:\s*(?:var\(--gm-touch-min|44px|48px)/.test(cssContent),
+      '.gm-search-clear must enforce 44x44px or 48x48px touch area'
     );
 
     // Check spot card focus-visible declaration

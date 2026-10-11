@@ -1,6 +1,6 @@
 /**
  * GlideMind - Aeronautical High-Contrast Design System
- * Outdoor Sunlight Resilient, Touch-Ergonomic (Fitts's Law >= 44px), Mobile Viewport 100dvh
+ * Outdoor Sunlight Resilient, Touch-Ergonomic (Fitts's Law >= 48px), Mobile Viewport 100dvh
  */
 
 :root {
@@ -417,7 +417,7 @@ button, input, select, textarea {
 }
 
 /* -------------------------------------------------------------
- * 4. Touch-Ergonomic Elements & Fitts's Law Controls (>= 44px)
+ * 4. Touch-Ergonomic Elements & Fitts's Law Controls (>= 48px)
  * ------------------------------------------------------------- */
 .gm-btn {
   min-height: var(--gm-touch-min);
@@ -591,6 +591,19 @@ button, input, select, textarea {
   text-align: center;
   flex-shrink: 0;
   user-select: none;
+}
+
+.gm-spot-header .gm-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.2;
+  border-radius: var(--gm-radius-full);
+  user-select: none;
+  flex-shrink: 0;
 }
 
 .gm-spot-header .gm-badge-flyable {
@@ -1126,7 +1139,7 @@ button, input, select, textarea {
   font-weight: 700;
 }
 
-/* Inline Text Button with Fitts Floor (>= 44px hit target) */
+/* Inline Text Button with Fitts Floor (>= 48px hit target) */
 .gm-text-btn {
   background: transparent;
   border: none;
@@ -1203,11 +1216,14 @@ button, input, select, textarea {
   color: var(--gm-text-inverse);
   font-weight: 700;
   font-size: 0.82rem;
-  padding: 6px 14px;
+  padding: 8px 18px;
   border-radius: var(--gm-radius-full);
-  min-height: 36px;
+  min-height: var(--gm-touch-min, 48px);
   cursor: pointer;
   border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .gm-toast-undo-btn:hover {
@@ -1534,7 +1550,7 @@ button, input, select, textarea {
 
 .gm-search-input {
   width: 100%;
-  height: 44px;
+  height: var(--gm-touch-min, 48px);
   min-height: 44px;
   background: var(--gm-bg-card);
   border: 1px solid var(--gm-border);
@@ -1568,6 +1584,8 @@ button, input, select, textarea {
   transform: translateY(-50%);
   width: 44px;
   height: 44px;
+  min-width: var(--gm-touch-min, 48px);
+  min-height: var(--gm-touch-min, 48px);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1600,13 +1618,13 @@ button, input, select, textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 36px;
-  padding: 4px 12px;
+  min-height: var(--gm-touch-min, 48px);
+  padding: 8px 16px;
   background-color: var(--gm-bg-elevated);
   border: 1px solid var(--gm-border);
   border-radius: var(--gm-radius-full);
   color: var(--gm-text-secondary);
-  font-size: 0.76rem;
+  font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
   transition: background-color var(--gm-transition-fast), border-color var(--gm-transition-fast), color var(--gm-transition-fast);
@@ -1736,15 +1754,16 @@ button, input, select, textarea {
   background: transparent;
   border: none;
   color: var(--gm-text-secondary);
-  font-size: 0.72rem;
+  font-size: 0.76rem;
   font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 4px;
+  padding: 6px 12px;
+  border-radius: var(--gm-radius-sm);
   cursor: pointer;
   transition: background-color var(--gm-transition-fast), color var(--gm-transition-fast);
-  min-height: 28px;
+  min-height: var(--gm-touch-min, 48px);
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
@@ -1785,8 +1804,8 @@ button, input, select, textarea {
   background: var(--gm-bg-surface);
   border: 1px solid var(--gm-border);
   border-radius: var(--gm-radius-full);
-  padding: 4px 12px;
-  min-height: 38px;
+  padding: 6px 14px;
+  min-height: var(--gm-touch-min, 48px);
   color: var(--gm-text-primary);
   cursor: pointer;
   font-size: 0.8125rem;
@@ -2055,7 +2074,7 @@ button, input, select, textarea {
   background: var(--gm-accent);
   border: 1px solid var(--gm-accent);
   color: var(--gm-text-inverse);
-  min-height: 44px;
+  min-height: var(--gm-touch-min, 48px);
   padding: 0 14px;
   border-radius: var(--gm-radius-sm);
   font-weight: 700;
@@ -2082,7 +2101,7 @@ button, input, select, textarea {
   background: rgba(245, 158, 11, 0.08);
   border: 1px solid var(--gm-accent);
   color: var(--gm-accent);
-  min-height: 44px;
+  min-height: var(--gm-touch-min, 48px);
   padding: 0 12px;
   border-radius: var(--gm-radius-sm);
   font-weight: 700;
@@ -2146,22 +2165,24 @@ button, input, select, textarea {
 
 .gm-duration-presets {
   display: flex;
-  gap: 6px;
-  margin-top: 4px;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
 }
 
 .gm-preset-btn {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--gm-border);
   color: var(--gm-text-secondary);
-  font-size: 0.72rem;
+  font-size: 0.76rem;
   font-weight: 600;
-  padding: 4px 8px;
+  padding: 6px 12px;
   border-radius: var(--gm-radius-sm);
   cursor: pointer;
-  min-height: 30px;
+  min-height: var(--gm-touch-min, 48px);
   display: inline-flex;
   align-items: center;
+  justify-content: center;
 }
 
 .gm-preset-btn:hover {
@@ -2172,24 +2193,25 @@ button, input, select, textarea {
 .gm-type-selector {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
+  gap: 8px;
 }
 
 .gm-type-btn {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--gm-border);
   border-radius: var(--gm-radius-sm);
-  padding: 8px 4px;
+  padding: 8px 6px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  justify-content: center;
+  gap: 4px;
   cursor: pointer;
   color: var(--gm-text-secondary);
-  font-size: 0.72rem;
+  font-size: 0.74rem;
   font-weight: 600;
   text-align: center;
-  min-height: 44px;
+  min-height: var(--gm-touch-min, 48px);
   transition: border-color var(--gm-transition-fast), background-color var(--gm-transition-fast);
 }
 
@@ -2672,21 +2694,24 @@ input.gm-input:focus {
 /* Past date presets for flight entry */
 .gm-past-presets {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   margin-top: 6px;
   flex-wrap: wrap;
 }
 
 .gm-past-preset-btn {
-  min-height: 32px;
-  padding: 4px 10px;
-  font-size: 0.75rem;
+  min-height: var(--gm-touch-min, 48px);
+  padding: 6px 14px;
+  font-size: 0.78rem;
   font-weight: 600;
   background-color: var(--gm-bg-surface);
   border: 1px solid var(--gm-border);
   border-radius: var(--gm-radius-sm);
   color: var(--gm-text-secondary);
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: background-color var(--gm-transition-fast), color var(--gm-transition-fast);
 }
 
@@ -2812,8 +2837,8 @@ input.gm-input:focus {
 }
 
 .gm-btn-briefing-refresh {
-  min-width: 36px;
-  min-height: 36px;
+  min-width: var(--gm-touch-min, 48px);
+  min-height: var(--gm-touch-min, 48px);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2982,7 +3007,7 @@ input.gm-input:focus {
   top: 0;
   left: 0;
   right: 0;
-  height: calc(44px + env(safe-area-inset-top, 0px));
+  height: calc(var(--gm-touch-min, 48px) + env(safe-area-inset-top, 0px));
   padding-top: env(safe-area-inset-top, 0px);
   background-color: var(--gm-bg-card);
   backdrop-filter: blur(12px);
@@ -3008,7 +3033,7 @@ input.gm-input:focus {
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  height: 44px;
+  height: var(--gm-touch-min, 48px);
   padding: 0 16px;
   box-sizing: border-box;
 }
@@ -3179,14 +3204,16 @@ input.gm-input:focus {
   transition: background-color var(--gm-transition-fast), border-color var(--gm-transition-fast), transform var(--gm-transition-fast);
 }
 
-/* Expand touchable target area to >= 44x44px for gloved fingers (Fitts's Law) */
+/* Expand touchable target area to >= 48x48px for gloved fingers (Fitts's Law) */
 .gm-stepper-btn::before {
   content: '';
   position: absolute;
-  top: -8px;
-  bottom: -8px;
-  left: -8px;
-  right: -8px;
+  top: -10px;
+  bottom: -10px;
+  left: -10px;
+  right: -10px;
+  min-width: var(--gm-touch-min, 48px);
+  min-height: var(--gm-touch-min, 48px);
 }
 
 .gm-stepper-btn:hover:not(:disabled) {
@@ -3217,7 +3244,7 @@ input.gm-input:focus {
 
 .gm-timeline-grid-13 {
   display: grid;
-  grid-template-columns: repeat(13, 1fr);
+  grid-template-columns: repeat(var(--gm-timeline-slots, 13), 1fr);
   gap: 2px;
   width: 100%;
   box-sizing: border-box;
@@ -3386,22 +3413,27 @@ input.gm-input:focus {
   display: inline-flex;
   background-color: var(--gm-bg-base);
   border: 1px solid var(--gm-border);
-  border-radius: 6px;
-  padding: 2px;
-  gap: 2px;
+  border-radius: var(--gm-radius-sm);
+  padding: 3px;
+  gap: 8px;
 }
 
 .gm-view-toggle-btn {
-  min-height: 32px;
-  padding: 2px 10px;
-  font-size: 0.72rem;
+  min-height: var(--gm-touch-min, 48px);
+  padding: 6px 14px;
+  font-size: 0.78rem;
   font-weight: 700;
   border: none;
   background: transparent;
   color: var(--gm-text-muted);
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: calc(var(--gm-radius-sm) - 2px);
   transition: all var(--gm-transition-fast);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .gm-view-toggle-btn:hover {
@@ -3556,7 +3588,7 @@ input.gm-input:focus {
   justify-content: space-between;
   width: 100%;
   padding: 10px 14px;
-  min-height: 44px;
+  min-height: var(--gm-touch-min, 48px);
   background: transparent;
   border: none;
   color: var(--gm-text-primary);
@@ -3888,8 +3920,8 @@ input.gm-input:focus {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  min-width: 44px;
-  min-height: 44px;
+  min-width: var(--gm-touch-min, 48px);
+  min-height: var(--gm-touch-min, 48px);
   width: 100%;
   height: 100%;
 }
@@ -3952,16 +3984,16 @@ input.gm-input:focus {
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 6px 10px;
+  padding: 8px 12px;
   background: transparent;
   border: none;
   border-radius: var(--gm-radius-sm, 4px);
   color: var(--gm-text-secondary);
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   font-weight: 600;
   text-align: left;
   cursor: pointer;
-  min-height: 36px;
+  min-height: var(--gm-touch-min, 48px);
   touch-action: manipulation;
   transition: background-color var(--gm-transition-fast), color var(--gm-transition-fast);
 }
@@ -4539,8 +4571,8 @@ input.gm-input:focus {
 
 .gm-map-select {
   width: 100%;
-  height: 36px;
-  min-height: 36px;
+  height: var(--gm-touch-min, 48px);
+  min-height: var(--gm-touch-min, 48px);
   padding: 0 24px 0 10px;
   background-color: var(--gm-bg-elevated);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='none' stroke='%2394a3b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
@@ -4699,7 +4731,7 @@ input.gm-input:focus {
 .gm-map-scrubber-stepper-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   width: 100%;
 }
 
@@ -4707,8 +4739,8 @@ input.gm-input:focus {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 44px;
-  min-height: 44px;
+  min-width: var(--gm-touch-min, 48px);
+  min-height: var(--gm-touch-min, 48px);
   padding: 0;
   background: var(--gm-bg-elevated);
   border: 1px solid var(--gm-border);
@@ -4743,7 +4775,7 @@ input.gm-input:focus {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  min-height: 44px;
+  min-height: var(--gm-touch-min, 48px);
   padding: 3px 1px;
   background: transparent;
   border: 1px solid transparent;
@@ -5047,21 +5079,21 @@ input.gm-input:focus {
 .gm-map-popup-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 6px;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .gm-map-popup-btn {
   flex: 1;
-  padding: 6px 8px;
-  font-size: 0.76rem;
+  padding: 8px 12px;
+  font-size: 0.78rem;
   font-weight: 700;
   border-radius: var(--gm-radius-sm, 6px);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 32px;
+  min-height: var(--gm-touch-min, 48px);
   text-decoration: none;
   transition: background-color var(--gm-transition-fast), border-color var(--gm-transition-fast), transform var(--gm-transition-fast);
   white-space: nowrap;
@@ -5359,14 +5391,17 @@ input.gm-input:focus {
   transition: border-color 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-/* Invisible touch floor expanding to >= 44px for outdoor ergonomics without visual bulk */
+/* Invisible touch floor expanding to >= 48px for outdoor ergonomics without visual bulk */
 .gm-mini-map-layer-select::before {
   content: '';
   position: absolute;
-  top: -8px;
-  bottom: -8px;
-  left: -8px;
-  right: -8px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  min-width: var(--gm-touch-min, 48px);
+  min-height: var(--gm-touch-min, 48px);
+  width: 100%;
+  height: 100%;
 }
 
 .gm-mini-map-layer-select:hover {
@@ -5410,14 +5445,17 @@ input.gm-input:focus {
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-/* Invisible touch floor expanding to >= 44px for outdoor ergonomics */
+/* Invisible touch floor expanding to >= 48px for outdoor ergonomics */
 .gm-mini-map-expand-btn::before {
   content: '';
   position: absolute;
-  top: -8px;
-  bottom: -8px;
-  left: -8px;
-  right: -8px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  min-width: var(--gm-touch-min, 48px);
+  min-height: var(--gm-touch-min, 48px);
+  width: 100%;
+  height: 100%;
 }
 
 .gm-mini-map-expand-btn:hover {
@@ -5915,8 +5953,8 @@ input.gm-input:focus {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: var(--gm-touch-min, 44px);
-  min-width: var(--gm-touch-min, 44px);
+  min-height: var(--gm-touch-min, 48px);
+  min-width: var(--gm-touch-min, 48px);
   padding: 6px 12px;
   font-size: var(--gm-font-xs, 12px);
   font-weight: 600;
@@ -6016,7 +6054,7 @@ input.gm-input:focus {
   align-items: center;
   gap: 8px;
   width: 100%;
-  min-height: var(--gm-touch-min, 44px);
+  min-height: var(--gm-touch-min, 48px);
   padding: 8px 12px;
   font-size: var(--gm-font-xs, 12px);
   font-weight: 600;
@@ -6053,9 +6091,9 @@ input.gm-input:focus {
 
 .gm-map-ctrl-select,
 .gm-flight-analysis-layer-select {
-  height: var(--gm-touch-min, 44px);
-  min-height: var(--gm-touch-min, 44px);
-  min-width: 44px;
+  height: var(--gm-touch-min, 48px);
+  min-height: var(--gm-touch-min, 48px);
+  min-width: var(--gm-touch-min, 48px);
   padding: 0 24px 0 10px;
   font-size: var(--gm-font-xs, 12px);
   font-weight: 600;
@@ -6550,8 +6588,8 @@ input.gm-input:focus {
 .gm-search-clear-btn {
   position: absolute;
   right: 8px;
-  min-height: 36px;
-  min-width: 36px;
+  min-height: var(--gm-touch-min, 48px);
+  min-width: var(--gm-touch-min, 48px);
   background: transparent;
   border: none;
   color: var(--gm-text-muted);
@@ -6578,8 +6616,8 @@ input.gm-input:focus {
 
 .gm-filter-chip {
   flex-shrink: 0;
-  min-height: 36px;
-  padding: 6px 14px;
+  min-height: var(--gm-touch-min, 48px);
+  padding: 8px 16px;
   border-radius: var(--gm-radius-full, 9999px);
   border: 1px solid var(--gm-border);
   background: var(--gm-bg-surface);
@@ -6711,7 +6749,7 @@ input.gm-input:focus {
 .gm-flight-badge-group {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex-shrink: 0;
 }
 
@@ -6721,9 +6759,9 @@ input.gm-input:focus {
   color: var(--gm-text-muted);
   font-size: 1.25rem;
   line-height: 1;
-  padding: 4px 8px;
-  min-height: 32px;
-  min-width: 32px;
+  padding: 8px;
+  min-height: var(--gm-touch-min, 48px);
+  min-width: var(--gm-touch-min, 48px);
   border-radius: var(--gm-radius-sm);
   cursor: pointer;
   transition: all var(--gm-transition-fast);
@@ -6968,8 +7006,8 @@ input.gm-input:focus {
   background: var(--gm-bg-base);
   border: 1px solid var(--gm-border);
   border-radius: var(--gm-radius-sm);
-  padding: 2px;
-  gap: 2px;
+  padding: 3px;
+  gap: 8px;
   flex-shrink: 0;
 }
 
@@ -6977,13 +7015,16 @@ input.gm-input:focus {
   background: transparent;
   border: none;
   color: var(--gm-text-muted);
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 4px;
+  padding: 6px 14px;
+  border-radius: calc(var(--gm-radius-sm) - 2px);
   cursor: pointer;
-  min-height: 32px;
-  min-width: 44px;
+  min-height: var(--gm-touch-min, 48px);
+  min-width: var(--gm-touch-min, 48px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: all 0.15s ease;
 }
 
@@ -7945,10 +7986,10 @@ input.gm-input:focus {
 .gm-replay-speed-group {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--gm-border);
-  padding: 2px;
+  padding: 2px 4px;
   border-radius: var(--gm-radius-sm);
 }
 
@@ -7956,13 +7997,16 @@ input.gm-input:focus {
   background: transparent;
   border: none;
   color: var(--gm-text-secondary);
-  font-size: 0.76rem;
+  font-size: 0.78rem;
   font-weight: 700;
   min-height: var(--gm-touch-min, 48px);
-  min-width: 38px;
-  padding: 0 6px;
+  min-width: var(--gm-touch-min, 48px);
+  padding: 0 8px;
   border-radius: calc(var(--gm-radius-sm) - 2px);
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: all var(--gm-transition-fast);
 }
 

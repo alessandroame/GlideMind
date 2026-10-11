@@ -13,7 +13,10 @@
 
 import { store } from '../../core/store.js';
 import { logbookManager } from '../../core/logbookDb.js';
+import { DEFAULT_COMPRENSORI, parseCoordinates } from '../../core/comprensorio.js';
+import { DEFAULT_SEED_FLIGHTS } from '../../core/logbook.js';
 import { HeadlessReplayEngine } from '../3d/HeadlessReplayEngine.js';
+import { MapLibreThreeEngine } from '../3d/MapLibreThreeEngine.js';
 import { ReplayTelemetryCanvas } from '../3d/ReplayTelemetryCanvas.js';
 
 export function escapeHtml(str) {
@@ -35,9 +38,11 @@ export class FlightReplayView {
     this.currentBundle = null;
     this.activeCameraMode = 'chase';
     this.activeSpeed = 1;
+    this.activeLayer = options.mapLayer || 'dark';
     this.isPlaying = false;
     this.elevationOffset = 0;
     this._boundKeyDown = this._onKeyDown.bind(this);
+    this._boundLayerChange = this._onLayerChange.bind(this);
     this._boundStoreListener = null;
   }
 
@@ -47,6 +52,11 @@ export class FlightReplayView {
    */
   _createEngine() {
     if (this.engine) return this.engine;
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      const state = (store && typeof store.getState === 'function') ? store.getState() : {};
+      const layerId = this.activeLayer || state.ui?.mapLayer || 'dark';
+      return new MapLibreThreeEngine({ mapLayer: layerId });
+    }
     return new HeadlessReplayEngine();
   }
 
@@ -109,9 +119,13 @@ export class FlightReplayView {
     }
 
     const state = store.getState();
-    const cachedFlight = Array.isArray(state.flights)
+    let cachedFlight = Array.isArray(state.flights)
       ? state.flights.find(f => (f.id === flightId || f.flightId === flightId))
       : null;
+
+    if (!cachedFlight && Array.isArray(DEFAULT_SEED_FLIGHTS)) {
+      cachedFlight = DEFAULT_SEED_FLIGHTS.find(f => (f.id === flightId || f.flightId === flightId));
+    }
 
     if (cachedFlight) {
       return {
@@ -125,34 +139,132 @@ export class FlightReplayView {
   }
 
   /**
+   * Resolves physical coordinates for site from meta or DEFAULT_COMPRENSORI.
+   * @param {object} meta
+   * @returns {{ takeoffLat: number, takeoffLon: number, takeoffAlt: number, landingLat: number, landingLon: number, landingAlt: number }}
+   */
+  _resolveSiteLocation(meta = {}) {
+    const siteQuery = (meta.site || meta.siteName || meta.comprensorio || '').toLowerCase();
+    if (siteQuery && Array.isArray(DEFAULT_COMPRENSORI)) {
+      const match = DEFAULT_COMPRENSORI.find(c =>
+        c.name.toLowerCase().includes(siteQuery) ||
+        siteQuery.includes(c.name.toLowerCase()) ||
+        c.id === meta.comprensorioId
+      );
+      if (match) {
+        const primaryTakeoff = match.takeoffs?.[0];
+        const primaryLanding = match.landings?.[0];
+        const parsedT = primaryTakeoff ? parseCoordinates(primaryTakeoff.coordinates) : null;
+        const parsedL = primaryLanding ? parseCoordinates(primaryLanding.coordinates) : null;
+        return {
+          takeoffLat: parsedT ? parsedT.lat : 45.833,
+          takeoffLon: parsedT ? parsedT.lon : 9.302,
+          takeoffAlt: primaryTakeoff?.altitude || 1060,
+          landingLat: parsedL ? parsedL.lat : (parsedT ? parsedT.lat - 0.015 : 45.817),
+          landingLon: parsedL ? parsedL.lon : (parsedT ? parsedT.lon + 0.015 : 9.318),
+          landingAlt: primaryLanding?.altitude || 260
+        };
+      }
+    }
+    return {
+      takeoffLat: meta.takeoffLat || 45.833,
+      takeoffLon: meta.takeoffLon || 9.302,
+      takeoffAlt: meta.takeoffAlt || 1060,
+      landingLat: meta.takeoffLat ? meta.takeoffLat - 0.015 : 45.817,
+      landingLon: meta.takeoffLon ? meta.takeoffLon + 0.015 : 9.318,
+      landingAlt: 260
+    };
+  }
+
+  /**
    * Generates realistic synthetic track points for fallback when raw points are absent.
    */
   _generateFallbackTrackPoints(meta = {}) {
-    const lat0 = meta.takeoffLat || 45.4983;
-    const lon0 = meta.takeoffLon || 7.8283;
-    const alt0 = meta.takeoffAlt || 1200;
-    const maxAlt = meta.maxAlt || 1850;
-    const duration = meta.durationSeconds || 3600;
+    const loc = this._resolveSiteLocation(meta);
+    const lat0 = meta.takeoffLat || loc.takeoffLat;
+    const lon0 = meta.takeoffLon || loc.takeoffLon;
+    const alt0 = meta.takeoffAlt || loc.takeoffAlt;
+    const landingLat = loc.landingLat;
+    const landingLon = loc.landingLon;
+    const landingAlt = loc.landingAlt || Math.max(220, alt0 - 700);
 
-    const count = 30;
+    // Realistic altitude envelope:
+    // Monte Cornizzolo summit is ~1240m. Takeoff is 1060m.
+    // Climb up to ~1280m (+220m above takeoff), then glide down to landing (~260m).
+    const maxClimbMeters = meta.maxAlt ? (meta.maxAlt - alt0) : 220;
+    const maxAlt = alt0 + Math.max(80, Math.min(300, maxClimbMeters));
+    const duration = meta.durationSeconds || ((meta.durationMinutes ? meta.durationMinutes * 60 : null) || 2700);
+
+    const count = 90;
     const pts = new Array(count);
 
     for (let i = 0; i < count; i++) {
       const frac = i / (count - 1);
-      const angle = frac * Math.PI * 4;
-      const r = 0.005 * (1 + frac);
-      const currentAlt = alt0 + (maxAlt - alt0) * Math.sin(frac * Math.PI);
+
+      // Phase 1: Ridge soaring & thermal climb (0% to 60% of flight)
+      // Phase 2: Transition & final glide to landing (60% to 100%)
+      let lat, lon, alt, vario;
+
+      if (frac <= 0.60) {
+        // Soaring phase: staying close to the mountain ridge (within 150-250m)
+        const pFrac = frac / 0.60;
+        // Thermal circles / figures of 8 along the ridge:
+        // Use sin/cos with phase so that at pFrac = 0, displacement from takeoff is 0
+        const turns = 4;
+        const angle = pFrac * Math.PI * 2 * turns;
+        // Radius ramps up smoothly from 0 at takeoff up to ~180m radius
+        const rLat = 0.0016 * Math.sin(pFrac * Math.PI * 0.5);
+        const rLon = 0.0022 * Math.sin(pFrac * Math.PI * 0.5);
+
+        // Fly out slightly south from ridge (into wind/slope)
+        const forwardPush = -0.0010 * Math.sin(pFrac * Math.PI * 0.5);
+
+        lat = lat0 + forwardPush + Math.sin(angle) * rLat;
+        lon = lon0 + (1 - Math.cos(angle)) * rLon * 0.5;
+
+        // Altitude climbs smoothly from alt0 up to maxAlt
+        const climbProfile = Math.sin(pFrac * Math.PI * 0.5);
+        alt = alt0 + (maxAlt - alt0) * climbProfile;
+        vario = Math.round((1.4 + Math.sin(angle * 2) * 0.8) * 10) / 10;
+      } else {
+        // Glide to landing phase
+        const gFrac = (frac - 0.60) / 0.40; // 0.0 -> 1.0
+        // Departure point at end of ridge soaring
+        const exitLat = lat0 - 0.0010;
+        const exitLon = lon0 + 0.0011;
+
+        // Smooth glide path from exit point to landing point
+        // S-turns during descent
+        const sTurns = Math.sin(gFrac * Math.PI * 5) * 0.0012 * (1 - gFrac);
+
+        lat = exitLat + (landingLat - exitLat) * gFrac + sTurns * 0.5;
+        lon = exitLon + (landingLon - exitLon) * gFrac + sTurns;
+
+        // Altitude descends steadily from maxAlt down to landingAlt
+        alt = maxAlt - (maxAlt - landingAlt) * gFrac;
+        vario = Math.round((-1.2 - Math.sin(gFrac * Math.PI * 3) * 0.4) * 10) / 10;
+      }
 
       pts[i] = {
-        lat: lat0 + Math.sin(angle) * r,
-        lon: lon0 + Math.cos(angle) * r,
-        alt: Math.round(currentAlt),
+        lat: Math.round(lat * 1e6) / 1e6,
+        lon: Math.round(lon * 1e6) / 1e6,
+        alt: Math.round(alt),
         timeSeconds: Math.round(frac * duration),
-        speedKmh: Math.round(36 + Math.sin(angle * 2) * 6),
-        vario: Math.round(Math.cos(frac * Math.PI) * 2.5 * 10) / 10,
-        heading: Math.round(((angle * 180 / Math.PI) + 360) % 360)
+        speedKmh: Math.round(36 + Math.sin(frac * Math.PI * 8) * 4),
+        vario,
+        heading: 0
       };
     }
+
+    // Ensure first point is exactly at takeoff coordinates and altitude
+    pts[0].lat = lat0;
+    pts[0].lon = lon0;
+    pts[0].alt = alt0;
+
+    // Ensure last point is exactly at landing coordinates and altitude
+    pts[count - 1].lat = landingLat;
+    pts[count - 1].lon = landingLon;
+    pts[count - 1].alt = landingAlt;
 
     return pts;
   }
@@ -188,6 +300,9 @@ export class FlightReplayView {
 
     this.currentFlightId = this._resolveTargetFlightId(params);
     this.currentBundle = await this._loadFlightData(this.currentFlightId);
+
+    const state = (store && typeof store.getState === 'function') ? store.getState() : {};
+    this.activeLayer = state.ui?.mapLayer || this.activeLayer || 'dark';
 
     this.render();
 
@@ -279,6 +394,11 @@ export class FlightReplayView {
         return;
       }
     });
+
+    const layerSelect = this.containerEl.querySelector('#gm-replay-layer-select');
+    if (layerSelect) {
+      layerSelect.addEventListener('change', this._boundLayerChange);
+    }
   }
 
   /**
@@ -408,6 +528,36 @@ export class FlightReplayView {
   }
 
   /**
+   * Event listener for 3D map layer dropdown change.
+   * @param {Event} e
+   */
+  _onLayerChange(e) {
+    const target = /** @type {HTMLSelectElement} */ (e.target);
+    if (target && target.value) {
+      this.handleLayerChange(target.value);
+    }
+  }
+
+  /**
+   * Switches active 3D cartographic basemap layer and updates store.
+   * @param {string} layerId ('dark' | 'satellite' | 'topo' | 'streets')
+   */
+  handleLayerChange(layerId) {
+    this.activeLayer = layerId;
+    if (this.engine && typeof this.engine.setMapLayer === 'function') {
+      this.engine.setMapLayer(layerId);
+    }
+    if (store && typeof store.setState === 'function') {
+      store.setState((prev) => ({
+        ui: {
+          ...prev.ui,
+          mapLayer: layerId
+        }
+      }));
+    }
+  }
+
+  /**
    * Exits 3D replay view and navigates back to logbook.
    */
   handleExitReplay() {
@@ -431,6 +581,10 @@ export class FlightReplayView {
       window.removeEventListener('keydown', this._boundKeyDown);
     }
     if (this.containerEl) {
+      const layerSelect = this.containerEl.querySelector('#gm-replay-layer-select');
+      if (layerSelect) {
+        layerSelect.removeEventListener('change', this._boundLayerChange);
+      }
       this.containerEl.innerHTML = '';
       this.containerEl = null;
     }
@@ -464,10 +618,20 @@ export class FlightReplayView {
               <span class="gm-replay-flight-subtitle" id="replay-flight-subtitle">${escapeHtml(dateStr)} • ${escapeHtml(gliderStr)}</span>
             </div>
           </div>
-          <div class="gm-replay-camera-group" role="radiogroup" aria-label="Modalità Telecamera">
-            <button type="button" class="gm-replay-cam-btn gm-active" data-camera="chase" aria-pressed="true">Inseguimento</button>
-            <button type="button" class="gm-replay-cam-btn" data-camera="cockpit" aria-pressed="false">Cockpit</button>
-            <button type="button" class="gm-replay-cam-btn" data-camera="free" aria-pressed="false">Libera</button>
+          <div class="gm-replay-top-right">
+            <div class="gm-replay-layer-wrap">
+              <select id="gm-replay-layer-select" class="gm-replay-layer-select" aria-label="Seleziona layer cartografico 3D">
+                <option value="dark" ${this.activeLayer === 'dark' ? 'selected' : ''}>Scuro</option>
+                <option value="satellite" ${this.activeLayer === 'satellite' ? 'selected' : ''}>Satellite</option>
+                <option value="topo" ${this.activeLayer === 'topo' ? 'selected' : ''}>OpenTopo</option>
+                <option value="streets" ${this.activeLayer === 'streets' ? 'selected' : ''}>CyclOSM</option>
+              </select>
+            </div>
+            <div class="gm-replay-camera-group" role="radiogroup" aria-label="Modalità Telecamera">
+              <button type="button" class="gm-replay-cam-btn ${this.activeCameraMode === 'chase' ? 'gm-active' : ''}" data-camera="chase" aria-pressed="${this.activeCameraMode === 'chase'}">Inseguimento</button>
+              <button type="button" class="gm-replay-cam-btn ${this.activeCameraMode === 'cockpit' ? 'gm-active' : ''}" data-camera="cockpit" aria-pressed="${this.activeCameraMode === 'cockpit'}">Pilota</button>
+              <button type="button" class="gm-replay-cam-btn ${this.activeCameraMode === 'free' ? 'gm-active' : ''}" data-camera="free" aria-pressed="${this.activeCameraMode === 'free'}">Libera</button>
+            </div>
           </div>
         </header>
 

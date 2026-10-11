@@ -70,6 +70,7 @@ export class LogbookViewController {
 
     // Bound event handlers
     this.boundHandleClick = this.handleClick.bind(this);
+    this.boundHandleKeyDown = this.handleKeyDown.bind(this);
     this.boundHandleSearchInput = this.handleSearchInput.bind(this);
     this.boundHandleDragOver = this.handleDragOver.bind(this);
     this.boundHandleDragLeave = this.handleDragLeave.bind(this);
@@ -111,6 +112,7 @@ export class LogbookViewController {
 
     // 4. Attach event listeners
     this.containerEl.addEventListener('click', this.boundHandleClick);
+    this.containerEl.addEventListener('keydown', this.boundHandleKeyDown);
     this.containerEl.addEventListener('dragover', this.boundHandleDragOver);
     this.containerEl.addEventListener('dragleave', this.boundHandleDragLeave);
     this.containerEl.addEventListener('drop', this.boundHandleDrop);
@@ -133,6 +135,7 @@ export class LogbookViewController {
 
     if (this.containerEl) {
       this.containerEl.removeEventListener('click', this.boundHandleClick);
+      this.containerEl.removeEventListener('keydown', this.boundHandleKeyDown);
       this.containerEl.removeEventListener('dragover', this.boundHandleDragOver);
       this.containerEl.removeEventListener('dragleave', this.boundHandleDragLeave);
       this.containerEl.removeEventListener('drop', this.boundHandleDrop);
@@ -497,7 +500,7 @@ export class LogbookViewController {
    * @returns {string}
    */
   renderFlightCard(flight, flightNumber = null) {
-    const flightId = flight.id;
+    const flightId = flight.id || flight.flightId || '';
     const title = flight.siteName || flight.site || 'Volo da IGC';
     const dateFormatted = flight.date || 'Data N/D';
     const takeoffTime = flight.takeoffTime ? `Ore ${flight.takeoffTime}` : '';
@@ -678,6 +681,27 @@ export class LogbookViewController {
       case 'replay-flight': {
         if (flightId) this.handleReplayFlight(flightId);
         break;
+      }
+    }
+  }
+
+  /**
+   * Keyboard interaction handler (WCAG 2.1 AA).
+   * Supports Enter and Space to open flight detail.
+   * @param {KeyboardEvent} e
+   */
+  async handleKeyDown(e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      const target = /** @type {HTMLElement} */ (e.target);
+      const actionBtn = target?.closest ? target.closest('[data-action]') : null;
+      if (!actionBtn) return;
+      const action = actionBtn.getAttribute('data-action');
+      if (action === 'open-flight-detail') {
+        if (typeof e.preventDefault === 'function') e.preventDefault();
+        const flightId = actionBtn.getAttribute('data-flight-id');
+        if (flightId) {
+          await this.handleOpenFlightDetail(flightId);
+        }
       }
     }
   }
@@ -877,7 +901,7 @@ export class LogbookViewController {
    */
   async handleOpenFlightDetail(flightId) {
     if (!flightId) return;
-    await openFlightDetailSheet(flightId);
+    await openFlightDetailSheet(flightId, { store: this.store });
   }
 }
 

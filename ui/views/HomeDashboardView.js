@@ -464,10 +464,15 @@ export class HomeDashboardViewController {
     const totalCount = allEvaluated.length;
     const flyableCount = allEvaluated.filter(item => item.status === 'flyable' || item.status === 'caution').length;
     const currentTheme = (state.ui && state.ui.theme) || 'dark';
+    const themeIcons = {
+      light: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>`,
+      dark: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`,
+      auto: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`
+    };
     const themeMeta = {
-      light: { label: 'Chiaro', icon: '☀️' },
-      dark: { label: 'Scuro', icon: '🌙' },
-      auto: { label: 'Auto', icon: '⚙️' }
+      light: { label: 'Chiaro', icon: themeIcons.light },
+      dark: { label: 'Scuro', icon: themeIcons.dark },
+      auto: { label: 'Auto', icon: themeIcons.auto }
     };
     const currentThemeMeta = themeMeta[currentTheme] || themeMeta.dark;
 
@@ -514,7 +519,7 @@ export class HomeDashboardViewController {
                   aria-pressed="${currentTheme === 'light' ? 'true' : 'false'}"
                   title="Tema chiaro (alta luminosità)"
                 >
-                  <span class="gm-theme-item-icon" aria-hidden="true">☀️</span>
+                  <span class="gm-theme-item-icon" aria-hidden="true">${themeIcons.light}</span>
                   <span class="gm-theme-item-text">Chiaro</span>
                   ${currentTheme === 'light' ? '<span class="gm-theme-item-check" aria-hidden="true">✓</span>' : ''}
                 </button>
@@ -527,7 +532,7 @@ export class HomeDashboardViewController {
                   aria-pressed="${currentTheme === 'dark' ? 'true' : 'false'}"
                   title="Tema scuro (antiriflesso)"
                 >
-                  <span class="gm-theme-item-icon" aria-hidden="true">🌙</span>
+                  <span class="gm-theme-item-icon" aria-hidden="true">${themeIcons.dark}</span>
                   <span class="gm-theme-item-text">Scuro</span>
                   ${currentTheme === 'dark' ? '<span class="gm-theme-item-check" aria-hidden="true">✓</span>' : ''}
                 </button>
@@ -540,7 +545,7 @@ export class HomeDashboardViewController {
                   aria-pressed="${currentTheme === 'auto' ? 'true' : 'false'}"
                   title="Tema automatico (di sistema)"
                 >
-                  <span class="gm-theme-item-icon" aria-hidden="true">⚙️</span>
+                  <span class="gm-theme-item-icon" aria-hidden="true">${themeIcons.auto}</span>
                   <span class="gm-theme-item-text">Auto</span>
                   ${currentTheme === 'auto' ? '<span class="gm-theme-item-check" aria-hidden="true">✓</span>' : ''}
                 </button>
@@ -875,8 +880,9 @@ export class HomeDashboardViewController {
             ${item.province ? `<span class="gm-spot-prov">${escapeHtml(item.province)}</span>` : ''}
           </div>
           <div class="flex items-center gap-2">
-            <span class="gm-badge gm-badge-icon ${badgeClass}" title="${escapeHtml(badgeTitle)}" aria-label="${escapeHtml(badgeTitle)}">
+            <span class="gm-badge gm-badge-pill ${badgeClass}" title="${escapeHtml(badgeTitle)}" aria-label="${escapeHtml(badgeTitle)}">
               <span aria-hidden="true">${badgeIcon}</span>
+              <span class="gm-badge-text font-bold">${escapeHtml(badgeTitle)}</span>
             </span>
             <svg class="gm-spot-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
               <polyline points="9 18 15 12 9 6"></polyline>
