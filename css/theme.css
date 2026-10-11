@@ -4294,6 +4294,122 @@ input.gm-input:focus {
   box-sizing: border-box;
 }
 
+/* Parameteo-Style Side-by-Side Trend Cards */
+.gm-trend-card.gm-trend-card-side-by-side {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  padding: 0;
+  overflow: hidden;
+  background-color: var(--gm-bg-card);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-md);
+}
+
+.gm-trend-side-panel {
+  width: 95px;
+  min-width: 95px;
+  max-width: 95px;
+  padding: 10px 8px 8px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  border-right: 1px solid var(--gm-border);
+  background-color: rgba(255, 255, 255, 0.015);
+  box-sizing: border-box;
+}
+
+.gm-trend-side-label {
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--gm-accent);
+  margin-bottom: 2px;
+  line-height: 1.1;
+}
+
+.gm-trend-side-val-group {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+
+.gm-trend-side-val {
+  font-size: 1.35rem;
+  font-weight: 800;
+  font-family: var(--gm-font-mono, monospace);
+  color: var(--gm-text-primary);
+  line-height: 1.1;
+}
+
+.gm-trend-side-unit {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--gm-text-muted);
+}
+
+.gm-trend-side-sub {
+  margin-top: 4px;
+  font-size: 0.70rem;
+}
+
+.gm-trend-sub-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background-color: var(--gm-bg-elevated);
+  color: var(--gm-text-secondary);
+  font-size: 0.68rem;
+  font-weight: 600;
+  border: 1px solid var(--gm-border);
+}
+
+.gm-trend-sub-badge.status-alert {
+  color: var(--gm-status-alert);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.gm-trend-sub-badge.status-caution {
+  color: var(--gm-status-caution);
+  border-color: rgba(234, 179, 8, 0.3);
+}
+
+.gm-trend-sub-badge.status-flyable {
+  color: var(--gm-status-flyable);
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.gm-trend-cardinal {
+  font-weight: 800;
+  color: var(--gm-text-primary);
+}
+
+.gm-trend-chart-panel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.gm-trend-card-side-by-side .gm-chart-box {
+  background: transparent !important;
+  border: none !important;
+  padding: 4px 6px 4px 0 !important;
+  box-shadow: none !important;
+  width: 100%;
+}
+
+.gm-trend-card-side-by-side .gm-chart-box svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 .gm-trend-card-header {
   display: flex;
   align-items: center;
@@ -6509,6 +6625,7 @@ input.gm-input:focus {
 
 .gm-flight-card.gm-flight-card-compact {
   cursor: pointer;
+  touch-action: pan-y;
 }
 
 .gm-flight-card.gm-flight-card-compact:hover {
@@ -6517,6 +6634,17 @@ input.gm-input:focus {
 
 .gm-flight-card.gm-flight-card-compact:active {
   transform: scale(0.995);
+}
+
+.gm-flight-sparkline-wrap,
+.gm-flight-metrics-row,
+.gm-flight-card-sub,
+.gm-flight-title-group {
+  pointer-events: none;
+}
+
+.gm-flight-delete-btn {
+  pointer-events: auto;
 }
 
 .gm-flight-card-header {
@@ -7636,6 +7764,37 @@ input.gm-input:focus {
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1.2;
+}
+
+.gm-replay-top-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.gm-replay-layer-wrap {
+  display: flex;
+  align-items: center;
+}
+
+.gm-replay-layer-select {
+  background: var(--gm-bg-card, rgba(15, 23, 42, 0.8));
+  color: var(--gm-text-primary);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-sm);
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  min-height: var(--gm-touch-min, 48px);
+  cursor: pointer;
+  outline: none;
+  transition: border-color var(--gm-transition-fast);
+}
+
+.gm-replay-layer-select:focus,
+.gm-replay-layer-select:hover {
+  border-color: var(--gm-accent, #38bdf8);
 }
 
 .gm-replay-camera-group {

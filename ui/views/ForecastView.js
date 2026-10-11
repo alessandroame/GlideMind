@@ -1646,9 +1646,13 @@ export class ForecastViewController {
     const hourlyData = (weatherData && weatherData.hourly) || {};
     const times = hourlyData.time || [];
 
+    const baseDate = (times[0] && !times.some(t => t.startsWith(`${this.activeDate}T`)))
+      ? times[0].slice(0, 10)
+      : this.activeDate;
+
     const hourlyPoints = [];
     for (let h = 8; h <= 20; h++) {
-      const timePrefix = `${this.activeDate}T${String(h).padStart(2, '0')}:`;
+      const timePrefix = `${baseDate}T${String(h).padStart(2, '0')}:`;
       const idx = times.findIndex(t => t.startsWith(timePrefix));
       let speed = 12;
       let gust = 16;
@@ -2197,14 +2201,16 @@ export class ForecastViewController {
     minY = 0,
     maxY = 40,
     selectedHour = this.selectedHour,
-    compact = false
+    compact = false,
+    hideTooltip = false,
+    hideThresholdLabels = false
   }) {
     const W = 350;
-    const H = compact ? 95 : 120;
+    const H = compact ? 85 : 120;
     const xMin = 36;
     const xMax = 335;
-    const yMin = 14;
-    const yMax = H - 22;
+    const yMin = compact ? 8 : 14;
+    const yMax = H - (compact ? 18 : 22);
     const yRange = Math.max(1, maxY - minY);
 
     const getX = (h) => Math.round(xMin + ((h - 8) / 12) * (xMax - xMin));
@@ -2227,7 +2233,7 @@ export class ForecastViewController {
           d="${linePath}" 
           fill="none" 
           stroke="${s.stroke || 'var(--gm-accent)'}" 
-          stroke-width="${s.strokeWidth || 2}" 
+          stroke-width="${s.strokeWidth || 2.2}" 
           stroke-linecap="round"
           stroke-linejoin="round"
           ${s.strokeDasharray ? `stroke-dasharray="${s.strokeDasharray}"` : ''} 
@@ -2239,7 +2245,7 @@ export class ForecastViewController {
       const yPos = getY(t.value);
       return `
         <line x1="${xMin}" y1="${yPos}" x2="${xMax}" y2="${yPos}" stroke="${t.stroke || 'var(--gm-status-caution)'}" stroke-width="1.2" stroke-dasharray="${t.strokeDasharray || '3,3'}" />
-        ${t.label ? `<text x="${xMax - 2}" y="${yPos - 3}" font-size="8" fill="${t.stroke || 'var(--gm-text-muted)'}" text-anchor="end">${escapeHtml(t.label)}</text>` : ''}
+        ${(!hideThresholdLabels && t.label) ? `<text x="${xMax - 2}" y="${yPos - 3}" font-size="8" fill="${t.stroke || 'var(--gm-text-muted)'}" text-anchor="end">${escapeHtml(t.label)}</text>` : ''}
       `;
     }).join('');
 
@@ -2268,19 +2274,21 @@ export class ForecastViewController {
           ${renderedSeries}
 
           <!-- Hourly X Axis Labels -->
-          <text x="${getX(8)}" y="${H - 6}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">08</text>
-          <text x="${getX(11)}" y="${H - 6}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">11</text>
-          <text x="${getX(14)}" y="${H - 6}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">14</text>
-          <text x="${getX(17)}" y="${H - 6}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">17</text>
-          <text x="${getX(20)}" y="${H - 6}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">20</text>
+          <text x="${getX(8)}" y="${H - 4}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">08</text>
+          <text x="${getX(11)}" y="${H - 4}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">11</text>
+          <text x="${getX(14)}" y="${H - 4}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">14</text>
+          <text x="${getX(17)}" y="${H - 4}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">17</text>
+          <text x="${getX(20)}" y="${H - 4}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">20</text>
 
           <!-- Active Hour Vertical Marker -->
           <line x1="${activeMarkerX}" y1="${yMin}" x2="${activeMarkerX}" y2="${yMax}" stroke="var(--gm-accent)" stroke-width="1.8" stroke-dasharray="3,3" />
           <circle cx="${activeMarkerX}" cy="${activeMarkerY}" r="4" fill="var(--gm-accent)" stroke="var(--gm-bg-base)" stroke-width="1.8" />
+          ${!hideTooltip ? `
           <rect x="${Math.max(xMin, Math.min(xMax - 54, activeMarkerX - 27))}" y="2" width="54" height="13" rx="3" fill="var(--gm-accent)" />
           <text x="${Math.max(xMin + 27, Math.min(xMax - 27, activeMarkerX))}" y="11" font-size="8" font-weight="700" fill="var(--gm-text-inverse)" text-anchor="middle">
             ${Math.round(activePoint.value)} ${escapeHtml(unit)}
           </text>
+          ` : ''}
         </svg>
       </div>
     `;
@@ -2399,24 +2407,34 @@ export class ForecastViewController {
    */
   renderMultiTrendCharts(evaluated, weatherData, spot, glider, activeSubSpotObj) {
     const { hourlyPoints, takeoff } = this.computeParamMetrics(evaluated, weatherData, spot, glider, activeSubSpotObj);
+    const activePoint = hourlyPoints.find(p => p.hour === this.selectedHour) || hourlyPoints[0] || {};
+    const activeSpeed = Math.round(activePoint.speed || 0);
+    const activeGust = Math.round(activePoint.gust || activeSpeed);
+    const activeDir = getCardinalDirection(activePoint.dir || 180);
 
     const chartCards = [
       {
         id: 'multi-chart-wind',
-        title: 'Vento & Raffiche in Decollo',
-        val: `${Math.round(hourlyPoints.find(p => p.hour === this.selectedHour)?.speed || 0)} km/h`,
-        chartHtml: this.renderWindChart(spot, weatherData, takeoff.heading)
+        label: 'Vento',
+        val: `${activeSpeed}`,
+        unit: 'km/h',
+        subHtml: `<span class="gm-trend-sub-badge"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="inline-block" aria-hidden="true"><path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/></svg> ${activeGust} <strong class="gm-trend-cardinal">${activeDir}</strong></span>`,
+        chartHtml: this.renderWindChart(spot, weatherData, takeoff.heading, { compact: true, hideTooltip: true, hideFooter: true })
       },
       {
         id: 'multi-chart-sounding',
-        title: 'Base Cumulo (LCL) vs Quota Decollo',
-        val: `${Math.round(hourlyPoints.find(p => p.hour === this.selectedHour)?.lclMsl || 0)} m slm`,
-        chartHtml: this.renderSoundingChart(spot, weatherData, takeoff.altitude)
+        label: 'Base Cumulo',
+        val: `${Math.round(activePoint.lclMsl || 0)}`,
+        unit: 'm slm',
+        subHtml: `<span class="gm-trend-sub-badge">AGL +${Math.round(Math.max(0, (activePoint.lclMsl || 0) - (takeoff.altitude || 1000)))}m</span>`,
+        chartHtml: this.renderSoundingChart(spot, weatherData, takeoff.altitude, { compact: true, hideTooltip: true, hideFooter: true })
       },
       {
         id: 'multi-chart-cape',
-        title: 'Instabilità / Temporali (CAPE)',
-        val: `${Math.round(hourlyPoints.find(p => p.hour === this.selectedHour)?.cape || 0)} J/kg`,
+        label: 'Instabilità (CAPE)',
+        val: `${Math.round(activePoint.cape || 0)}`,
+        unit: 'J/kg',
+        subHtml: `<span class="gm-trend-sub-badge ${activePoint.cape > 800 ? 'status-alert' : activePoint.cape > 300 ? 'status-caution' : 'status-flyable'}">${activePoint.cape > 800 ? 'Rischio CB' : activePoint.cape > 300 ? 'Cumuli attivi' : 'Stabile'}</span>`,
         chartHtml: this.renderSvgTrendChart({
           id: 'multi-cape',
           title: 'CAPE',
@@ -2424,22 +2442,27 @@ export class ForecastViewController {
           minY: 0,
           maxY: Math.max(1200, ...hourlyPoints.map(p => p.cape)),
           compact: true,
+          hideTooltip: true,
+          hideThresholdLabels: true,
           thresholds: [
-            { value: 300, stroke: 'var(--gm-status-caution)', label: 'Attenzione (300)' },
-            { value: 800, stroke: 'var(--gm-status-unflyable)', label: 'Rischio (800)' }
+            { value: 300, stroke: 'var(--gm-status-caution)', strokeDasharray: '4,3' },
+            { value: 800, stroke: 'var(--gm-status-unflyable)', strokeDasharray: '4,3' }
           ],
           series: [{
             name: 'CAPE',
             points: hourlyPoints.map(p => ({ hour: p.hour, value: p.cape })),
-            stroke: 'var(--gm-status-caution)',
-            fillArea: 'rgba(234, 179, 8, 0.12)'
+            stroke: '#a855f7',
+            strokeWidth: 2.5,
+            fillArea: 'rgba(168, 85, 247, 0.20)'
           }]
         })
       },
       {
         id: 'multi-chart-turbulence',
-        title: 'Turbolenza in Termica (EDR) & Salita',
-        val: `+${(hourlyPoints.find(p => p.hour === this.selectedHour)?.updraft || 0).toFixed(1)} m/s`,
+        label: 'Turbolenza',
+        val: `${(activePoint.edr || 0).toFixed(2)}`,
+        unit: 'EDR',
+        subHtml: `<span class="gm-trend-sub-badge">+${(activePoint.updraft || 0).toFixed(1)} m/s salita</span>`,
         chartHtml: this.renderSvgTrendChart({
           id: 'multi-turbulence',
           title: 'Salita',
@@ -2447,21 +2470,26 @@ export class ForecastViewController {
           minY: 0,
           maxY: 5,
           compact: true,
+          hideTooltip: true,
+          hideThresholdLabels: true,
           thresholds: [
-            { value: 2.5, stroke: 'var(--gm-status-caution)', label: 'Termiche Vive' }
+            { value: 2.5, stroke: 'var(--gm-status-caution)', strokeDasharray: '4,3' }
           ],
           series: [{
             name: 'Updraft',
             points: hourlyPoints.map(p => ({ hour: p.hour, value: p.updraft })),
-            stroke: 'var(--gm-status-flyable)',
-            fillArea: 'rgba(34, 197, 94, 0.12)'
+            stroke: 'var(--gm-status-caution)',
+            strokeWidth: 2.5,
+            fillArea: 'rgba(234, 179, 8, 0.18)'
           }]
         })
       },
       {
         id: 'multi-chart-cloudcover',
-        title: 'Copertura Nuvolosa & Insolazione',
-        val: `${Math.round(hourlyPoints.find(p => p.hour === this.selectedHour)?.cloudCover || 0)}%`,
+        label: 'Copertura',
+        val: `${Math.round(activePoint.cloudCover || 0)}`,
+        unit: '%',
+        subHtml: `<span class="gm-trend-sub-badge">${activePoint.cloudCover > 70 ? 'Nuvoloso' : activePoint.cloudCover > 25 ? 'Parziale' : 'Sereno'}</span>`,
         chartHtml: this.renderSvgTrendChart({
           id: 'multi-cloudcover',
           title: 'Copertura',
@@ -2469,21 +2497,26 @@ export class ForecastViewController {
           minY: 0,
           maxY: 100,
           compact: true,
+          hideTooltip: true,
+          hideThresholdLabels: true,
           thresholds: [
-            { value: 80, stroke: 'var(--gm-status-caution)', label: 'Nuvoloso (80%)' }
+            { value: 80, stroke: 'var(--gm-status-caution)', strokeDasharray: '4,3' }
           ],
           series: [{
             name: 'Copertura',
             points: hourlyPoints.map(p => ({ hour: p.hour, value: p.cloudCover })),
             stroke: 'var(--gm-text-secondary)',
-            fillArea: 'rgba(148, 163, 184, 0.15)'
+            strokeWidth: 2.5,
+            fillArea: 'rgba(148, 163, 184, 0.18)'
           }]
         })
       },
       {
         id: 'multi-chart-landing',
-        title: 'Condizioni in Atterraggio (Brezza di Valle)',
-        val: `${Math.round(hourlyPoints.find(p => p.hour === this.selectedHour)?.landingSpeed || 0)} km/h`,
+        label: 'Brezza Valle',
+        val: `${Math.round(activePoint.landingSpeed || 0)}`,
+        unit: 'km/h',
+        subHtml: `<span class="gm-trend-sub-badge ${activePoint.landingSpeed > 18 ? 'status-caution' : 'status-flyable'}">${activePoint.landingSpeed > 18 ? 'Sostenuta' : 'Regolare'}</span>`,
         chartHtml: this.renderSvgTrendChart({
           id: 'multi-landing',
           title: 'Brezza',
@@ -2491,14 +2524,17 @@ export class ForecastViewController {
           minY: 0,
           maxY: 35,
           compact: true,
+          hideTooltip: true,
+          hideThresholdLabels: true,
           thresholds: [
-            { value: 18, stroke: 'var(--gm-status-caution)', label: 'Limite Brezza (18)' }
+            { value: 18, stroke: 'var(--gm-status-caution)', strokeDasharray: '4,3' }
           ],
           series: [{
             name: 'Brezza Valle',
             points: hourlyPoints.map(p => ({ hour: p.hour, value: p.landingSpeed })),
             stroke: 'var(--gm-status-flyable)',
-            fillArea: 'rgba(34, 197, 94, 0.12)'
+            strokeWidth: 2.5,
+            fillArea: 'rgba(34, 197, 94, 0.18)'
           }]
         })
       }
@@ -2507,12 +2543,18 @@ export class ForecastViewController {
     return `
       <div class="gm-multi-charts-container">
         ${chartCards.map(c => `
-          <div class="gm-trend-card" id="${c.id}">
-            <div class="gm-trend-card-header">
-              <span class="gm-trend-card-title">${escapeHtml(c.title)}</span>
-              <span class="gm-trend-card-val">${escapeHtml(c.val)}</span>
+          <div class="gm-trend-card gm-trend-card-side-by-side" id="${c.id}">
+            <div class="gm-trend-side-panel">
+              <span class="gm-trend-side-label">${escapeHtml(c.label)}</span>
+              <div class="gm-trend-side-val-group">
+                <span class="gm-trend-side-val">${escapeHtml(c.val)}</span>
+                <span class="gm-trend-side-unit">${escapeHtml(c.unit)}</span>
+              </div>
+              <div class="gm-trend-side-sub">${c.subHtml}</div>
             </div>
-            ${c.chartHtml}
+            <div class="gm-trend-chart-panel">
+              ${c.chartHtml}
+            </div>
           </div>
         `).join('')}
       </div>
@@ -2698,14 +2740,21 @@ export class ForecastViewController {
   /**
    * Renders the Expanded SVG Wind & Gusts Temporal Chart with active hour marker.
    */
-  renderWindChart(spot, weatherData, takeoffAzimuth) {
+  renderWindChart(spot, weatherData, takeoffAzimuth, options = {}) {
+    const compact = Boolean(options.compact);
+    const hideTooltip = Boolean(options.hideTooltip);
+    const hideFooter = Boolean(options.hideFooter);
+
     const hours = [];
-    const hourlyData = weatherData.hourly || {};
+    const hourlyData = (weatherData && weatherData.hourly) || {};
     const times = hourlyData.time || [];
+    const baseDate = (times[0] && !times.some(t => t.startsWith(`${this.activeDate}T`)))
+      ? times[0].slice(0, 10)
+      : this.activeDate;
 
     // Map 13 points from 08:00 to 20:00
     for (let h = 8; h <= 20; h++) {
-      const timePrefix = `${this.activeDate}T${String(h).padStart(2, '0')}:`;
+      const timePrefix = `${baseDate}T${String(h).padStart(2, '0')}:`;
       const idx = times.findIndex(t => t.startsWith(timePrefix));
       let speed = 12;
       let gust = 16;
@@ -2718,13 +2767,12 @@ export class ForecastViewController {
       hours.push({ hour: h, speed, gust });
     }
 
-    // Chart dimensions: width 350, height 120, plot margins: left 30, right 15, top 15, bottom 25
     const W = 350;
-    const H = 120;
+    const H = compact ? 85 : 120;
     const xMin = 30;
     const xMax = 335;
-    const yMin = 15;
-    const yMax = 95;
+    const yMin = compact ? 8 : 15;
+    const yMax = H - (compact ? 18 : 25);
     const maxVal = 40; // Max Y axis 40 km/h
 
     const getX = (h) => Math.round(xMin + ((h - 8) / 12) * (xMax - xMin));
@@ -2735,7 +2783,7 @@ export class ForecastViewController {
     const gustCoords = hours.map(p => ({ x: getX(p.hour), y: getY(p.gust) }));
     const speedPath = buildSmoothPath(speedCoords);
     const gustPath = buildSmoothPath(gustCoords);
-    const gustAreaPath = buildSmoothAreaPath(gustCoords, yMax);
+    const speedAreaPath = buildSmoothAreaPath(speedCoords, yMax);
 
     // Active marker coordinates
     const activeMarkerX = getX(this.selectedHour);
@@ -2752,47 +2800,51 @@ export class ForecastViewController {
           <line x1="${xMin}" y1="${yMax}" x2="${xMax}" y2="${yMax}" stroke="var(--gm-border-strong)" stroke-width="1" />
 
           <!-- Y Axis Labels -->
-          <text x="${xMin - 4}" y="${getY(10) + 3}" font-size="9" fill="var(--gm-text-muted)" text-anchor="end">10</text>
-          <text x="${xMin - 4}" y="${getY(20) + 3}" font-size="9" fill="var(--gm-text-muted)" text-anchor="end">20</text>
-          <text x="${xMin - 4}" y="${getY(30) + 3}" font-size="9" fill="var(--gm-text-muted)" text-anchor="end">30</text>
+          <text x="${xMin - 4}" y="${getY(10) + 3}" font-size="8" fill="var(--gm-text-muted)" text-anchor="end">10</text>
+          <text x="${xMin - 4}" y="${getY(20) + 3}" font-size="8" fill="var(--gm-text-muted)" text-anchor="end">20</text>
+          <text x="${xMin - 4}" y="${getY(30) + 3}" font-size="8" fill="var(--gm-text-muted)" text-anchor="end">30</text>
 
           <!-- EN-A Glider Limit (18 km/h) -->
           <line x1="${xMin}" y1="${getY(18)}" x2="${xMax}" y2="${getY(18)}" stroke="var(--gm-status-caution)" stroke-width="1.2" stroke-dasharray="4,3" />
 
-          <!-- Shaded Gust Area -->
-          <path d="${gustAreaPath}" fill="rgba(249, 115, 22, 0.15)" />
+          <!-- Shaded Speed Area (Parameteo Style) -->
+          <path d="${speedAreaPath}" fill="rgba(59, 130, 246, 0.18)" />
 
-          <!-- Gust line -->
-          <path d="${gustPath}" fill="none" stroke="var(--gm-status-alert)" stroke-width="1.8" stroke-dasharray="3,3" stroke-linecap="round" stroke-linejoin="round" />
+          <!-- Gust line (Dotted Slate) -->
+          <path d="${gustPath}" fill="none" stroke="#94a3b8" stroke-width="1.8" stroke-dasharray="3,3" stroke-linecap="round" stroke-linejoin="round" />
 
-          <!-- Wind speed line -->
-          <path d="${speedPath}" fill="none" stroke="var(--gm-status-flyable)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+          <!-- Wind speed line (Azure Blue) -->
+          <path d="${speedPath}" fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
 
           <!-- Hourly X Axis Labels -->
-          <text x="${getX(8)}" y="${H - 8}" font-size="9" fill="var(--gm-text-muted)" text-anchor="middle">08</text>
-          <text x="${getX(11)}" y="${H - 8}" font-size="9" fill="var(--gm-text-muted)" text-anchor="middle">11</text>
-          <text x="${getX(14)}" y="${H - 8}" font-size="9" fill="var(--gm-text-muted)" text-anchor="middle">14</text>
-          <text x="${getX(17)}" y="${H - 8}" font-size="9" fill="var(--gm-text-muted)" text-anchor="middle">17</text>
-          <text x="${getX(20)}" y="${H - 8}" font-size="9" fill="var(--gm-text-muted)" text-anchor="middle">20</text>
+          <text x="${getX(8)}" y="${H - 4}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">08</text>
+          <text x="${getX(11)}" y="${H - 4}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">11</text>
+          <text x="${getX(14)}" y="${H - 4}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">14</text>
+          <text x="${getX(17)}" y="${H - 4}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">17</text>
+          <text x="${getX(20)}" y="${H - 4}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">20</text>
 
           <!-- ACTIVE HOUR VERTICAL MARKER -->
-          <line x1="${activeMarkerX}" y1="${yMin}" x2="${activeMarkerX}" y2="${yMax}" stroke="var(--gm-accent)" stroke-width="2" stroke-dasharray="3,3" />
-          <circle cx="${activeMarkerX}" cy="${activeMarkerY}" r="4.5" fill="var(--gm-accent)" stroke="var(--gm-bg-base)" stroke-width="2" />
+          <line x1="${activeMarkerX}" y1="${yMin}" x2="${activeMarkerX}" y2="${yMax}" stroke="var(--gm-accent)" stroke-width="1.8" stroke-dasharray="3,3" />
+          <circle cx="${activeMarkerX}" cy="${activeMarkerY}" r="4" fill="var(--gm-accent)" stroke="var(--gm-bg-base)" stroke-width="1.8" />
+          ${!hideTooltip ? `
           <rect x="${activeMarkerX - 22}" y="2" width="44" height="14" rx="3" fill="var(--gm-accent)" />
           <text x="${activeMarkerX}" y="12" font-size="9" font-weight="700" fill="var(--gm-text-inverse)" text-anchor="middle">
             ${Math.round(activeData.speed)} km/h
           </text>
+          ` : ''}
         </svg>
 
+        ${!hideFooter ? `
         <div class="flex items-center justify-between text-xs px-2 pt-1 border-t border-[var(--gm-border)]">
           <div class="flex items-center gap-3">
-            <span class="flex items-center gap-1.5"><span class="w-2.5 h-0.5 bg-[var(--gm-status-flyable)] inline-block"></span> Vento</span>
-            <span class="flex items-center gap-1.5"><span class="w-2.5 h-0.5 bg-[var(--gm-status-alert)] border-dashed inline-block"></span> Raffica</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-0.5 bg-[#3b82f6] inline-block"></span> Vento</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-0.5 bg-[#94a3b8] border-dashed inline-block"></span> Raffica</span>
           </div>
           <span class="text-xs text-[var(--gm-accent)] font-mono font-bold">
             Ore ${String(this.selectedHour).padStart(2, '0')}:00: ${Math.round(activeData.speed)} km/h (raffica ${Math.round(activeData.gust)} km/h)
           </span>
         </div>
+        ` : ''}
       </div>
     `;
   }
@@ -2899,13 +2951,20 @@ export class ForecastViewController {
   /**
    * Renders the Expanded SVG Sounding & Thermals Altimetric Chart with active hour marker.
    */
-  renderSoundingChart(spot, weatherData, takeoffAlt) {
+  renderSoundingChart(spot, weatherData, takeoffAlt, options = {}) {
+    const compact = Boolean(options.compact);
+    const hideTooltip = Boolean(options.hideTooltip);
+    const hideFooter = Boolean(options.hideFooter);
+
     const hours = [];
-    const hourlyData = weatherData.hourly || {};
+    const hourlyData = (weatherData && weatherData.hourly) || {};
     const times = hourlyData.time || [];
+    const baseDate = (times[0] && !times.some(t => t.startsWith(`${this.activeDate}T`)))
+      ? times[0].slice(0, 10)
+      : this.activeDate;
 
     for (let h = 8; h <= 20; h++) {
-      const timePrefix = `${this.activeDate}T${String(h).padStart(2, '0')}:`;
+      const timePrefix = `${baseDate}T${String(h).padStart(2, '0')}:`;
       const idx = times.findIndex(t => t.startsWith(timePrefix));
       let temp = 20;
       let dew = 13;
@@ -2921,11 +2980,11 @@ export class ForecastViewController {
     }
 
     const W = 350;
-    const H = 120;
+    const H = compact ? 85 : 120;
     const xMin = 36;
     const xMax = 335;
-    const yMin = 15;
-    const yMax = 95;
+    const yMin = compact ? 8 : 15;
+    const yMax = H - (compact ? 18 : 25);
     const maxAlt = 3000; // Max altitude 3000m MSL
 
     const getX = (h) => Math.round(xMin + ((h - 8) / 12) * (xMax - xMin));
@@ -2935,6 +2994,7 @@ export class ForecastViewController {
     const ceilingCoords = hours.map(p => ({ x: getX(p.hour), y: getY(p.ceiling) }));
     const lclPath = buildSmoothPath(lclCoords);
     const ceilingPath = buildSmoothPath(ceilingCoords);
+    const lclAreaPath = buildSmoothAreaPath(lclCoords, yMax);
 
     const activeMarkerX = getX(this.selectedHour);
     const activeData = hours.find(h => h.hour === this.selectedHour) || hours[0];
@@ -2949,11 +3009,14 @@ export class ForecastViewController {
           <line x1="${xMin}" y1="${yMax}" x2="${xMax}" y2="${yMax}" stroke="var(--gm-border-strong)" stroke-width="1" />
 
           <!-- Y Axis Labels -->
-          <text x="${xMin - 4}" y="${getY(1000) + 3}" font-size="9" fill="var(--gm-text-muted)" text-anchor="end">1000m</text>
-          <text x="${xMin - 4}" y="${getY(2000) + 3}" font-size="9" fill="var(--gm-text-muted)" text-anchor="end">2000m</text>
+          <text x="${xMin - 4}" y="${getY(1000) + 3}" font-size="8" fill="var(--gm-text-muted)" text-anchor="end">1000m</text>
+          <text x="${xMin - 4}" y="${getY(2000) + 3}" font-size="8" fill="var(--gm-text-muted)" text-anchor="end">2000m</text>
 
           <!-- Takeoff Elevation Reference Line -->
           <line x1="${xMin}" y1="${getY(takeoffAlt)}" x2="${xMax}" y2="${getY(takeoffAlt)}" stroke="var(--gm-border-strong)" stroke-width="1.2" stroke-dasharray="3,3" />
+
+          <!-- Shaded LCL Area -->
+          <path d="${lclAreaPath}" fill="rgba(56, 189, 248, 0.12)" />
 
           <!-- Ceiling line -->
           <path d="${ceilingPath}" fill="none" stroke="var(--gm-status-flyable)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
@@ -2962,21 +3025,24 @@ export class ForecastViewController {
           <path d="${lclPath}" fill="none" stroke="var(--gm-accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
 
           <!-- Hourly X Axis Labels -->
-          <text x="${getX(8)}" y="${H - 8}" font-size="9" fill="var(--gm-text-muted)" text-anchor="middle">08</text>
-          <text x="${getX(11)}" y="${H - 8}" font-size="9" fill="var(--gm-text-muted)" text-anchor="middle">11</text>
-          <text x="${getX(14)}" y="${H - 8}" font-size="9" fill="var(--gm-text-muted)" text-anchor="middle">14</text>
-          <text x="${getX(17)}" y="${H - 8}" font-size="9" fill="var(--gm-text-muted)" text-anchor="middle">17</text>
-          <text x="${getX(20)}" y="${H - 8}" font-size="9" fill="var(--gm-text-muted)" text-anchor="middle">20</text>
+          <text x="${getX(8)}" y="${H - 4}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">08</text>
+          <text x="${getX(11)}" y="${H - 4}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">11</text>
+          <text x="${getX(14)}" y="${H - 4}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">14</text>
+          <text x="${getX(17)}" y="${H - 4}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">17</text>
+          <text x="${getX(20)}" y="${H - 4}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">20</text>
 
           <!-- ACTIVE HOUR VERTICAL MARKER -->
-          <line x1="${activeMarkerX}" y1="${yMin}" x2="${activeMarkerX}" y2="${yMax}" stroke="var(--gm-accent)" stroke-width="2" stroke-dasharray="3,3" />
-          <circle cx="${activeMarkerX}" cy="${activeLclY}" r="4.5" fill="var(--gm-accent)" stroke="var(--gm-bg-base)" stroke-width="2" />
+          <line x1="${activeMarkerX}" y1="${yMin}" x2="${activeMarkerX}" y2="${yMax}" stroke="var(--gm-accent)" stroke-width="1.8" stroke-dasharray="3,3" />
+          <circle cx="${activeMarkerX}" cy="${activeLclY}" r="4" fill="var(--gm-accent)" stroke="var(--gm-bg-base)" stroke-width="1.8" />
+          ${!hideTooltip ? `
           <rect x="${activeMarkerX - 28}" y="2" width="56" height="14" rx="3" fill="var(--gm-accent)" />
           <text x="${activeMarkerX}" y="12" font-size="9" font-weight="700" fill="var(--gm-text-inverse)" text-anchor="middle">
             Base: ${Math.round(activeData.lclMsl)}m
           </text>
+          ` : ''}
         </svg>
 
+        ${!hideFooter ? `
         <div class="flex items-center justify-between text-xs px-2 pt-1 border-t border-[var(--gm-border)]">
           <div class="flex items-center gap-3">
             <span class="flex items-center gap-1.5"><span class="w-2.5 h-0.5 bg-[var(--gm-accent)] inline-block"></span> Base Nubi (LCL)</span>
@@ -2986,6 +3052,7 @@ export class ForecastViewController {
             Ore ${String(this.selectedHour).padStart(2, '0')}:00: Base ${Math.round(activeData.lclMsl)}m MSL
           </span>
         </div>
+        ` : ''}
       </div>
     `;
   }

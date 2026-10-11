@@ -2324,6 +2324,33 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
       assert.equal(rendered, true, 'Must trigger render after subspot selection');
     });
   });
+
+  describe('Parameteo Side-by-Side Chart Architecture & Anti-Clutter Contracts', () => {
+    it('renders clean 2-column side-by-side cards with dedicated left metric panel and uncluttered SVG in Solo Grafici mode', () => {
+      const mockStore = createStore({ selectedSpot: DEFAULT_COMPRENSORI[0] });
+      const controller = new ForecastViewController({ store: mockStore });
+      controller.forecastMode = 'charts';
+
+      const html = controller.renderHtml();
+
+      // 1. Structure: must render side-by-side cards and side panels
+      assert.ok(html.includes('gm-trend-card-side-by-side'), 'Must render side-by-side card class');
+      assert.ok(html.includes('gm-trend-side-panel'), 'Must render dedicated left metric panel');
+      assert.ok(html.includes('gm-trend-chart-panel'), 'Must render right chart panel');
+
+      // 2. Metrics display in left panel
+      assert.ok(html.includes('gm-trend-side-label'), 'Must render metric label in side panel');
+      assert.ok(html.includes('gm-trend-side-val'), 'Must render prominent value in side panel');
+      assert.ok(html.includes('gm-trend-sub-badge'), 'Must render secondary sub-badge in side panel');
+
+      // 3. Anti-Clutter: multi-trend charts must NOT have floating tooltips covering the SVG curves
+      const windCard = html.slice(html.indexOf('id="multi-chart-wind"'), html.indexOf('id="multi-chart-sounding"'));
+      assert.ok(!windCard.includes('rect x="'), 'Must not render floating tooltip rect over wind curve in side-by-side mode');
+
+      // 4. Anti-Echo: must not render duplicate summary footer inside side-by-side chart boxes
+      assert.ok(!windCard.includes('border-t border-[var(--gm-border)]'), 'Must not render bottom duplicate summary line in side-by-side card');
+    });
+  });
 });
 
 
