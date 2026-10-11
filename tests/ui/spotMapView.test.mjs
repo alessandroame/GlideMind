@@ -367,43 +367,45 @@ describe('Spot Map View - Controller & Cartography Contracts (UI Layer)', () => 
     );
   });
 
-  it('should render unified 13-slot continuous timeline scrubber (08:00 - 20:00) with colored bars', () => {
+  it('should render daylight diurnal timeline scrubber bounded by sunrise and sunset with colored bars', () => {
     spotMapView.mount(mockContainer);
 
     const strip = mockContainer.querySelector('#map-timeline-strip');
     assert.ok(strip, 'Must contain #map-timeline-strip element');
     assert.ok(strip.classList.contains('gm-timeline-grid-13'), 'Must declare gm-timeline-grid-13 class');
 
+    const daylight = spotMapView.getDaylightWindow();
     const cols = mockContainer.querySelectorAll('.gm-timeline-col-compact');
-    assert.equal(cols.length, 13, 'Must render exactly 13 hourly columns (08:00 to 20:00)');
+    assert.equal(cols.length, daylight.hours.length, `Must render exactly ${daylight.hours.length} daylight hourly columns`);
 
     // Verify first and last hours
-    assert.equal(cols[0].getAttribute('data-hour'), '8');
-    assert.equal(cols[12].getAttribute('data-hour'), '20');
+    assert.equal(cols[0].getAttribute('data-hour'), String(daylight.sunriseHour));
+    assert.equal(cols[cols.length - 1].getAttribute('data-hour'), String(daylight.sunsetHour));
 
     // Verify presence of time labels and bar fills in every column
     cols.forEach((col, idx) => {
-      const expectedHour = 8 + idx;
+      const expectedHour = daylight.hours[idx];
       assert.equal(col.getAttribute('data-hour'), String(expectedHour));
       assert.ok(mockContainer.innerHTML.includes(`data-slot-hour="${expectedHour}"`), `Column ${expectedHour} must contain bar fill`);
     });
   });
 
-  it('should handle pointer and touch swipe scrubbing continuously across hours', () => {
+  it('should handle pointer and touch swipe scrubbing continuously across daylight hours', () => {
     spotMapView.mount(mockContainer);
 
     const strip = mockContainer.querySelector('#map-timeline-strip');
     assert.ok(strip);
+    const daylight = spotMapView.getDaylightWindow();
 
-    // Initial hour is defaulted or active (e.g. 12 or 14)
-    spotMapView.setActiveHour(8, true);
-    assert.equal(spotMapView.activeHour, 8);
+    // Initial hour is set to sunriseHour
+    spotMapView.setActiveHour(daylight.sunriseHour, true);
+    assert.equal(spotMapView.activeHour, daylight.sunriseHour);
 
     // Start scrubbing with pointerdown
     const downEvt = {
       type: 'pointerdown',
       target: strip,
-      clientX: 50,
+      clientX: 5,
       pointerId: 1,
       preventDefault: () => {}
     };
@@ -411,7 +413,9 @@ describe('Spot Map View - Controller & Cartography Contracts (UI Layer)', () => 
     assert.equal(spotMapView.isScrubbing, true);
     assert.equal(spotMapView.activeScrubStrip, strip);
 
-    // Move pointer towards middle (width is 390 in mock, 195px is hour 14)
+    // Move pointer towards middle (50% width -> median daylight hour)
+    const midIdx = Math.floor(daylight.hours.length / 2);
+    const expectedMidHour = daylight.hours[midIdx];
     const moveEvt = {
       type: 'pointermove',
       target: strip,
@@ -419,10 +423,10 @@ describe('Spot Map View - Controller & Cartography Contracts (UI Layer)', () => 
       preventDefault: () => {}
     };
     spotMapView.handlePointerMove(moveEvt);
-    assert.equal(spotMapView.activeHour, 14, 'Must continuously update active hour to 14 at 50% width');
-    assert.equal(store.getState().activeHourIndex, 14);
+    assert.equal(spotMapView.activeHour, expectedMidHour, `Must continuously update active hour to ${expectedMidHour} at 50% width`);
+    assert.equal(store.getState().activeHourIndex, expectedMidHour);
 
-    // Move pointer to the end (clientX = 380 -> hour 20)
+    // Move pointer to the end (clientX = 380 -> sunsetHour)
     const moveEndEvt = {
       type: 'pointermove',
       target: strip,
@@ -430,7 +434,7 @@ describe('Spot Map View - Controller & Cartography Contracts (UI Layer)', () => 
       preventDefault: () => {}
     };
     spotMapView.handlePointerMove(moveEndEvt);
-    assert.equal(spotMapView.activeHour, 20, 'Must continuously update active hour to 20 near right edge');
+    assert.equal(spotMapView.activeHour, daylight.sunsetHour, 'Must continuously update active hour to sunsetHour near right edge');
 
     // Release pointer
     const upEvt = {

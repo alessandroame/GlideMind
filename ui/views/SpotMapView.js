@@ -36,6 +36,7 @@ import {
   getAvailableCalendarDates
 } from '../../core/datePresets.js';
 import { fetchBatchComprensoriWeather, generateSyntheticWeather } from '../../core/openMeteoApi.js';
+import { resolveDaylightHours } from '../../core/daylight.js';
 
 /**
  * Escapes HTML characters for safe template string rendering.
@@ -69,7 +70,6 @@ export class SpotMapView {
     this.isFetchingWeather = false;
     this.storeUnsub = null;
     this.moveDebounceTimer = null;
-    this.hoursRange = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
     this.isScrubbing = false;
     this.pointerStartX = 0;
     this.hasDraggedPointer = false;
@@ -208,7 +208,21 @@ export class SpotMapView {
   }
 
   /**
-   * Renders the continuous 13-hour timeline strip (08:00 - 20:00) with flyability indicators.
+   * Returns the active diurnal daylight window for the current spot, date, and weather payload.
+   * @param {object} [spot]
+   * @param {object} [weatherData]
+   * @param {string} [targetDate]
+   * @returns {{ sunriseHour: number, sunsetHour: number, sunriseStr: string, sunsetStr: string, hours: number[] }}
+   */
+  getDaylightWindow(spot = null, weatherData = null, targetDate = null) {
+    const activeSpot = spot || (this.focusedSpotId && this.comprensoriCatalog.find(s => s.id === this.focusedSpotId)) || this.comprensoriCatalog[0] || DEFAULT_COMPRENSORI[0];
+    const date = targetDate || this.activeDate;
+    const weather = weatherData || (activeSpot ? this.cachedWeatherMap.get(activeSpot.id)?.weatherData : null);
+    return resolveDaylightHours(weather, date, activeSpot);
+  }
+
+  /**
+   * Renders the continuous timeline strip strictly bounded between sunrise and sunset.
    * Matches ForecastView and Comprensorio Flight Analysis overlay specification.
    * 
    * @param {object|null} spot
@@ -223,8 +237,9 @@ export class SpotMapView {
     const isToday = this.activeDate === todayIso;
     const currentHour = now.getHours();
 
+    const daylight = this.getDaylightWindow(spot, weatherData, this.activeDate);
     const hours = [];
-    for (let h = 8; h <= 20; h++) {
+    for (let h = daylight.sunriseHour; h <= daylight.sunsetHour; h++) {
       let evalHour = { status: 'unflyable', badge: 'Non Volabile' };
       if (spot) {
         evalHour = evaluateComprensorio({
@@ -246,7 +261,7 @@ export class SpotMapView {
     }
 
     return `
-      <div id="${stripId}" class="gm-timeline-grid-13 gm-map-scrubber-slots" role="tablist" aria-label="Timeline oraria">
+      <div id="${stripId}" class="gm-timeline-grid-13 gm-map-scrubber-slots" style="--gm-timeline-slots: ${hours.length}; grid-template-columns: repeat(${hours.length}, 1fr);" role="tablist" aria-label="Timeline oraria">
         ${hours.map(slot => {
           const h = slot.hour;
           const evalH = slot.eval;
@@ -414,8 +429,10 @@ export class SpotMapView {
       const clientX = this.getClientX(evt);
       const relX = Math.max(0, Math.min(rect.width - 1, clientX - rect.left));
       const fraction = relX / rect.width;
-      const hourIndex = Math.min(12, Math.max(0, Math.floor(fraction * 13)));
-      const targetHour = 8 + hourIndex;
+      const daylight = this.getDaylightWindow();
+      const count = daylight.hours.length || 13;
+      const hourIndex = Math.min(count - 1, Math.max(0, Math.floor(fraction * count)));
+      const targetHour = daylight.hours[hourIndex] ?? (daylight.sunriseHour + hourIndex);
       if (targetHour !== this.activeHour) {
         this.setActiveHour(targetHour, true);
         if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
@@ -427,7 +444,8 @@ export class SpotMapView {
       const col = target && typeof target.closest === 'function' ? target.closest('[data-hour]') : null;
       if (col) {
         const hour = parseInt(col.getAttribute('data-hour'), 10);
-        if (!isNaN(hour) && hour >= 8 && hour <= 20 && hour !== this.activeHour) {
+        const daylight = this.getDaylightWindow();
+        if (!isNaN(hour) && hour >= daylight.sunriseHour && hour <= daylight.sunsetHour && hour !== this.activeHour) {
           this.setActiveHour(hour, true);
         }
       }
@@ -453,11 +471,6 @@ export class SpotMapView {
       this.comprensoriCatalog = state.locationsCatalog;
     }
     this.activeDate = state.activeDate || formatDateIso(new Date());
-    if (typeof state.activeHourIndex === 'number' && state.activeHourIndex >= 8 && state.activeHourIndex <= 20) {
-      this.activeHour = state.activeHourIndex;
-    } else {
-      this.activeHour = 12;
-    }
 
     this.activeLayer = (state.ui && state.ui.mapLayer) || 'dark';
     this.activeTheme = (state.ui && state.ui.theme) || 'dark';
@@ -476,7 +489,15 @@ export class SpotMapView {
       const coords = getComprensorioCoordinates(initialSpot);
       if (coords) {
         initialWeather = generateSyntheticWeather({ lat: coords.lat, lon: coords.lon }, { days: 1, targetDate: this.activeDate });
+        this.cachedWeatherMap.set(initialSpot.id, { fetchedAt: Date.now(), weatherData: initialWeather });
       }
+    }
+
+    const daylight = this.getDaylightWindow(initialSpot, initialWeather, this.activeDate);
+    if (typeof state.activeHourIndex === 'number' && state.activeHourIndex >= daylight.sunriseHour && state.activeHourIndex <= daylight.sunsetHour) {
+      this.activeHour = state.activeHourIndex;
+    } else {
+      this.activeHour = Math.min(daylight.sunsetHour, Math.max(daylight.sunriseHour, 12));
     }
 
     // Build DOM structure with external top bar placed outside and above map canvas
@@ -690,7 +711,8 @@ export class SpotMapView {
           this.syncVisibleSpotsWeather();
         }
         // Check hour change
-        if (typeof s.activeHourIndex === 'number' && s.activeHourIndex !== this.activeHour && s.activeHourIndex >= 8 && s.activeHourIndex <= 20) {
+        const daylight = this.getDaylightWindow();
+        if (typeof s.activeHourIndex === 'number' && s.activeHourIndex !== this.activeHour && s.activeHourIndex >= daylight.sunriseHour && s.activeHourIndex <= daylight.sunsetHour) {
           this.setActiveHour(s.activeHourIndex, false);
         }
       });
@@ -884,7 +906,8 @@ export class SpotMapView {
         const col = e.target?.closest ? e.target.closest('[data-hour]') : null;
         if (col) {
           const hour = parseInt(col.getAttribute('data-hour'), 10);
-          if (!isNaN(hour) && hour >= 8 && hour <= 20) {
+          const daylight = this.getDaylightWindow();
+          if (!isNaN(hour) && hour >= daylight.sunriseHour && hour <= daylight.sunsetHour) {
             this.setActiveHour(hour, true);
           }
         }
@@ -895,7 +918,8 @@ export class SpotMapView {
     const prevBtn = this.container.querySelector('#gm-map-prev-hour-btn');
     if (prevBtn) {
       prevBtn.addEventListener('click', () => {
-        if (this.activeHour > 8) {
+        const daylight = this.getDaylightWindow();
+        if (this.activeHour > daylight.sunriseHour) {
           this.setActiveHour(this.activeHour - 1, true);
         }
       });
@@ -904,7 +928,8 @@ export class SpotMapView {
     const nextBtn = this.container.querySelector('#gm-map-next-hour-btn');
     if (nextBtn) {
       nextBtn.addEventListener('click', () => {
-        if (this.activeHour < 20) {
+        const daylight = this.getDaylightWindow();
+        if (this.activeHour < daylight.sunsetHour) {
           this.setActiveHour(this.activeHour + 1, true);
         }
       });
@@ -1026,30 +1051,31 @@ export class SpotMapView {
    * @param {boolean} [updateStore=true]
    */
   setActiveHour(hour, updateStore = true) {
-    if (hour < 8 || hour > 20) return;
-    if (this.activeHour === hour) return;
-    this.activeHour = hour;
+    const daylight = this.getDaylightWindow();
+    const clampedHour = Math.min(daylight.sunsetHour, Math.max(daylight.sunriseHour, hour));
+    if (this.activeHour === clampedHour) return;
+    this.activeHour = clampedHour;
 
     if (updateStore && typeof store.setState === 'function') {
-      store.setState({ activeHourIndex: hour });
+      store.setState({ activeHourIndex: clampedHour });
     }
 
     if (this.container) {
       const activeLabel = this.container.querySelector('#gm-map-active-hour-label');
-      if (activeLabel) activeLabel.textContent = `Ore ${String(hour).padStart(2, '0')}:00`;
+      if (activeLabel) activeLabel.textContent = `Ore ${String(clampedHour).padStart(2, '0')}:00`;
 
       const prevBtn = this.container.querySelector('#gm-map-prev-hour-btn');
-      if (prevBtn) prevBtn.disabled = hour <= 8;
+      if (prevBtn) prevBtn.disabled = clampedHour <= daylight.sunriseHour;
 
       const nextBtn = this.container.querySelector('#gm-map-next-hour-btn');
-      if (nextBtn) nextBtn.disabled = hour >= 20;
+      if (nextBtn) nextBtn.disabled = clampedHour >= daylight.sunsetHour;
 
       const strip = this.container.querySelector('#map-timeline-strip') || this.container.querySelector('.gm-timeline-grid-13');
       if (strip) {
         const cols = strip.querySelectorAll ? strip.querySelectorAll('.gm-timeline-col-compact') : [];
         cols.forEach(col => {
           const colHour = parseInt(col.getAttribute('data-hour'), 10);
-          const isActive = colHour === hour;
+          const isActive = colHour === clampedHour;
           col.classList.toggle('active', isActive);
           col.setAttribute('aria-selected', isActive ? 'true' : 'false');
           col.setAttribute('tabindex', isActive ? '0' : '-1');
@@ -1112,6 +1138,7 @@ export class SpotMapView {
         const coords = getComprensorioCoordinates(spot);
         if (coords) {
           weather = generateSyntheticWeather({ lat: coords.lat, lon: coords.lon }, { days: 1, targetDate: this.activeDate });
+          this.cachedWeatherMap.set(spot.id, { fetchedAt: Date.now(), weatherData: weather });
         }
       }
 
@@ -1180,7 +1207,8 @@ export class SpotMapView {
 
     const strip = this.container.querySelector('#map-timeline-strip') || this.container.querySelector('.gm-timeline-grid-13');
     if (strip) {
-      this.hoursRange.forEach(h => {
+      const daylight = this.getDaylightWindow(spot, weather, this.activeDate);
+      daylight.hours.forEach(h => {
         const col = strip.querySelector(`[data-hour="${h}"]`);
         if (col) {
           const evalAtH = evaluateComprensorio({

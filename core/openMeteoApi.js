@@ -20,6 +20,7 @@ import {
     calculateWeekOverview,
     calculateDailyFlyabilitySummary
 } from './flyability.js';
+import { calculateSolarTimes } from './daylight.js';
 
 // Base API Endpoints
 export const OPEN_METEO_FORECAST_URL = 'https://api.open-meteo.com/v1/forecast';
@@ -741,7 +742,7 @@ export function generateSyntheticWeather(coords, options = {}) {
         }
     });
 
-    // Daily sunrise/sunset timestamps
+    // Daily sunrise/sunset timestamps based on astronomical solar ephemeris
     const dailyTimes = [];
     const sunriseTimes = [];
     const sunsetTimes = [];
@@ -749,8 +750,9 @@ export function generateSyntheticWeather(coords, options = {}) {
         const dObj = new Date(baseDate.getTime() + (d * 24 * 3600 * 1000));
         const dStr = dObj.toISOString().split('T')[0];
         dailyTimes.push(dStr);
-        sunriseTimes.push(`${dStr}T06:15:00`);
-        sunsetTimes.push(`${dStr}T20:30:00`);
+        const solar = calculateSolarTimes(lat, lon, dObj);
+        sunriseTimes.push(`${dStr}T${solar.sunrise}:00`);
+        sunsetTimes.push(`${dStr}T${solar.sunset}:00`);
     }
 
     return {

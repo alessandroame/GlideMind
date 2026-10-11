@@ -108,7 +108,6 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     this.elevationOffset = 0;
     this.terrainDelta = 0;
     this._hasSnappedTerrain = false;
-    this._lastDiagLogTime = 0;
     this._lastValidCenterElevation = 0;
 
     // Preallocated reusable scratch objects for 60 FPS render loop (Lesson 116)
@@ -481,11 +480,6 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
         self._coordTransform = (typeof THREE.Matrix4 === 'function') ? new THREE.Matrix4() : null;
         self._reusableVec3A = (typeof THREE.Vector3 === 'function') ? new THREE.Vector3() : null;
         self._reusableVec3B = (typeof THREE.Vector3 === 'function') ? new THREE.Vector3() : null;
-
-        // Diagnostic camera movement listener
-        if (map && typeof map.on === 'function') {
-          map.on('move', () => self._logCameraDiagnostics('MOVE'));
-        }
       },
 
       render(gl, matrix) {
@@ -545,9 +539,6 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
 
         self.threeRenderer.resetState();
         self.threeRenderer.render(self.threeScene, self.threeCamera);
-
-        // Real-time camera & projection diagnostic logger for video frame analysis
-        self._logCameraDiagnostics('RENDER', { centerElev: centerElevation, currentTranslateZ });
 
         if (self.isPlaying) {
           map.triggerRepaint();
@@ -772,95 +763,7 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     this.threeScene.add(this.curtainMesh);
   }
 
-  /**
-   * Real-time camera & projection diagnostic logger for video frame analysis.
-   * Logs camera zoom, pitch, bearing, center coordinates, center terrain elevation,
-   * and screen pixel positions of Takeoff (P0) and Landing (PN).
-   * Throttled to ~250ms to keep console clean and readable.
-   * 
-   * @param {string} [source='RENDER'] Trigger source
-   * @param {object} [extra={}] Additional diagnostic parameters (centerElev, currentTranslateZ)
-   */
-  _logCameraDiagnostics(source = 'RENDER', extra = {}) {
-    if (!this.map || !this.THREE || !this.threeCamera || !this.origin || !this.projectedTrack) {
-      return;
-    }
-    const now = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
-    if (this._lastDiagLogTime && (now - this._lastDiagLogTime) < 250) {
-      return;
-    }
-    this._lastDiagLogTime = now;
 
-    const map = this.map;
-    const canvas = map.getCanvas ? map.getCanvas() : null;
-    const width = canvas ? (canvas.clientWidth || canvas.width || 800) : 800;
-    const height = canvas ? (canvas.clientHeight || canvas.height || 600) : 600;
-
-    const zoom = map.getZoom ? map.getZoom().toFixed(2) : 'N/A';
-    const pitch = map.getPitch ? map.getPitch().toFixed(1) : 'N/A';
-    const bearing = map.getBearing ? map.getBearing().toFixed(1) : 'N/A';
-    const center = map.getCenter ? map.getCenter() : null;
-    const centerLng = center ? center.lng.toFixed(5) : 'N/A';
-    const centerLat = center ? center.lat.toFixed(5) : 'N/A';
-
-    let centerElev = 'N/A';
-    if (typeof map.queryTerrainElevation === 'function' && center) {
-      const qElev = map.queryTerrainElevation([center.lng, center.lat]);
-      if (typeof qElev === 'number') centerElev = qElev.toFixed(1);
-    }
-    const transformElev = map.transform?.elevation !== undefined ? Number(map.transform.elevation).toFixed(1) : 'N/A';
-    const compElev = extra.centerElev !== undefined ? Number(extra.centerElev).toFixed(1) : transformElev;
-
-    const pts = this.projectedTrack.points;
-    const p0 = pts[0];
-    const pLast = pts[pts.length - 1];
-
-    let threeScreenP0 = { x: 0, y: 0 };
-    let mapScreenP0 = { x: 0, y: 0 };
-    let deltaP0 = { dist: 0 };
-
-    if (this.threeCamera.projectionMatrix) {
-      const v0 = this._reusableVec3A ? this._reusableVec3A.set(p0.x, p0.y, p0.z) : new this.THREE.Vector3(p0.x, p0.y, p0.z);
-      v0.applyMatrix4(this.threeCamera.projectionMatrix);
-      threeScreenP0 = {
-        x: Math.round((v0.x * 0.5 + 0.5) * width),
-        y: Math.round((-v0.y * 0.5 + 0.5) * height)
-      };
-      if (typeof map.project === 'function') {
-        const mp0 = map.project([p0.lon, p0.lat]);
-        mapScreenP0 = { x: Math.round(mp0.x), y: Math.round(mp0.y) };
-        const dx = threeScreenP0.x - mapScreenP0.x;
-        const dy = threeScreenP0.y - mapScreenP0.y;
-        deltaP0 = { dist: Math.round(Math.hypot(dx, dy)) };
-      }
-    }
-
-    let threeScreenPN = { x: 0, y: 0 };
-    let mapScreenPN = { x: 0, y: 0 };
-    let deltaPN = { dist: 0 };
-
-    if (this.threeCamera.projectionMatrix) {
-      const vn = this._reusableVec3B ? this._reusableVec3B.set(pLast.x, pLast.y, pLast.z) : new this.THREE.Vector3(pLast.x, pLast.y, pLast.z);
-      vn.applyMatrix4(this.threeCamera.projectionMatrix);
-      threeScreenPN = {
-        x: Math.round((vn.x * 0.5 + 0.5) * width),
-        y: Math.round((-vn.y * 0.5 + 0.5) * height)
-      };
-      if (typeof map.project === 'function') {
-        const mpn = map.project([pLast.lon, pLast.lat]);
-        mapScreenPN = { x: Math.round(mpn.x), y: Math.round(mpn.y) };
-        const dx = threeScreenPN.x - mapScreenPN.x;
-        const dy = threeScreenPN.y - mapScreenPN.y;
-        deltaPN = { dist: Math.round(Math.hypot(dx, dy)) };
-      }
-    }
-
-    const mt = this.modelTransform;
-    console.log(
-      `%c[3D-CAM ${source}] Z:${zoom} P:${pitch}° B:${bearing}° | Center:[${centerLng},${centerLat}] Elev:${centerElev}m (txElev:${transformElev}m comp:${compElev}m) | P0_Δ:${deltaP0.dist}px (3D:[${threeScreenP0.x},${threeScreenP0.y}] Map:[${mapScreenP0.x},${mapScreenP0.y}]) | PN_Δ:${deltaPN.dist}px (3D:[${threeScreenPN.x},${threeScreenPN.y}] Map:[${mapScreenPN.x},${mapScreenPN.y}]) | tDelta:${this.terrainDelta?.toFixed(1)}m | tZ:${mt?.translateZ?.toExponential(3)}`,
-      'color: #ff007f; font-weight: bold; font-family: monospace; font-size: 11px;'
-    );
-  }
 
   /**
    * Starts playback animation loop.

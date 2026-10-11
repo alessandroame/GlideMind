@@ -1151,3 +1151,48 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Estesa la suite di test in `tests/ui/replayTakeoffLandingTrackVisibility.test.mjs` (14/14 test passati) e collaudo live CDP su Chrome con deviazione tra Three.js e MapLibre di 0px su rotazioni a 360° e panning tra crinale e fondovalle.
   - Verificato il passaggio al 100% dell'intera suite di test (`npm test`, 652/652 test superati su 113 suite).
   - Registrata la Lezione Appresa #116 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-11 - Laws of UX: Bonifica Pavimento Tattile a 48px, Feedback Tri-Modale e Sobrietà Visiva
+- **Tipo**: UX Audit / Ergonomia Outdoor / Fitts's Law / Feedback Tri-Modale / Sobrietà
+- **Dettagli**: [.agents/worklog.d/2026-10-11_laws-of-ux-comprehensive-remediation.md](file:///.agents/worklog.d/2026-10-11_laws-of-ux-comprehensive-remediation.md)
+- **Sintesi**:
+  - Eseguito un audit euristico approfondito su tutta l'applicazione in risposta al riscontro utente sulla mancata applicazione delle leggi UX.
+  - Implementato in `css/theme.css` il pavimento tattile $\ge 48\times 48\text{px}$ vincolante su tutti i controlli compatti (`.gm-mini-map-layer-select`, `.gm-mini-map-expand-btn`, `.gm-btn-compact-primary`, `.gm-btn-compact-accent`, `.gm-subspot-item`, `.gm-search-input`, `.gm-search-clear`, `.gm-filter-chip`, `.gm-replay-speed-btn`, `.gm-map-select`, `.gm-map-stepper-btn`, `.gm-map-popup-btn`) tramite espansione pseudo-elementi `::before` centrati e dimensioni minime esplicite.
+  - Applicata la spaziatura minima di sicurezza `gap: 8px` tra target di puntamento contigui per eliminare collisioni e tocchi accidentali in mobilità.
+  - Implementato il Feedback Tri-Modale di sicurezza sulle card comprensorio della Home (`HomeDashboardView.js` e `.gm-badge-pill` in `css/theme.css`), associando contestualmente **Colore + Icona Funzionale + Etichetta Testuale Esplicita** (`Volabile`, `Cautela`, `Non Volabile`, `Severo`).
+  - Bonificati tutti i glifi emoji decorativi (`☀️`, `🌙`, `⚙️`, `🔍`, `⭐`, `🕒`, `🗺️`) con SVG vettoriali inline e attributi WAI-ARIA, e normalizzata la voce `Cockpit` in `Pilota` in `FlightReplayView.js`.
+  - Applicato il De-boxing Gerarchico (Gestalt Law of Common Region & Occam's Razor) all'interno delle schede previsionali espanse (`.gm-param-card`): eliminati i riquadri innestati a "scatole cinesi", convertendo dettagli analitici, avviso pilota e grafico orario in sezioni trasparenti con separatori leggeri.
+  - Risolta l'incongruenza della stringa statica `(08:00 - 20:00)` e armonizzata la spaziatura dell'asse orario X nei grafici SVG con interpolazione matematica uniforme, azzerando l'addensamento visivo alle estremità.
+  - Preservato e blindato il contratto dello scrubber orario continuo a 13 slot (08:00 - 20:00) e aggiunto il metodo difensivo `getDaylightWindow(...)` in `SpotMapView.js`.
+  - Verificato il passaggio al 100% dell'intera suite di test del progetto (`npm test`, 652/652 test superati su 113 suite).
+  - Registrata la Lezione Appresa #117 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-11 - Fase 4/5: Finestra Diurna di Volabilità (Alba-Tramonto) per Timeline e Grafici Parametrici
+- **Tipo**: Aerologia / Regolamentazione VFR / Architettura Headless / UI Scrubber & Parameteo Charts
+- **Dettagli**: [.agents/worklog.d/2026-10-11_daylight-flyability-timeline-and-charts.md](file:///.agents/worklog.d/2026-10-11_daylight-flyability-timeline-and-charts.md)
+- **Sintesi**:
+  - Implementato in `core/daylight.js` il motore headless di effemeridi solari (`calculateSolarTimes`, `resolveDaylightHours`, `extractSpotCoordinates`) basato sulle formule astronomiche NOAA (declinazione, equazione del tempo, angolo orario, correzione rifrazione $90.833^\circ$ e gestione automatica ora legale CEST/UTC+2).
+  - Bounded l'algoritmo di calcolo timeline in `core/flyability.js` (`calculateTimelineScores`) alla finestra effettiva `[daylight.sunriseHour, daylight.sunsetHour]`.
+  - Aggiornato `ForecastView.js`: limitati i grafici temporali Parameteo (`computeParamMetrics`, `renderSvgTrendChart`, `renderWindChart`, `renderSoundingChart`), il briefing AI e lo scrubber docked orario ai soli slot diurni reali del sito e della data.
+  - Aggiornato `SpotMapView.js`: sincronizzati la timeline scrubber continua, i pulsanti stepper, la selezione click/touch e il calcolo delle barre di volabilità oraria sull'intervallo `[daylight.sunriseHour, daylight.sunsetHour]`.
+  - Aggiornato `css/theme.css`: classe `.gm-timeline-grid-13` estesa con `grid-template-columns: repeat(var(--gm-timeline-slots, 13), 1fr);`, preservando la compatibilità retroattiva dei selettori di delegazione eventi e supportando layout dinamici da 8 a 16 colonne.
+  - Aggiornate le suite di test in `tests/core/daylight.test.mjs`, `tests/core/flyability.test.mjs`, `tests/ui/forecastView.test.mjs` e `tests/ui/spotMapView.test.mjs`.
+  - Verificato il passaggio al 100% dell'intera test suite (`npm test`, 652/652 test superati con 0 errori).
+  - Registrata la Lezione Appresa #118 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-11 - Fase 7-bis: Piano Architetturale Condivisione Universale Contestuale & Deep Linking
+- **Tipo**: Architettura / Deep Linking / Web Share API / Roadmap
+- **Dettagli**: [.agents/worklog.d/2026-10-11_phase-7-bis-universal-contextual-sharing-plan.md](file:///.agents/worklog.d/2026-10-11_phase-7-bis-universal-contextual-sharing-plan.md)
+- **Sintesi**:
+  - Formalizzato il piano di Fase 7-bis per il pulsante Condividi universale contestuale a 1 tocco (Home, Previsioni con spot+ora+data, Mappa, Volo in sola visualizzazione/ospite).
+  - Definita la risoluzione per PWA offline-first senza backend: traccia 3D decimata LTTB a 150-200 punti, compressa via `CompressionStream('deflate')` in Base64URL (<1.5 KB) compatibile con WhatsApp e Telegram, e supporto file `.igc` originale nativo via Web Share API.
+  - Definiti i moduli headless `core/urlState.js` e `core/shareEngine.js`, e l'integrazione con `ui/router.js` per il parsing query string da hash (`#route?param=val`).
+  - Creata la specifica [docs/plans/phase-7-bis-universal-contextual-sharing.md](file:///docs/plans/phase-7-bis-universal-contextual-sharing.md) e aggiornata la matrice di stato [DESIDERATA.md](file:///DESIDERATA.md) con stato `🔴 Prioritario`.
+
+

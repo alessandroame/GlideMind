@@ -1447,3 +1447,28 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
   5. *LOD Smoothing*: Smussare le variazioni discrete di quota durante il caricamento di tile DEM ad alta risoluzione tramite filtro esponenziale (EMA, $\alpha \approx 0.2$).
   6. *Recupero del Contesto WebGL su Mobile*: Gestire `webglcontextlost` (invocando `event.preventDefault()`) e `webglcontextrestored`, ricreando renderer e scene senza crash o ricaricamento della PWA.
   7. *Zero Allocazioni nel Render Loop*: Nessuna allocazione di oggetti (`Vector3`, `Matrix4`, geometrie) a 60 FPS; preallocare buffer e aggiornare unicamente indici di disegno (`setDrawRange`) e pose matriciali.
+
+---
+
+## 117. Applicazione Sistematica delle Laws of UX, Pavimento Tattile a 48px e Feedback Tri-Modale di Sicurezza
+- **Problema**: L'interfaccia mobile outdoor presentava diversi controlli compatti (selettori layer mini-mappa, pulsanti di espansione, filtri a chip, toggle di velocità replay, input e bottoni di cancellazione ricerca) con target di tocco compresi tra 28px e 44px o spaziatura adiacente $< 8\text{px}$, contravvenendo al pavimento tattile vincolante di $\ge 48\times 48\text{px}$ (Fitts's Law 2026 per uso all'aperto con dita fredde o guanti). Inoltre, i verdetti di volabilità su card e badge facevano affidamento su icone o colori isolati privi di testo esplicito (violazione WCAG 1.4.1 e del principio tri-modale), e persistevano emoji decorative non funzionali e termini gergali non ammessi (`Cockpit`).
+- **Causa Radice**:
+  1. Eredità di stili con fallback storico a 44px o classi compatte a 28-36px non aggiornate alle nuove direttive.
+  2. Test di governance statica focalizzati solo su un sottoinsieme ristretto di emoji (`['📈', '🎙️', '⏱️', 'ℹ️', '🚀', '✨', '🔥', '🎉']`), permettendo a glifi come `☀️`, `🌙`, `⚙️`, `🔍`, `⭐`, `🕒`, `🗺️` di superare i gate shift-left.
+  3. Badge di sicurezza concepiti con sole icone per minimizzare lo spazio orizzontale, a discapito della chiarezza ergonomica.
+- **Pattern Vincolante**:
+  1. **Pavimento Tattile $\ge 48\times 48\text{px}$ Invariante (Fitts's Law)**: Tutti gli elementi interattivi touch devono garantire un'area di tocco effettiva $\ge 48\times 48\text{px}$. Per controlli visivamente compatti (es. micro-capsule mini-mappa), utilizzare pseudo-elementi `::before` con posizionamento centrato (`top: 50%; left: 50%; transform: translate(-50%, -50%); min-width: var(--gm-touch-min, 48px); min-height: var(--gm-touch-min, 48px);`) per non alterare la silhouette visiva espandendo al contempo l'area attiva di hit test.
+  2. **Spaziatura Minima di 8px tra Target Adiacenti**: I pulsanti contigui (toggle viste, velocità, stepper, bottoni popup) devono mantenere `gap: 8px` (o minimo 4px con confini touch non sovrapposti) per prevenire click accidentali in mobilità.
+  3. **Feedback Tri-Modale di Sicurezza Obbligatorio**: Qualsiasi indicazione di sicurezza o stato di volo (Volabile, Cautela, Non Volabile, Severo) deve combinare contestualmente **Colore Semantico + Icona Funzionale + Testo Esplicito** affiancato (`.gm-badge-pill`), azzerando l'ambiguità per utenti daltonici o sotto forte riverbero solare.
+  4. **Zero Emoji Decorative & Sobrietà Terminologica**: Rimuovere categoricamente tutte le emoji decorative nei titoli e pulsanti ordinari in favore di SVG funzionali con `aria-label`; adottare denominazioni standard (es. `Pilota` anziché `Cockpit`).
+
+---
+
+## 118. Finestra Diurna di Volabilità (Alba-Tramonto) su Timeline Orarie e Serie Parametriche (Normativa VFR & Solar Ephemeris)
+- **Problema**: Le timeline orarie (scrubber), i grafici temporali (vento, raffiche, LCL/base nube) e i parametri di volabilità mostravano un intervallo rigido e immutabile 08:00 - 20:00 (13 slot). In inverno (tramonto alle 16:40), mostrare ore serali buie (17:00-20:00) come "volabili" vìola le regole del volo a vista VFR (che vietano il volo notturno in parapendio) e trae in inganno il pilota. In estate (alba alle 05:30), troncare le prime ore esclude finestre ottimali e calme per piloti ricreativi.
+- **Causa Radice**: Assunzione semplificatoria di un range nominale fisso `[8..20]` nei loop di rendering e negli scrubber, disaccoppiato dall'effimero solare astronomico del sito e della data.
+- **Pattern Vincolante**:
+  1. **Modulo Canonico Headless Solar Ephemeris (`core/daylight.js`)**: Risolve la finestra solare reale secondo la gerarchia: (1) `weatherData.daily` (Open-Meteo live o sintetico), (2) `weatherData.daylight`, (3) `weatherData.meta`, (4) Calcolo astronomico NOAA standard basato su declinazione solare, equazione del tempo e coordinate geografiche, (5) Fallback nominale con guardie.
+  2. **Bounding Dinamico Invariante**: Sia la timeline oraria (`renderTimelineGrid`, scrubber slider, step buttons), sia i grafici parametrici (`computeParamMetrics`, `renderSvgTrendChart`, `renderWindChart`, `renderSoundingChart`) e il briefing AI (`generateGuidoBriefing`) devono essere strettamente delimitati tra `sunriseHour` e `sunsetHour`.
+  3. **CSS Grid Flessibile con Compatibilità Retroattiva**: La classe `.gm-timeline-grid-13` adotta `grid-template-columns: repeat(var(--gm-timeline-slots, 13), 1fr);`, permettendo un numero arbitrario di slot diurni (es. 9 in inverno, 15 in estate) senza rompere la delegazione eventi basata su classe nei test e nella UI.
+

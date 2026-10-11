@@ -98,7 +98,7 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.ok(summaryHtml.includes('gm-spot-explain'), 'Must render physical explainability string');
   });
 
-  it('should render the 13-slot hourly timeline from 08:00 to 20:00 with waterfall bars', () => {
+  it('should render daylight diurnal timeline scrubber bounded by sunrise and sunset with waterfall bars', () => {
     const mockStore = createStore({
       selectedSpot: DEFAULT_COMPRENSORI[0]
     });
@@ -108,8 +108,9 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     const html = controller.renderHtml();
     assert.ok(html.includes('id="forecast-timeline-scrubber"'), 'Must render timeline scrubber');
 
-    // Verify all 13 hourly columns exist
-    for (let h = 8; h <= 20; h++) {
+    const daylight = controller.getDaylightWindow();
+    // Verify all daylight hourly columns exist
+    for (let h = daylight.sunriseHour; h <= daylight.sunsetHour; h++) {
       const timeLabel = String(h).padStart(2, '0');
       assert.ok(html.includes(`data-hour="${h}"`), `Timeline must contain slot for hour ${h}`);
       assert.ok(html.includes(timeLabel), `Timeline must render label ${timeLabel}`);
@@ -346,14 +347,15 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.equal(controller.selectedHour, 12);
 
     // Bounds: test min boundary
-    controller.selectedHour = 8;
+    const daylight = controller.getDaylightWindow();
+    controller.selectedHour = daylight.sunriseHour;
     controller.handleClick(createActionClick('prev-hour'));
-    assert.equal(controller.selectedHour, 8, 'Must not decrement below 8:00');
+    assert.equal(controller.selectedHour, daylight.sunriseHour, 'Must not decrement below sunrise hour');
 
     // Bounds: test max boundary
-    controller.selectedHour = 20;
+    controller.selectedHour = daylight.sunsetHour;
     controller.handleClick(createActionClick('next-hour'));
-    assert.equal(controller.selectedHour, 20, 'Must not advance above 20:00');
+    assert.equal(controller.selectedHour, daylight.sunsetHour, 'Must not advance above sunset hour');
   });
 
   it('should support continuous pointer scrubbing/slide selection across timeline hours', () => {
@@ -387,22 +389,24 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
 
     controller.containerEl = mockContainer;
 
-    // 1. PointerDown at hour 10 (x = 100 + 2.5 * 20 = 150)
+    const daylight = controller.getDaylightWindow();
+
+    // 1. PointerDown at sunrise boundary (left edge clientX = 105)
     controller.handlePointerDown({
       target: mockStrip,
-      clientX: 150,
+      clientX: 105,
       pointerId: 1
     });
     assert.equal(controller.isScrubbing, true, 'Scrubbing must be active on pointer down');
-    assert.equal(controller.selectedHour, 10, 'Selected hour must update to 10');
+    assert.equal(controller.selectedHour, daylight.sunriseHour, 'Selected hour must update to sunriseHour');
 
-    // 2. Continuous pointer drag to hour 18 (x = 100 + 10.5 * 20 = 310)
+    // 2. Continuous pointer drag to sunset boundary (right edge clientX = 355)
     controller.handlePointerMove({
       target: mockStrip,
-      clientX: 310,
+      clientX: 355,
       pointerId: 1
     });
-    assert.equal(controller.selectedHour, 18, 'Selected hour must smoothly update to 18 during slide');
+    assert.equal(controller.selectedHour, daylight.sunsetHour, 'Selected hour must smoothly update to sunsetHour during slide');
 
     // 3. PointerUp finishes scrubbing
     controller.handlePointerUp({
@@ -428,7 +432,7 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
         }
       }
     });
-    assert.equal(controller.selectedHour, 18, 'Selected hour must remain 18 and not jump back to 10 from trailing click');
+    assert.equal(controller.selectedHour, daylight.sunsetHour, 'Selected hour must remain at sunset hour and not jump back to 10 from trailing click');
   });
 
   it('should toggle wind and sounding views between summary and chart mode', () => {
@@ -731,15 +735,16 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     controller.unmount();
   });
 
-  it('should automatically select current local hour (clamped 08..20) when date is today, and default to 13:00 for future dates', () => {
+  it('should automatically select current local hour (clamped to daylight bounds) when date is today, and default to 13:00 for future dates', () => {
     const mockStore = createStore();
     const controller = new ForecastViewController({ store: mockStore });
 
     const now = new Date();
     const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    const expectedTodayHour = Math.min(20, Math.max(8, now.getHours()));
+    const daylight = controller.getDaylightWindow(null, null, todayIso);
+    const expectedTodayHour = Math.min(daylight.sunsetHour, Math.max(daylight.sunriseHour, now.getHours()));
 
-    assert.equal(controller._resolveInitialHour(todayIso), expectedTodayHour, 'Today must resolve to current local hour (clamped 08..20)');
+    assert.equal(controller._resolveInitialHour(todayIso), expectedTodayHour, 'Today must resolve to current local hour clamped to daylight bounds');
     assert.equal(controller._resolveInitialHour('2028-06-15'), 13, 'Future date must default to 13:00 soaring hour');
   });
 
@@ -1493,31 +1498,31 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
 
     assert.ok(controller.findActiveTimelineStrip(overlayStrip), 'Active strip must be resolved from target');
 
-    // Simulate touchstart at 14:00 (hour index 6, relX = 120 -> clientX = 220)
-    // 8 + Math.floor((120 / 260) * 13) = 8 + Math.floor(6) = 14
+    const daylight = controller.getDaylightWindow();
+
+    // Simulate touchstart at beginning of daylight window (clientX = 105)
     controller.handlePointerDown({
       target: overlayStrip,
-      touches: [{ clientX: 220 }],
+      touches: [{ clientX: 105 }],
       cancelable: true,
       preventDefault: () => {}
     });
 
-    assert.strictEqual(controller.selectedHour, 14, 'Selected hour must update to 14 on touchstart swipe');
+    assert.strictEqual(controller.selectedHour, daylight.sunriseHour, 'Selected hour must update to sunriseHour on touchstart swipe');
     assert.strictEqual(controller.isScrubbing, true, 'Controller must enter scrubbing mode');
 
-    // Simulate touchmove at 16:00 (hour index 8, relX = 170 -> clientX = 270)
-    // 8 + Math.floor((170 / 260) * 13) = 8 + 8 = 16
+    // Simulate touchmove towards end of daylight window (clientX = 355)
     controller.handlePointerMove({
-      touches: [{ clientX: 270 }],
+      touches: [{ clientX: 355 }],
       cancelable: true,
       preventDefault: () => {}
     });
 
-    assert.strictEqual(controller.selectedHour, 16, 'Selected hour must update to 16 on touchmove swipe');
+    assert.strictEqual(controller.selectedHour, daylight.sunsetHour, 'Selected hour must update to sunsetHour on touchmove swipe');
 
     // Release swipe
     controller.handlePointerUp({
-      changedTouches: [{ clientX: 270 }]
+      changedTouches: [{ clientX: 355 }]
     });
 
     assert.strictEqual(controller.isScrubbing, false, 'Controller must exit scrubbing mode on touchend');

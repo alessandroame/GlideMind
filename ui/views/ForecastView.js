@@ -232,8 +232,9 @@ export function generateGuidoBriefing(spot, weatherData, dateStr, glider = DEFAU
     };
   }
 
+  const daylight = resolveDaylightHours(weatherData, dateStr, spot);
   const hours = [];
-  for (let h = 8; h <= 20; h++) {
+  for (let h = daylight.sunriseHour; h <= daylight.sunsetHour; h++) {
     const evalResult = evaluateComprensorio({
       comprensorio: spot,
       weatherData,
@@ -2284,12 +2285,12 @@ export class ForecastViewController {
     const activePoint = (primarySeries.points || []).find(p => p.hour === selectedHour) || primarySeries.points?.[0] || { value: 0 };
     const activeMarkerY = getY(activePoint.value);
 
-    const labelStep = Math.max(2, Math.round(hRange / 4));
+    const numLabels = hRange <= 8 ? 3 : (hRange <= 12 ? 4 : 5);
     const labelHours = [];
-    for (let lh = sH; lh < eH; lh += labelStep) {
-      labelHours.push(lh);
+    for (let i = 0; i < numLabels; i++) {
+      const h = Math.round(sH + (i * hRange) / (numLabels - 1));
+      if (!labelHours.includes(h)) labelHours.push(h);
     }
-    if (!labelHours.includes(eH)) labelHours.push(eH);
 
     return `
       <div id="${id}-box" class="gm-chart-box">
@@ -2428,9 +2429,9 @@ export class ForecastViewController {
                   </div>
 
                   <!-- Trend Chart -->
-                  <div class="gm-param-chart-wrap mt-3">
-                    <div class="text-xs font-semibold text-[var(--gm-text-muted)] uppercase tracking-wider mb-1">
-                      Tendenza Oraria (08:00 - 20:00)
+                  <div class="gm-param-chart-wrap">
+                    <div class="gm-param-chart-header">
+                      <span class="gm-param-chart-title">Tendenza Oraria</span>
                     </div>
                     ${chartHtml}
                   </div>
@@ -2843,12 +2844,12 @@ export class ForecastViewController {
     const activeData = hours.find(h => h.hour === this.selectedHour) || hours[0];
     const activeMarkerY = getY(activeData.speed);
 
-    const labelStep = Math.max(2, Math.round(hRange / 4));
+    const numLabels = hRange <= 8 ? 3 : (hRange <= 12 ? 4 : 5);
     const labelHours = [];
-    for (let lh = sH; lh < eH; lh += labelStep) {
-      labelHours.push(lh);
+    for (let i = 0; i < numLabels; i++) {
+      const h = Math.round(sH + (i * hRange) / (numLabels - 1));
+      if (!labelHours.includes(h)) labelHours.push(h);
     }
-    if (!labelHours.includes(eH)) labelHours.push(eH);
 
     return `
       <div id="forecast-wind-chart-box" class="gm-chart-box">
@@ -3063,12 +3064,12 @@ export class ForecastViewController {
     const activeData = hours.find(h => h.hour === this.selectedHour) || hours[0];
     const activeLclY = getY(activeData.lclMsl);
 
-    const labelStep = Math.max(2, Math.round(hRange / 4));
+    const numLabels = hRange <= 8 ? 3 : (hRange <= 12 ? 4 : 5);
     const labelHours = [];
-    for (let lh = sH; lh < eH; lh += labelStep) {
-      labelHours.push(lh);
+    for (let i = 0; i < numLabels; i++) {
+      const h = Math.round(sH + (i * hRange) / (numLabels - 1));
+      if (!labelHours.includes(h)) labelHours.push(h);
     }
-    if (!labelHours.includes(eH)) labelHours.push(eH);
 
     return `
       <div id="forecast-sounding-chart-box" class="gm-chart-box">
@@ -3210,8 +3211,9 @@ export class ForecastViewController {
     const effectiveTakeoffId = (activeSub && activeSub.spotType === 'takeoff') ? activeSub.id : this.activeTakeoffId;
     const effectiveLandingId = (activeSub && activeSub.spotType === 'landing') ? activeSub.id : this.activeLandingId;
 
+    const daylight = this.getDaylightWindow(spot, weatherData, this.activeDate);
     const hours = [];
-    for (let h = 8; h <= 20; h++) {
+    for (let h = daylight.sunriseHour; h <= daylight.sunsetHour; h++) {
       const evalHour = evaluateComprensorio({
         comprensorio: spot,
         weatherData,
@@ -3814,7 +3816,8 @@ export class ForecastViewController {
    * @param {number} hour
    */
   setHour(hour) {
-    if (hour < 8 || hour > 20) return;
+    const daylight = this.getDaylightWindow();
+    if (hour < daylight.sunriseHour || hour > daylight.sunsetHour) return;
     this.selectedHour = hour;
 
     if (!this.containerEl) {
@@ -4095,8 +4098,10 @@ export class ForecastViewController {
         const colIdx = Math.min(cols.length - 1, Math.max(0, Math.floor(fraction * cols.length)));
         targetHour = parseInt(cols[colIdx].getAttribute('data-hour'), 10);
       } else {
-        const hourIndex = Math.min(12, Math.max(0, Math.floor(fraction * 13)));
-        targetHour = 8 + hourIndex;
+        const daylight = this.getDaylightWindow();
+        const count = daylight.hours.length || 13;
+        const idx = Math.min(count - 1, Math.max(0, Math.floor(fraction * count)));
+        targetHour = daylight.hours[idx] ?? (daylight.sunriseHour + idx);
       }
 
       if (targetHour !== this.selectedHour) {
@@ -4111,7 +4116,8 @@ export class ForecastViewController {
       const col = target && typeof target.closest === 'function' ? target.closest('[data-hour]') : null;
       if (col) {
         const hour = parseInt(col.getAttribute('data-hour'), 10);
-        if (!isNaN(hour) && hour >= 8 && hour <= 20 && hour !== this.selectedHour) {
+        const daylight = this.getDaylightWindow();
+        if (!isNaN(hour) && hour >= daylight.sunriseHour && hour <= daylight.sunsetHour && hour !== this.selectedHour) {
           this.setHour(hour);
         }
       }
@@ -4212,16 +4218,19 @@ export class ForecastViewController {
       const hourAttr = actionEl.getAttribute('data-hour');
       if (hourAttr != null) {
         const hour = parseInt(hourAttr, 10);
-        if (!isNaN(hour) && hour >= 8 && hour <= 20) {
+        const daylight = this.getDaylightWindow();
+        if (!isNaN(hour) && hour >= daylight.sunriseHour && hour <= daylight.sunsetHour) {
           this.setHour(hour);
         }
       }
     } else if (action === 'prev-hour') {
-      if (this.selectedHour > 8) {
+      const daylight = this.getDaylightWindow();
+      if (this.selectedHour > daylight.sunriseHour) {
         this.setHour(this.selectedHour - 1);
       }
     } else if (action === 'next-hour') {
-      if (this.selectedHour < 20) {
+      const daylight = this.getDaylightWindow();
+      if (this.selectedHour < daylight.sunsetHour) {
         this.setHour(this.selectedHour + 1);
       }
     } else if (action === 'open-full-map') {
@@ -4244,7 +4253,8 @@ export class ForecastViewController {
       const hourAttr = actionEl.getAttribute('data-hour');
       if (hourAttr != null) {
         const hour = parseInt(hourAttr, 10);
-        if (!isNaN(hour) && hour >= 8 && hour <= 20) {
+        const daylight = this.getDaylightWindow();
+        if (!isNaN(hour) && hour >= daylight.sunriseHour && hour <= daylight.sunsetHour) {
           this.setHour(hour);
         }
       }
