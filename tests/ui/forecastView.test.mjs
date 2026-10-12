@@ -2385,7 +2385,7 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
   });
 
   describe('Precipitation Visualization & Hourly Trend Contracts', () => {
-    it('renders multi-chart-precipitation with SVG bars, threshold lines, and badge in Solo Grafici mode', () => {
+    it('renders multi-chart-precipitation with SVG bars, threshold lines, and Windy-style probability heatmap in Solo Grafici mode', () => {
       const mockStore = createStore({ selectedSpot: DEFAULT_COMPRENSORI[0] });
       const controller = new ForecastViewController({ store: mockStore });
       controller.forecastMode = 'charts';
@@ -2419,11 +2419,11 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
       assert.ok(html.includes('mm/h</span>'), 'Must display mm/h unit');
       assert.ok(html.includes('NO FLY: Pioggia'), 'Must indicate NO FLY: Pioggia in badge for 1.2 mm/h hour');
       assert.ok(html.includes('<rect x='), 'Must render SVG rect bars for hourly precipitation');
-      assert.ok(html.includes('stroke-dasharray="3,3"'), 'Must render dashed line for precipitation probability');
-      assert.ok(html.includes('100%'), 'Must render secondary right-axis label for 100%');
+      assert.ok(html.includes('>Prob.<'), 'Must render Windy-style heatmap row label Prob.');
+      assert.ok(html.includes('>90%<'), 'Must render 90% probability label in heatmap cell');
     });
 
-    it('renders caution badge and secondary probability curve when accumulation is 0 mm/h but precipitation_probability is significant (e.g. 39%)', () => {
+    it('renders caution badge and Windy-style probability heatmap when accumulation is 0 mm/h but precipitation_probability is significant (e.g. 39%)', () => {
       const mockStore = createStore({ selectedSpot: DEFAULT_COMPRENSORI[0] });
       const controller = new ForecastViewController({ store: mockStore });
       controller.forecastMode = 'charts';
@@ -2457,9 +2457,9 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
       // Sub-badge must NOT say 'Assenti' or be 'status-flyable', it must warn with probability
       assert.ok(html.includes('status-caution'), 'Must have status-caution badge class for 39% rain probability');
       assert.ok(html.includes('39% prob. pioggia'), 'Must show 39% prob. pioggia in sub-badge');
-      // Chart must render probability curve even with 0 mm/h accumulation
-      assert.ok(html.includes('stroke-dasharray="3,3"'), 'Must render probability line path');
-      assert.ok(html.includes('100%'), 'Must render right-axis percentage marker');
+      // Chart must render probability heatmap cells with 39% label even with 0 mm/h accumulation
+      assert.ok(html.includes('>Prob.<'), 'Must render heatmap row label Prob.');
+      assert.ok(html.includes('>39%<'), 'Must render 39% probability label in heatmap strip');
     });
 
     it('evaluates severe NO FLY: Pioggia when hourly precipitation exceeds 0.5 mm/h in computeParamMetrics', () => {
@@ -2601,6 +2601,47 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
 
       assert.ok(svg.includes('<rect x='), 'Must render SVG rect bars');
       assert.ok(svg.includes('var(--gm-accent-sky, #0ea5e9)'), 'Must use sky accent variable for bars');
+    });
+
+    it('renders Windy-style heatmap ribbon when renderSvgTrendChart is provided heatmapRow', () => {
+      const controller = new ForecastViewController({ store: createStore() });
+      const svg = controller.renderSvgTrendChart({
+        id: 'test-heatmap-chart',
+        title: 'Precipitazioni Test',
+        unit: 'mm/h',
+        minY: 0,
+        maxY: 5,
+        compact: true,
+        selectedHour: 14,
+        series: [
+          {
+            name: 'Precipitazioni',
+            type: 'bar',
+            points: [
+              { hour: 12, value: 0 },
+              { hour: 14, value: 0 },
+              { hour: 16, value: 1.5 }
+            ],
+            fill: 'var(--gm-accent-sky, #0ea5e9)'
+          }
+        ],
+        heatmapRow: {
+          label: 'Prob.',
+          points: [
+            { hour: 12, value: 10 },
+            { hour: 14, value: 39 },
+            { hour: 16, value: 75 }
+          ]
+        }
+      });
+
+      assert.ok(svg.includes('>Prob.<'), 'Must render Prob. label');
+      assert.ok(svg.includes('>10%<'), 'Must render 10% label');
+      assert.ok(svg.includes('>39%<'), 'Must render 39% label');
+      assert.ok(svg.includes('>75%<'), 'Must render 75% label');
+      assert.ok(svg.includes('var(--gm-status-caution, #f59e0b)'), 'Must style 39% cell with caution color');
+      assert.ok(svg.includes('var(--gm-status-unflyable, #ef4444)'), 'Must style 75% cell with unflyable alert color');
+      assert.ok(svg.includes('stroke="var(--gm-accent)" stroke-width="1.6"'), 'Must highlight active hour cell');
     });
   });
 });

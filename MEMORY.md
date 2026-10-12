@@ -1736,24 +1736,24 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
 
 ---
 
-## 136. Controlli Mappa Icon-Only: Geometrie Vettoriali Dedicate (Sfera Wireframe e Vetta di Montagna) e Sfumatura Radiale Soffice Senza Bordi
-- **Problema**: I pulsanti toggle per l'alternanza dei layer cartografici includevano etichette testuali ("OpenTopo", "Satellite") che appesantivano la mappa e consumavano spazio visivo prezioso, specialmente nella mini-mappa e su schermi mobili outdoor. Inoltre, i contenitori rettangolari dotati di bordo solido e ombre scatolari risultavano invasivi, distraenti o simili a placche sovrimpresse sul terreno orografico.
+## 136. Controlli Mappa Icon-Only & Mirino: Geometrie Vettoriali Dedicate (Sfera Wireframe e Vetta di Montagna) e Sfumatura Radiale Soffice Senza Bordi
+- **Problema**: I pulsanti toggle per l'alternanza dei layer cartografici includevano etichette testuali ("OpenTopo", "Satellite") che appesantivano la mappa e consumavano spazio visivo prezioso, specialmente nella mini-mappa e su schermi mobili outdoor. Inoltre, i contenitori dei controlli mappa (toggle layer, trigger del menu mirino/puntamento) dotati di bordo solido, forme scatolari e sfondi bianchi opachi risultavano invasivi, distraenti o simili a placche sovrimpresse sul terreno orografico.
 - **Causa Radice**:
   1. Utilizzo di pulsanti a capsula estesi con etichetta testuale affiancata all'icona, anziché un controllo icon-only puro con divulgazione del nome del layer tramite tooltip nativo e attributi semantici ARIA.
-  2. Adozione di bordi solidi (`border: 1px solid ...`) e gradienti lineari pesanti che marcavano contorni geometrici rigidi sul canvas orografico.
+  2. Adozione di bordi solidi (`border: 1px solid ...`), sfondi opachi (`rgba(255, 255, 255, 0.92)`) e gradienti lineari pesanti che marcavano contorni geometrici rigidi sul canvas orografico.
   3. Icone generiche (disegno satellite convenzionale) meno intuitive rispetto a simboli geodetici puri.
 - **Pattern Vincolante**:
   1. **Icon-Only Design su Tutti i Controlli Mappa**: Eliminare etichette testuali interne (`.gm-layer-toggle-label`). I pulsanti toggle renderizzano unicamente l'icona SVG (dimensione 20px), affidando la denominazione del layer agli attributi `aria-label="Layer mappa: [Attivo] (tocca per [Successivo])"` e `title="Passa a [Successivo]"`.
   2. **Iconografia Specialistica Dedicata**:
      - *Satellite*: Sfera wireframe 3D geometrica (cerchio perimetrale a raggio 9.5, assi ortogonali equatoriale e meridiano a piena estensione, ed ellissi longitudinali e latitudinali perfettamente raccordate a raggio 9.5 con spessore 1.8px).
      - *OpenTopo*: Vetta alpina scultorea con nevaio a doppio arco simmetrico (`M12 2.5L2.5 20.5h19L12 2.5z` e `M6.8 12.5L9.5 14.5L12 12.2L14.5 14.5L17.2 12.5`), perfettamente armonizzata nello spessore (1.8px) e nel peso visivo con la sfera wireframe.
-  3. **Sfondo Circolare con Sfumatura Radiale Soffice (Border-Free & Zero Blur-Disc)**:
-     - Rimuovere tassativamente qualsiasi bordo (`border: none !important;`), ombra dura (`box-shadow: none !important;`) e sfocatura di sfondo (`backdrop-filter: none !important;`): il backdrop blur applicato al cerchio genera infatti un disco ottico rigido dal contorno netto anziché una sfumatura graduale.
-     - Applicare una sagoma circolare (`border-radius: 50% !important;`, $32\times 32\text{px}$ nella mini-mappa, $36\times 36\text{px}$ nelle mappe principali).
+  3. **Controlli Mappa Border-Free con Sfumatura Radiale Soffice (Zero Blur-Disc)**:
+     - Applicare a tutti i controlli flottanti su mappa (`.gm-map-layer-toggle`, `.gm-mini-map-layer-toggle`, `.gm-mini-map-expand-btn`, `.gm-aim-menu-trigger`, `.gm-replay-layer-toggle`) sagome geometriche morbide (circolare $32\text{px}/36\text{px}$ o pill $36\text{px}$ di altezza con `border-radius: var(--gm-radius-full)`).
+     - Rimuovere tassativamente qualsiasi bordo (`border: none !important;`), ombra dura (`box-shadow: none !important;`) e sfocatura di sfondo (`backdrop-filter: none !important;`): il backdrop blur applicato all'elemento genera infatti un disco ottico rigido dal contorno netto anziché una sfumatura graduale.
      - La sfumatura radiale deve estinguersi a zero opacità nel perimetro esterno ("completamente trasparente intorno") e concentrare il contrasto ("meno trasparente al centro") sotto l'icona:
-       - *Sfondo Scuro / Satellite*: `radial-gradient(circle at center, rgba(15, 23, 42, 0.65) 0%, rgba(15, 23, 42, 0.35) 40%, rgba(15, 23, 42, 0.08) 70%, transparent 95%)` con icona bianca (`#f8fafc`).
-       - *Sfondo Chiaro / Topo*: `radial-gradient(circle at center, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.40) 40%, rgba(255, 255, 255, 0.10) 70%, transparent 95%)` con icona scura (`#0f172a`).
-  4. **Presidio Ergonomico (Fitts's Law)**: Mantenere l'area interattiva touch $\ge 48\times 48\text{px}$ tramite pseudo-elemento invisibile `::before`.
+       - *Sfondo Scuro / Satellite*: `radial-gradient(circle/ellipse at center, rgba(15, 23, 42, 0.65) 0%, rgba(15, 23, 42, 0.35) 40%, rgba(15, 23, 42, 0.08) 70%, transparent 95%)` con icona bianca (`#f8fafc`).
+       - *Sfondo Chiaro / Topo*: `radial-gradient(circle/ellipse at center, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.40) 40%, rgba(255, 255, 255, 0.10) 70%, transparent 95%)` con icona scura (`#0f172a`).
+  4. **Presidio Ergonomico (Fitts's Law)**: Mantenere l'area interattiva touch $\ge 48\times 48\text{px}$ tramite pseudo-elemento invisibile `::before` su tutti i controlli.
 
 ---
 
@@ -1803,4 +1803,33 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
      - Interpolazione smooth automatica di Three.js e WebGL tra vertici consecutivi (`vertexColors: true`).
   4. **Coerenza Semantica Linee di Caduta a Terreno**:
      - I segmenti verticali del drop curtain verso il DEM adottano `vertexColors: true` con i colori variometrici dei punti corrispondenti e opacità controllata (0.40), visualizzando istantaneamente sul rilievo montuoso la localizzazione orografica di termiche e discendenze.
+
+---
+
+## 139. Visualizzazione Precipitazioni: Disaccoppiamento di Dominio Accumulo (mm/h) vs Probabilità (%) tramite Heatmap Oraria Dedicata Stile Windy (Prevenzione Interferenza di Gestalt)
+- **Problema**:
+  1. Nella card compatta "Precipitazioni" (`multi-chart-precipitation`), la curva della probabilità di pioggia (0-100%) tracciata come spezzata azzurra tratteggiata (`stroke-dasharray="3,3"`) intersecava le linee orizzontali di soglia aeronautica (0.1 mm/h cautela, 0.5 mm/h NO FLY pioggia), anch'esse tratteggiate (`strokeDasharray: "4,3"`). Tale sovrapposizione generava grave interferenza di Gestalt, portando il pilota a confondere la probabilità adimensionale con i limiti quantitativi di bagnamento dell'ala.
+  2. In valli alpine e con modelli meteo ad alta risoluzione (es. ICON-EU in Open-Meteo per Chialamberto a 5-6 giorni), la quantità oraria prevista può risultare pari a 0.0 mm/h (barre di altezza zero) anche in presenza di una probabilità di pioggia del 39%. Senza barre visibili e con una curva tratteggiata ambigua, il grafico appariva privo di dati o guasto.
+  3. L'etichetta estesa "PRECIPITAZIONI" nel pannello laterale del trend subiva clipping contro il bordo di separazione verticale su viewport compatti per larghezza insufficiente del contenitore (`82px`).
+- **Causa Radice**:
+  1. Tentativo di plottare due grandezze fisiche eterogenee (accumulo continuo $0\dots N\text{ mm/h}$ su asse Y primario vs probabilità discreta $0\dots 100\%$ su asse Y secondario) sul medesimo piano cartesiano 2D ricorrendo allo stesso pattern visivo (tratteggio).
+  2. Discrepanza interpretativa tra modelli meteo sintetici globali (es. GFS che stima 0.7-1.7 mm/h) e modelli regionali alpini (ICON-EU che a 5 giorni azzera l'accumulo al punto griglia pur segnalando probabilità convettiva).
+- **Pattern Vincolante**:
+  1. **Disaccoppiamento Rigido di Dominio**:
+     - L'area di grafico cartesiano è rigorosamente riservata all'accumulo orario quantitativo in mm/h (barre SVG verticali `type: 'bar'`, `var(--gm-accent-sky)`) e alle soglie aeronautiche orizzontali di sicurezza (0.1 e 0.5 mm/h).
+     - Rimosso l'asse Y secondario e la curva tratteggiata di probabilità dal canvas principale.
+  2. **Striscia Oraria Heatmap Stile Windy (`heatmapRow`)**:
+     - Posizionare sotto la baseline del grafico (`yMax + 5`) una striscia di celle orarie dedicate con etichetta `Prob.`.
+     - Ciascuna cella riporta la percentuale esatta (`val + '%'`) e assume colorazione progressiva saturata:
+       - $\ge 60\%$: Rosso emergenza (`var(--gm-status-unflyable)`).
+       - $35\dots 59\%$: Ambra cautela (`var(--gm-status-caution)`).
+       - $20\dots 34\%$: Ciano intenso (`var(--gm-accent-sky)`).
+       - $1\dots 19\%$: Ciano tenue (`rgba(14, 165, 233, 0.28)`).
+       - $0\%$: Grigio neutro attenuato (`rgba(148, 163, 184, 0.12)`).
+     - La cella dell'ora attiva selezionata dallo scrubber riceve un contorno di evidenziazione (`stroke="var(--gm-accent)" stroke-width="1.6"`).
+     - Il cursore orario verticale si prolunga attraverso la striscia heatmap per mantenere perfetta continuità temporale.
+  3. **Typography & Layout Guard**:
+     - Impostare la larghezza del side panel `.gm-trend-side-panel` ad almeno `98px` (padding `10px 6px 8px 8px`).
+     - Applicare `font-size: 0.62rem`, `letter-spacing: 0.02em` e `text-overflow: ellipsis` a `.gm-trend-side-label`.
+
 

@@ -1549,6 +1549,8 @@ export class ForecastViewController {
     toggleBtn.setAttribute('aria-label', `Layer mappa: ${curLabel} (tocca per ${nextLabel})`);
     toggleBtn.setAttribute('title', `Layer mappa: ${curLabel} (tocca per ${nextLabel})`);
     toggleBtn.innerHTML = renderLayerToggleIcon(newLayer, 20);
+    const aimTrigger = root.querySelector('.gm-aim-menu-trigger');
+    if (aimTrigger) aimTrigger.setAttribute('data-layer', newLayer);
     const select = root.querySelector('.gm-flight-analysis-layer-select');
     if (select) select.value = newLayer;
   }
@@ -2747,8 +2749,6 @@ export class ForecastViewController {
           unit: 'mm/h',
           minY: 0,
           maxY: Math.max(3, Math.ceil(Math.max(...hourlyPoints.map(p => p.precip || 0), 0) * 1.5)),
-          secondaryAxis: { unit: '%', minY: 0, maxY: 100 },
-          legendText: 'Barre: mm/h · Tratteggio: % prob.',
           compact: true,
           hideTooltip: true,
           hideThresholdLabels: true,
@@ -2763,18 +2763,12 @@ export class ForecastViewController {
               points: hourlyPoints.map(p => ({ hour: p.hour, value: p.precip || 0 })),
               fill: 'var(--gm-accent-sky, #0ea5e9)',
               opacity: 0.85
-            },
-            {
-              name: 'Probabilità Pioggia',
-              points: hourlyPoints.map(p => ({ hour: p.hour, value: p.precipProb || 0 })),
-              stroke: 'var(--gm-accent-sky, #0ea5e9)',
-              strokeWidth: 1.8,
-              strokeDasharray: '3,3',
-              fillArea: 'rgba(14, 165, 233, 0.12)',
-              minY: 0,
-              maxY: 100
             }
-          ]
+          ],
+          heatmapRow: {
+            label: 'Prob.',
+            points: hourlyPoints.map(p => ({ hour: p.hour, value: p.precipProb || 0 }))
+          }
         })
       },
       {
@@ -4878,6 +4872,7 @@ export class ForecastViewController {
                   type="button" 
                   class="gm-flight-analysis-ctrl-btn gm-aim-menu-trigger" 
                   data-action="toggle-aim-menu" 
+                  data-layer="${activeLayer}"
                   aria-haspopup="menu"
                   aria-expanded="false"
                   aria-label="Opzioni di puntamento"

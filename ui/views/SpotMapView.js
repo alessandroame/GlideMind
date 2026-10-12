@@ -563,6 +563,7 @@ export class SpotMapView {
                   id="gm-map-aim-trigger"
                   class="gm-map-ctrl-btn gm-aim-menu-trigger" 
                   data-action="toggle-aim-menu"
+                  data-layer="${this.activeLayer}"
                   aria-haspopup="menu"
                   aria-expanded="false"
                   aria-label="Opzioni di puntamento"
@@ -970,6 +971,8 @@ export class SpotMapView {
     toggleBtn.setAttribute('data-layer', this.activeLayer);
     toggleBtn.setAttribute('aria-label', `Layer mappa: ${curLabel} (tocca per ${nextLabel})`);
     toggleBtn.innerHTML = renderLayerToggleIcon(this.activeLayer, 20);
+    const aimTrigger = this.container.querySelector('#gm-map-aim-trigger');
+    if (aimTrigger) aimTrigger.setAttribute('data-layer', this.activeLayer);
     const select = this.container.querySelector('#gm-map-layer-select');
     if (select) select.value = this.activeLayer;
   }

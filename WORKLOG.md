@@ -1435,3 +1435,18 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Aggiunte suite di test in `tests/core/flightReplayMath.test.mjs` e aggiornati i contratti di integrazione in `tests/ui/replayTakeoffLandingTrackVisibility.test.mjs`.
   - Test suite globale al 100% verde: 704 test (123 suite), 703 passanti, 0 falliti, 1 skipped.
   - Registrata la Lezione Appresa #138 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-12 - UI / Meteo: Heatmap Oraria Stile Windy per Probabilità Precipitazioni ed Eliminazione Interferenza di Gestalt
+- **Tipo**: Refactoring / UI / Ergonomia Outdoor / Visualizzazione Parametri Meteo
+- **Dettagli**: [.agents/worklog.d/2026-10-12_windy_style_precipitation_probability_heatmap_ribbon.md](file:///.agents/worklog.d/2026-10-12_windy_style_precipitation_probability_heatmap_ribbon.md)
+- **Sintesi**:
+  - Risolto il sovraccarico visivo e il conflitto di Gestalt nella card "Precipitazioni" (`multi-chart-precipitation`) in modalità "Solo Grafici", in cui la linea tratteggiata azzurra della probabilità (0-100%) si confondeva con le due linee di soglia orizzontali tratteggiate (0.1 mm/h cautela, 0.5 mm/h NO FLY pioggia).
+  - Rimosso l'asse secondario destro e la curva tratteggiata dal canvas primario, riservando l'area del grafico esclusivamente all'accumulo orario quantitativo in mm/h con barre verticali e relative soglie.
+  - Implementata la striscia oraria a celle colorate stile Windy (`heatmapRow` in `renderSvgTrendChart`) collocata sotto la baseline del grafico: riporta la percentuale per ciascuna ora diurna con saturazione cromatica progressiva (grigio per 0%, ciano tenue per 1-19%, ciano pieno per 20-34%, ambra per 35-59%, rosso per $\ge 60\%$) ed evidenziazione attiva dell'ora selezionata con contorno coordinato al cursore verticale.
+  - Raffinata la tipografia di `.gm-trend-side-panel` e `.gm-trend-side-label` in `css/theme.css` per prevenire il clipping del testo "PRECIPITAZIONI".
+  - Aggiornati i contratti di test in `tests/ui/forecastView.test.mjs` con nuova suite per `heatmapRow`.
+  - Test suite globale al 100% verde: 705 test (123 suite), 704 passanti, 0 falliti, 1 skipped.
+  - Registrata la Lezione Appresa #139 in [MEMORY.md](file:///MEMORY.md).
+

@@ -278,6 +278,7 @@ export function generateExpandedSvgChart(points, width = 600, height = 220, opti
   const thermals = Array.isArray(options.thermals) ? options.thermals : [];
   const probes = Array.isArray(options.thermalProbes) ? options.thermalProbes : [];
   const rollInversions = Array.isArray(options.rollInversions) ? options.rollInversions : [];
+  const dynamicManeuvers = Array.isArray(options.dynamicManeuvers) ? options.dynamicManeuvers : [];
 
   // Variometer gradient stops along the visible trajectory
   const maxStops = Math.min(80, Math.max(10, visibleN));
@@ -370,6 +371,36 @@ export function generateExpandedSvgChart(points, width = 600, height = 220, opti
     }
   });
 
+  dynamicManeuvers.forEach((m) => {
+    const isInv = m.type === 'inversioni' || String(m.type).toLowerCase().includes('inversion');
+    if (isInv) return;
+    const { sIdx, eIdx } = resolveIndices(m, 4);
+
+    if (eIdx >= startIdx && sIdx <= endIdx) {
+      const visS = Math.max(startIdx, sIdx);
+      const visE = Math.min(endIdx, eIdx);
+      const x1 = Math.round(((visS - startIdx) / (visibleN - 1)) * width * 10) / 10;
+      const x2 = Math.round(((visE - startIdx) / (visibleN - 1)) * width * 10) / 10;
+      const bandW = Math.max(14, x2 - x1);
+      const cx = Math.round((x1 + bandW / 2) * 10) / 10;
+      const title = formatManeuverTitle(m.type, m);
+      const label = m.type === 'wingover' ? 'WO' : (m.type === 'spirale' ? 'Spirale' : (m.type === 'figura8' ? 'Otto' : (title.length > 9 ? title.slice(0, 8) + '…' : title)));
+
+      eventItems.push({
+        type: 'maneuver',
+        sIdx,
+        eIdx,
+        x1,
+        x2,
+        bandW,
+        cx,
+        label,
+        fullTitle: title,
+        rawObj: m
+      });
+    }
+  });
+
   // Sort by horizontal position and allocate 3 non-colliding vertical lanes
   eventItems.sort((a, b) => a.cx - b.cx);
   const laneRightBounds = [-999, -999, -999];
@@ -424,6 +455,25 @@ export function generateExpandedSvgChart(points, width = 600, height = 220, opti
           <rect x="${ev.x1}" y="${padTop + 2}" width="${ev.bandW}" height="${chartHeight}" fill="rgba(234, 88, 12, 0.14)" stroke="rgba(234, 88, 12, 0.7)" stroke-width="1" stroke-dasharray="2,2" rx="2" />
           <rect x="${ev.cx - pillW / 2}" y="${badgeY - 9}" width="${pillW}" height="${pillH}" fill="rgba(15, 23, 42, 0.92)" stroke="#ea580c" stroke-width="0.8" rx="2.5" />
           <text x="${ev.cx}" y="${badgeY}" text-anchor="middle" font-size="8.5" font-family="monospace" font-weight="800" fill="#ea580c">${escapeHtml(ev.label)}</text>
+        </g>
+      `;
+    })
+    .join('');
+
+  // Render general dynamic maneuver markers
+  const maneuverMarkersSvg = eventItems
+    .filter((ev) => ev.type === 'maneuver')
+    .map((ev) => {
+      const badgeY = padTop + 9 + ev.yLevel * 13;
+      const pillW = Math.max(24, ev.label.length * 7 + 8);
+      const pillH = 12;
+      const sIdx = ev.sIdx;
+      const eIdx = ev.eIdx;
+      return `
+        <g class="gm-chart-maneuver-marker" role="img" aria-label="Manovra ${escapeHtml(ev.fullTitle || ev.label)}" data-phase-type="maneuver" data-phase-label="${escapeHtml(ev.fullTitle || ev.label)}" data-start-index="${sIdx}" data-end-index="${eIdx}" data-start-time="${ev.rawObj?.startTimeSeconds ?? ''}" data-end-time="${ev.rawObj?.endTimeSeconds ?? ''}" style="cursor: pointer;">
+          <rect x="${ev.x1}" y="${padTop + 2}" width="${ev.bandW}" height="${chartHeight}" fill="rgba(192, 132, 252, 0.14)" stroke="rgba(192, 132, 252, 0.7)" stroke-width="1" stroke-dasharray="2,2" rx="2" />
+          <rect x="${ev.cx - pillW / 2}" y="${badgeY - 9}" width="${pillW}" height="${pillH}" fill="rgba(15, 23, 42, 0.92)" stroke="#c084fc" stroke-width="0.8" rx="2.5" />
+          <text x="${ev.cx}" y="${badgeY}" text-anchor="middle" font-size="8.5" font-family="monospace" font-weight="800" fill="#c084fc">${escapeHtml(ev.label)}</text>
         </g>
       `;
     })
@@ -641,6 +691,9 @@ export function generateExpandedSvgChart(points, width = 600, height = 220, opti
       <!-- Thermal sections bands -->
       ${thermalBandsSvg}
 
+      <!-- Dynamic maneuver bands -->
+      ${maneuverMarkersSvg}
+
       <!-- Roll inversion bands -->
       ${rollMarkersSvg}
 
@@ -657,7 +710,7 @@ export function generateExpandedSvgChart(points, width = 600, height = 220, opti
       ${speedSvg}
 
       <!-- Area fill below path -->
-      ${showAlt ? `<polygon points="0,${height - padBottom} ${polyPoints} ${width},${height - padBottom}" fill="url(#${gradId}-area)" />` : ''}
+      ${showAlt ? `<polygon points="0,${height - padBottom} ${polyPoints} ${width},${height - padBottom}" fill="url(#${gradId}-area)" pointer-events="none" />` : ''}
 
       <!-- Main altitude polyline colored by variometer -->
       ${showAlt ? `<polyline points="${polyPoints}" fill="none" stroke="url(#${gradId})" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />` : ''}
@@ -791,7 +844,8 @@ export function renderFlightDetailHtml(bundle, options = {}) {
   const svgChartHtml = generateExpandedSvgChart(points, 600, 220, {
     thermals,
     thermalProbes,
-    rollInversions
+    rollInversions,
+    dynamicManeuvers
   });
 
   const sourcePoints = (raw.originalPoints && Array.isArray(raw.originalPoints) && raw.originalPoints.length >= 10)
@@ -1409,10 +1463,12 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
 
   const tel = bundle?.telemetry || {};
   const thermals = Array.isArray(tel.thermals) ? tel.thermals : [];
-  const thermalProbes = Array.isArray(tel.thermalProbes) ? tel.thermalProbes : [];
-  const rollInversions = Array.isArray(tel.maneuvers)
-    ? tel.maneuvers.filter((m) => m.type === 'inversioni' || String(m.type).toLowerCase().includes('inversion'))
-    : [];
+  const allManeuvers = Array.isArray(tel.maneuvers) ? tel.maneuvers : [];
+  const thermalProbes = (Array.isArray(tel.thermalProbes) && tel.thermalProbes.length > 0)
+    ? tel.thermalProbes
+    : allManeuvers.filter((m) => m.type === '360°' || m.type === 'SINGLE_360' || m.type === 'sondaggio_termica');
+  const rollInversions = allManeuvers.filter((m) => m.type === 'inversioni' || String(m.type).toLowerCase().includes('inversion'));
+  const dynamicManeuvers = allManeuvers.filter((m) => m.type !== '360°' && m.type !== 'SINGLE_360' && m.type !== 'sondaggio_termica');
 
   const btnToggleAlt = overlayEl.querySelector('#btn-toggle-alt');
   const btnToggleVario = overlayEl.querySelector('#btn-toggle-vario');
@@ -1495,6 +1551,115 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
     selectedPhase: null
   };
 
+  const resolveIndices = (item, defaultEndSpan = null) => {
+    let sIdx = 0;
+    let eIdx = points.length - 1;
+    const n = points.length;
+
+    const sTime = item.startTimeSeconds ?? item.timeSeconds;
+    const eTime = item.endTimeSeconds;
+    if (typeof sTime === 'number' && typeof points[0]?.timeSeconds === 'number') {
+      let fS = points.findIndex((p) => (p.timeSeconds ?? 0) >= sTime);
+      sIdx = fS === -1 ? n - 1 : fS;
+      if (typeof eTime === 'number') {
+        let fE = points.findIndex((p) => (p.timeSeconds ?? 0) >= eTime);
+        eIdx = fE === -1 ? n - 1 : fE;
+      } else {
+        eIdx = defaultEndSpan !== null ? Math.min(n - 1, sIdx + defaultEndSpan) : sIdx;
+      }
+      return { sIdx: Math.min(sIdx, eIdx), eIdx: Math.max(sIdx, eIdx) };
+    }
+
+    if (typeof item.startIndex === 'number') {
+      const origN = (raw.originalPoints?.length && raw.originalPoints.length > 1)
+        ? raw.originalPoints.length
+        : (item.startIndex >= n ? item.startIndex + 1 : n);
+      const sFrac = Math.max(0, Math.min(1, item.startIndex / Math.max(1, origN - 1)));
+      const eRaw = item.endIndex ?? (defaultEndSpan !== null ? item.startIndex + defaultEndSpan : item.startIndex);
+      const eFrac = Math.max(0, Math.min(1, eRaw / Math.max(1, origN - 1)));
+      sIdx = Math.max(0, Math.min(n - 1, Math.round(sFrac * (n - 1))));
+      eIdx = Math.max(sIdx, Math.min(n - 1, Math.round(eFrac * (n - 1))));
+      return { sIdx, eIdx };
+    }
+
+    return { sIdx: 0, eIdx: n - 1 };
+  };
+
+  const findPhaseAtPoint = (pointIndex) => {
+    if (pointIndex < 0 || pointIndex >= points.length) return null;
+    const pt = points[pointIndex];
+    const ptTime = pt?.timeSeconds;
+
+    // 1. Dynamic maneuvers and roll inversions
+    for (const m of dynamicManeuvers) {
+      const { sIdx, eIdx } = resolveIndices(m, 4);
+      const inRange = (pointIndex >= sIdx && pointIndex <= eIdx) ||
+        (ptTime != null && m.startTimeSeconds != null && m.endTimeSeconds != null && ptTime >= m.startTimeSeconds && ptTime <= m.endTimeSeconds) ||
+        (Math.abs(pointIndex - sIdx) <= 2 && Math.abs(pointIndex - eIdx) <= 2);
+      if (inRange) {
+        const title = formatManeuverTitle(m.type, m);
+        const isInv = m.type === 'inversioni' || String(m.type).toLowerCase().includes('inversion');
+        return {
+          type: isInv ? 'roll' : 'maneuver',
+          label: title,
+          startIndex: sIdx,
+          endIndex: eIdx,
+          startTime: m.startTimeSeconds ?? '',
+          endTime: m.endTimeSeconds ?? '',
+          isResolvedIndex: true,
+          raw: m
+        };
+      }
+    }
+
+    // 2. Thermals
+    for (let idx = 0; idx < thermals.length; idx++) {
+      const th = thermals[idx];
+      const { sIdx, eIdx } = resolveIndices(th);
+      const inRange = (pointIndex >= sIdx && pointIndex <= eIdx) ||
+        (ptTime != null && th.startTimeSeconds != null && th.endTimeSeconds != null && ptTime >= th.startTimeSeconds && ptTime <= th.endTimeSeconds);
+      if (inRange) {
+        const tNum = th.thermalIndex || (idx + 1);
+        const gain = typeof th.altGain === 'number' ? th.altGain : (typeof th.netGain === 'number' ? th.netGain : ((th.exitAlt || 0) - (th.entryAlt || 0)));
+        return {
+          type: 'thermal',
+          label: `T${tNum}`,
+          displayTitle: `Termica #${tNum}${gain ? ` (+${gain}m)` : ''}`,
+          startIndex: sIdx,
+          endIndex: eIdx,
+          startTime: th.startTimeSeconds ?? '',
+          endTime: th.endTimeSeconds ?? '',
+          isResolvedIndex: true,
+          gain,
+          raw: th
+        };
+      }
+    }
+
+    // 3. Thermal probes
+    for (let idx = 0; idx < thermalProbes.length; idx++) {
+      const pr = thermalProbes[idx];
+      const { sIdx, eIdx } = resolveIndices(pr, 4);
+      const inRange = (pointIndex >= sIdx && pointIndex <= eIdx) ||
+        (ptTime != null && pr.startTimeSeconds != null && pr.endTimeSeconds != null && ptTime >= pr.startTimeSeconds && ptTime <= pr.endTimeSeconds) ||
+        (Math.abs(pointIndex - sIdx) <= 3);
+      if (inRange) {
+        return {
+          type: 'probe',
+          label: `Sondaggio #${idx + 1}`,
+          startIndex: sIdx,
+          endIndex: eIdx,
+          startTime: pr.startTimeSeconds ?? '',
+          endTime: pr.endTimeSeconds ?? '',
+          isResolvedIndex: true,
+          raw: pr
+        };
+      }
+    }
+
+    return null;
+  };
+
   const selectPhase = (phase) => {
     if (!phase) return;
     const label = phase.label || 'Fase Volo';
@@ -1503,31 +1668,36 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
     let startIndex = 0;
     let endIndex = 0;
 
-    const startTimeSec = (phase.startTime != null && phase.startTime !== '') ? parseFloat(phase.startTime) : null;
-    const endTimeSec = (phase.endTime != null && phase.endTime !== '') ? parseFloat(phase.endTime) : null;
-
-    if (startTimeSec !== null && !isNaN(startTimeSec) && points.length > 0 && typeof points[0].timeSeconds === 'number') {
-      let foundS = points.findIndex((p) => (p.timeSeconds ?? 0) >= startTimeSec);
-      if (foundS === -1) foundS = points.length - 1;
-      let foundE = foundS;
-      if (endTimeSec !== null && !isNaN(endTimeSec)) {
-        const matchE = points.findIndex((p) => (p.timeSeconds ?? 0) >= endTimeSec);
-        foundE = matchE === -1 ? points.length - 1 : matchE;
-      }
-      startIndex = Math.min(foundS, foundE);
-      endIndex = Math.max(foundS, foundE);
+    if (phase.isResolvedIndex && typeof phase.startIndex === 'number') {
+      startIndex = Math.max(0, Math.min(points.length - 1, phase.startIndex));
+      endIndex = Math.max(startIndex, Math.min(points.length - 1, phase.endIndex ?? startIndex));
     } else {
-      let rawS = parseInt(phase.startIndex ?? 0, 10);
-      let rawE = parseInt(phase.endIndex ?? rawS, 10);
-      const totalSource = (raw.originalPoints?.length || points.length);
-      if (totalSource > points.length && rawS < totalSource) {
-        const sFrac = Math.max(0, Math.min(1, rawS / (totalSource - 1)));
-        const eFrac = Math.max(0, Math.min(1, rawE / (totalSource - 1)));
-        startIndex = Math.max(0, Math.min(points.length - 1, Math.round(sFrac * (points.length - 1))));
-        endIndex = Math.max(startIndex, Math.min(points.length - 1, Math.round(eFrac * (points.length - 1))));
+      const startTimeSec = (phase.startTime != null && phase.startTime !== '') ? parseFloat(phase.startTime) : null;
+      const endTimeSec = (phase.endTime != null && phase.endTime !== '') ? parseFloat(phase.endTime) : null;
+
+      if (startTimeSec !== null && !isNaN(startTimeSec) && points.length > 0 && typeof points[0].timeSeconds === 'number') {
+        let foundS = points.findIndex((p) => (p.timeSeconds ?? 0) >= startTimeSec);
+        if (foundS === -1) foundS = points.length - 1;
+        let foundE = foundS;
+        if (endTimeSec !== null && !isNaN(endTimeSec)) {
+          const matchE = points.findIndex((p) => (p.timeSeconds ?? 0) >= endTimeSec);
+          foundE = matchE === -1 ? points.length - 1 : matchE;
+        }
+        startIndex = Math.min(foundS, foundE);
+        endIndex = Math.max(foundS, foundE);
       } else {
-        startIndex = Math.max(0, Math.min(points.length - 1, rawS));
-        endIndex = Math.max(startIndex, Math.min(points.length - 1, rawE));
+        let rawS = parseInt(phase.startIndex ?? 0, 10);
+        let rawE = parseInt(phase.endIndex ?? rawS, 10);
+        const totalSource = (raw.originalPoints?.length || points.length);
+        if (totalSource > points.length && rawS < totalSource) {
+          const sFrac = Math.max(0, Math.min(1, rawS / (totalSource - 1)));
+          const eFrac = Math.max(0, Math.min(1, rawE / (totalSource - 1)));
+          startIndex = Math.max(0, Math.min(points.length - 1, Math.round(sFrac * (points.length - 1))));
+          endIndex = Math.max(startIndex, Math.min(points.length - 1, Math.round(eFrac * (points.length - 1))));
+        } else {
+          startIndex = Math.max(0, Math.min(points.length - 1, rawS));
+          endIndex = Math.max(startIndex, Math.min(points.length - 1, rawE));
+        }
       }
     }
 
@@ -1653,20 +1823,18 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
     if (hudSpeed) hudSpeed.textContent = `${speedVal.toFixed(1)} km/h`;
 
     let eventText = '--';
-    const th = thermals.find((t) => pointIndex >= (t.startIndex ?? 0) && pointIndex <= (t.endIndex ?? 0));
-    if (th) {
-      const gain = th.altGain || th.netGain;
-      eventText = `T${th.thermalIndex || ''} (${gain ? `+${gain}m` : 'Termica'})`;
-    } else {
-      const roll = rollInversions.find((r) => pointIndex >= (r.startIndex ?? 0) && pointIndex <= (r.endIndex ?? 0));
-      if (roll) {
-        const pCount = getPendolateCount(roll);
+    const matched = findPhaseAtPoint(pointIndex);
+    if (matched) {
+      if (matched.type === 'thermal') {
+        const gain = matched.gain;
+        eventText = `${matched.label} (${gain ? `+${gain}m` : 'Termica'})`;
+      } else if (matched.type === 'roll') {
+        const pCount = matched.raw ? getPendolateCount(matched.raw) : null;
         eventText = `Inversione (${pCount ? `${pCount}P` : 'Rollio'})`;
+      } else if (matched.type === 'probe') {
+        eventText = 'Sondaggio 360°';
       } else {
-        const pr = thermalProbes.find((prb) => Math.abs((prb.startIndex ?? 0) - pointIndex) <= 3);
-        if (pr) {
-          eventText = 'Sondaggio 360°';
-        }
+        eventText = matched.label || '--';
       }
     }
     if (hudEvent) hudEvent.textContent = eventText;
@@ -1686,7 +1854,8 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
       selectedPhase: state.selectedPhase,
       thermals,
       thermalProbes,
-      rollInversions
+      rollInversions,
+      dynamicManeuvers
     });
 
     chartContainer.innerHTML = html;
@@ -1763,9 +1932,10 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
 
   const getPointIndexFromEvent = (e) => {
     const rect = chartContainer.getBoundingClientRect();
-    if (!rect || rect.width <= 0) return 0;
+    const w = (rect && rect.width > 0) ? rect.width : (chartContainer.clientWidth || 600);
+    const left = rect ? rect.left : 0;
     const clientX = e.clientX ?? (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
-    const relX = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    const relX = Math.max(0, Math.min(1, (clientX - left) / w));
 
     const n = points.length;
     if (state.zoom > 1.0) {
@@ -1831,11 +2001,31 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
   // 3. Pointer & Pan Dragging on chart container
   let isPointerDown = false;
   let startX = 0;
+  let startY = 0;
+  let pointerDownTime = 0;
+  let hasDragged = false;
   let startPan = 0.5;
+  let lastSelectionTime = 0;
+
+  const handleChartPointSelection = (e) => {
+    if (Date.now() - lastSelectionTime < 250) return;
+    const idx = getPointIndexFromEvent(e);
+    const matched = findPhaseAtPoint(idx);
+    if (matched) {
+      lastSelectionTime = Date.now();
+      selectPhase(matched);
+    } else if (state.selectedPhase) {
+      lastSelectionTime = Date.now();
+      clearPhaseSelection();
+    }
+  };
 
   chartContainer.addEventListener('pointerdown', (e) => {
     isPointerDown = true;
-    startX = e.clientX;
+    startX = e.clientX ?? 0;
+    startY = e.clientY ?? 0;
+    pointerDownTime = Date.now();
+    hasDragged = false;
     startPan = state.pan;
     if (typeof chartContainer.setPointerCapture === 'function') {
       try { chartContainer.setPointerCapture(e.pointerId); } catch (_) {}
@@ -1854,11 +2044,19 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
   chartContainer.addEventListener('pointermove', (e) => {
     const idx = getPointIndexFromEvent(e);
 
-    if (isPointerDown && state.zoom > 1.0) {
-      const deltaX = e.clientX - startX;
-      if (Math.abs(deltaX) > 4) {
+    if (isPointerDown) {
+      const curX = e.clientX ?? 0;
+      const curY = e.clientY ?? 0;
+      const deltaX = Math.abs(curX - startX);
+      const deltaY = Math.abs(curY - startY);
+      if (deltaX > 6 || deltaY > 6) {
+        hasDragged = true;
+      }
+
+      if (state.zoom > 1.0 && deltaX > 4) {
         const rect = chartContainer.getBoundingClientRect();
-        const panDelta = -(deltaX / rect.width) * (1 / state.zoom);
+        const w = (rect && rect.width > 0) ? rect.width : (chartContainer.clientWidth || 600);
+        const panDelta = -((curX - startX) / w) * (1 / state.zoom);
         state.pan = Math.max(0.0, Math.min(1.0, startPan + panDelta));
         state.cursorIndex = idx;
         updateHud(idx);
@@ -1868,6 +2066,15 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
           flightDetailMapEngine.setFlightTrackCursor(idx, points.length, pt?.timeSeconds);
         }
         return;
+      }
+    } else {
+      const hoveredPhase = findPhaseAtPoint(idx);
+      if (hoveredPhase) {
+        chartContainer.style.cursor = 'pointer';
+        chartContainer.title = `Tocca per selezionare ${hoveredPhase.label || 'manovra'}`;
+      } else {
+        chartContainer.style.cursor = 'crosshair';
+        chartContainer.title = '';
       }
     }
 
@@ -1886,12 +2093,18 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
     if (typeof chartContainer.releasePointerCapture === 'function') {
       try { chartContainer.releasePointerCapture(e.pointerId); } catch (_) {}
     }
+    const elapsed = Date.now() - pointerDownTime;
+    if (!hasDragged && elapsed < 500) {
+      handleChartPointSelection(e);
+    }
   };
 
   chartContainer.addEventListener('pointerup', onPointerUp);
   chartContainer.addEventListener('pointercancel', onPointerUp);
 
   chartContainer.addEventListener('pointerleave', () => {
+    chartContainer.style.cursor = '';
+    chartContainer.title = '';
     if (!isPointerDown) {
       state.cursorIndex = null;
       const cursorGroup = chartContainer.querySelector('#gm-chart-cursor-group');
@@ -1952,6 +2165,8 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
       const startTime = phaseTarget.getAttribute('data-start-time');
       const endTime = phaseTarget.getAttribute('data-end-time');
       selectPhase({ type, label, startIndex, endIndex, startTime, endTime });
+    } else {
+      handleChartPointSelection(e);
     }
   });
 

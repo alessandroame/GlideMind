@@ -6315,13 +6315,93 @@ input.gm-input:focus {
   display: inline-flex;
 }
 
-.gm-aim-menu-trigger {
-  gap: 4px;
-  padding: 6px 8px;
+/* Aiming & Centering Submenu Trigger (Crosshair / Mirino) with Soft Radial Scrim */
+.gm-aim-menu-trigger,
+.gm-map-ctrl-btn.gm-aim-menu-trigger,
+.gm-flight-analysis-ctrl-btn.gm-aim-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  height: 36px;
+  min-height: 36px;
+  min-width: 36px;
+  padding: 0 8px;
+  gap: 3px;
+  border-radius: var(--gm-radius-full, 9999px) !important;
+  border: none !important;
+  outline: none;
+  background: radial-gradient(ellipse at center, rgba(15, 23, 42, 0.65) 0%, rgba(15, 23, 42, 0.35) 40%, rgba(15, 23, 42, 0.08) 70%, transparent 95%) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+  color: #f8fafc;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+/* Touch floor expanding to >= 48px for outdoor field ergonomics (Fitts's Law) */
+.gm-aim-menu-trigger::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  min-width: var(--gm-touch-min, 48px);
+  min-height: var(--gm-touch-min, 48px);
+  width: 100%;
+  height: 100%;
+}
+
+.gm-aim-menu-trigger[data-layer="topo"],
+[data-theme="light"] .gm-aim-menu-trigger,
+[data-theme="light"] .gm-map-ctrl-btn.gm-aim-menu-trigger,
+[data-theme="light"] .gm-flight-analysis-ctrl-btn.gm-aim-menu-trigger {
+  background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.40) 40%, rgba(255, 255, 255, 0.10) 70%, transparent 95%) !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  color: #0f172a !important;
+}
+
+.gm-aim-menu-trigger[data-layer="satellite"] {
+  background: radial-gradient(ellipse at center, rgba(15, 23, 42, 0.65) 0%, rgba(15, 23, 42, 0.35) 40%, rgba(15, 23, 42, 0.08) 70%, transparent 95%) !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  color: #f8fafc !important;
+}
+
+.gm-aim-menu-trigger:hover {
+  transform: scale(1.08);
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.gm-aim-menu-trigger[data-layer="topo"]:hover,
+[data-theme="light"] .gm-aim-menu-trigger:hover,
+[data-theme="light"] .gm-map-ctrl-btn.gm-aim-menu-trigger:hover {
+  background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.90) 0%, rgba(255, 255, 255, 0.50) 40%, rgba(255, 255, 255, 0.15) 70%, transparent 95%) !important;
+  color: #0284c7 !important;
+  border: none !important;
+}
+
+.gm-aim-menu-trigger[data-layer="satellite"]:hover {
+  background: radial-gradient(ellipse at center, rgba(15, 23, 42, 0.80) 0%, rgba(15, 23, 42, 0.45) 40%, rgba(15, 23, 42, 0.12) 70%, transparent 95%) !important;
+  color: #38bdf8 !important;
+  border: none !important;
+}
+
+.gm-aim-menu-trigger:active {
+  transform: scale(0.92);
 }
 
 .gm-aim-menu-trigger.open {
-  border-color: var(--gm-accent);
+  border: none !important;
 }
 
 .gm-aim-chevron {
