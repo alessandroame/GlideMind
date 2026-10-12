@@ -155,7 +155,7 @@ export function detectThermals(points, smoothedAlts = null) {
     const alts = smoothedAlts || smoothAltitudes(points, 3);
     const n = points.length;
 
-    // Step 1: Compute instantaneous bearings, speed and vario per interval
+    // Step 1: Compute instantaneous bearings, speed, and vario per interval
     const stepBearings = new Array(n - 1);
     const stepVarios = new Array(n - 1);
 
@@ -176,11 +176,14 @@ export function detectThermals(points, smoothedAlts = null) {
         turnRates[i] = delta / dt;
     }
 
-    // Step 2: Identify candidate circling blocks with 2-second jitter tolerance
-    const rawCircles = [];
+    // Step 2: Extract candidate turning blocks
+    // 2A: Continuous single-direction circling (CW or CCW) with 2-second jitter tolerance
+    const rawSegments = [];
     let currentDir = 0; // +1 CW, -1 CCW
     let startIdx = 0;
     let accumulatedAngle = 0;
+    let cwAngle = 0;
+    let ccwAngle = 0;
     let noiseSec = 0;
     let lastValidIdx = 0;
 
@@ -196,28 +199,35 @@ export function detectThermals(points, smoothedAlts = null) {
                 currentDir = dir;
                 startIdx = Math.max(0, i);
                 accumulatedAngle = Math.abs(delta);
+                if (dir > 0) cwAngle = accumulatedAngle; else ccwAngle = accumulatedAngle;
                 noiseSec = 0;
                 lastValidIdx = i;
             } else if (dir === currentDir) {
                 accumulatedAngle += Math.abs(delta);
+                if (dir > 0) cwAngle += Math.abs(delta); else ccwAngle += Math.abs(delta);
                 noiseSec = 0;
                 lastValidIdx = i;
             } else {
-                // Opposite direction: allow up to 2 seconds of turbulence/correction if already in sustained turn
+                // Direction reversal
                 if (accumulatedAngle >= 140 && noiseSec < 2) {
                     noiseSec++;
                 } else {
-                    if (accumulatedAngle >= 260) {
-                        rawCircles.push({
+                    if (accumulatedAngle >= 220) {
+                        rawSegments.push({
                             startIndex: startIdx,
                             endIndex: lastValidIdx + 1,
                             accumulatedAngle,
-                            turnDir: currentDir > 0 ? 'CW' : 'CCW'
+                            cwAngle,
+                            ccwAngle,
+                            turnDir: currentDir > 0 ? 'CW' : 'CCW',
+                            type: 'circle'
                         });
                     }
                     currentDir = dir;
                     startIdx = Math.max(0, i - noiseSec);
                     accumulatedAngle = Math.abs(delta);
+                    cwAngle = dir > 0 ? accumulatedAngle : 0;
+                    ccwAngle = dir < 0 ? accumulatedAngle : 0;
                     noiseSec = 0;
                     lastValidIdx = i;
                 }
@@ -227,34 +237,131 @@ export function detectThermals(points, smoothedAlts = null) {
             if (currentDir !== 0) {
                 noiseSec++;
                 if (noiseSec > 4) {
-                    if (accumulatedAngle >= 260) {
-                        rawCircles.push({
+                    if (accumulatedAngle >= 220) {
+                        rawSegments.push({
                             startIndex: startIdx,
                             endIndex: lastValidIdx + 1,
                             accumulatedAngle,
-                            turnDir: currentDir > 0 ? 'CW' : 'CCW'
+                            cwAngle,
+                            ccwAngle,
+                            turnDir: currentDir > 0 ? 'CW' : 'CCW',
+                            type: 'circle'
                         });
                     }
                     currentDir = 0;
                     accumulatedAngle = 0;
+                    cwAngle = 0;
+                    ccwAngle = 0;
                     noiseSec = 0;
                 }
             }
         }
     }
 
-    if (currentDir !== 0 && accumulatedAngle >= 260) {
-        rawCircles.push({
+    if (currentDir !== 0 && accumulatedAngle >= 220) {
+        rawSegments.push({
             startIndex: startIdx,
             endIndex: lastValidIdx + 1,
             accumulatedAngle,
-            turnDir: currentDir > 0 ? 'CW' : 'CCW'
+            cwAngle,
+            ccwAngle,
+            turnDir: currentDir > 0 ? 'CW' : 'CCW',
+            type: 'circle'
         });
     }
 
-    // Step 3: Trim each candidate circle to real climb range (Entry & Exit trimming)
+    // 2B: Active maneuvering blocks in thermal lift (alternating turns, figure-8s, ridge thermal soaring)
+    let altTurnStart = -1;
+    let altTurnAngle = 0;
+    let altTurnCw = 0;
+    let altTurnCcw = 0;
+    let nonTurnSec = 0;
+    let altLastTurn = -1;
+
+    for (let i = 0; i < turnRates.length; i++) {
+        const absRate = Math.abs(turnRates[i]);
+        const delta = turnDeltas[i];
+        const vz = stepVarios[i];
+
+        if (absRate >= 2.5 && vz >= -0.2) {
+            if (altTurnStart === -1) {
+                altTurnStart = i;
+                altTurnAngle = Math.abs(delta);
+                altTurnCw = delta > 0 ? delta : 0;
+                altTurnCcw = delta < 0 ? -delta : 0;
+                nonTurnSec = 0;
+                altLastTurn = i;
+            } else {
+                altTurnAngle += Math.abs(delta);
+                if (delta > 0) altTurnCw += delta; else altTurnCcw -= delta;
+                nonTurnSec = 0;
+                altLastTurn = i;
+            }
+        } else {
+            if (altTurnStart !== -1) {
+                nonTurnSec++;
+                if (nonTurnSec > 5 || vz < -0.8) {
+                    const dur = Math.max(1, (points[altLastTurn + 1].timeSeconds || (altLastTurn + 1)) - (points[altTurnStart].timeSeconds || altTurnStart));
+                    const gain = alts[altLastTurn + 1] - alts[altTurnStart];
+                    if (altTurnAngle >= 220 && gain >= 8 && (gain / dur) >= 0.15) {
+                        rawSegments.push({
+                            startIndex: altTurnStart,
+                            endIndex: altLastTurn + 1,
+                            accumulatedAngle: altTurnAngle,
+                            cwAngle: altTurnCw,
+                            ccwAngle: altTurnCcw,
+                            turnDir: altTurnCw > altTurnCcw * 1.5 ? 'CW' : (altTurnCcw > altTurnCw * 1.5 ? 'CCW' : 'CW/CCW'),
+                            type: 'soaring_turn'
+                        });
+                    }
+                    altTurnStart = -1;
+                    altTurnAngle = 0;
+                    nonTurnSec = 0;
+                }
+            }
+        }
+    }
+    if (altTurnStart !== -1) {
+        const dur = Math.max(1, (points[altLastTurn + 1].timeSeconds || (altLastTurn + 1)) - (points[altTurnStart].timeSeconds || altTurnStart));
+        const gain = alts[altLastTurn + 1] - alts[altTurnStart];
+        if (altTurnAngle >= 220 && gain >= 8 && (gain / dur) >= 0.15) {
+            rawSegments.push({
+                startIndex: altTurnStart,
+                endIndex: altLastTurn + 1,
+                accumulatedAngle: altTurnAngle,
+                cwAngle: altTurnCw,
+                ccwAngle: altTurnCcw,
+                turnDir: altTurnCw > altTurnCcw * 1.5 ? 'CW' : (altTurnCcw > altTurnCw * 1.5 ? 'CCW' : 'CW/CCW'),
+                type: 'soaring_turn'
+            });
+        }
+    }
+
+    // Sort rawSegments chronologically
+    rawSegments.sort((a, b) => a.startIndex - b.startIndex);
+
+    // Merge directly overlapping or contiguous raw segments
+    const uniqueSegments = [];
+    for (const seg of rawSegments) {
+        if (uniqueSegments.length === 0) {
+            uniqueSegments.push({ ...seg });
+            continue;
+        }
+        const last = uniqueSegments[uniqueSegments.length - 1];
+        if (seg.startIndex <= last.endIndex) {
+            last.endIndex = Math.max(last.endIndex, seg.endIndex);
+            last.accumulatedAngle = Math.max(last.accumulatedAngle, seg.accumulatedAngle);
+            last.cwAngle = (last.cwAngle || 0) + (seg.cwAngle || 0);
+            last.ccwAngle = (last.ccwAngle || 0) + (seg.ccwAngle || 0);
+            if (last.turnDir !== seg.turnDir) last.turnDir = 'CW/CCW';
+        } else {
+            uniqueSegments.push({ ...seg });
+        }
+    }
+
+    // Step 3: Trim each candidate to real climb range (entry & peak max altitude) and extend climb
     const trimmedCandidates = [];
-    for (const c of rawCircles) {
+    for (const c of uniqueSegments) {
         let sIdx = c.startIndex;
         let eIdx = c.endIndex;
 
@@ -281,53 +388,84 @@ export function detectThermals(points, smoothedAlts = null) {
                 maxAltIdx = i;
             }
         }
-        if (maxAltIdx > sIdx && (maxAlt - alts[eIdx]) >= 6) {
+        if (maxAltIdx > sIdx && (maxAlt - alts[eIdx]) >= 5) {
             eIdx = maxAltIdx;
+        }
+
+        // Forward climb extension: if glider continues climbing in thermal core immediately after turn block
+        while (eIdx < n - 1 && alts[eIdx + 1] >= alts[eIdx] - 0.5) {
+            if (alts[eIdx + 1] > maxAlt) maxAlt = alts[eIdx + 1];
+            if (maxAlt - alts[eIdx + 1] >= 4.0) break;
+            eIdx++;
         }
 
         const dur = Math.max(1, (points[eIdx].timeSeconds || eIdx) - (points[sIdx].timeSeconds || sIdx));
         const gain = alts[eIdx] - alts[sIdx];
         const vz = gain / dur;
 
-        // Recalculate turn progression inside trimmed bounds
-        let trimmedAngle = 0;
-        for (let i = sIdx; i < Math.min(eIdx, turnDeltas.length); i++) {
-            const delta = turnDeltas[i];
-            if ((c.turnDir === 'CW' && delta > 0) || (c.turnDir === 'CCW' && delta < 0)) {
-                trimmedAngle += Math.abs(delta);
-            }
-        }
-
-        if (gain >= 8 && vz >= 0.15 && trimmedAngle >= 220) {
+        if (gain >= 8 && vz >= 0.15) {
             trimmedCandidates.push({
                 startIndex: sIdx,
                 endIndex: eIdx,
-                accumulatedAngle: trimmedAngle,
+                accumulatedAngle: c.accumulatedAngle,
+                cwAngle: c.cwAngle,
+                ccwAngle: c.ccwAngle,
                 turnDir: c.turnDir
             });
         }
     }
 
-    // Step 4: Merge adjacent thermal fragments with same turning direction and small gap (<= 12s)
+    // Helper: calculate geographical center of track slice
+    function computeSliceCenter(sIdx, eIdx) {
+        let sumLat = 0, sumLon = 0, count = 0;
+        const step = Math.max(1, Math.floor((eIdx - sIdx) / 30));
+        for (let i = sIdx; i <= eIdx; i += step) {
+            sumLat += points[i].lat;
+            sumLon += points[i].lon;
+            count++;
+        }
+        return {
+            lat: count > 0 ? sumLat / count : points[sIdx].lat,
+            lon: count > 0 ? sumLon / count : points[sIdx].lon
+        };
+    }
+
+    // Step 4: Intelligent Thermal Clustering & Merging ("Entro ed Esco")
+    // Merges adjacent fragments belonging to the same thermal column:
+    // - Direction-invariant: does NOT reject merge if pilot reversed turn direction (CW <-> CCW)
+    // - Spatial proximity: horizontal distance between core centers <= 250-300m
+    // - Search tolerance: time gap <= 45s (or up to 60s if within 140m) and alt drop <= 22-25m
     const mergedThermals = [];
     let curBlock = null;
 
     for (let i = 0; i < trimmedCandidates.length; i++) {
         const cand = trimmedCandidates[i];
         if (!curBlock) {
-            curBlock = { ...cand };
+            curBlock = { ...cand, center: computeSliceCenter(cand.startIndex, cand.endIndex) };
             continue;
         }
 
         const gapSec = (points[cand.startIndex].timeSeconds || cand.startIndex) - (points[curBlock.endIndex].timeSeconds || curBlock.endIndex);
         const altDrop = alts[curBlock.endIndex] - alts[cand.startIndex];
+        const candCenter = computeSliceCenter(cand.startIndex, cand.endIndex);
+        const distMeters = computeDistanceKm(curBlock.center.lat, curBlock.center.lon, candCenter.lat, candCenter.lon) * 1000;
 
-        if (gapSec <= 12 && altDrop <= 8 && cand.turnDir === curBlock.turnDir) {
-            curBlock.endIndex = cand.endIndex;
+        const isSameThermal = (gapSec <= 15 && altDrop <= 15 && distMeters <= 300) ||
+                              (gapSec <= 45 && altDrop <= 22 && distMeters <= 250) ||
+                              (gapSec <= 60 && altDrop <= 25 && distMeters <= 140);
+
+        if (isSameThermal) {
+            curBlock.endIndex = Math.max(curBlock.endIndex, cand.endIndex);
             curBlock.accumulatedAngle += cand.accumulatedAngle;
+            curBlock.cwAngle = (curBlock.cwAngle || 0) + (cand.cwAngle || 0);
+            curBlock.ccwAngle = (curBlock.ccwAngle || 0) + (cand.ccwAngle || 0);
+            if (curBlock.turnDir !== cand.turnDir) {
+                curBlock.turnDir = 'CW/CCW';
+            }
+            curBlock.center = computeSliceCenter(curBlock.startIndex, curBlock.endIndex);
         } else {
             mergedThermals.push(curBlock);
-            curBlock = { ...cand };
+            curBlock = { ...cand, center: candCenter };
         }
     }
     if (curBlock) {
@@ -436,6 +574,18 @@ export function detectThermals(points, smoothedAlts = null) {
         const durationFormatted = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
         const efficiency = effectiveDurationSec > 0 ? Math.round((positiveVarioSeconds / effectiveDurationSec) * 100) : 0;
 
+        // Determine dominant turn direction
+        let finalTurnDir = block.turnDir || 'CW';
+        if (block.cwAngle > 0 && block.ccwAngle > 0) {
+            if (block.cwAngle >= block.ccwAngle * 2.0) {
+                finalTurnDir = 'CW';
+            } else if (block.ccwAngle >= block.cwAngle * 2.0) {
+                finalTurnDir = 'CCW';
+            } else {
+                finalTurnDir = 'CW/CCW';
+            }
+        }
+
         validThermals.push({
             id: `th_${thermalIndex}`,
             thermalIndex,
@@ -452,7 +602,7 @@ export function detectThermals(points, smoothedAlts = null) {
             maxAlt: Math.round(maxAlt),
             altGain: Math.round(netGain),
             turnCount: turns,
-            turnDirection: block.turnDir,
+            turnDirection: finalTurnDir,
             avgClimbRate: Math.round(avgClimbRate * 10) / 10,
             maxClimbRate: Math.round(peakVario * 10) / 10,
             meanRadiusMeters,

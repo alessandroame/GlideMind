@@ -1219,7 +1219,7 @@ export function renderFlightDetailHtml(bundle, options = {}) {
                     </div>
 
                     <div class="flex flex-col items-end text-xs text-[var(--gm-text-secondary)]">
-                      ${turns ? `<span>${turns} giri (${turnDir === 'CW' ? 'Orario' : 'Antiorario'})</span>` : ''}
+                      ${turns ? `<span>${turns} giri (${turnDir === 'CW' ? 'Orario' : (turnDir === 'CCW' ? 'Antiorario' : 'Misto')})</span>` : ''}
                       ${eff != null ? `<span class="font-bold text-emerald-400">${eff}% in salita</span>` : ''}
                     </div>
                   </div>

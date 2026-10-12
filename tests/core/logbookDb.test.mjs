@@ -9,6 +9,7 @@ import {
   requestStoragePersistence,
   logbookManager
 } from '../../core/logbookDb.js';
+import { CURRENT_TELEMETRY_ENGINE_VERSION } from '../../core/flightTelemetry.js';
 
 describe('Logbook Database & Storage Adapters - Headless Core Contracts', () => {
   let adapter;
@@ -249,7 +250,8 @@ describe('Logbook Database & Storage Adapters - Headless Core Contracts', () => 
           site: 'Bassano del Grappa',
           glider: 'Axis Compact 4',
           gliderClass: 'EN-A',
-          notes: ''
+          notes: '',
+          isExplicitlyUntrimmed: true
         },
         {
           id: 'fl_mgr_detail',
@@ -263,6 +265,7 @@ describe('Logbook Database & Storage Adapters - Headless Core Contracts', () => 
             { timeSeconds: 300, alt: 1100, lat: 45.805, lon: 11.705, vario: -1.6 }
           ],
           telemetry: {
+            engineVersion: CURRENT_TELEMETRY_ENGINE_VERSION,
             thermals: [{ thermalIndex: 1, netGain: 250, avgClimbRate: 1.4, durationFormatted: '3m 0s' }],
             dominantWindDrift: { speedKmh: 12, cardinal: 'SSW', bearingDeg: 200 }
           }

@@ -9,7 +9,7 @@
  */
 
 import { parseIgc, trimFlightGroundPoints } from './igcParser.js';
-import { analyzeFlightTelemetry, lttbDecimate } from './flightTelemetry.js';
+import { analyzeFlightTelemetry, lttbDecimate, CURRENT_TELEMETRY_ENGINE_VERSION } from './flightTelemetry.js';
 import { store } from './store.js';
 import { DEFAULT_COMPRENSORI, parseCoordinates } from './comprensorio.js';
 import { POPULAR_GLIDERS } from './gliders.js';
@@ -912,7 +912,23 @@ class LogbookManager {
     }
 
     let telemetry = raw?.telemetry || null;
-    if (!telemetry && decimatedPoints && decimatedPoints.length >= 5) {
+    const hasOutdatedEngineVersion = Boolean(telemetry && typeof telemetry.engineVersion === 'number' && telemetry.engineVersion < CURRENT_TELEMETRY_ENGINE_VERSION);
+    if (hasOutdatedEngineVersion && ((originalPoints && originalPoints.length >= 10) || (decimatedPoints && decimatedPoints.length >= 10))) {
+      const ptsToAnalyze = (originalPoints && originalPoints.length >= 10) ? originalPoints : decimatedPoints;
+      telemetry = analyzeFlightTelemetry(ptsToAnalyze);
+      if (raw) {
+        raw.telemetry = telemetry;
+        if (bundle.meta) {
+          bundle.meta.thermalsCount = telemetry.thermalCount || 0;
+          bundle.meta.hasThermals = (telemetry.thermalCount || 0) > 0;
+        }
+        this.adapter.saveFlight(bundle.meta, raw).catch(err => {
+          if (typeof console !== 'undefined' && console.warn) {
+            console.warn('[LogbookManager] Background telemetry version upgrade save failed:', err);
+          }
+        });
+      }
+    } else if (!telemetry && decimatedPoints && decimatedPoints.length >= 5) {
       telemetry = analyzeFlightTelemetry(decimatedPoints);
     }
 

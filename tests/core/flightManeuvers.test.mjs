@@ -196,6 +196,99 @@ test('Flight Maneuvers - Thermal Circling Detection', async (t) => {
         const thermals = detectThermals(points);
         assert.strictEqual(thermals.length, 0, 'Sinking turns must not be classified as thermals');
     });
+
+    await t.test('should merge thermal fragments across turn direction reversals (CW to CCW)', () => {
+        const points = [];
+        const centerLat = 45.40;
+        const centerLon = 7.40;
+        const radiusDeg = 0.0008;
+        let time = 1000;
+
+        // Phase 1: 2 CW circles climbing from 1000m to 1050m (+50m)
+        for (let i = 0; i < 40; i++) {
+            const rad = (i / 20) * 2 * Math.PI;
+            points.push({
+                timeSeconds: time,
+                timeFormatted: '12:00:00',
+                lat: centerLat + Math.sin(rad) * radiusDeg,
+                lon: centerLon + Math.cos(rad) * radiusDeg,
+                alt: 1000 + (i / 40) * 50
+            });
+            time += 2;
+        }
+
+        // Phase 2: Pilot immediately reverses direction to CCW in the same thermal (+50m, 1050m to 1100m)
+        for (let i = 0; i <= 40; i++) {
+            const rad = -((i / 20) * 2 * Math.PI);
+            points.push({
+                timeSeconds: time,
+                timeFormatted: '12:01:20',
+                lat: centerLat + Math.sin(rad) * radiusDeg,
+                lon: centerLon + Math.cos(rad) * radiusDeg,
+                alt: 1050 + (i / 40) * 50
+            });
+            time += 2;
+        }
+
+        const thermals = detectThermals(points);
+        assert.strictEqual(thermals.length, 1, 'Must merge CW and CCW segments into one unified thermal');
+        const th = thermals[0];
+        assert.ok(th.altGain >= 95, `Expected gain >= 95m, got ${th.altGain}m`);
+        assert.strictEqual(th.turnDirection, 'CW/CCW');
+        assert.ok(th.turnCount >= 3.5);
+    });
+
+    await t.test('should recognize and merge thermal when pilot exits and re-enters the core ("entro ed esco")', () => {
+        const points = [];
+        const centerLat = 45.40;
+        const centerLon = 7.40;
+        const radiusDeg = 0.0008;
+        let time = 1000;
+
+        // Phase 1: Initial thermal climb (+50m from 1000m to 1050m)
+        for (let i = 0; i < 40; i++) {
+            const rad = (i / 20) * 2 * Math.PI;
+            points.push({
+                timeSeconds: time,
+                timeFormatted: '12:00:00',
+                lat: centerLat + Math.sin(rad) * radiusDeg,
+                lon: centerLon + Math.cos(rad) * radiusDeg,
+                alt: 1000 + (i / 40) * 50
+            });
+            time += 2;
+        }
+
+        // Phase 2: Pilot falls out of core for 20 seconds, searching within 80m and losing 8m
+        for (let i = 1; i <= 10; i++) {
+            points.push({
+                timeSeconds: time,
+                timeFormatted: '12:01:20',
+                lat: centerLat + 0.0008 + (i * 0.00005),
+                lon: centerLon + 0.0008,
+                alt: 1050 - (i * 0.8)
+            });
+            time += 2;
+        }
+
+        // Phase 3: Pilot re-enters thermal and resumes climbing (+60m from 1042m to 1102m)
+        for (let i = 0; i <= 40; i++) {
+            const rad = (i / 20) * 2 * Math.PI;
+            points.push({
+                timeSeconds: time,
+                timeFormatted: '12:01:40',
+                lat: centerLat + Math.sin(rad) * radiusDeg,
+                lon: centerLon + Math.cos(rad) * radiusDeg,
+                alt: 1042 + (i / 40) * 60
+            });
+            time += 2;
+        }
+
+        const thermals = detectThermals(points);
+        assert.strictEqual(thermals.length, 1, 'Must recognize as the same thermal when exiting and re-entering');
+        const th = thermals[0];
+        assert.ok(th.altGain >= 95, `Expected net gain >= 95m, got ${th.altGain}m`);
+        assert.ok(th.maxAlt >= 1100);
+    });
 });
 
 test('Flight Maneuvers - Rapid Descent & Acrobatic Detection', async (t) => {

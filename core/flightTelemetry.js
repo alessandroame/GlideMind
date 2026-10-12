@@ -14,7 +14,7 @@
 import { computeDistanceKm, computeBearing, angularDifference } from './geoSpatialMath.js';
 import { detectThermals, detectFlightManeuvers, degToCardinal, smoothAltitudes } from './flightManeuvers.js';
 
-export const CURRENT_TELEMETRY_ENGINE_VERSION = 8;
+export const CURRENT_TELEMETRY_ENGINE_VERSION = 9;
 
 /**
  * Standard FAI / Ogoy 6-band vario color definitions.
