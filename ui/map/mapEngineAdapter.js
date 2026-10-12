@@ -181,6 +181,7 @@ export class HeadlessMockMapEngine {
 
   setLayer(layerId) {
     this.currentLayerId = layerId;
+    this.activeLayer = layerId;
     this.theme = (layerId === 'satellite') ? 'dark' : 'light';
   }
 
@@ -334,10 +335,12 @@ export class HeadlessMockMapEngine {
   renderFlightTrack(containerEl, trackData, options = {}) {
     this.container = containerEl || this.container;
     this.activeFlightTrackData = trackData;
+    this.renderedTrack = { container: this.container, ...trackData, ...options };
     this.renderedMode = 'flightTrack';
     this.trackPoints = trackData?.points || [];
     this.highlightedRange = trackData?.highlightRange || null;
     this.cursorIndex = trackData?.cursorIndex ?? null;
+    this.cursorPointIndex = this.cursorIndex;
     this.takeoff = trackData?.takeoff || null;
     this.landing = trackData?.landing || null;
     this.isCanvasRendered = Boolean(this.options.preferCanvas);
@@ -346,16 +349,23 @@ export class HeadlessMockMapEngine {
     return this;
   }
 
-  highlightFlightTrackRange(range) {
-    this.highlightedRange = range;
+  highlightFlightTrackRange(startIndex, endIndex = null, options = {}) {
+    if (startIndex == null) {
+      this.highlightedRange = null;
+    } else if (typeof startIndex === 'object') {
+      this.highlightedRange = startIndex;
+    } else {
+      this.highlightedRange = { startIndex, endIndex, options };
+    }
     if (this.activeFlightTrackData) {
-      this.activeFlightTrackData.highlightRange = range;
+      this.activeFlightTrackData.highlightRange = this.highlightedRange;
     }
     return this;
   }
 
   setFlightTrackCursor(index) {
     this.cursorIndex = index;
+    this.cursorPointIndex = index;
     if (this.activeFlightTrackData) {
       this.activeFlightTrackData.cursorIndex = index;
     }
@@ -369,9 +379,11 @@ export class HeadlessMockMapEngine {
     this.activeMiniMapSpotData = null;
     this.activeFlightMapData = null;
     this.activeFlightTrackData = null;
+    this.renderedTrack = null;
     this.trackPoints = [];
     this.highlightedRange = null;
     this.cursorIndex = null;
+    this.cursorPointIndex = null;
     this.lastWindsockUpdate = null;
     this.lastGlideUpdate = null;
     this.lastCircuitUpdate = null;

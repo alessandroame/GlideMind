@@ -6,6 +6,8 @@ import {
   generateEducationalDebriefing,
   renderFlightDetailHtml,
   openFlightDetailSheet,
+  closeFlightDetailView,
+  getActiveFlightDetailMapEngine,
   escapeHtml,
   formatTrimPointLabel,
   getPendolateCount,
@@ -18,6 +20,109 @@ import {
 import { renderTrackSetupHtml } from '../../ui/views/TrackSetupSheet.js';
 import { logbookManager, createMemoryDbAdapter } from '../../core/logbookDb.js';
 import { store } from '../../core/store.js';
+
+function createMockElement(id, classes = [], tagName = 'div', attributes = {}) {
+  const children = [];
+  const classSet = new Set(classes);
+  const listeners = new Map();
+  const attrs = { ...attributes };
+  if (id) attrs.id = id;
+
+  const el = {
+    tagName: tagName.toUpperCase(),
+    attributes: attrs,
+    style: {},
+    dataset: {},
+    children,
+    parentElement: null,
+    clientWidth: 600,
+    clientHeight: 220,
+    innerHTML: '',
+    textContent: '',
+    classList: {
+      add: (...names) => names.forEach(n => classSet.add(n)),
+      remove: (...names) => names.forEach(n => classSet.delete(n)),
+      contains: (n) => classSet.has(n),
+      toggle: (n, force) => {
+        if (force !== undefined) {
+          if (force) classSet.add(n); else classSet.delete(n);
+          return force;
+        }
+        if (classSet.has(n)) { classSet.delete(n); return false; }
+        classSet.add(n); return true;
+      }
+    },
+    getAttribute: (k) => el.attributes[k] ?? null,
+    setAttribute: (k, v) => { el.attributes[k] = String(v); },
+    hasAttribute: (k) => k in el.attributes,
+    removeAttribute: (k) => { delete el.attributes[k]; },
+    addEventListener: (type, fn) => {
+      if (!listeners.has(type)) listeners.set(type, new Set());
+      listeners.get(type).add(fn);
+    },
+    removeEventListener: (type, fn) => {
+      if (listeners.has(type)) listeners.get(type).delete(fn);
+    },
+    dispatchEvent: (event) => {
+      const type = event.type || event;
+      if (listeners.has(type)) {
+        listeners.get(type).forEach(fn => fn(event));
+      }
+      return true;
+    },
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 600, height: 220 }),
+    appendChild: (child) => {
+      child.parentElement = el;
+      children.push(child);
+      return child;
+    },
+    closest: (selector) => {
+      let cur = el;
+      while (cur) {
+        if (selector.startsWith('#') && cur.attributes?.id === selector.slice(1)) return cur;
+        if (selector.startsWith('.') && cur.classList?.contains(selector.slice(1))) return cur;
+        if (selector.startsWith('[') && selector.endsWith(']')) {
+          const content = selector.slice(1, -1);
+          const [k, v] = content.split('=');
+          const cleanVal = v ? v.replace(/['"]/g, '') : null;
+          if (cleanVal !== null ? cur.getAttribute(k) === cleanVal : cur.hasAttribute(k)) return cur;
+        }
+        cur = cur.parentElement;
+      }
+      return null;
+    },
+    querySelector: (selector) => {
+      if (selector.startsWith('#')) {
+        const id = selector.slice(1);
+        if (el.attributes?.id === id) return el;
+        for (const c of children) {
+          const res = c.querySelector?.(selector);
+          if (res) return res;
+        }
+      }
+      if (selector.startsWith('.')) {
+        const cls = selector.slice(1);
+        if (el.classList?.contains(cls)) return el;
+        for (const c of children) {
+          const res = c.querySelector?.(selector);
+          if (res) return res;
+        }
+      }
+      if (selector.startsWith('[') && selector.endsWith(']')) {
+        const content = selector.slice(1, -1);
+        const [k, v] = content.split('=');
+        const cleanVal = v ? v.replace(/['"]/g, '') : null;
+        if (cleanVal !== null ? el.getAttribute(k) === cleanVal : el.hasAttribute(k)) return el;
+        for (const c of children) {
+          const res = c.querySelector?.(selector);
+          if (res) return res;
+        }
+      }
+      return null;
+    }
+  };
+  return el;
+}
 
 describe('FlightDetailSheet - Telemetry Analysis & Educational Debriefing (UI Layer)', () => {
   let mockBundle;
@@ -434,13 +539,15 @@ describe('FlightDetailSheet - Telemetry Analysis & Educational Debriefing (UI La
       assert.ok(speed1 > 10, 'Speed must be calculated from coordinates (>10 km/h)');
     });
 
-    it('should generate SVG with variometer curve layer when showVario option is enabled', () => {
+    it('should generate SVG with variometer curve layer when showVario option is enabled with dual positive/negative colors', () => {
       const svgWithVario = generateExpandedSvgChart(mockBundle.raw.decimatedPoints, 600, 220, {
         showVario: true
       });
       assert.ok(svgWithVario.includes('gm-chart-vario-layer'), 'Must contain vario layer group');
       assert.ok(svgWithVario.includes('0 m/s'), 'Must contain vario 0 m/s reference label');
-      assert.ok(svgWithVario.includes('#10b981'), 'Must use emerald green color for variometer');
+      assert.ok(svgWithVario.includes('#10b981'), 'Must use emerald green color for positive variometer (climb)');
+      assert.ok(svgWithVario.includes('#ef4444'), 'Must use red color for negative variometer (sink)');
+      assert.ok(svgWithVario.includes('gm-vario-stroke-climb') || svgWithVario.includes('gm-vario-stroke-sink'), 'Must have variometer stroke classes');
     });
 
     it('should generate SVG with ground speed curve layer when showSpeed option is enabled', () => {
@@ -503,6 +610,174 @@ describe('FlightDetailSheet - Telemetry Analysis & Educational Debriefing (UI La
       assert.ok(html.includes('id="gm-chart-nav-handle"'), 'Must have overview navigator handle');
     });
   });
+
+  describe('2D Flight Track Mini-Map & Altimetric Chart Synchronization', () => {
+    it('should render 2D mini-map markup container, canvas, legend, and layer toggle in renderFlightDetailHtml', () => {
+      const html = renderFlightDetailHtml(mockBundle);
+
+      assert.ok(html.includes('id="flight-detail-map-container"'), 'Must contain 2D mini-map container');
+      assert.ok(html.includes('id="flight-detail-map-canvas"'), 'Must contain map canvas');
+      assert.ok(html.includes('id="flight-detail-map-legend"'), 'Must contain map HUD legend');
+      assert.ok(html.includes('id="flight-detail-map-layer-toggle"'), 'Must contain layer toggle button');
+      assert.ok(html.includes('id="gm-flight-map-phase-badge"'), 'Must contain phase badge element');
+      assert.ok(html.includes('id="btn-flight-map-reset-selection"'), 'Must contain reset selection button');
+      assert.ok(html.includes('data-action="select-phase"'), 'Must include select-phase attributes on cards');
+      assert.ok(html.includes('data-phase-type="thermal"'), 'Must mark thermal cards with thermal phase type');
+    });
+
+    it('should render selectedPhase highlight rect in generateExpandedSvgChart when a phase is active', () => {
+      const svgWithPhase = generateExpandedSvgChart(mockBundle.raw.decimatedPoints, 600, 220, {
+        selectedPhase: {
+          type: 'thermal',
+          label: 'T1',
+          startIndex: 1,
+          endIndex: 3
+        }
+      });
+
+      assert.ok(svgWithPhase.includes('gm-chart-phase-selected-group'), 'Must contain selected phase group');
+      assert.ok(svgWithPhase.includes('gm-chart-phase-selected-rect'), 'Must contain highlight rect');
+      assert.ok(svgWithPhase.includes('Fase selezionata T1'), 'Must include aria-label with phase name');
+    });
+
+    it('should initialize HeadlessMockMapEngine, render track and sync cursor and phase selection', () => {
+      // Build mock DOM structure for overlay
+      const overlay = createMockElement('flight-detail-overlay');
+      const chartContainer = createMockElement('gm-interactive-chart-container');
+      const mapCanvas = createMockElement('flight-detail-map-canvas');
+      const phaseBadge = createMockElement('gm-flight-map-phase-badge');
+      const resetBtn = createMockElement('btn-flight-map-reset-selection');
+      const layerToggle = createMockElement('flight-detail-map-layer-toggle', [], 'button', { 'data-layer': 'topo' });
+
+      // Add a thermal card inside overlay
+      const thermalCard = createMockElement('card-t1', ['gm-thermal-card'], 'div', {
+        'data-action': 'select-phase',
+        'data-phase-type': 'thermal',
+        'data-phase-label': 'T1',
+        'data-start-index': '1',
+        'data-end-index': '3'
+      });
+
+      overlay.appendChild(mapCanvas);
+      overlay.appendChild(phaseBadge);
+      overlay.appendChild(resetBtn);
+      overlay.appendChild(layerToggle);
+      overlay.appendChild(chartContainer);
+      overlay.appendChild(thermalCard);
+
+      // Attach interactive flight chart
+      attachInteractiveFlightChart(overlay, mockBundle);
+
+      const mapEngine = getActiveFlightDetailMapEngine();
+      assert.ok(mapEngine, 'Map engine must be initialized and accessible');
+      assert.ok(mapEngine.renderedTrack, 'Track must be rendered on map engine');
+      assert.strictEqual(mapEngine.renderedTrack.points.length, mockBundle.raw.decimatedPoints.length);
+
+      // Test cursor synchronization
+      chartContainer.dispatchEvent({ type: 'pointerdown', clientX: 200, pointerId: 1 });
+      assert.ok(mapEngine.cursorPointIndex !== null, 'Cursor point index must be updated on pointerdown');
+
+      // Test phase selection from card click
+      overlay.dispatchEvent({
+        type: 'click',
+        target: thermalCard
+      });
+
+      assert.ok(mapEngine.highlightedRange, 'Highlighted range must be set on map engine');
+      assert.strictEqual(mapEngine.highlightedRange.startIndex, 1);
+      assert.strictEqual(mapEngine.highlightedRange.endIndex, 3);
+      assert.strictEqual(mapEngine.highlightedRange.options.label, 'T1');
+      assert.strictEqual(phaseBadge.textContent, 'T1');
+      assert.strictEqual(phaseBadge.style.display, 'inline-flex');
+      assert.strictEqual(resetBtn.style.display, 'inline-flex');
+
+      // Test layer toggle
+      layerToggle.dispatchEvent({ type: 'click', stopPropagation: () => {} });
+      assert.strictEqual(mapEngine.activeLayer, 'satellite', 'Layer should toggle to satellite');
+
+      // Test reset button
+      resetBtn.dispatchEvent({ type: 'click', stopPropagation: () => {} });
+      assert.strictEqual(mapEngine.highlightedRange, null, 'Highlighted range must be cleared');
+      assert.strictEqual(phaseBadge.textContent, '');
+      assert.strictEqual(phaseBadge.style.display, 'none');
+      assert.strictEqual(resetBtn.style.display, 'none');
+
+      // Test pointerup and pointerleave clears cursor
+      chartContainer.dispatchEvent({ type: 'pointerup', pointerId: 1 });
+      chartContainer.dispatchEvent({ type: 'pointerleave' });
+      assert.strictEqual(mapEngine.cursorPointIndex, null, 'Cursor must be cleared on pointerleave');
+
+      // Test cleanup on closeFlightDetailView
+      closeFlightDetailView();
+      assert.strictEqual(getActiveFlightDetailMapEngine(), null, 'Map engine must be destroyed and reset to null');
+    });
+  });
+
+  describe('Personal Career Records Badges in Flight Detail', () => {
+    it('should render record badge and highlight class on metrics that hold career records', () => {
+      const recordBundle = {
+        ...mockBundle,
+        meta: {
+          ...mockBundle.meta,
+          maxAltMsl: 2037, // Record
+          maxGainMeters: 850, // Record
+          durationMinutes: 120, // Record
+          distanceKm: 25.5 // Record
+        }
+      };
+
+      const careerRecords = {
+        maxAlt: { val: 2037, flightId: 'fl_cornizzolo_detail' },
+        maxGain: { val: 850, flightId: 'fl_cornizzolo_detail' },
+        maxDuration: { val: 120, flightId: 'fl_cornizzolo_detail' },
+        maxDistance: { val: 25.5, flightId: 'fl_cornizzolo_detail' },
+        maxClimbRate: { val: 5.0, flightId: 'other' }
+      };
+
+      const html = renderFlightDetailHtml(recordBundle, { careerRecords });
+
+      // Header card should display "Record Personale" status pill and duration record badge
+      assert.ok(html.includes('gm-status-pill-record'), 'Must show Record Personale status pill in header');
+      assert.ok(html.includes('Record Personale'), 'Must contain Record Personale text');
+      assert.ok(html.includes('title="Record Personale: Volo Più Lungo"'), 'Must have duration record badge');
+
+      // Metric cards for Alt, Gain, Distance should have record badges and highlight classes
+      assert.ok(html.includes('gm-record-badge'), 'Must render record badges on metric cards');
+      assert.ok(html.includes('gm-flight-metric-card-record'), 'Must apply record card highlight class');
+      assert.ok(html.includes('title="Record Personale: Quota Massima MSL"'), 'Must highlight maxAlt record');
+      assert.ok(html.includes('title="Record Personale: Maggior Guadagno"'), 'Must highlight maxGain record');
+      assert.ok(html.includes('title="Record Personale: Distanza Massima"'), 'Must highlight distance record');
+    });
+
+    it('should NOT render record badges or highlight classes on metrics below career records', () => {
+      const nonRecordBundle = {
+        ...mockBundle,
+        meta: {
+          ...mockBundle.meta,
+          maxAltMsl: 1200,
+          maxGainMeters: 300,
+          durationMinutes: 30,
+          distanceKm: 5.0,
+          maxClimbRate: 1.5
+        }
+      };
+
+      const careerRecords = {
+        maxAlt: { val: 2037, flightId: 'other-1' },
+        maxGain: { val: 850, flightId: 'other-2' },
+        maxDuration: { val: 120, flightId: 'other-3' },
+        maxDistance: { val: 25.5, flightId: 'other-4' },
+        maxClimbRate: { val: 4.5, flightId: 'other-5' }
+      };
+
+      const html = renderFlightDetailHtml(nonRecordBundle, { careerRecords });
+
+      assert.ok(!html.includes('gm-status-pill-record'), 'Non-record flight must NOT show Record Personale pill');
+      assert.ok(!html.includes('gm-record-badge'), 'Non-record flight must NOT render record badges');
+      assert.ok(!html.includes('gm-flight-metric-card-record'), 'Non-record flight must NOT apply record card highlight class');
+    });
+  });
 });
+
 
 

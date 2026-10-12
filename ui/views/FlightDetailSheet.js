@@ -443,12 +443,12 @@ export function generateExpandedSvgChart(points, width = 600, height = 220, opti
     }
   }
 
-  // Optional Variometer Curve Layer (Smoothed 3-point moving average)
+  // Optional Variometer Curve Layer (Smoothed 3-point moving average with distinct positive/negative colors)
   let varioSvg = '';
   if (showVario) {
     const varioLimit = 5.0; // +/- 5 m/s scale
     const varioZeroY = Math.round((padTop + chartHeight * 0.58) * 10) / 10;
-    const varioCoords = visiblePoints.map((p, vIdx) => {
+    const varioPts = visiblePoints.map((p, vIdx) => {
       const origIdx = startIdx + vIdx;
       const vRaw = getPointVario(p, origIdx, points);
       const vPrev = getPointVario(visiblePoints[Math.max(0, vIdx - 1)], Math.max(0, origIdx - 1), points);
@@ -457,14 +457,75 @@ export function generateExpandedSvgChart(points, width = 600, height = 220, opti
       const clampedV = Math.max(-varioLimit, Math.min(varioLimit, vSmooth));
       const x = Math.round((vIdx / (visibleN - 1)) * width * 10) / 10;
       const y = Math.round((varioZeroY - (clampedV / varioLimit) * (chartHeight * 0.28)) * 10) / 10;
-      return `${x},${y}`;
-    }).join(' ');
+      return { x, y, v: vSmooth };
+    });
+
+    // Partition into contiguous positive (climb >= 0) and negative (sink < 0) runs with exact zero crossing
+    const runs = [];
+    if (varioPts.length > 0) {
+      let currentRun = {
+        sign: varioPts[0].v >= 0 ? 1 : -1,
+        points: [varioPts[0]]
+      };
+
+      for (let i = 0; i < varioPts.length - 1; i++) {
+        const p1 = varioPts[i];
+        const p2 = varioPts[i + 1];
+        const s1 = p1.v >= 0 ? 1 : -1;
+        const s2 = p2.v >= 0 ? 1 : -1;
+
+        if (s1 === s2) {
+          currentRun.points.push(p2);
+        } else {
+          // Zero crossing between p1 and p2 at y = varioZeroY
+          const denom = Math.abs(p1.v) + Math.abs(p2.v);
+          const t = denom > 0 ? Math.abs(p1.v) / denom : 0.5;
+          const x0 = Math.round((p1.x + t * (p2.x - p1.x)) * 10) / 10;
+          const pZero = { x: x0, y: varioZeroY, v: 0 };
+
+          currentRun.points.push(pZero);
+          runs.push(currentRun);
+
+          currentRun = {
+            sign: s2,
+            points: [pZero, p2]
+          };
+        }
+      }
+      runs.push(currentRun);
+    }
+
+    let posStrokeD = '';
+    let negStrokeD = '';
+    let posFillD = '';
+    let negFillD = '';
+
+    runs.forEach((run) => {
+      if (!run.points || run.points.length < 2) return;
+      const pts = run.points;
+      const strokeCmd = `M ${pts[0].x},${pts[0].y} ` + pts.slice(1).map(pt => `L ${pt.x},${pt.y}`).join(' ');
+      const fillCmd = `M ${pts[0].x},${varioZeroY} L ${pts[0].x},${pts[0].y} ` +
+        pts.slice(1).map(pt => `L ${pt.x},${pt.y}`).join(' ') +
+        ` L ${pts[pts.length - 1].x},${varioZeroY} Z`;
+
+      if (run.sign === 1) {
+        posStrokeD += (posStrokeD ? ' ' : '') + strokeCmd;
+        posFillD += (posFillD ? ' ' : '') + fillCmd;
+      } else {
+        negStrokeD += (negStrokeD ? ' ' : '') + strokeCmd;
+        negFillD += (negFillD ? ' ' : '') + fillCmd;
+      }
+    });
 
     varioSvg = `
       <g class="gm-chart-vario-layer" aria-label="Curva Variometro">
-        <line x1="0" y1="${varioZeroY}" x2="${width}" y2="${varioZeroY}" stroke="#10b981" stroke-dasharray="2,3" stroke-width="1" opacity="0.45" />
-        <text x="${width - 6}" y="${varioZeroY - 3}" text-anchor="end" font-size="8.5" font-family="monospace" fill="#10b981" opacity="0.8">0 m/s</text>
-        <polyline points="${varioCoords}" fill="none" stroke="#10b981" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.85" />
+        <!-- Zero Reference Datum Line -->
+        <line x1="0" y1="${varioZeroY}" x2="${width}" y2="${varioZeroY}" stroke="#64748b" stroke-dasharray="3,3" stroke-width="1" opacity="0.65" />
+        <text x="${width - 6}" y="${varioZeroY - 3}" text-anchor="end" font-size="8.5" font-family="monospace" font-weight="600" fill="#94a3b8" opacity="0.9">0 m/s</text>
+        ${posFillD ? `<path class="gm-vario-fill-climb" d="${posFillD}" fill="rgba(16, 185, 129, 0.16)" stroke="none" />` : ''}
+        ${negFillD ? `<path class="gm-vario-fill-sink" d="${negFillD}" fill="rgba(239, 68, 68, 0.16)" stroke="none" />` : ''}
+        ${posStrokeD ? `<path class="gm-vario-stroke-climb" d="${posStrokeD}" fill="none" stroke="#10b981" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.9" />` : ''}
+        ${negStrokeD ? `<path class="gm-vario-stroke-sink" d="${negStrokeD}" fill="none" stroke="#ef4444" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.9" />` : ''}
       </g>
     `;
   }
@@ -943,6 +1004,10 @@ export function renderFlightDetailHtml(bundle, options = {}) {
               <span class="gm-legend-scale-lbl">&gt;+3 m/s</span>
             </div>
             <div class="gm-legend-chips-wrap">
+              <div class="gm-legend-chip gm-legend-vario-chip">
+                <span class="gm-vario-dual-dot" aria-hidden="true"></span>
+                <span>Vario: <span class="text-emerald-400 font-semibold">+Salita</span> / <span class="text-rose-400 font-semibold">-Discesa</span></span>
+              </div>
               ${thermals.length > 0 ? `
                 <div class="gm-legend-chip">
                   <span class="gm-thermal-legend-icon">T</span>
@@ -1338,14 +1403,150 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
   const navTrack = overlayEl.querySelector('#gm-chart-navigator');
   const navHandle = overlayEl.querySelector('#gm-chart-nav-handle');
 
+  const mapCanvasEl = overlayEl.querySelector('#flight-detail-map-canvas');
+  const phaseBadgeEl = overlayEl.querySelector('#gm-flight-map-phase-badge');
+  const resetPhaseBtn = overlayEl.querySelector('#btn-flight-map-reset-selection');
+  const layerToggleBtn = overlayEl.querySelector('#flight-detail-map-layer-toggle');
+
+  const targetStore = bundle?.options?.store || store;
+  const currentAppState = (targetStore && typeof targetStore.getState === 'function') ? targetStore.getState() : {};
+  const activeTheme = currentAppState.ui?.theme || 'dark';
+  let activeLayer = currentAppState.ui?.mapLayer || 'topo';
+
+  // Ensure points have fallback coordinates for mock/synthesized tracks
+  const safePoints = points.map((p, idx) => {
+    const lat = (typeof p.lat === 'number' && !isNaN(p.lat)) ? p.lat : (45.8 + idx * 0.0008);
+    const lon = (typeof p.lon === 'number' && !isNaN(p.lon)) ? p.lon : (9.29 + idx * 0.0006);
+    return {
+      ...p,
+      lat,
+      lon
+    };
+  });
+
+  if (flightDetailMapEngine) {
+    try { flightDetailMapEngine.destroy(); } catch (_) {}
+    flightDetailMapEngine = null;
+  }
+
+  if (mapCanvasEl) {
+    flightDetailMapEngine = createMapEngine(mapCanvasEl, {
+      theme: activeTheme,
+      layer: activeLayer,
+      isMiniMap: true
+    });
+
+    if (flightDetailMapEngine) {
+      const meta = bundle?.meta || {};
+      const takeoff = (meta.takeoffLat != null && meta.takeoffLon != null)
+        ? { lat: meta.takeoffLat, lon: meta.takeoffLon, name: meta.takeoffName || 'Decollo' }
+        : { lat: safePoints[0].lat, lon: safePoints[0].lon, name: 'Decollo' };
+
+      const landing = (meta.landingLat != null && meta.landingLon != null)
+        ? { lat: meta.landingLat, lon: meta.landingLon, name: meta.landingName || 'Atterraggio' }
+        : { lat: safePoints[safePoints.length - 1].lat, lon: safePoints[safePoints.length - 1].lon, name: 'Atterraggio' };
+
+      flightDetailMapEngine.renderFlightTrack(mapCanvasEl, {
+        points: safePoints,
+        takeoff,
+        landing,
+        thermals,
+        maneuvers: Array.isArray(tel.maneuvers) ? tel.maneuvers : []
+      });
+    }
+  }
+
   const state = {
     zoom: 1.0,
     pan: 0.5,
     showAlt: true,
     showVario: false,
     showSpeed: false,
-    cursorIndex: null
+    cursorIndex: null,
+    selectedPhase: null
   };
+
+  const selectPhase = (phase) => {
+    if (!phase) return;
+    const startIndex = Math.max(0, Math.min(points.length - 1, parseInt(phase.startIndex ?? 0, 10)));
+    const endIndex = Math.max(startIndex, Math.min(points.length - 1, parseInt(phase.endIndex ?? startIndex, 10)));
+    const label = phase.label || 'Fase Volo';
+    const type = phase.type || 'phase';
+
+    state.selectedPhase = {
+      type,
+      label,
+      startIndex,
+      endIndex
+    };
+
+    if (phaseBadgeEl) {
+      phaseBadgeEl.textContent = label;
+      phaseBadgeEl.style.display = 'inline-flex';
+    }
+    if (resetPhaseBtn) {
+      resetPhaseBtn.style.display = 'inline-flex';
+    }
+
+    if (flightDetailMapEngine && typeof flightDetailMapEngine.highlightFlightTrackRange === 'function') {
+      flightDetailMapEngine.highlightFlightTrackRange(startIndex, endIndex, {
+        label,
+        type
+      });
+    }
+
+    renderSvg();
+  };
+
+  const clearPhaseSelection = () => {
+    state.selectedPhase = null;
+
+    if (phaseBadgeEl) {
+      phaseBadgeEl.textContent = '';
+      phaseBadgeEl.style.display = 'none';
+    }
+    if (resetPhaseBtn) {
+      resetPhaseBtn.style.display = 'none';
+    }
+
+    if (flightDetailMapEngine && typeof flightDetailMapEngine.highlightFlightTrackRange === 'function') {
+      flightDetailMapEngine.highlightFlightTrackRange(null, null);
+    }
+
+    renderSvg();
+  };
+
+  if (resetPhaseBtn) {
+    resetPhaseBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      clearPhaseSelection();
+    });
+  }
+
+  if (layerToggleBtn) {
+    layerToggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const currentLayer = layerToggleBtn.getAttribute('data-layer') || activeLayer;
+      const nextLayer = getNextMapLayer(currentLayer);
+      activeLayer = nextLayer;
+      layerToggleBtn.setAttribute('data-layer', nextLayer);
+      layerToggleBtn.setAttribute('aria-label', `Layer mappa: ${nextLayer === 'satellite' ? 'Satellite (tocca per OpenTopo)' : 'OpenTopo (tocca per Satellite)'}`);
+      layerToggleBtn.setAttribute('title', `Passa a ${nextLayer === 'satellite' ? 'OpenTopo' : 'Satellite'}`);
+      layerToggleBtn.innerHTML = `
+        ${renderLayerToggleIcon(nextLayer)}
+        <span class="gm-layer-toggle-label">${getMapLayerLabel(nextLayer)}</span>
+      `;
+
+      if (flightDetailMapEngine && typeof flightDetailMapEngine.setLayer === 'function') {
+        flightDetailMapEngine.setLayer(nextLayer);
+      }
+
+      if (targetStore && typeof targetStore.setState === 'function') {
+        const prevUi = targetStore.getState().ui || {};
+        targetStore.setState({ ui: { ...prevUi, mapLayer: nextLayer } });
+      }
+    });
+  }
 
   const updateHud = (pointIndex) => {
     if (pointIndex == null || pointIndex < 0 || pointIndex >= points.length) {
@@ -1416,6 +1617,7 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
       showVario: state.showVario,
       showSpeed: state.showSpeed,
       cursorIndex: state.cursorIndex,
+      selectedPhase: state.selectedPhase,
       thermals,
       thermalProbes,
       rollInversions
@@ -1577,6 +1779,9 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
     state.cursorIndex = idx;
     updateHud(idx);
     updateCursorGroup(idx);
+    if (flightDetailMapEngine && typeof flightDetailMapEngine.setFlightTrackCursor === 'function') {
+      flightDetailMapEngine.setFlightTrackCursor(idx);
+    }
   });
 
   chartContainer.addEventListener('pointermove', (e) => {
@@ -1591,6 +1796,9 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
         state.cursorIndex = idx;
         updateHud(idx);
         renderSvg();
+        if (flightDetailMapEngine && typeof flightDetailMapEngine.setFlightTrackCursor === 'function') {
+          flightDetailMapEngine.setFlightTrackCursor(idx);
+        }
         return;
       }
     }
@@ -1598,6 +1806,9 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
     state.cursorIndex = idx;
     updateHud(idx);
     updateCursorGroup(idx);
+    if (flightDetailMapEngine && typeof flightDetailMapEngine.setFlightTrackCursor === 'function') {
+      flightDetailMapEngine.setFlightTrackCursor(idx);
+    }
   });
 
   const onPointerUp = (e) => {
@@ -1616,6 +1827,9 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
       state.cursorIndex = null;
       const cursorGroup = chartContainer.querySelector('#gm-chart-cursor-group');
       if (cursorGroup) cursorGroup.style.display = 'none';
+      if (flightDetailMapEngine && typeof flightDetailMapEngine.setFlightTrackCursor === 'function') {
+        flightDetailMapEngine.setFlightTrackCursor(null);
+      }
     }
   });
 
@@ -1658,7 +1872,33 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
     navTrack.addEventListener('pointercancel', onNavUp);
   }
 
-  // 5. Initialize HUD with highest altitude or starting point
+  // 5. Click delegation for flight phases on chart and cards
+  chartContainer.addEventListener('click', (e) => {
+    const phaseTarget = e.target.closest('[data-phase-type]');
+    if (phaseTarget) {
+      const type = phaseTarget.getAttribute('data-phase-type');
+      const label = phaseTarget.getAttribute('data-phase-label');
+      const startIndex = parseInt(phaseTarget.getAttribute('data-start-index'), 10);
+      const endIndex = parseInt(phaseTarget.getAttribute('data-end-index'), 10);
+      selectPhase({ type, label, startIndex, endIndex });
+    }
+  });
+
+  overlayEl.addEventListener('click', (e) => {
+    const cardTarget = e.target.closest('[data-action="select-phase"]');
+    if (cardTarget) {
+      const type = cardTarget.getAttribute('data-phase-type');
+      const label = cardTarget.getAttribute('data-phase-label');
+      const startIndex = parseInt(cardTarget.getAttribute('data-start-index'), 10);
+      const endIndex = parseInt(cardTarget.getAttribute('data-end-index'), 10);
+      selectPhase({ type, label, startIndex, endIndex });
+      if (mapCanvasEl && typeof mapCanvasEl.scrollIntoView === 'function') {
+        try { mapCanvasEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (_) {}
+      }
+    }
+  });
+
+  // 6. Initialize HUD with highest altitude or starting point
   const alts = points.map((p) => (typeof p.alt === 'number' && !isNaN(p.alt) ? p.alt : 0));
   const maxAlt = Math.max(...alts);
   const maxIdx = alts.indexOf(maxAlt);

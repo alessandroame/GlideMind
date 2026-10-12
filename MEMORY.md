@@ -1660,3 +1660,46 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
   2. **Preservazione dei Decimali su Scale Ridotte ($\le 5$)**: Se `maxY <= 5`, l'asse Y e i tooltip per unità frazionarie (`mm/h`, `EDR`) devono utilizzare tassativamente `toFixed(1)` anziché `Math.round()`, garantendo la visibilità immediata delle soglie di pioviggine ($0.1\text{ mm/h}$) e limite di volo ($0.5\text{ mm/h}$).
   3. **Integrazione Duale Multi-Trend e Schede**: Esporre un pannello dedicato `multi-chart-precipitation` nello stack dei grafici orari con soglie tratteggiate di allerta ($0.1$ gialla, $0.5$ rossa) e affiancare la polilinea tratteggiata della probabilità di pioggia (%) alla copertura nuvolosa (%) nella card espandibile.
 
+---
+
+## 131. Prevenzione Regressioni su Contratti di Test nei Refactoring UI e Identificazione Puntuale dei Target di Bonifica
+- **Problema**: Durante l'audit visivo e la stesura del piano di bonifica ergonomica, la proposta di rimuovere direttamente l'azione `[data-action="delete-flight"]` dalle card del feed di volo per prevenire cancellazioni accidentali rischiava di far fallire 2 suite di test di integrazione (`logbookView.test.mjs` e `logbookFlightDetailInteraction.test.mjs`) che asseriscono la presenza e la gestione di tale attributo. Inoltre, un controllo mappa duplicato (select + toggle) segnalato dal manifest automatico è stato inizialmente attribuito a `SpotMapView.js` anziché alla mini-mappa di `ForecastView.js`.
+- **Causa Radice**:
+  1. Scansione euristica aggregata dell'audit visuale non preventivamente incrociata con la base di codice dei test automatizzati (`tests/ui/`).
+  2. Omonimia parziale o sovrapposizione concettuale tra controlli simili presenti in viste differenti (mini-mappa di `ForecastView.js` con `#forecast-minimap-layer-*` vs canvas di `SpotMapView.js` con `#gm-map-layer-*`).
+- **Pattern Vincolante**:
+  1. **Preservazione dei Contratti di Test**: Prima di modificare o rimuovere attributi `data-action` o ID semantici dalla UI, eseguire sempre un `git grep` su `tests/` per identificare le dipendenze contrattuali. Se l'azione deve essere protetta, intercettarla con pattern a 2 fasi (dialogo/modale di conferma conforme a NN/G #5) o finestra di grazia (Undo a 5 secondi), garantendo la continuità dei test.
+  2. **Ispezione Puntuale del Target**: Validare sempre gli ID univoci degli elementi evidenziati dagli audit headless prima di pianificare il refactoring, distinguendo nettamente le istanze mini-mappa (`ForecastView.js`) dalle istanze mappa completa (`SpotMapView.js`).
+
+---
+
+## 132. Differenziazione Cromatico-Vettoriale Salita / Discesa nei Tracciati Variometrici con Zero-Crossing Esatto
+- **Problema**: La curva del variometro visualizzata in overlay al profilo altimetrico veniva renderizzata come una polilinea uniforme monocromatica verde smeraldo (`#10b981`), sia per valori positivi di salita (termica o dinamica, $v > 0$) sia per valori negativi di discesa e sprofondamento ($v < 0$). Questa monotonia cromatica impediva al pilota di cogliere a colpo d'occhio le inversioni di rateo verticale e aumentava il carico cognitivo all'aperto.
+- **Causa Radice**: La funzione di render vettoriale tracciava una singola polilinea SVG (`polyline points=...`) associata a uno stile globale `stroke="#10b981"` senza calcolare le partizioni di segno né i punti di attraversamento della quota zero.
+- **Pattern Vincolante**:
+  1. **Calcolo Geometrico dello Zero-Crossing**: Per ogni coppia di campioni consecutivi aventi segno discordante ($v_i \cdot v_{i+1} < 0$), calcolare la frazione di interpolazione lineare $t = |v_i| / (|v_i| + |v_{i+1}|)$ e inserire il vertice esatto $(x_0, y_{zero})$ sia come fine della partizione corrente sia come inizio della successiva.
+  2. **Tracciati Vettoriali e Aree a Doppio Canale**:
+     - **Salita ($v \ge 0$)**: Stroke verde smeraldo (`#10b981`, `.gm-vario-stroke-climb`) e riempimento semitrasparente verso l'asse zero (`rgba(16, 185, 129, 0.16)`, `.gm-vario-fill-climb`).
+     - **Discesa ($v < 0$)**: Stroke rosso corallo (`#ef4444`, `.gm-vario-stroke-sink`) e riempimento semitrasparente verso l'asse zero (`rgba(239, 68, 68, 0.16)`, `.gm-vario-fill-sink`).
+  3. **Asse Datum Neutro e Indicatore Bicolore**:
+     - L'asse di zero deve adottare un colore neutro di riferimento (`#64748b` tratteggiato con etichetta `0 m/s` in `#94a3b8`), evitando di confondersi con la curva di salita.
+     - Il dot del selettore (`.dot-vario`) e il chip di legenda devono mostrare il gradiente bicolore a 135° (`#10b981` 50% / `#ef4444` 50%) con microcopy esplicita `+Salita / -Discesa`.
+
+---
+
+## 133. Sincronizzazione Bidirezionale tra Mappa 2D Traccia e Grafico Altimetrico: Colorazione Variometrica a Segmenti Raggruppati, Evidenziazione Fasi e Cursore Real-time
+- **Problema**: Nella schermata di dettaglio del volo, l'altimetria temporale e la traccia geografica al suolo erano disconnesse, impedendo al pilota di contestualizzare geograficamente dove si trovavano le termiche salite o le manovre registrate nel grafico altimetrico. Inoltre, renderizzare una polilinea Leaflet distinta per ogni singolo secondo di registrazione (migliaia di punti) provocava crolli di frame rate e lag nell'interazione touch.
+- **Causa Radice**:
+  1. Assenza di una mini mappa cartografica 2D sopra il profilo altimetrico per collegare quota e posizione geografica.
+  2. Frammentazione eccessiva del tracciato cartografico se suddiviso punto per punto per applicare la colorazione variometrica.
+  3. Mancanza di un protocollo unificato di selezione delle fasi di volo (indici di inizio/fine) in grado di aggiornare contemporaneamente il grafico SVG (rettangolo di fase) e la mappa (halo luminoso, zoom automatico e attenuazione dei segmenti restanti).
+- **Pattern Vincolante**:
+  1. **Raggruppamento per Fasce Variometriche Continue**: In `renderFlightTrack`, unire i punti contigui appartenenti alla stessa fascia di colore variometrico (stessa palette `sampleVarioRgb`) in macro-segmenti Leaflet (`L.polyline`), riducendo da migliaia a poche decine il numero di elementi DOM nel layer cartografico e garantendo 60 FPS stabili.
+  2. **Evidenziazione Spaziale della Fase con Alone Luminoso (Halo)**: Quando l'utente seleziona una fase (termica, inversione, sondaggio) cliccando sul grafico o sulle schede analitiche:
+     - Tracciare un layer halo evidenziato (`#38bdf8`, spessore 6px, opacità 0.9) sulla porzione selezionata.
+     - Posizionare un pin marker semantico informativo (`.gm-flight-phase-map-pin`) sul punto medio della fase.
+     - Attenuare la luminosità dei segmenti non selezionati (`opacity: 0.25`).
+     - Eseguire `fitBounds` con margine di sicurezza centrato sulla porzione di traccia selezionata.
+  3. **Sincronizzazione Mirino Cursore in Tempo Reale**: Durante l'ispezione touch/mouse del grafico altimetrico (`pointerdown`, `pointermove`), aggiornare un marker circolare a impulsi (`.gm-flight-track-cursor`) sulla traccia 2D alle coordinate esatte del punto campionato, rimuovendolo su `pointerleave` o `pointerup`.
+  4. **Toggle Layer Cartografico Unificato**: Offrire un controllo compatto in-canvas per alternare tra `OpenTopoMap` e `Satellite`, sincronizzando istantaneamente `store.ui.mapLayer` per coerenza con le altre viste dell'app.
+

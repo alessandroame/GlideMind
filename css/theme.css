@@ -7366,6 +7366,32 @@ input.gm-input:focus {
   box-sizing: border-box;
 }
 
+.gm-stats-record-clickable {
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.15s ease, border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.gm-stats-record-clickable:hover {
+  border-color: rgba(56, 189, 248, 0.45);
+  background-color: var(--gm-bg-card-hover, rgba(255, 255, 255, 0.04));
+  transform: translateY(-1px);
+}
+
+.gm-stats-record-clickable:active {
+  transform: scale(0.98);
+}
+
+.gm-stats-record-clickable:focus-visible {
+  outline: 2px solid var(--gm-accent-sky, #38bdf8);
+  outline-offset: 2px;
+}
+
+[data-theme="light"] .gm-stats-record-clickable:hover {
+  border-color: rgba(2, 132, 199, 0.4);
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
 .gm-stats-metric-val {
   font-size: 1.2rem;
   font-weight: 700;
@@ -7782,8 +7808,17 @@ input.gm-input:focus {
   flex-shrink: 0;
 }
 .dot-alt { background: #38bdf8; }
-.dot-vario { background: #10b981; }
+.dot-vario { background: linear-gradient(135deg, #10b981 50%, #ef4444 50%); }
 .dot-speed { background: #c084fc; }
+
+.gm-vario-dual-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #10b981 50%, #ef4444 50%);
+  flex-shrink: 0;
+}
 
 .gm-telemetry-zoom-group,
 .gm-telemetry-zoom-dock {
@@ -8447,6 +8482,18 @@ input.gm-input:focus {
   border: 1px solid rgba(16, 185, 129, 0.35);
 }
 
+.gm-status-pill-record {
+  background: rgba(245, 158, 11, 0.18);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+[data-theme="light"] .gm-status-pill-record {
+  background: rgba(217, 119, 6, 0.15);
+  color: #b45309;
+  border-color: rgba(217, 119, 6, 0.4);
+}
+
 .gm-debrief-callout {
   padding: 10px 14px;
   border-radius: var(--gm-radius-md);
@@ -8753,6 +8800,40 @@ input.gm-input:focus {
   color: var(--gm-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.03em;
+}
+
+.gm-record-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--gm-font-mono, monospace);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  border-radius: var(--gm-radius-sm, 4px);
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.38);
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+[data-theme="light"] .gm-record-badge {
+  background: rgba(217, 119, 6, 0.12);
+  color: #b45309;
+  border-color: rgba(217, 119, 6, 0.35);
+}
+
+.gm-flight-metric-card-record {
+  border-color: rgba(245, 158, 11, 0.45) !important;
+  background: linear-gradient(135deg, var(--gm-bg-card) 0%, rgba(245, 158, 11, 0.06) 100%) !important;
+}
+
+[data-theme="light"] .gm-flight-metric-card-record {
+  border-color: rgba(217, 119, 6, 0.4) !important;
+  background: linear-gradient(135deg, var(--gm-bg-card) 0%, rgba(245, 158, 11, 0.08) 100%) !important;
 }
 
 /* ==========================================================================

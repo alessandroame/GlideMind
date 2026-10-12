@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {
   calculatePilotPeriodMetrics,
   calculateMonthlyFlightActivity,
+  calculatePersonalRecords,
+  checkFlightRecordFlags,
   createFlightLogEntry,
   deduceFlightActivitiesFromTrack,
   DEFAULT_SEED_FLIGHTS,
@@ -264,6 +266,134 @@ describe('GlideMind Flight Logbook & Pilot Currency Analytics (Headless Core)', 
       const res = calculateMonthlyFlightActivity(mixedFlights, { referenceDate: refDate });
       assert.equal(res.totalFlights, 2);
       assert.equal(res.totalHours, 1.5);
+    });
+  });
+
+  describe('Career Personal Records & Record Flags (Headless Core)', () => {
+    const testFlights = [
+      {
+        id: 'fl-1',
+        flightNumber: 10,
+        date: '2026-10-10',
+        siteName: 'Decollo Ciavanis',
+        maxAltMsl: 2037,
+        maxGainMeters: 260,
+        durationMinutes: 36,
+        distanceKm: 19.7,
+        maxClimbRate: 3.5
+      },
+      {
+        id: 'fl-2',
+        flightNumber: 9,
+        date: '2026-09-20',
+        siteName: 'Monte Cornizzolo',
+        maxAltMsl: 1850,
+        maxGainMeters: 850,
+        durationMinutes: 120,
+        distanceKm: 14.2,
+        maxClimbRate: 4.1
+      },
+      {
+        id: 'fl-3',
+        // No flightNumber explicit -> total (3) - index (2) = 1
+        date: '2026-08-15',
+        siteName: 'Bassano',
+        maxAltMsl: 1200,
+        maxGainMeters: 400,
+        durationMinutes: 45,
+        distanceKm: 8.0,
+        maxClimbRate: 2.0
+      }
+    ];
+
+    it('should calculate career personal records accurately with flight metadata attribution', () => {
+      const records = calculatePersonalRecords(testFlights);
+
+      // Max altitude: fl-1 (2037 m, #10)
+      assert.equal(records.maxAlt.val, 2037);
+      assert.equal(records.maxAlt.flightId, 'fl-1');
+      assert.equal(records.maxAlt.flightNumber, 10);
+      assert.equal(records.maxAlt.site, 'Decollo Ciavanis');
+
+      // Max gain: fl-2 (+850 m, #9)
+      assert.equal(records.maxGain.val, 850);
+      assert.equal(records.maxGain.flightId, 'fl-2');
+      assert.equal(records.maxGain.flightNumber, 9);
+      assert.equal(records.maxGain.site, 'Monte Cornizzolo');
+
+      // Max duration: fl-2 (120 min, #9)
+      assert.equal(records.maxDuration.val, 120);
+      assert.equal(records.maxDuration.flightId, 'fl-2');
+      assert.equal(records.maxDuration.flightNumber, 9);
+
+      // Max distance: fl-1 (19.7 km, #10)
+      assert.equal(records.maxDistance.val, 19.7);
+      assert.equal(records.maxDistance.flightId, 'fl-1');
+      assert.equal(records.maxDistance.flightNumber, 10);
+
+      // Max climb rate: fl-2 (4.1 m/s, #9)
+      assert.equal(records.maxClimbRate.val, 4.1);
+      assert.equal(records.maxClimbRate.flightId, 'fl-2');
+      assert.equal(records.maxClimbRate.flightNumber, 9);
+    });
+
+    it('should deduce flightNumber from progressive position when omitted', () => {
+      const flightsWithoutNumbers = [
+        { id: 'f-newest', durationMinutes: 50 },
+        { id: 'f-oldest', durationMinutes: 90 }
+      ];
+      const records = calculatePersonalRecords(flightsWithoutNumbers);
+
+      // Longest flight is f-oldest at index 1 -> total (2) - index (1) = 1
+      assert.equal(records.maxDuration.val, 90);
+      assert.equal(records.maxDuration.flightId, 'f-oldest');
+      assert.equal(records.maxDuration.flightNumber, 1);
+    });
+
+    it('should return empty records safely for empty or invalid flight arrays', () => {
+      const records = calculatePersonalRecords([]);
+      assert.equal(records.maxAlt.val, 0);
+      assert.equal(records.maxAlt.flightId, null);
+      assert.equal(records.maxAlt.flightNumber, null);
+      assert.equal(records.maxGain.val, 0);
+      assert.equal(records.maxDuration.val, 0);
+      assert.equal(records.maxDistance.val, 0);
+      assert.equal(records.maxClimbRate.val, 0);
+    });
+
+    it('should identify which metrics of a specific flight are records with checkFlightRecordFlags', () => {
+      const records = calculatePersonalRecords(testFlights);
+
+      // fl-1 has maxAlt (2037) and maxDistance (19.7)
+      const flags1 = checkFlightRecordFlags(testFlights[0], records);
+      assert.equal(flags1.isMaxAlt, true);
+      assert.equal(flags1.isMaxDistance, true);
+      assert.equal(flags1.isMaxGain, false);
+      assert.equal(flags1.isMaxDuration, false);
+      assert.equal(flags1.hasAnyRecord, true);
+
+      // fl-2 has maxGain (850), maxDuration (120), maxClimbRate (4.1)
+      const flags2 = checkFlightRecordFlags(testFlights[1], records);
+      assert.equal(flags2.isMaxAlt, false);
+      assert.equal(flags2.isMaxDistance, false);
+      assert.equal(flags2.isMaxGain, true);
+      assert.equal(flags2.isMaxDuration, true);
+      assert.equal(flags2.isMaxClimbRate, true);
+      assert.equal(flags2.hasAnyRecord, true);
+
+      // fl-3 has no records
+      const flags3 = checkFlightRecordFlags(testFlights[2], records);
+      assert.equal(flags3.isMaxAlt, false);
+      assert.equal(flags3.isMaxDistance, false);
+      assert.equal(flags3.isMaxGain, false);
+      assert.equal(flags3.isMaxDuration, false);
+      assert.equal(flags3.hasAnyRecord, false);
+    });
+
+    it('should handle null flightMeta or careerRecords safely in checkFlightRecordFlags', () => {
+      const safe = checkFlightRecordFlags(null, null);
+      assert.equal(safe.hasAnyRecord, false);
+      assert.equal(safe.isMaxAlt, false);
     });
   });
 });

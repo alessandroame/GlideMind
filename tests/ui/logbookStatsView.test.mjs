@@ -66,6 +66,19 @@ describe('LogbookStatsView Component (UI Layer)', () => {
     assert.ok(html.includes('60 min'), 'Longest flight must be 60 min');
     assert.ok(html.includes('15.2 km'), 'Max distance must be 15.2 km');
 
+    // Flight number badges visible on personal records
+    assert.ok(html.includes('gm-flight-number-badge'), 'Must render flight number badge on personal records');
+    assert.ok(html.includes('>#2<'), 'fl-1 (index 0 of 2) has flight number #2');
+    assert.ok(html.includes('>#1<'), 'fl-2 (index 1 of 2) has flight number #1');
+
+    // Clickable card attributes for opening flight detail
+    assert.ok(html.includes('data-action="open-flight-detail"'), 'Must have open-flight-detail action on record cards');
+    assert.ok(html.includes('data-flight-id="fl-1"'), 'Must link to flight fl-1');
+    assert.ok(html.includes('data-flight-id="fl-2"'), 'Must link to flight fl-2');
+    assert.ok(html.includes('gm-stats-record-clickable'), 'Must apply interactive clickable class to record cards');
+    assert.ok(html.includes('role="button"'), 'Must have role="button" for accessibility');
+    assert.ok(html.includes('tabindex="0"'), 'Must have tabindex="0" for keyboard navigation');
+
     // Top Sites & Gliders
     assert.ok(html.includes('Decollo Risparmio'));
     assert.ok(html.includes('Decollo Stella'));

@@ -1334,3 +1334,32 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Suite completa di 687 test (119 suite) superata al 100% (686 pass, 0 fail, 1 skipped).
   - Registrata la Lezione Appresa #129 in [MEMORY.md](file:///MEMORY.md).
 
+---
+
+## 2026-10-12 - UI / Telemetria: Colorazione Differenziata Salita / Discesa per la Curva Variometro
+- **Tipo**: UI / Telemetria di Volo / SVG Vettoriale / Avionica
+- **Dettagli**: [.agents/worklog.d/2026-10-12_dual_color_variometer_curve_climb_sink.md](file:///.agents/worklog.d/2026-10-12_dual_color_variometer_curve_climb_sink.md)
+- **Sintesi**:
+  - Superata la monotonia monocromatica della curva del variometro: calcolata l'intersezione esatta sull'asse di zero ($y = varioZeroY$) per ogni inversione di segno ($v_i \cdot v_{i+1} < 0$).
+  - Partizionato il tracciato in segmenti di salita ($v \ge 0$, verde smeraldo `#10b981` con riempimento `.gm-vario-fill-climb` semitrasparente verso lo zero) e segmenti di discesa ($v < 0$, rosso corallo `#ef4444` con riempimento `.gm-vario-fill-sink` semitrasparente verso lo zero).
+  - Neutralizzato l'asse di zero a datum grigio lavagna (`#64748b`) con etichetta `0 m/s` in `#94a3b8`.
+  - Aggiornato il selettore `.dot-vario` con gradiente diagonale bicolore a 135° e introdotto nella legenda il chip con indicatore `Vario: +Salita / -Discesa`.
+  - Aggiornati i test in `tests/ui/flightDetailSheet.test.mjs` con asserzioni deterministiche su `#10b981` e `#ef4444`; suite di 697 test al 100% verde (696 pass, 0 fail, 1 skipped).
+  - Registrata la Lezione Appresa #131 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-12 - Audit Visivo Multi-Modale, Master Plan Prioritario & Scrutinio Critico
+- **Tipo**: Audit Visivo / Ergonomia Outdoor / Architettura / Master Plan
+- **Dettagli**: [.agents/worklog.d/2026-10-12_multi_modal_visual_audit_and_remediation_plan.md](file:///.agents/worklog.d/2026-10-12_multi_modal_visual_audit_and_remediation_plan.md)
+- **Sintesi**:
+  - Implementata infrastruttura di cattura visiva automatizzata headless Node.js v24 via Chrome DevTools Protocol (`scripts/run-full-audit-capture.mjs`).
+  - Acquisito ed esaminato un corpus di **23 screenshot reali a piena pagina** (2x DPR) nei temi Dark Cockpit e Sunlight Mode per dispositivi mobile (390×844) e desktop (1280×800), con generazione di `docs/audit-screenshots/audit-manifest.json`.
+  - Risolto difetto bloccante di navigazione [P0-1] in `ui/router.js` e `ui/views/TrackSetupSheet.js` (persistenza overlay modali a pieno schermo durante il cambio route).
+  - Redatto e registrato come prioritario in `DESIDERATA.md` il Master Plan in 5 fasi (`docs/plans/audit_and_remediation_master_plan.md`).
+  - Eseguito scrutinio critico avversariale sul piano: identificato e scongiurato il rischio di rottura dei test su `data-action="delete-flight"`, rettificata l'attribuzione dei controlli mappa ridondanti alla mini-mappa di `ForecastView.js` e circoscritto il padding di sicurezza inferiore a viewport mobile.
+  - Registrata la Lezione Appresa #133 in [MEMORY.md](file:///MEMORY.md).
+  - Suite di test al 100% verde (686 passati su 687).
+
+
+
