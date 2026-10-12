@@ -16,6 +16,7 @@ import { detectTrimPoints } from '../../core/flightTrimming.js';
 let activeSetupOverlay = null;
 let previousActiveEl = null;
 let escapeKeyHandler = null;
+let hashChangeHandler = null;
 
 /**
  * Escapes HTML characters to prevent XSS.
@@ -186,7 +187,7 @@ export function renderTrackSetupHtml(bundle) {
               <button
                 type="button"
                 id="btn-setup-auto-detect-trim"
-                class="gm-btn-secondary"
+                class="gm-btn gm-btn-secondary"
                 style="min-height: var(--gm-touch-min, 48px); padding: 0 16px;"
               >
                 Rileva Automaticamente
@@ -197,7 +198,7 @@ export function renderTrackSetupHtml(bundle) {
                   <button
                     type="button"
                     id="btn-setup-reset-trim"
-                    class="gm-btn-secondary"
+                    class="gm-btn gm-btn-secondary"
                     style="min-height: var(--gm-touch-min, 48px); padding: 0 16px;"
                   >
                     Ripristina Originale
@@ -206,7 +207,7 @@ export function renderTrackSetupHtml(bundle) {
                 <button
                   type="button"
                   id="btn-setup-apply-trim"
-                  class="gm-btn-primary"
+                  class="gm-btn gm-btn-primary"
                   style="min-height: var(--gm-touch-min, 48px); padding: 0 20px;"
                 >
                   Applica Trimming
@@ -311,7 +312,7 @@ export function renderTrackSetupHtml(bundle) {
                 <button
                   type="button"
                   id="btn-setup-reset-elevation"
-                  class="gm-btn-secondary"
+                  class="gm-btn gm-btn-secondary"
                   style="min-height: var(--gm-touch-min, 48px); padding: 0 16px;"
                 >
                   Ripristina Quote Strumento
@@ -320,7 +321,7 @@ export function renderTrackSetupHtml(bundle) {
               <button
                 type="button"
                 id="btn-setup-apply-elevation"
-                class="gm-btn-primary"
+                class="gm-btn gm-btn-primary"
                 style="min-height: var(--gm-touch-min, 48px); padding: 0 20px;"
               >
                 Applica Calibrazione Quote
@@ -340,6 +341,11 @@ export function closeTrackSetupView() {
   if (escapeKeyHandler && typeof window !== 'undefined') {
     window.removeEventListener('keydown', escapeKeyHandler);
     escapeKeyHandler = null;
+  }
+
+  if (hashChangeHandler && typeof window !== 'undefined') {
+    window.removeEventListener('hashchange', hashChangeHandler);
+    hashChangeHandler = null;
   }
 
   if (activeSetupOverlay) {
@@ -406,7 +412,7 @@ export async function openTrackSetupView(flightId, options = {}) {
     });
   }
 
-  // 2. Escape key navigation
+  // 2. Escape key navigation & hashchange dismissal
   escapeKeyHandler = (e) => {
     if (e.key === 'Escape') {
       closeTrackSetupView();
@@ -416,6 +422,11 @@ export async function openTrackSetupView(flightId, options = {}) {
     }
   };
   window.addEventListener('keydown', escapeKeyHandler);
+
+  hashChangeHandler = () => {
+    closeTrackSetupView();
+  };
+  window.addEventListener('hashchange', hashChangeHandler, { once: true });
 
   // 3. Trimming Controls Event Listeners
   const rawData = bundle.raw || {};

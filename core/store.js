@@ -109,7 +109,7 @@ export const DEFAULT_INITIAL_STATE = Object.freeze({
     drawerOpen: false,
     highContrast: true,
     theme: 'dark',
-    mapLayer: 'dark'
+    mapLayer: 'topo'
   }),
   activeReplayFlightId: null,
   replay: Object.freeze({
@@ -223,6 +223,9 @@ export function createStore(initialStateOverrides = {}, customStorageAdapter = n
         ...deepClone(DEFAULT_INITIAL_STATE.ui),
         ...loadedSlice.ui
       };
+      if (loadedSlice.ui.mapLayer !== 'satellite' && loadedSlice.ui.mapLayer !== 'topo') {
+        loadedSlice.ui.mapLayer = 'topo';
+      }
     }
     if (Object.keys(loadedSlice).length > 0) {
       setState(loadedSlice);

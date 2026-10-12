@@ -10,7 +10,10 @@ import {
   formatTrimPointLabel,
   getPendolateCount,
   formatManeuverTitle,
-  formatManeuverDetails
+  formatManeuverDetails,
+  getPointVario,
+  getPointSpeed,
+  attachInteractiveFlightChart
 } from '../../ui/views/FlightDetailSheet.js';
 import { renderTrackSetupHtml } from '../../ui/views/TrackSetupSheet.js';
 import { logbookManager, createMemoryDbAdapter } from '../../core/logbookDb.js';
@@ -415,5 +418,91 @@ describe('FlightDetailSheet - Telemetry Analysis & Educational Debriefing (UI La
       assert.ok(html.includes('registrate 4 pendolate consecutive'), 'Guido must explicitly debrief on 4 pendolate');
     });
   });
+
+  describe('Interactive Telemetry Zoom, Pan, Channels & Cockpit HUD', () => {
+    it('should compute variometer and speed fallbacks when not explicitly provided in points', () => {
+      const p0 = { timeSeconds: 0, alt: 1000, lat: 46.0, lon: 11.0 };
+      const p1 = { timeSeconds: 10, alt: 1025, lat: 46.001, lon: 11.001 };
+      const pts = [p0, p1];
+
+      const vario0 = getPointVario(p0, 0, pts);
+      const vario1 = getPointVario(p1, 1, pts);
+      assert.strictEqual(vario0, 0);
+      assert.strictEqual(vario1, 2.5); // 25m / 10s = 2.5 m/s
+
+      const speed1 = getPointSpeed(p1, 1, pts);
+      assert.ok(speed1 > 10, 'Speed must be calculated from coordinates (>10 km/h)');
+    });
+
+    it('should generate SVG with variometer curve layer when showVario option is enabled', () => {
+      const svgWithVario = generateExpandedSvgChart(mockBundle.raw.decimatedPoints, 600, 220, {
+        showVario: true
+      });
+      assert.ok(svgWithVario.includes('gm-chart-vario-layer'), 'Must contain vario layer group');
+      assert.ok(svgWithVario.includes('0 m/s'), 'Must contain vario 0 m/s reference label');
+      assert.ok(svgWithVario.includes('#10b981'), 'Must use emerald green color for variometer');
+    });
+
+    it('should generate SVG with ground speed curve layer when showSpeed option is enabled', () => {
+      const svgWithSpeed = generateExpandedSvgChart(mockBundle.raw.decimatedPoints, 600, 220, {
+        showSpeed: true
+      });
+      assert.ok(svgWithSpeed.includes('gm-chart-speed-layer'), 'Must contain ground speed layer group');
+      assert.ok(svgWithSpeed.includes('70 km/h'), 'Must contain speed scale label');
+      assert.ok(svgWithSpeed.includes('#c084fc'), 'Must use purple color for ground speed');
+    });
+
+    it('should render zoom and pan window correctly without breaking polyline or summary header', () => {
+      const zoomedSvg = generateExpandedSvgChart(mockBundle.raw.decimatedPoints, 600, 220, {
+        zoom: 2.5,
+        pan: 0.3
+      });
+      assert.ok(zoomedSvg.includes('<svg viewBox="0 0 600 220"'));
+      assert.ok(zoomedSvg.includes('polyline points='));
+      assert.ok(zoomedSvg.includes('Max: 1480 m'));
+      assert.ok(zoomedSvg.includes('Decollo: 1060 m'));
+      assert.ok(zoomedSvg.includes('Atterraggio: 260 m'));
+    });
+
+    it('should render inspection crosshair and cursor dot when cursorIndex is passed', () => {
+      const cursorSvg = generateExpandedSvgChart(mockBundle.raw.decimatedPoints, 600, 220, {
+        cursorIndex: 2
+      });
+      assert.ok(cursorSvg.includes('id="gm-chart-cursor-group"'));
+      assert.ok(cursorSvg.includes('id="gm-chart-cursor-line"'));
+      assert.ok(cursorSvg.includes('id="gm-chart-cursor-dot"'));
+      assert.ok(!cursorSvg.includes('display:none;'), 'Cursor group must be visible when valid index is passed');
+    });
+
+    it('should render all interactive telemetry controls and HUD in renderFlightDetailHtml', () => {
+      const html = renderFlightDetailHtml(mockBundle);
+
+      // Toolbar and channel toggles
+      assert.ok(html.includes('class="gm-telemetry-toolbar'), 'Must render telemetry toolbar');
+      assert.ok(html.includes('id="btn-toggle-alt"'), 'Must have Quota toggle');
+      assert.ok(html.includes('id="btn-toggle-vario"'), 'Must have Vario toggle');
+      assert.ok(html.includes('id="btn-toggle-speed"'), 'Must have Speed toggle');
+
+      // Zoom group
+      assert.ok(html.includes('id="btn-chart-zoom-in"'), 'Must have zoom in button');
+      assert.ok(html.includes('id="btn-chart-zoom-out"'), 'Must have zoom out button');
+      assert.ok(html.includes('id="btn-chart-zoom-reset"'), 'Must have zoom reset button');
+      assert.ok(html.includes('id="gm-chart-zoom-level"'), 'Must have zoom level display');
+
+      // Cockpit HUD
+      assert.ok(html.includes('id="gm-chart-inspection-hud"'), 'Must render cockpit inspection HUD');
+      assert.ok(html.includes('id="gm-hud-time"'), 'Must have HUD time element');
+      assert.ok(html.includes('id="gm-hud-alt"'), 'Must have HUD altitude element');
+      assert.ok(html.includes('id="gm-hud-vario"'), 'Must have HUD vario element');
+      assert.ok(html.includes('id="gm-hud-speed"'), 'Must have HUD speed element');
+      assert.ok(html.includes('id="gm-hud-event"'), 'Must have HUD event element');
+
+      // Interactive chart container and overview navigator
+      assert.ok(html.includes('id="gm-interactive-chart-container"'), 'Must have interactive chart container');
+      assert.ok(html.includes('id="gm-chart-navigator"'), 'Must have overview navigator track');
+      assert.ok(html.includes('id="gm-chart-nav-handle"'), 'Must have overview navigator handle');
+    });
+  });
 });
+
 

@@ -1254,4 +1254,83 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Soppressa la barra di fase fittizia e unificata la legenda variometrica con marcatori operativi di salita, discesa, termiche, sondaggi 360° e oscillazioni di rollio.
   - Suite completa di test verificata con successo (675/675 passati).
   - Registrata la Lezione Appresa #125 in [MEMORY.md](file:///MEMORY.md).
+---
+
+## 2026-10-12 - UI Theme: Allineamento Cromatico Codici di Gravità e Volabilità tra Dark e Light Mode
+- **Tipo**: UI / Design System / Accessibilità / Outdoor HMI
+- **Dettagli**: [.agents/worklog.d/2026-10-12_uniform_status_severity_colors_light_mode.md](file:///.agents/worklog.d/2026-10-12_uniform_status_severity_colors_light_mode.md)
+- **Sintesi**:
+  - Eliminata la discrepanza cromatica nel tema chiaro: sostituiti i valori scuri e fangosi (#15803d, #b45309, #b91c1c) con le identiche colorazioni vivaci e sature della modalità scura (#22c55e, #eab308, #ef4444, #f87171, #f97316) per tutte le variabili --gm-status-* in css/theme.css.
+  - Allineati tutti i componenti che definiscono livelli di gravità e volabilità: barre orarie della timeline scrubber (13 slot), pillole comprensivo, badge delle vele EN-A/B/C/D, badge della scheda parametri meteo (.gm-param-status-badge), banner di sicurezza (.gm-flight-safety-warning-banner), e oggetto STATUS_COLORS in ui/map/mapEngineAdapter.js.
+  - Aggiornate le asserzioni di governance statica in 	ests/ui/shiftLeftGovernance.test.mjs (Gate 4) e validata la completa esecuzione della test suite (681 test superati).
+  - Aggiornata la Lezione Appresa #32 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-12 - Cartografia: Razionalizzazione sui Due Layer OpenTopo e Satellite con Toggle Iconico
+- **Tipo**: UI / Cartografia / Map Controls / Ergonomia Outdoor
+- **Dettagli**: [.agents/worklog.d/2026-10-12_two_map_layers_opentopo_satellite_toggle.md](file:///.agents/worklog.d/2026-10-12_two_map_layers_opentopo_satellite_toggle.md)
+- **Sintesi**:
+  - Ristretta la cartografia dell'intera applicazione ai soli due layer essenziali per il volo in parapendio: OpenTopo (`topo`, curve di livello a 20m e toponomastica orografica) e Satellite (`satellite`, ortofoto HD Esri World Imagery). Rimossi i layer obsoleti `dark` e `streets` da `mapEngineAdapter.js`, `MapLibreThreeEngine.js` e `SettingsView.js`.
+  - Sostituiti tutti i vecchi menu a tendina (`<select>`) su tutte le mappe dell'app (Mappa Comprensori, Mini-Mappa Forecast, Overlay Analisi di Volo 100dvh, Replay 3D traccia) con un pulsante Toggle unico e compatto ad alta ergonomia.
+  - Implementata iconografia funzionale SVG pulita senza emoji: icona montagna con curva di livello per OpenTopo e icona satellite per Satellite (`renderLayerToggleIcon`).
+  - Sincronizzazione reattiva bidirezionale con `store.ui.mapLayer`, normalizzazione automatica dei vecchi stati persistiti e rispetto dei requisiti Fitts touch floor $\ge 48\times 48\text{px}$ e dual theme.
+  - Suite completa di 119 suite e 686 test superata al 100% con 0 fallimenti.
+
+---
+
+## 2026-10-12 - UI / Telemetria: Espansione a Piena Altezza e Ingrandimento del Grafico Altimetrico
+- **Tipo**: UI / Telemetria / Layout SVG
+- **Dettagli**: [.agents/worklog.d/2026-10-12_altimetric_chart_full_height_expansion.md](file:///.agents/worklog.d/2026-10-12_altimetric_chart_full_height_expansion.md)
+- **Sintesi**:
+  - Risolto il dimezzamento visivo dell'SVG nel box `.gm-flight-detail-alt-chart`: aggiunta la classe di utilità globale `.h-full` in `css/theme.css` e dichiarata l'altezza esplicita al 100% per il tag SVG.
+  - Aumentata l'altezza del contenitore a 220px su mobile e 260px su desktop (`@media (min-width: 640px)`), espandendo l'escursione netta della polilinea da 32px a 168px.
+  - 675 test superati con successo.
+
+---
+
+## 2026-10-12 - UI / Telemetria: Navigazione Telemetrica Multi-Canale (Zoom, Pan, Vario, Velocità) e Cockpit HUD
+- **Tipo**: Feature / Telemetria Avanzata / SVG Interattivo / Cockpit HUD
+- **Dettagli**: [.agents/worklog.d/2026-10-12_interactive_telemetry_zoom_pan_vario_speed.md](file:///.agents/worklog.d/2026-10-12_interactive_telemetry_zoom_pan_vario_speed.md)
+- **Sintesi**:
+  - Implementato supporto multi-canale sovrapposto in `FlightDetailSheet.js`: curva variometro in m/s (asse 0 m/s, verde `#10b981`) e curva velocità al suolo in km/h (scala 0-70 km/h, viola `#c084fc`) attivabili tramite toggle switch nella toolbar telemetrica.
+  - Implementati controlli di zoom (1x-8x), panning continuo su trascinamento orizzontale e mini-barra di navigazione panoramica (navigator scrub bar) con maniglia trascinabile.
+  - Integrato cruscotto istantaneo (Cockpit HUD) a risposta immediata (<16ms, Doherty Threshold) con quota MSL, variometro semantico, velocità al suolo e badge degli eventi (termica con guadagno, oscillazioni di rollio, sondaggi 360°).
+  - Preservato `touch-action: pan-y` per garantire lo scorrimento naturale della pagina mobile.
+  - 681 test superati con successo.
+
+---
+
+## 2026-10-12 - UI / Design System: Standardizzazione Stilistica dei Pulsanti Dettaglio Volo e Setup Traccia
+- **Tipo**: UI / Design System / Reset CSS
+- **Dettagli**: [.agents/worklog.d/2026-10-12_flight_detail_and_track_setup_button_styling_standardization.md](file:///.agents/worklog.d/2026-10-12_flight_detail_and_track_setup_button_styling_standardization.md)
+- **Sintesi**:
+  - Risolta l'incongruenza dei pulsanti di azione inferiore in `FlightDetailSheet.js` e `TrackSetupSheet.js` che presentavano bordi grigi 3D di default del browser per assenza della classe base `.gm-btn`.
+  - Esteso il reset CSS dei pulsanti a tutti i modificatori (`.gm-btn, .gm-bottom-replay-btn, .gm-bottom-action-btn`) in `css/theme.css` e armonizzata la bottom bar con blur e ombra morbida.
+  - Normalizzati tutti i markup dei pulsanti nelle viste correlate con prefisso `.gm-btn`.
+
+---
+
+## 2026-10-12 - UI / Logbook: Rimozione del Grafico Altimetrico dall'Elenco Voli
+- **Tipo**: UI / Ergonomia / Logbook Feed
+- **Dettagli**: [.agents/worklog.d/2026-10-12_remove_altimetric_sparkline_from_flight_list.md](file:///.agents/worklog.d/2026-10-12_remove_altimetric_sparkline_from_flight_list.md)
+- **Sintesi**:
+  - Rimosso il micro-grafico altimetrico compresso (sparkline) dalle schede sintetiche dei voli in `ui/views/LogbookView.js`, eliminando la ridondanza rispetto al grafico telemetrico ad alta risoluzione del dettaglio volo.
+  - Ridotta l'altezza delle card dei voli a ~85px, massimizzando il numero di voli visualizzabili a colpo d'occhio nel feed.
+  - Aggiornata la test suite `tests/ui/logbookView.test.mjs` e confermata la completa conformità dell'intera suite (681 test passati, 0 falliti).
+
+
+---
+
+## 2026-10-12 - UI / Ergonomia: Riorganizzazione Ergonomica Grafico Telemetrico, Dock Monofila e Ticker HUD
+- **Tipo**: UI / Ergonomia / Dettaglio Volo / SVG Layout / Performance
+- **Dettagli**: [.agents/worklog.d/2026-10-12_altimetric_chart_ui_streamlining_and_controls_dock.md](file:///.agents/worklog.d/2026-10-12_altimetric_chart_ui_streamlining_and_controls_dock.md)
+- **Sintesi**:
+  - Unificati i controlli di canale telemetrico (`Quota`, `Vario`, `Velocità`) e i comandi di zoom (`-`, `1.0x`, `+`, `Reset`) in una singola barra a dock monofila (`.gm-telemetry-toolbar`) a sviluppo orizzontale, recuperando circa 130px di altezza utile su mobile.
+  - Ridisegnato l'HUD di ispezione come ticker compatto a riga singola (`.gm-telemetry-hud-ticker`, $\le 36\text{px}$) con `overflow-x: auto`, fornendo riscontro istantaneo (< 16ms) su Tempo, Quota MSL, Vario con colorazione dinamica salita/discesa, Velocità al suolo ed Evento attivo.
+  - Applicata media mobile a 3 campioni anti-rumore per le curve del variometro e della velocità al suolo, e confinati i rispettivi layer nella fascia inferiore 58% e 38% del grafico, prevenendo qualsiasi sovrapposizione caotica con il profilo altimetrico.
+  - Implementato algoritmo greedy a 3 corsie con tracciamento dell'ingombro orizzontale (`laneRightBounds`) e distanza di sicurezza $\ge 48\text{px}$, azzerando le collisioni tra badge vicini di termiche (`T1..Tn`) e inversioni di rollio (`nP`).
+  - Sostituita la legenda testuale a 8 righe con barra a gradiente orizzontale compatta (-5 m/s $\to$ +5 m/s) e chip semantiche discrete.
+  - Suite completa di 687 test (119 suite) superata al 100% (686 pass, 0 fail, 1 skipped).
+  - Registrata la Lezione Appresa #129 in [MEMORY.md](file:///MEMORY.md).
 

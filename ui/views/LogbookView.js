@@ -12,6 +12,7 @@
  */
 
 import { store } from '../../core/store.js';
+import { DEFAULT_SEED_FLIGHTS } from '../../core/logbook.js';
 import { logbookManager, requestStoragePersistence } from '../../core/logbookDb.js';
 import { openFlightDetailSheet } from './FlightDetailSheet.js';
 import { openImportFlightSheet, processImportFiles } from './ImportFlightSheet.js';
@@ -494,7 +495,7 @@ export class LogbookViewController {
   }
 
   /**
-   * Renders a single lean flight card (~110px height).
+   * Renders a single lean flight card (~85px height).
    * @param {Object} flight
    * @param {number|string} [flightNumber=null] - Progressive flight number
    * @returns {string}
@@ -510,16 +511,6 @@ export class LogbookViewController {
     const classBadgeStyle = (gliderClass || '').toLowerCase().trim().replace(/[^a-z0-9-]/g, '');
     const maxAlt = flight.maxAltMsl ? `${flight.maxAltMsl} m` : '--';
     const maxGain = flight.maxGainMeters ? `+${flight.maxGainMeters} m` : '--';
-    const climbRate = flight.maxClimbRate ? `${flight.maxClimbRate} m/s` : '--';
-    const thermals = flight.thermalsCount != null
-      ? `${flight.thermalsCount} ${flight.thermalsCount === 1 ? 'termica' : 'termiche'}`
-      : '--';
-    const distance = flight.distanceKm ? `${flight.distanceKm} km` : '--';
-    const sparkline = flight.sparklineSvgPoints || '';
-    const hasValidSparkline = sparkline &&
-      sparkline.split(' ').length > 2 &&
-      !sparkline.includes('0,16 100,16') &&
-      !sparkline.includes('0,12 100,12');
     const siteArea = flight.site && flight.site !== title ? flight.site : '';
 
     return `
@@ -564,15 +555,6 @@ export class LogbookViewController {
           ${siteArea ? `<span>•</span><span class="font-medium text-[var(--gm-text-secondary)]">${escapeHtml(siteArea)}</span>` : ''}
           <span class="truncate max-w-[140px] text-[var(--gm-text-secondary)] font-medium">• ${escapeHtml(glider)}</span>
         </div>
-
-        <!-- Altimetric Sparkline (Rendered only if track has altitude variation) -->
-        ${hasValidSparkline ? `
-          <div class="gm-flight-sparkline-wrap" aria-hidden="true">
-            <svg viewBox="0 0 100 24" class="gm-flight-sparkline" preserveAspectRatio="none">
-              <polyline points="${escapeHtml(sparkline)}" class="gm-flight-sparkline-polyline" />
-            </svg>
-          </div>
-        ` : ''}
 
         <!-- Glanceable 3-Metric Row (Grid-based: Never wraps) -->
         <div class="gm-flight-metrics-row">
@@ -903,10 +885,15 @@ export class LogbookViewController {
     if (!flightId) return;
     const state = this.store.getState();
     const flights = (state.flights || []);
-    const idx = flights.findIndex((f) => f && (f.id === flightId || f.flightId === flightId));
+    let idx = flights.findIndex((f) => f && (f.id === flightId || f.flightId === flightId));
     let flightNum = null;
     if (idx !== -1) {
       flightNum = flights[idx].flightNumber != null ? flights[idx].flightNumber : (flights.length - idx);
+    } else if (Array.isArray(DEFAULT_SEED_FLIGHTS)) {
+      idx = DEFAULT_SEED_FLIGHTS.findIndex((f) => f && (f.id === flightId || f.flightId === flightId));
+      if (idx !== -1) {
+        flightNum = DEFAULT_SEED_FLIGHTS[idx].flightNumber != null ? DEFAULT_SEED_FLIGHTS[idx].flightNumber : (DEFAULT_SEED_FLIGHTS.length - idx);
+      }
     }
     await openFlightDetailSheet(flightId, { store: this.store, flightNumber: flightNum });
   }

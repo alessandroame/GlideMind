@@ -20,7 +20,7 @@
 import { store } from '../../core/store.js';
 import { router } from '../router.js';
 import { openSheet, closeSheet } from '../sheetManager.js';
-import { createMapEngine, STATUS_COLORS } from '../map/mapEngineAdapter.js';
+import { createMapEngine, STATUS_COLORS, renderLayerToggleIcon, getNextMapLayer, getMapLayerLabel } from '../map/mapEngineAdapter.js';
 import { calculateLandingCircuit } from '../../core/flightProcedures.js';
 import {
   DEFAULT_COMPRENSORI,
@@ -821,10 +821,20 @@ export class ForecastViewController {
           this.activeTheme = nextState.ui.theme;
           this.miniMapEngine.setTheme(nextState.ui.theme);
         }
-        if (nextState.ui && nextState.ui.mapLayer && this.miniMapEngine) {
-          if (typeof this.miniMapEngine.setLayer === 'function') {
-            this.miniMapEngine.setLayer(nextState.ui.mapLayer);
+        if (nextState.ui && nextState.ui.mapLayer) {
+          const validLayer = nextState.ui.mapLayer === 'satellite' ? 'satellite' : 'topo';
+          if (this.miniMapEngine && typeof this.miniMapEngine.setLayer === 'function') {
+            this.miniMapEngine.setLayer(validLayer);
           }
+          if (this.flightAnalysisMapEngine && typeof this.flightAnalysisMapEngine.setLayer === 'function') {
+            this.flightAnalysisMapEngine.setLayer(validLayer);
+          }
+          const miniMapContainer = this.container?.querySelector?.('#forecast-mini-map-container');
+          if (miniMapContainer) {
+            miniMapContainer.setAttribute('data-map-layer', validLayer);
+          }
+          this.updateMiniMapToggleUi(validLayer);
+          this.updateFlightAnalysisToggleUi(validLayer);
         }
         this.render();
         if (needsWeatherFetch) {
@@ -1497,16 +1507,60 @@ export class ForecastViewController {
    * @returns {string}
   /**
    * Resolves the active cartographic map layer from state or theme fallback.
-   * @returns {string} Layer ID ('dark' | 'topo' | 'satellite' | 'streets')
+   * @returns {'topo' | 'satellite'}
    */
   getActiveMapLayer() {
     const state = this.store ? this.store.getState() : {};
-    const theme = (state.ui && state.ui.theme) || 'dark';
-    return (state.ui && state.ui.mapLayer) || (theme === 'light' ? 'topo' : 'dark');
+    return (state.ui && state.ui.mapLayer) || 'dark';
   }
 
   /**
-   * Renders the mini-map box container with canvas, layer selector, and expand action button.
+   * Updates the mini-map layer toggle button UI.
+   * @param {string} newLayer
+   */
+  updateMiniMapToggleUi(newLayer) {
+    if (!this.container) return;
+    const toggleBtn = this.container.querySelector('#forecast-minimap-layer-toggle');
+    if (!toggleBtn) return;
+    const isSat = newLayer === 'satellite';
+    const curLabel = isSat ? 'Satellite' : 'OpenTopo';
+    const nextLabel = isSat ? 'OpenTopo' : 'Satellite';
+    toggleBtn.setAttribute('data-layer', newLayer);
+    toggleBtn.setAttribute('aria-label', `Layer mappa: ${curLabel} (tocca per ${nextLabel})`);
+    toggleBtn.setAttribute('title', `Layer mappa: ${curLabel} (tocca per ${nextLabel})`);
+    toggleBtn.innerHTML = `
+      ${renderLayerToggleIcon(newLayer)}
+      <span class="gm-layer-toggle-label">${curLabel}</span>
+    `;
+    const select = this.container.querySelector('#forecast-minimap-layer-select');
+    if (select) select.value = newLayer;
+  }
+
+  /**
+   * Updates the flight analysis overlay map layer toggle button UI.
+   * @param {string} newLayer
+   */
+  updateFlightAnalysisToggleUi(newLayer) {
+    const root = this.flightAnalysisOverlayEl || this.container || (typeof document !== 'undefined' ? document : null);
+    if (!root) return;
+    const toggleBtn = root.querySelector('#forecast-flight-analysis-layer-toggle');
+    if (!toggleBtn) return;
+    const isSat = newLayer === 'satellite';
+    const curLabel = isSat ? 'Satellite' : 'OpenTopo';
+    const nextLabel = isSat ? 'OpenTopo' : 'Satellite';
+    toggleBtn.setAttribute('data-layer', newLayer);
+    toggleBtn.setAttribute('aria-label', `Layer mappa: ${curLabel} (tocca per ${nextLabel})`);
+    toggleBtn.setAttribute('title', `Layer mappa: ${curLabel} (tocca per ${nextLabel})`);
+    toggleBtn.innerHTML = `
+      ${renderLayerToggleIcon(newLayer)}
+      <span class="gm-layer-toggle-label">${curLabel}</span>
+    `;
+    const select = root.querySelector('.gm-flight-analysis-layer-select');
+    if (select) select.value = newLayer;
+  }
+
+  /**
+   * Renders the mini-map box container with canvas, layer toggle button, and expand action button.
    * @returns {string}
    */
   renderMiniMapBox() {
@@ -1514,17 +1568,18 @@ export class ForecastViewController {
     return `
       <div id="forecast-mini-map-container" class="gm-mini-map-box" data-map-layer="${activeLayer}">
         <div id="forecast-mini-map" class="gm-mini-map-canvas"></div>
-        <select 
-          id="forecast-minimap-layer-select" 
-          class="gm-mini-map-layer-select" 
-          aria-label="Seleziona layer cartografico" 
-          title="Seleziona layer mappa"
+        <button 
+          type="button" 
+          id="forecast-minimap-layer-toggle" 
+          class="gm-mini-map-layer-toggle" 
+          data-action="toggle-minimap-layer" 
+          data-layer="${activeLayer}" 
+          aria-label="Layer mappa: ${activeLayer === 'satellite' ? 'Satellite (tocca per OpenTopo)' : 'OpenTopo (tocca per Satellite)'}" 
+          title="Passa a ${activeLayer === 'satellite' ? 'OpenTopo' : 'Satellite'}"
         >
-          <option value="topo" ${activeLayer === 'topo' ? 'selected' : ''}>OpenTopo</option>
-          <option value="satellite" ${activeLayer === 'satellite' ? 'selected' : ''}>Satellite</option>
-          <option value="dark" ${activeLayer === 'dark' ? 'selected' : ''}>Scuro</option>
-          <option value="streets" ${activeLayer === 'streets' ? 'selected' : ''}>CyclOSM</option>
-        </select>
+          ${renderLayerToggleIcon(activeLayer)}
+          <span class="gm-layer-toggle-label">${getMapLayerLabel(activeLayer)}</span>
+        </button>
         <button 
           type="button" 
           class="gm-mini-map-expand-btn" 
@@ -1687,6 +1742,7 @@ export class ForecastViewController {
       let cape = 150;
       let cloudCover = 25;
       let precip = 0;
+      let precipProb = 0;
 
       if (idx !== -1) {
         const rawSpeed = hourlyData.windspeed_10m ?? hourlyData.wind_speed_10m;
@@ -1697,7 +1753,8 @@ export class ForecastViewController {
         const rawHum = hourlyData.relativehumidity_2m ?? hourlyData.relative_humidity_2m;
         const rawCape = hourlyData.cape;
         const rawCloud = hourlyData.cloudcover ?? hourlyData.cloud_cover;
-        const rawPrecip = hourlyData.precipitation ?? hourlyData.precipitation_probability;
+        const rawPrecip = hourlyData.precipitation ?? hourlyData.rain;
+        const rawPrecipProb = hourlyData.precipitation_probability;
 
         if (rawSpeed && rawSpeed[idx] != null) speed = Number(rawSpeed[idx]);
         if (rawGust && rawGust[idx] != null) gust = Number(rawGust[idx]);
@@ -1708,6 +1765,8 @@ export class ForecastViewController {
         if (rawCape && rawCape[idx] != null) cape = Number(rawCape[idx]);
         if (rawCloud && rawCloud[idx] != null) cloudCover = Number(rawCloud[idx]);
         if (rawPrecip && rawPrecip[idx] != null) precip = Number(rawPrecip[idx]);
+        if (rawPrecipProb && rawPrecipProb[idx] != null) precipProb = Number(rawPrecipProb[idx]);
+        else if (precip > 0) precipProb = 80;
       }
 
       const lcl = calculateLCL(temp, dew, takeoff.altitude);
@@ -1731,6 +1790,7 @@ export class ForecastViewController {
         cape,
         cloudCover,
         precip,
+        precipProb,
         lclMsl,
         deltaWind,
         angleDelta,
@@ -2083,43 +2143,61 @@ export class ForecastViewController {
     // 6. Copertura Nuvolosa & Insolazione
     let cloudStatus = 'flyable';
     let cloudStatusLabel = 'Soleggiato';
-    if (activePoint.cloudCover <= 35 && activePoint.precip === 0) {
+    if (activePoint.precip > 0.5) {
+      cloudStatus = 'severe';
+      cloudStatusLabel = 'NO FLY: Pioggia';
+    } else if (activePoint.precip >= 0.1) {
+      cloudStatus = 'caution';
+      cloudStatusLabel = 'Pioviggine';
+    } else if (activePoint.precipProb >= 60) {
+      cloudStatus = 'caution';
+      cloudStatusLabel = 'Rischio Pioggia';
+    } else if (activePoint.cloudCover <= 35) {
       cloudStatus = 'flyable';
       cloudStatusLabel = 'Soleggiato';
-    } else if (activePoint.cloudCover <= 80 && activePoint.precip === 0) {
+    } else if (activePoint.cloudCover <= 80) {
       cloudStatus = 'caution';
       cloudStatusLabel = 'Parz. Nuvoloso';
-    } else if (activePoint.precip > 0.5) {
-      cloudStatus = 'severe';
-      cloudStatusLabel = 'Pioggia';
     } else {
       cloudStatus = 'unflyable';
       cloudStatusLabel = 'Coperto';
     }
 
+    const precipBadgeText = activePoint.precip > 0.5
+      ? ` · Pioggia (${activePoint.precip.toFixed(1)} mm/h)`
+      : (activePoint.precip >= 0.1
+        ? ` · Pioviggine (${activePoint.precip.toFixed(1)} mm/h)`
+        : (activePoint.precipProb >= 40
+          ? ` · Rischio Pioggia ${Math.round(activePoint.precipProb)}%`
+          : ` · ${activePoint.cloudCover <= 35 ? 'Soleggiato' : activePoint.cloudCover <= 70 ? 'Variabile' : 'Coperto'}`));
+
     const cloudParam = {
       id: 'copertura',
       title: 'Copertura Nuvolosa & Insolazione',
       subtitle: 'Radiazione solare al suolo e innesco termico dei versanti',
-      value: `${Math.round(activePoint.cloudCover)}% coperto · ${activePoint.cloudCover <= 35 ? 'Soleggiato' : activePoint.cloudCover <= 70 ? 'Variabile' : 'Coperto'}`,
+      value: `${Math.round(activePoint.cloudCover)}% coperto${precipBadgeText}`,
       status: cloudStatus,
       statusLabel: cloudStatusLabel,
       details: [
         { label: 'Copertura Totale', value: `${Math.round(activePoint.cloudCover)}%` },
         { label: 'Insolazione Pendio', value: activePoint.cloudCover <= 35 ? 'Massima (100%)' : activePoint.cloudCover <= 70 ? 'Variabile (60%)' : 'Debole (<20%)' },
-        { label: 'Precipitazioni Orarie', value: `${activePoint.precip.toFixed(1)} mm` },
-        { label: 'Umidità Relativa', value: `${Math.round(activePoint.humidity)}%` }
+        { label: 'Precipitazioni Orarie', value: `${activePoint.precip.toFixed(1)} mm/h` },
+        { label: 'Probabilità Pioggia', value: `${Math.round(activePoint.precipProb)}%` }
       ],
-      advice: cloudStatus === 'flyable'
-        ? 'Pendii ben illuminati dal sole, innesco termico costante e ben delineato.'
-        : cloudStatus === 'caution'
-        ? 'Passaggi nuvolosi che potrebbero ombreggiare temporaneamente i versanti e spegnere le termiche.'
-        : cloudStatus === 'severe'
-        ? 'Pioggia in atto o imminente. Decollo assolutamente vietato per pericolo bagnatura del tessuto e stallo paracadutale.'
-        : 'Cielo compatto o minaccia di precipitazioni; attività termica inibita con rischio di spegnimento delle brezze.',
+      advice: activePoint.precip > 0.5
+        ? 'Pioggia in atto o imminente (>0.5 mm/h). Decollo assolutamente vietato per pericolo bagnatura del tessuto e stallo paracadutale immediato.'
+        : (activePoint.precip >= 0.1
+          ? 'Pioviggine o rovesci deboli previsti. Rischio di bagnare l\'ala ed alterare il profilo aerodinamico; volo sconsigliato.'
+          : (activePoint.precipProb >= 60
+            ? 'Rischio elevato di rovesci sparsi. Prestare massima attenzione all\'addensarsi delle nubi scure.'
+            : (cloudStatus === 'flyable'
+              ? 'Pendii ben illuminati dal sole, innesco termico costante e ben delineato.'
+              : cloudStatus === 'caution'
+              ? 'Passaggi nuvolosi che potrebbero ombreggiare temporaneamente i versanti e spegnere le termiche.'
+              : 'Cielo compatto o minaccia di precipitazioni; attività termica inibita con rischio di spegnimento delle brezze.'))),
       chartOptions: {
         id: 'param-chart-cloud',
-        title: 'Copertura Nuvolosa',
+        title: 'Copertura Nuvolosa e Probabilità Pioggia',
         unit: '%',
         minY: 0,
         maxY: 100,
@@ -2133,6 +2211,13 @@ export class ForecastViewController {
             stroke: 'var(--gm-text-secondary)',
             strokeWidth: 2,
             fillArea: 'rgba(148, 163, 184, 0.15)'
+          },
+          {
+            name: 'Probabilità Pioggia',
+            points: hourlyPoints.map(p => ({ hour: p.hour, value: p.precipProb })),
+            stroke: 'var(--gm-accent-sky, #0ea5e9)',
+            strokeWidth: 1.8,
+            strokeDasharray: '3,3'
           }
         ]
       }
@@ -2252,6 +2337,16 @@ export class ForecastViewController {
     const mid2 = minY + yRange * 0.66;
 
     const renderedSeries = series.map(s => {
+      if (s.type === 'bar') {
+        const barWidth = s.barWidth || Math.max(4, Math.round(((xMax - xMin) / hRange) * 0.55));
+        const barsMarkup = (s.points || []).map(p => {
+          const x = Math.round(getX(p.hour) - barWidth / 2);
+          const y = getY(p.value);
+          const h = Math.max(0, yMax - y);
+          return `<rect x="${x}" y="${y}" width="${barWidth}" height="${h}" fill="${s.fill || s.stroke || 'var(--gm-accent-sky, #0ea5e9)'}" rx="${s.rx ?? 1}" opacity="${s.opacity ?? 0.85}" />`;
+        }).join('');
+        return barsMarkup;
+      }
       const coords = (s.points || []).map(p => ({ x: getX(p.hour), y: getY(p.value) }));
       let areaMarkup = '';
       if (s.fillArea && coords.length > 0) {
@@ -2301,9 +2396,9 @@ export class ForecastViewController {
           <line x1="${xMin}" y1="${yMax}" x2="${xMax}" y2="${yMax}" stroke="var(--gm-border-strong)" stroke-width="1" />
 
           <!-- Y Axis Labels -->
-          <text x="${xMin - 4}" y="${getY(minY) + 3}" font-size="8" fill="var(--gm-text-muted)" text-anchor="end">${Math.round(minY)}</text>
-          <text x="${xMin - 4}" y="${getY(mid2) + 3}" font-size="8" fill="var(--gm-text-muted)" text-anchor="end">${Math.round(mid2)}</text>
-          <text x="${xMin - 4}" y="${getY(maxY) + 7}" font-size="8" fill="var(--gm-text-muted)" text-anchor="end">${Math.round(maxY)}</text>
+          <text x="${xMin - 4}" y="${getY(minY) + 3}" font-size="8" fill="var(--gm-text-muted)" text-anchor="end">${maxY <= 5 ? minY.toFixed(1) : Math.round(minY)}</text>
+          <text x="${xMin - 4}" y="${getY(mid2) + 3}" font-size="8" fill="var(--gm-text-muted)" text-anchor="end">${maxY <= 5 ? mid2.toFixed(1) : Math.round(mid2)}</text>
+          <text x="${xMin - 4}" y="${getY(maxY) + 7}" font-size="8" fill="var(--gm-text-muted)" text-anchor="end">${maxY <= 5 ? maxY.toFixed(1) : Math.round(maxY)}</text>
 
           <!-- Threshold lines -->
           ${renderedThresholds}
@@ -2322,7 +2417,7 @@ export class ForecastViewController {
           ${!hideTooltip ? `
           <rect x="${Math.max(xMin, Math.min(xMax - 54, activeMarkerX - 27))}" y="2" width="54" height="13" rx="3" fill="var(--gm-accent)" />
           <text x="${Math.max(xMin + 27, Math.min(xMax - 27, activeMarkerX))}" y="11" font-size="8" font-weight="700" fill="var(--gm-text-inverse)" text-anchor="middle">
-            ${Math.round(activePoint.value)} ${escapeHtml(unit)}
+            ${unit === 'mm/h' || unit === 'EDR' ? Number(activePoint.value || 0).toFixed(1) : Math.round(activePoint.value)} ${escapeHtml(unit)}
           </text>
           ` : ''}
         </svg>
@@ -2557,6 +2652,34 @@ export class ForecastViewController {
             stroke: 'var(--gm-text-secondary)',
             strokeWidth: 2.5,
             fillArea: 'rgba(148, 163, 184, 0.18)'
+          }]
+        })
+      },
+      {
+        id: 'multi-chart-precipitation',
+        label: 'Precipitazioni',
+        val: `${(activePoint.precip || 0).toFixed(1)}`,
+        unit: 'mm/h',
+        subHtml: `<span class="gm-trend-sub-badge ${(activePoint.precip || 0) > 0.5 ? 'status-unflyable' : (activePoint.precip || 0) > 0 ? 'status-caution' : 'status-flyable'}">${(activePoint.precip || 0) > 0.5 ? 'NO FLY: Pioggia' : (activePoint.precip || 0) > 0 ? 'Pioviggine' : ((activePoint.precipProb || 0) > 30 ? `${Math.round(activePoint.precipProb)}% prob.` : 'Assenti')}</span>`,
+        chartHtml: this.renderSvgTrendChart({
+          id: 'multi-precipitation',
+          title: 'Precipitazioni',
+          unit: 'mm/h',
+          minY: 0,
+          maxY: Math.max(3, Math.ceil(Math.max(...hourlyPoints.map(p => p.precip || 0), 0) * 1.5)),
+          compact: true,
+          hideTooltip: true,
+          hideThresholdLabels: true,
+          thresholds: [
+            { value: 0.1, stroke: 'var(--gm-status-caution)', strokeDasharray: '4,3' },
+            { value: 0.5, stroke: 'var(--gm-status-unflyable)', strokeDasharray: '4,3' }
+          ],
+          series: [{
+            name: 'Precipitazioni',
+            type: 'bar',
+            points: hourlyPoints.map(p => ({ hour: p.hour, value: p.precip || 0 })),
+            fill: 'var(--gm-accent-sky, #0ea5e9)',
+            opacity: 0.85
           }]
         })
       },
@@ -4161,7 +4284,35 @@ export class ForecastViewController {
 
     const action = actionEl.getAttribute('data-action');
 
-    if (action === 'toggle-subspot-menu') {
+    if (action === 'toggle-minimap-layer') {
+      const currentLayer = this.getActiveMapLayer();
+      const newLayer = getNextMapLayer(currentLayer);
+      const miniMapContainer = this.container?.querySelector?.('#forecast-mini-map-container');
+      if (miniMapContainer) {
+        miniMapContainer.setAttribute('data-map-layer', newLayer);
+      }
+      if (this.miniMapEngine && typeof this.miniMapEngine.setLayer === 'function') {
+        this.miniMapEngine.setLayer(newLayer);
+      }
+      if (this.store && typeof this.store.setState === 'function') {
+        const state = this.store.getState() || {};
+        const ui = state.ui || {};
+        this.store.setState({ ui: { ...ui, mapLayer: newLayer } });
+      }
+      this.updateMiniMapToggleUi(newLayer);
+    } else if (action === 'toggle-flight-analysis-layer') {
+      const currentLayer = this.getActiveMapLayer();
+      const newLayer = getNextMapLayer(currentLayer);
+      if (this.flightAnalysisMapEngine && typeof this.flightAnalysisMapEngine.setLayer === 'function') {
+        this.flightAnalysisMapEngine.setLayer(newLayer);
+      }
+      if (this.store && typeof this.store.setState === 'function') {
+        const state = this.store.getState() || {};
+        const ui = state.ui || {};
+        this.store.setState({ ui: { ...ui, mapLayer: newLayer } });
+      }
+      this.updateFlightAnalysisToggleUi(newLayer);
+    } else if (action === 'toggle-subspot-menu') {
       this.isSubSpotMenuOpen = !this.isSubSpotMenuOpen;
       this.render();
     } else if (action === 'select-subspot') {
@@ -4489,7 +4640,7 @@ export class ForecastViewController {
       }
       this.render();
     } else if (target.id === 'forecast-minimap-layer-select') {
-      const newLayer = target.value;
+      const newLayer = target.value === 'satellite' ? 'satellite' : 'topo';
       const miniMapContainer = this.container?.querySelector?.('#forecast-mini-map-container');
       if (miniMapContainer) {
         miniMapContainer.setAttribute('data-map-layer', newLayer);
@@ -4502,8 +4653,9 @@ export class ForecastViewController {
         const ui = state.ui || {};
         this.store.setState({ ui: { ...ui, mapLayer: newLayer } });
       }
-    } else if (target.getAttribute('data-action') === 'set-flight-analysis-layer' || target.classList.contains('gm-flight-analysis-layer-select')) {
-      const newLayer = target.value;
+      this.updateMiniMapToggleUi(newLayer);
+    } else if (target.getAttribute && (target.getAttribute('data-action') === 'set-flight-analysis-layer' || (target.classList && target.classList.contains('gm-flight-analysis-layer-select')))) {
+      const newLayer = target.value === 'satellite' ? 'satellite' : 'topo';
       if (this.flightAnalysisMapEngine && typeof this.flightAnalysisMapEngine.setLayer === 'function') {
         this.flightAnalysisMapEngine.setLayer(newLayer);
       }
@@ -4512,6 +4664,7 @@ export class ForecastViewController {
         const ui = state.ui || {};
         this.store.setState({ ui: { ...ui, mapLayer: newLayer } });
       }
+      this.updateFlightAnalysisToggleUi(newLayer);
     }
   }
 
@@ -4613,12 +4766,18 @@ export class ForecastViewController {
           <!-- Floating Map Controls (Inside Map Canvas) -->
           <div class="gm-flight-analysis-map-controls" role="toolbar" aria-label="Controlli mappa">
             <div class="gm-flight-analysis-controls-left">
-              <select class="gm-flight-analysis-layer-select" data-action="set-flight-analysis-layer" aria-label="Seleziona layer cartografico">
-                <option value="topo" ${activeLayer === 'topo' ? 'selected' : ''}>OpenTopo</option>
-                <option value="satellite" ${activeLayer === 'satellite' ? 'selected' : ''}>Satellite</option>
-                <option value="dark" ${activeLayer === 'dark' ? 'selected' : ''}>Scuro</option>
-                <option value="streets" ${activeLayer === 'streets' ? 'selected' : ''}>CyclOSM</option>
-              </select>
+              <button 
+                type="button" 
+                id="forecast-flight-analysis-layer-toggle" 
+                class="gm-flight-analysis-ctrl-btn gm-map-layer-toggle" 
+                data-action="toggle-flight-analysis-layer" 
+                data-layer="${activeLayer}" 
+                aria-label="Layer mappa: ${activeLayer === 'satellite' ? 'Satellite (tocca per OpenTopo)' : 'OpenTopo (tocca per Satellite)'}" 
+                title="Layer mappa: ${activeLayer === 'satellite' ? 'Satellite (tocca per OpenTopo)' : 'OpenTopo (tocca per Satellite)'}"
+              >
+                ${renderLayerToggleIcon(activeLayer)}
+                <span class="gm-layer-toggle-label">${getMapLayerLabel(activeLayer)}</span>
+              </button>
             </div>
             <div class="gm-flight-analysis-controls-right">
               <div class="gm-aim-menu-wrap">

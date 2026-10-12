@@ -509,3 +509,115 @@ export function calculateMonthlyFlightActivity(flights = [], options = {}) {
   };
 }
 
+/**
+ * Calculates career personal records from a collection of flights.
+ * Headless domain function: zero DOM dependencies, 100% testable in Node.js.
+ * 
+ * @param {Array<Object>} flights - Collection of flight records
+ * @returns {{
+ *   maxAlt: { val: number, flightId: string|null, flightNumber: number|null, site: string, date: string },
+ *   maxGain: { val: number, flightId: string|null, flightNumber: number|null, site: string, date: string },
+ *   maxDuration: { val: number, flightId: string|null, flightNumber: number|null, site: string, date: string },
+ *   maxDistance: { val: number, flightId: string|null, flightNumber: number|null, site: string, date: string },
+ *   maxClimbRate: { val: number, flightId: string|null, flightNumber: number|null, site: string, date: string }
+ * }}
+ */
+export function calculatePersonalRecords(flights = []) {
+  const safeFlights = Array.isArray(flights) ? flights : [];
+  const total = safeFlights.length;
+
+  const records = {
+    maxAlt: { val: 0, flightId: null, flightNumber: null, site: '', date: '' },
+    maxGain: { val: 0, flightId: null, flightNumber: null, site: '', date: '' },
+    maxDuration: { val: 0, flightId: null, flightNumber: null, site: '', date: '' },
+    maxDistance: { val: 0, flightId: null, flightNumber: null, site: '', date: '' },
+    maxClimbRate: { val: 0, flightId: null, flightNumber: null, site: '', date: '' }
+  };
+
+  safeFlights.forEach((f, index) => {
+    if (!f) return;
+    const flightId = f.id || f.flightId || null;
+    const flightNum = f.flightNumber != null ? f.flightNumber : (total - index);
+    const site = f.siteName || f.site || '';
+    const date = f.date || '';
+
+    const alt = Number(f.maxAltMsl) || 0;
+    if (alt > records.maxAlt.val) {
+      records.maxAlt = { val: alt, flightId, flightNumber: flightNum, site, date };
+    }
+
+    const gain = Number(f.maxGainMeters) || 0;
+    if (gain > records.maxGain.val) {
+      records.maxGain = { val: gain, flightId, flightNumber: flightNum, site, date };
+    }
+
+    const dur = Number(f.durationMinutes) || 0;
+    if (dur > records.maxDuration.val) {
+      records.maxDuration = { val: dur, flightId, flightNumber: flightNum, site, date };
+    }
+
+    const dist = Number(f.distanceKm) || 0;
+    if (dist > records.maxDistance.val) {
+      records.maxDistance = { val: dist, flightId, flightNumber: flightNum, site, date };
+    }
+
+    const climb = Number(f.maxClimbRate) || 0;
+    if (climb > records.maxClimbRate.val) {
+      records.maxClimbRate = { val: climb, flightId, flightNumber: flightNum, site, date };
+    }
+  });
+
+  return records;
+}
+
+/**
+ * Checks which metrics of a specific flight are career personal records.
+ * 
+ * @param {Object} flightMeta - Flight metadata object
+ * @param {Object} careerRecords - Career records calculated by calculatePersonalRecords
+ * @returns {{
+ *   isMaxAlt: boolean,
+ *   isMaxGain: boolean,
+ *   isMaxDuration: boolean,
+ *   isMaxDistance: boolean,
+ *   isMaxClimbRate: boolean,
+ *   hasAnyRecord: boolean
+ * }}
+ */
+export function checkFlightRecordFlags(flightMeta, careerRecords) {
+  if (!flightMeta || !careerRecords) {
+    return {
+      isMaxAlt: false,
+      isMaxGain: false,
+      isMaxDuration: false,
+      isMaxDistance: false,
+      isMaxClimbRate: false,
+      hasAnyRecord: false
+    };
+  }
+
+  const alt = Number(flightMeta.maxAltMsl) || 0;
+  const isMaxAlt = alt > 0 && careerRecords.maxAlt?.val > 0 && alt >= careerRecords.maxAlt.val;
+
+  const gain = Number(flightMeta.maxGainMeters) || 0;
+  const isMaxGain = gain > 0 && careerRecords.maxGain?.val > 0 && gain >= careerRecords.maxGain.val;
+
+  const dur = Number(flightMeta.durationMinutes) || 0;
+  const isMaxDuration = dur > 0 && careerRecords.maxDuration?.val > 0 && dur >= careerRecords.maxDuration.val;
+
+  const dist = Number(flightMeta.distanceKm) || 0;
+  const isMaxDistance = dist > 0 && careerRecords.maxDistance?.val > 0 && dist >= careerRecords.maxDistance.val;
+
+  const climb = Number(flightMeta.maxClimbRate) || 0;
+  const isMaxClimbRate = climb > 0 && careerRecords.maxClimbRate?.val > 0 && climb >= careerRecords.maxClimbRate.val;
+
+  return {
+    isMaxAlt,
+    isMaxGain,
+    isMaxDuration,
+    isMaxDistance,
+    isMaxClimbRate,
+    hasAnyRecord: isMaxAlt || isMaxGain || isMaxDuration || isMaxDistance || isMaxClimbRate
+  };
+}
+

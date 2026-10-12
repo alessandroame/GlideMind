@@ -18,17 +18,9 @@ import {
   generateWindsockSvg,
   generateWindsockKeyframeCss
 } from '../../core/windsock.js';
+import { sampleVarioRgb } from '../../core/flightTelemetry.js';
 
 export const MAP_LAYERS = Object.freeze({
-  topo: Object.freeze({
-    id: 'topo',
-    name: 'OpenTopo',
-    url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-    subdomains: 'abc',
-    attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, SRTM | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a>',
-    maxZoom: 19,
-    maxNativeZoom: 17
-  }),
   satellite: Object.freeze({
     id: 'satellite',
     name: 'Satellite',
@@ -37,45 +29,68 @@ export const MAP_LAYERS = Object.freeze({
     maxZoom: 19,
     maxNativeZoom: 19
   }),
-  dark: Object.freeze({
-    id: 'dark',
-    name: 'Scuro',
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
-    attribution: '&copy; <a href="https://www.esri.com/">Esri</a> &mdash; Dark Gray Canvas',
-    maxZoom: 19,
-    maxNativeZoom: 16
-  }),
-  streets: Object.freeze({
-    id: 'streets',
-    name: 'CyclOSM',
-    url: 'https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
+  topo: Object.freeze({
+    id: 'topo',
+    name: 'OpenTopo',
+    url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
     subdomains: 'abc',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://www.cyclosm.org">CyclOSM</a>',
+    attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, SRTM | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a>',
     maxZoom: 19,
-    maxNativeZoom: 18
+    maxNativeZoom: 17
   })
 });
 
 export const MAP_THEMES = Object.freeze({
-  dark: MAP_LAYERS.dark,
+  dark: MAP_LAYERS.satellite,
   light: MAP_LAYERS.topo
 });
 
+/**
+ * Returns the SVG icon string for map layer toggle button.
+ * @param {string} layerId ('topo' | 'satellite')
+ * @param {number} [size=16]
+ * @returns {string}
+ */
+export function renderLayerToggleIcon(layerId, size = 16) {
+  if (layerId === 'satellite') {
+    return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="gm-layer-icon gm-icon-satellite"><path d="M13 7 9 3 5 7l4 4"></path><path d="m17 11 4 4-4 4-4-4"></path><path d="m8 12 4 4 6-6-4-4Z"></path><path d="m16 8 3-3"></path><path d="M9 21a6 6 0 0 0-6-6"></path></svg>`;
+  }
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="gm-layer-icon gm-icon-topo"><path d="m8 3 4 8 5-5 5 15H2L8 3z"></path><path d="M4.15 18h15.7"></path></svg>`;
+}
+
+/**
+ * Resolves the next alternating layer for binary toggle.
+ * @param {string} currentLayer
+ * @returns {'topo' | 'satellite'}
+ */
+export function getNextMapLayer(currentLayer) {
+  return currentLayer === 'satellite' ? 'topo' : 'satellite';
+}
+
+/**
+ * Returns localized human-readable label for the map layer.
+ * @param {string} layerId
+ * @returns {string}
+ */
+export function getMapLayerLabel(layerId) {
+  return layerId === 'satellite' ? 'Satellite' : 'OpenTopo';
+}
+
 export const STATUS_COLORS = Object.freeze({
   flyable: {
-    color: '#15803d',
+    color: '#22c55e',
     fill: '#22c55e',
     badge: 'Volabile',
     icon: '●'
   },
   caution: {
-    color: '#b45309',
+    color: '#eab308',
     fill: '#eab308',
     badge: 'Cautela',
     icon: '▲'
   },
   unflyable: {
-    color: '#b91c1c',
+    color: '#ef4444',
     fill: '#ef4444',
     badge: 'Non Volabile',
     icon: '✕'
@@ -104,7 +119,7 @@ export class HeadlessMockMapEngine {
     this.center = options.center || { lat: 45.4, lon: 8.0 };
     this.zoom = options.zoom || 7;
     this.theme = options.theme || 'dark';
-    this.currentLayerId = options.layer || (this.theme === 'light' ? 'topo' : 'dark');
+    this.currentLayerId = options.layer || (this.theme === 'light' ? 'topo' : 'satellite');
     this.renderedOverlays = [];
     this.renderedMode = 'circular';
     this.preferCanvas = Boolean(options.preferCanvas);
@@ -161,12 +176,12 @@ export class HeadlessMockMapEngine {
     const newTheme = theme === 'light' ? 'light' : 'dark';
     if (this.theme === newTheme && this.currentLayerId) return;
     this.theme = newTheme;
-    this.currentLayerId = this.theme === 'light' ? 'topo' : 'dark';
+    this.currentLayerId = this.theme === 'light' ? 'topo' : 'satellite';
   }
 
   setLayer(layerId) {
     this.currentLayerId = layerId;
-    this.theme = (layerId === 'dark' || layerId === 'satellite') ? 'dark' : 'light';
+    this.theme = (layerId === 'satellite') ? 'dark' : 'light';
   }
 
   renderOverlays(evaluatedSpots, zoomLevel = null, glider = null, activeSpotId = null) {
@@ -316,12 +331,47 @@ export class HeadlessMockMapEngine {
     return this;
   }
 
+  renderFlightTrack(containerEl, trackData, options = {}) {
+    this.container = containerEl || this.container;
+    this.activeFlightTrackData = trackData;
+    this.renderedMode = 'flightTrack';
+    this.trackPoints = trackData?.points || [];
+    this.highlightedRange = trackData?.highlightRange || null;
+    this.cursorIndex = trackData?.cursorIndex ?? null;
+    this.takeoff = trackData?.takeoff || null;
+    this.landing = trackData?.landing || null;
+    this.isCanvasRendered = Boolean(this.options.preferCanvas);
+    this.paused = false;
+    this.destroyed = false;
+    return this;
+  }
+
+  highlightFlightTrackRange(range) {
+    this.highlightedRange = range;
+    if (this.activeFlightTrackData) {
+      this.activeFlightTrackData.highlightRange = range;
+    }
+    return this;
+  }
+
+  setFlightTrackCursor(index) {
+    this.cursorIndex = index;
+    if (this.activeFlightTrackData) {
+      this.activeFlightTrackData.cursorIndex = index;
+    }
+    return this;
+  }
+
   destroy() {
     this.destroyed = true;
     this.eventListeners.clear();
     this.renderedOverlays = [];
     this.activeMiniMapSpotData = null;
     this.activeFlightMapData = null;
+    this.activeFlightTrackData = null;
+    this.trackPoints = [];
+    this.highlightedRange = null;
+    this.cursorIndex = null;
     this.lastWindsockUpdate = null;
     this.lastGlideUpdate = null;
     this.lastCircuitUpdate = null;
@@ -481,6 +531,13 @@ export class LeafletMapEngine {
     this.flightLandingPin = null;
     this.flightLandingWindsock = null;
     this.flightGlideLine = null;
+    this.flightTrackPolylines = [];
+    this.phaseHighlightGroup = null;
+    this.trackCursorMarker = null;
+    this.trackTakeoffMarker = null;
+    this.trackLandingMarker = null;
+    this.validTrackPoints = [];
+    this.trackBounds = null;
     this.theme = options.theme || 'dark';
     this.isMiniMap = Boolean(options.isMiniMap);
     this.canvasRenderer = null;
@@ -590,13 +647,13 @@ export class LeafletMapEngine {
     const newTheme = theme === 'light' ? 'light' : 'dark';
     if (this.theme === newTheme && this.tileLayer) return;
     this.theme = newTheme;
-    this.setLayer(this.theme === 'light' ? 'topo' : 'dark');
+    this.setLayer(this.theme === 'light' ? 'topo' : 'satellite');
   }
 
   setLayer(layerId) {
-    const layer = MAP_LAYERS[layerId] || MAP_LAYERS.dark;
+    const layer = MAP_LAYERS[layerId] || (layerId === 'satellite' ? MAP_LAYERS.satellite : MAP_LAYERS.topo);
     this.currentLayerId = layer.id;
-    this.theme = (layer.id === 'dark' || layer.id === 'satellite') ? 'dark' : 'light';
+    this.theme = (layer.id === 'satellite') ? 'dark' : 'light';
     if (!this.map || typeof window === 'undefined' || !window.L) return;
 
     if (this.tileLayer) {
@@ -1376,8 +1433,252 @@ export class LeafletMapEngine {
     return this;
   }
 
+  clearFlightTrackLayers() {
+    if (this.flightTrackPolylines) {
+      for (const p of this.flightTrackPolylines) {
+        if (p && typeof p.remove === 'function') p.remove();
+      }
+      this.flightTrackPolylines = [];
+    }
+    if (this.phaseHighlightGroup && typeof this.phaseHighlightGroup.clearLayers === 'function') {
+      this.phaseHighlightGroup.clearLayers();
+    }
+    if (this.trackTakeoffMarker) {
+      this.trackTakeoffMarker.remove();
+      this.trackTakeoffMarker = null;
+    }
+    if (this.trackLandingMarker) {
+      this.trackLandingMarker.remove();
+      this.trackLandingMarker = null;
+    }
+    if (this.trackCursorMarker) {
+      this.trackCursorMarker.remove();
+      this.trackCursorMarker = null;
+    }
+  }
+
+  renderFlightTrack(containerEl, trackData, options = {}) {
+    if (typeof window === 'undefined' || !window.L) return this;
+    if (containerEl && (!this.map || this.container !== containerEl)) {
+      if (this.map) {
+        this.destroy();
+      }
+      this.init(containerEl, { ...this.options, ...options, isMiniMap: true });
+    }
+
+    if (!this.map) return this;
+    if (!this.overlayLayerGroup) {
+      this.overlayLayerGroup = window.L.featureGroup().addTo(this.map);
+    }
+    if (!this.phaseHighlightGroup) {
+      this.phaseHighlightGroup = window.L.featureGroup().addTo(this.map);
+    }
+
+    this.clearFlightTrackLayers();
+    this.activeFlightTrackData = trackData;
+    this.renderedMode = 'flightTrack';
+
+    const rawPoints = trackData?.points || [];
+    const validPoints = [];
+    for (let i = 0; i < rawPoints.length; i++) {
+      const p = rawPoints[i];
+      const lat = typeof p.lat === 'number' ? p.lat : (typeof p.latitude === 'number' ? p.latitude : null);
+      const lon = typeof p.lon === 'number' ? p.lon : (typeof p.longitude === 'number' ? p.longitude : null);
+      if (lat !== null && lon !== null && !isNaN(lat) && !isNaN(lon)) {
+        validPoints.push({
+          ...p,
+          lat,
+          lon,
+          origIdx: i
+        });
+      }
+    }
+
+    this.validTrackPoints = validPoints;
+    if (validPoints.length === 0) return this;
+
+    // Segment points by continuous variometer color bands
+    const segments = [];
+    let curSeg = null;
+    for (let i = 0; i < validPoints.length; i++) {
+      const p = validPoints[i];
+      const vario = typeof p.vario === 'number' && !isNaN(p.vario)
+        ? p.vario
+        : (i > 0 ? ((p.alt || 0) - (validPoints[i - 1].alt || 0)) / Math.max(0.5, (p.timeSeconds ?? i) - (validPoints[i - 1].timeSeconds ?? (i - 1))) : 0);
+      const band = sampleVarioRgb(vario);
+      const color = band.css;
+      const pt = [p.lat, p.lon];
+
+      if (!curSeg) {
+        curSeg = { color, points: [pt], startIdx: p.origIdx, endIdx: p.origIdx };
+      } else if (curSeg.color === color) {
+        curSeg.points.push(pt);
+        curSeg.endIdx = p.origIdx;
+      } else {
+        curSeg.points.push(pt);
+        curSeg.endIdx = p.origIdx;
+        segments.push(curSeg);
+        curSeg = { color, points: [pt], startIdx: p.origIdx, endIdx: p.origIdx };
+      }
+    }
+    if (curSeg && curSeg.points.length >= 2) {
+      segments.push(curSeg);
+    }
+
+    this.flightTrackPolylines = [];
+    for (const segment of segments) {
+      const poly = window.L.polyline(segment.points, {
+        color: segment.color,
+        weight: 3.5,
+        opacity: 0.85,
+        lineCap: 'round',
+        lineJoin: 'round'
+      });
+      poly.segmentData = segment;
+      this.overlayLayerGroup.addLayer(poly);
+      this.flightTrackPolylines.push(poly);
+    }
+
+    // Takeoff marker "D"
+    const tCoord = [validPoints[0].lat, validPoints[0].lon];
+    const tIcon = window.L.divIcon({
+      className: 'gm-map-div-icon',
+      html: `<div class="gm-flight-map-pin gm-flight-map-takeoff-pin" title="Decollo">D</div>`,
+      iconSize: [22, 22],
+      iconAnchor: [11, 11]
+    });
+    this.trackTakeoffMarker = window.L.marker(tCoord, { icon: tIcon, zIndexOffset: 700 });
+    this.overlayLayerGroup.addLayer(this.trackTakeoffMarker);
+
+    // Landing marker "A"
+    const lCoord = [validPoints[validPoints.length - 1].lat, validPoints[validPoints.length - 1].lon];
+    const lIcon = window.L.divIcon({
+      className: 'gm-map-div-icon',
+      html: `<div class="gm-flight-map-pin gm-flight-map-landing-pin" title="Atterraggio">A</div>`,
+      iconSize: [22, 22],
+      iconAnchor: [11, 11]
+    });
+    this.trackLandingMarker = window.L.marker(lCoord, { icon: lIcon, zIndexOffset: 700 });
+    this.overlayLayerGroup.addLayer(this.trackLandingMarker);
+
+    // Fit bounds to flight track
+    const allCoords = validPoints.map(p => [p.lat, p.lon]);
+    this.trackBounds = window.L.latLngBounds(allCoords);
+    this.map.fitBounds(this.trackBounds, { padding: [25, 25], maxZoom: 16 });
+
+    // Apply initial range or cursor if provided
+    if (trackData.highlightRange) {
+      this.highlightFlightTrackRange(trackData.highlightRange);
+    }
+    if (typeof trackData.cursorIndex === 'number') {
+      this.setFlightTrackCursor(trackData.cursorIndex);
+    }
+
+    return this;
+  }
+
+  highlightFlightTrackRange(range) {
+    if (this.phaseHighlightGroup && typeof this.phaseHighlightGroup.clearLayers === 'function') {
+      this.phaseHighlightGroup.clearLayers();
+    }
+    this.highlightedRange = range;
+
+    if (!range || typeof range.startIndex !== 'number') {
+      if (this.flightTrackPolylines) {
+        for (const poly of this.flightTrackPolylines) {
+          poly.setStyle({ opacity: 0.85, weight: 3.5 });
+        }
+      }
+      if (this.map && this.trackBounds) {
+        this.map.fitBounds(this.trackBounds, { padding: [25, 25], maxZoom: 16 });
+      }
+      return this;
+    }
+
+    const sIdx = range.startIndex;
+    const eIdx = range.endIndex ?? sIdx;
+
+    if (this.flightTrackPolylines) {
+      for (const poly of this.flightTrackPolylines) {
+        const seg = poly.segmentData;
+        const overlaps = seg && !(seg.endIdx < sIdx || seg.startIdx > eIdx);
+        if (overlaps) {
+          poly.setStyle({ opacity: 1.0, weight: 5 });
+        } else {
+          poly.setStyle({ opacity: 0.22, weight: 2 });
+        }
+      }
+    }
+
+    if (this.validTrackPoints && window.L && this.phaseHighlightGroup) {
+      const phasePoints = this.validTrackPoints.filter(p => p.origIdx >= sIdx && p.origIdx <= eIdx);
+      if (phasePoints.length >= 2) {
+        const phaseCoords = phasePoints.map(p => [p.lat, p.lon]);
+        const halo = window.L.polyline(phaseCoords, {
+          color: '#ffffff',
+          weight: 8,
+          opacity: 0.45,
+          lineCap: 'round',
+          lineJoin: 'round'
+        });
+        this.phaseHighlightGroup.addLayer(halo);
+
+        const badgeIcon = window.L.divIcon({
+          className: 'gm-map-div-icon',
+          html: `<div class="gm-flight-phase-map-pin">${escapeHtml(range.label || 'Fase')}</div>`,
+          iconAnchor: [18, 24]
+        });
+        const badgeMarker = window.L.marker(phaseCoords[0], { icon: badgeIcon, zIndexOffset: 950 });
+        this.phaseHighlightGroup.addLayer(badgeMarker);
+
+        const phaseBounds = window.L.latLngBounds(phaseCoords);
+        if (this.map) {
+          this.map.fitBounds(phaseBounds, { padding: [30, 30], maxZoom: 17, animate: true });
+        }
+      }
+    }
+
+    return this;
+  }
+
+  setFlightTrackCursor(index) {
+    this.cursorIndex = index;
+    if (typeof window === 'undefined' || !window.L || !this.map) return this;
+
+    if (typeof index === 'number' && this.validTrackPoints) {
+      let targetPt = this.validTrackPoints.find(p => p.origIdx === index);
+      if (!targetPt && this.validTrackPoints.length > 0) {
+        const clamped = Math.max(0, Math.min(this.validTrackPoints.length - 1, index));
+        targetPt = this.validTrackPoints[clamped];
+      }
+
+      if (targetPt) {
+        const coord = [targetPt.lat, targetPt.lon];
+        if (!this.trackCursorMarker) {
+          const cIcon = window.L.divIcon({
+            className: 'gm-map-div-icon',
+            html: `<div class="gm-flight-track-cursor"><div class="gm-flight-track-cursor-pulse"></div><div class="gm-flight-track-cursor-core"></div></div>`,
+            iconSize: [20, 20],
+            iconAnchor: [10, 10]
+          });
+          this.trackCursorMarker = window.L.marker(coord, { icon: cIcon, zIndexOffset: 1200 }).addTo(this.map);
+        } else {
+          this.trackCursorMarker.setLatLng(coord);
+        }
+        return this;
+      }
+    }
+
+    if (this.trackCursorMarker) {
+      this.trackCursorMarker.remove();
+      this.trackCursorMarker = null;
+    }
+    return this;
+  }
+
   destroy() {
     this.clearOverlays();
+    this.clearFlightTrackLayers();
     if (this.userLocationMarker) {
       this.userLocationMarker.remove();
       this.userLocationMarker = null;
@@ -1402,6 +1703,7 @@ export class LeafletMapEngine {
     this.flightGlideLine = null;
     this.circuitLayers = null;
     this.overlayLayerGroup = null;
+    this.phaseHighlightGroup = null;
     this.tileLayer = null;
   }
 }

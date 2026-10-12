@@ -19,6 +19,7 @@ import { HeadlessReplayEngine } from '../3d/HeadlessReplayEngine.js';
 import { MapLibreThreeEngine } from '../3d/MapLibreThreeEngine.js';
 import { ReplayTelemetryCanvas } from '../3d/ReplayTelemetryCanvas.js';
 import { extractFlightEvents } from '../../core/flightTelemetry.js';
+import { renderLayerToggleIcon, getNextMapLayer, getMapLayerLabel } from '../map/mapEngineAdapter.js';
 
 export function escapeHtml(str) {
   if (str == null) return '';
@@ -39,12 +40,13 @@ export class FlightReplayView {
     this.currentBundle = null;
     this.activeCameraMode = 'chase';
     this.activeSpeed = 1;
-    this.activeLayer = options.mapLayer || 'dark';
+    this.activeLayer = options.mapLayer === 'satellite' ? 'satellite' : 'topo';
     this.isPlaying = false;
     this.elevationOffset = 0;
     this.flightEvents = [];
     this._boundKeyDown = this._onKeyDown.bind(this);
     this._boundLayerChange = this._onLayerChange.bind(this);
+    this._boundReplayToggle = null;
     this._boundStoreListener = null;
   }
 
@@ -56,7 +58,7 @@ export class FlightReplayView {
     if (this.engine) return this.engine;
     if (typeof window !== 'undefined' && typeof document !== 'undefined') {
       const state = (store && typeof store.getState === 'function') ? store.getState() : {};
-      const layerId = this.activeLayer || state.ui?.mapLayer || 'dark';
+      const layerId = (this.activeLayer === 'satellite' || state.ui?.mapLayer === 'satellite') ? 'satellite' : 'topo';
       return new MapLibreThreeEngine({ mapLayer: layerId });
     }
     return new HeadlessReplayEngine();
@@ -313,7 +315,21 @@ export class FlightReplayView {
     });
 
     const state = (store && typeof store.getState === 'function') ? store.getState() : {};
-    this.activeLayer = state.ui?.mapLayer || this.activeLayer || 'dark';
+    this.activeLayer = (state.ui?.mapLayer === 'satellite' || this.activeLayer === 'satellite') ? 'satellite' : 'topo';
+
+    if (store && typeof store.subscribe === 'function') {
+      this._boundStoreListener = store.subscribe(() => {
+        const s = store.getState();
+        if (s.ui?.mapLayer && s.ui.mapLayer !== this.activeLayer) {
+          const validLayer = s.ui.mapLayer === 'satellite' ? 'satellite' : 'topo';
+          this.activeLayer = validLayer;
+          if (this.engine && typeof this.engine.setMapLayer === 'function') {
+            this.engine.setMapLayer(validLayer);
+          }
+          this.updateLayerToggleUi();
+        }
+      });
+    }
 
     this.render();
     this._renderEventsStrip();
@@ -418,6 +434,15 @@ export class FlightReplayView {
         return;
       }
     });
+
+    const layerToggle = this.containerEl.querySelector('#gm-replay-layer-toggle');
+    if (layerToggle) {
+      this._boundReplayToggle = () => {
+        const nextLayer = getNextMapLayer(this.activeLayer);
+        this.handleLayerChange(nextLayer);
+      };
+      layerToggle.addEventListener('click', this._boundReplayToggle);
+    }
 
     const layerSelect = this.containerEl.querySelector('#gm-replay-layer-select');
     if (layerSelect) {
@@ -588,21 +613,44 @@ export class FlightReplayView {
 
   /**
    * Switches active 3D cartographic basemap layer and updates store.
-   * @param {string} layerId ('dark' | 'satellite' | 'topo' | 'streets')
+   * @param {string} layerId ('topo' | 'satellite')
    */
   handleLayerChange(layerId) {
-    this.activeLayer = layerId;
+    const validLayer = layerId === 'satellite' ? 'satellite' : 'topo';
+    this.activeLayer = validLayer;
     if (this.engine && typeof this.engine.setMapLayer === 'function') {
-      this.engine.setMapLayer(layerId);
+      this.engine.setMapLayer(validLayer);
     }
     if (store && typeof store.setState === 'function') {
       store.setState((prev) => ({
         ui: {
           ...prev.ui,
-          mapLayer: layerId
+          mapLayer: validLayer
         }
       }));
     }
+    this.updateLayerToggleUi();
+  }
+
+  /**
+   * Updates the 3D replay layer toggle button UI.
+   */
+  updateLayerToggleUi() {
+    if (!this.containerEl) return;
+    const toggleBtn = this.containerEl.querySelector('#gm-replay-layer-toggle');
+    if (!toggleBtn) return;
+    const isSat = this.activeLayer === 'satellite';
+    const curLabel = isSat ? 'Satellite' : 'OpenTopo';
+    const nextLabel = isSat ? 'OpenTopo' : 'Satellite';
+    toggleBtn.setAttribute('data-layer', this.activeLayer);
+    toggleBtn.setAttribute('aria-label', `Layer mappa: ${curLabel} (tocca per ${nextLabel})`);
+    toggleBtn.setAttribute('title', `Layer mappa: ${curLabel} (tocca per ${nextLabel})`);
+    toggleBtn.innerHTML = `
+      ${renderLayerToggleIcon(this.activeLayer)}
+      <span class="gm-layer-toggle-label">${curLabel}</span>
+    `;
+    const select = this.containerEl.querySelector('#gm-replay-layer-select');
+    if (select) select.value = this.activeLayer;
   }
 
   /**
@@ -628,7 +676,15 @@ export class FlightReplayView {
     if (typeof window !== 'undefined') {
       window.removeEventListener('keydown', this._boundKeyDown);
     }
+    if (this._boundStoreListener) {
+      this._boundStoreListener();
+      this._boundStoreListener = null;
+    }
     if (this.containerEl) {
+      const layerToggle = this.containerEl.querySelector('#gm-replay-layer-toggle');
+      if (layerToggle && this._boundReplayToggle) {
+        layerToggle.removeEventListener('click', this._boundReplayToggle);
+      }
       const layerSelect = this.containerEl.querySelector('#gm-replay-layer-select');
       if (layerSelect) {
         layerSelect.removeEventListener('change', this._boundLayerChange);
@@ -670,12 +726,18 @@ export class FlightReplayView {
           </div>
           <div class="gm-replay-top-right">
             <div class="gm-replay-layer-wrap">
-              <select id="gm-replay-layer-select" class="gm-replay-layer-select" aria-label="Seleziona layer cartografico 3D">
-                <option value="dark" ${this.activeLayer === 'dark' ? 'selected' : ''}>Scuro</option>
-                <option value="satellite" ${this.activeLayer === 'satellite' ? 'selected' : ''}>Satellite</option>
-                <option value="topo" ${this.activeLayer === 'topo' ? 'selected' : ''}>OpenTopo</option>
-                <option value="streets" ${this.activeLayer === 'streets' ? 'selected' : ''}>CyclOSM</option>
-              </select>
+              <button 
+                type="button" 
+                id="gm-replay-layer-toggle" 
+                class="gm-replay-layer-toggle" 
+                data-action="toggle-replay-layer" 
+                data-layer="${this.activeLayer}" 
+                aria-label="Layer mappa: ${this.activeLayer === 'satellite' ? 'Satellite (tocca per OpenTopo)' : 'OpenTopo (tocca per Satellite)'}" 
+                title="Layer mappa: ${this.activeLayer === 'satellite' ? 'Satellite (tocca per OpenTopo)' : 'OpenTopo (tocca per Satellite)'}"
+              >
+                ${renderLayerToggleIcon(this.activeLayer)}
+                <span class="gm-layer-toggle-label">${getMapLayerLabel(this.activeLayer)}</span>
+              </button>
             </div>
             <div class="gm-replay-camera-group" role="radiogroup" aria-label="Modalità Telecamera">
               <button type="button" class="gm-replay-cam-btn ${this.activeCameraMode === 'chase' ? 'gm-active' : ''}" data-camera="chase" aria-pressed="${this.activeCameraMode === 'chase'}">Inseguimento</button>

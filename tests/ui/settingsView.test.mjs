@@ -39,7 +39,7 @@ describe('GlideMind Phase 8-bis - SettingsView Architecture & Map Layer Persiste
 
   it('should update store ui.mapLayer and persist when a map layer is selected', () => {
     const storageAdapter = createInMemoryStorageAdapter();
-    const mockStore = createStore({ ui: { theme: 'dark', mapLayer: 'dark' } }, storageAdapter);
+    const mockStore = createStore({ ui: { theme: 'dark', mapLayer: 'satellite' } }, storageAdapter);
     const controller = new SettingsViewController({ store: mockStore });
 
     const mockContainer = {
@@ -49,7 +49,7 @@ describe('GlideMind Phase 8-bis - SettingsView Architecture & Map Layer Persiste
     };
 
     controller.mount(mockContainer);
-    assert.equal(mockStore.getState().ui.mapLayer, 'dark');
+    assert.equal(mockStore.getState().ui.mapLayer, 'satellite');
 
     // Simulate clicking the OpenTopo map layer
     controller.handleClick({
@@ -88,7 +88,7 @@ describe('GlideMind Phase 8-bis - SettingsView Architecture & Map Layer Persiste
   });
 
   it('should react to external store mapLayer mutations (e.g. from mini-map or full map)', () => {
-    const mockStore = createStore({ ui: { theme: 'dark', mapLayer: 'dark' } });
+    const mockStore = createStore({ ui: { theme: 'dark', mapLayer: 'topo' } });
     const controller = new SettingsViewController({ store: mockStore });
 
     let lastHtml = '';
@@ -100,15 +100,15 @@ describe('GlideMind Phase 8-bis - SettingsView Architecture & Map Layer Persiste
     };
 
     controller.mount(mockContainer);
-    assert.equal(controller.getActiveMapLayer(), 'dark');
+    assert.equal(controller.getActiveMapLayer(), 'topo');
 
     // Simulate external store update from ForecastView mini-map or SpotMapView
     mockStore.setState({
-      ui: { ...mockStore.getState().ui, mapLayer: 'streets' }
+      ui: { ...mockStore.getState().ui, mapLayer: 'satellite' }
     });
 
-    assert.equal(controller.getActiveMapLayer(), 'streets', 'SettingsView must reflect externally changed mapLayer');
-    assert.ok(lastHtml.includes('data-layer="streets"\n                  aria-checked="true"'), 'Markup must update with streets as active layer');
+    assert.equal(controller.getActiveMapLayer(), 'satellite', 'SettingsView must reflect externally changed mapLayer');
+    assert.ok(lastHtml.includes('data-layer="satellite"\n                  aria-checked="true"'), 'Markup must update with satellite as active layer');
 
     controller.unmount();
   });
@@ -132,7 +132,7 @@ describe('GlideMind Phase 8-bis - SettingsView Architecture & Map Layer Persiste
     // Reset preferences
     controller.resetPreferences();
     assert.equal(mockStore.getState().ui.theme, 'dark');
-    assert.equal(mockStore.getState().ui.mapLayer, 'dark');
+    assert.equal(mockStore.getState().ui.mapLayer, 'topo');
     assert.equal(mockStore.getState().units.speed, 'km/h');
   });
 

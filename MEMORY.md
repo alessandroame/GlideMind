@@ -302,7 +302,7 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
 - **Pattern Vincolante**:
   1. **Dual High-Contrast Theme Engine**: L'applicazione supporta due temi nativi ad alto contrasto governati da CSS Custom Properties: `dark` (predefinito, cockpit e luce moderata) e `light` ("Sunlight Mode", ad altissima luminanza per luce solare battente), oltre alla modalità `system` (media query OS).
   2. **Palette Sunlight Mode a Contrasto Estremo**: Nel tema chiaro, il fondo primario è bianco ottico/slate ultra-chiaro (`#f8fafc` / `#ffffff`) con testo quasi nero puro (`#0a0c10` / `#0f172a`), garantendo un contrasto $\ge 12:1$ (ben oltre la soglia minima WCAG AA di $4.5:1$).
-  3. **Ricalibrazione Semantica dei 4 Colori di Volabilità**: I codici di stato di volabilità (🟢 Verde, 🟡 Giallo, 🔴 Rosso, ⚫ Severo) devono essere ricalibrati con varianti a densità pigmentata più scura sul tema chiaro (`#15803d` anziché verde neon, `#b45309` anziché giallo chiaro, `#b91c1c` anziché rosso chiaro, `#09090b` per severo) per mantenere sempre un contrasto $\ge 4.5:1$ contro lo sfondo.
+  3. **Uniformità Cromatica dei Codici di Stato tra Dark e Light Mode**: I codici di stato di volabilità e gravità (🟢 Verde #22c55e, 🟡 Giallo #eab308, 🔴 Rosso #ef4444, ⚫ Severo #09090b / #f87171, 🟠 Allerta #f97316) mantengono rigorosamente le stesse colorazioni sature e vivaci sia in modalità scura che in modalità chiara per tutti gli elementi semantici (barre della timeline, pillole spot, badge orari, dot variometrici, card parametri e indicatori di severità), eliminando varianti eccessivamente scure o fangose (#15803d, #b45309, #b91c1c) che compromettevano l'immediatezza visiva e la coerenza percettiva tra i temi.
   4. **Adattamento Mappe e Telemetria Canvas**: La commutazione del tema deve aggiornare sia la palette raster/vettoriale della mappa (`SpotMapView.js`, layer tile chiara vs scura) sia il colore delle tracce altimetriche e termiche sui Canvas 2D per prevenire linee scure invisibili su fondo scuro o viceversa.
   5. **SSOT e Runtime Switch a Zero Ricaricamento**: La selezione del tema risiede in `store.ui.theme`, viene persistita in `localStorage` e si applica in tempo reale a `document.documentElement.dataset.theme` e al meta-tag `<meta name="theme-color">` entro 50ms senza ricaricare la pagina.
 
@@ -1580,4 +1580,83 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
      - *Riga Superiore di Riferimento Quote (`y = 17px`)*: Riserva uno spazio dedicato esterno all'area di volo per `Decollo` (sinistra), `Max • Min` (centro) e `Atterraggio` (destra).
      - *Badge Scaglionati*: Termiche e inversioni di rollio vengono ordinate per tempo e renderizzate ad altezze Y alternate con sfondi a pillola scura ad alto contrasto per azzerare qualsiasi sovrapposizione visiva.
   3. **Legenda Unica e Coerente**: Soppressione della barra di fase fittizia e della seconda legenda; adozione di un'unica legenda variometrica arricchita dinamicamente con gli indicatori di termica, sondaggio 360° e oscillazioni di rollio.
+
+---
+
+## 126. Espansione a Piena Altezza dell'SVG Altimetrico nei Contenitori Card (`.h-full` e `width/height: 100%`)
+- **Problema**: Nel dettaglio volo, il grafico altimetrico occupava solo la metà superiore della card contenitore (`.gm-flight-detail-alt-chart`), lasciando la metà inferiore vuota e scura e comprimendo la traiettoria di volo in una banda microscopica.
+- **Causa Radice**:
+  1. La classe `.h-full` mancava completamente in `css/theme.css`, impedendo all'elemento `<svg class="w-full h-full">` di estendersi al 100% dell'altezza del genitore.
+  2. Assenza di attributi `width="100%"` e `height="100%"` sul tag `<svg>` e assenza della regola CSS `.gm-flight-detail-alt-chart svg { width: 100%; height: 100%; display: block; }`. Su schermi mobile compatti ($\approx 370\text{px}$), il browser applicava l'aspect ratio intrinseco del viewBox ($600 \times 140$), riducendo l'altezza del disegno a soli $85\text{px}$ a fronte di un contenitore di $160\text{px}$.
+  3. L'altezza complessiva del contenitore ($160\text{px}$) era insufficiente per una consultazione telemetrica aeronautica dettagliata.
+- **Pattern Vincolante**:
+  1. **Definizione Globale di `.h-full`**: Censire `.h-full { height: 100%; }` in `css/theme.css` e vincolare `.gm-flight-detail-alt-chart svg { width: 100%; height: 100%; display: block; }`.
+  2. **Doppio Presidio Attributi / CSS**: Impostare sempre `width="100%" height="100%"` e `preserveAspectRatio="none"` sull'elemento `<svg>`.
+  3. **Ingrandimento Ergonomico della Risoluzione Verticale**: Portare l'altezza del contenitore a $220\text{px}$ su mobile e $260\text{px}$ su desktop (`@media (min-width: 640px)`), con coordinate viewBox a $220\text{px}$ (`padTop = 30`, `padBottom = 22`), quintuplicando l'escursione verticale della curva altimetrica ($168\text{px}$ utili contro i $32\text{px}$ precedenti).
+
+---
+
+## 127. Navigazione Telemetrica Multi-Canale (Zoom, Pan, Vario & Velocità al Suolo) e HUD Cockpit Real-Time con Isolamento Gestuale
+- **Problema**: La visualizzazione del solo tracciato altimetrico statico impediva al pilota di analizzare le singole fasi del volo ad alta risoluzione temporale (es. aggancio termica, transizione veloce controvento). Inoltre, mancavano la visualizzazione della componente variometrica continua in m/s e della velocità al suolo in km/h, costringendo l'utente a desumere le variazioni unicamente dalla pendenza visiva del profilo altimetrico. Infine, l'interazione touch su grafici web rischia di bloccare lo scroll verticale naturale della pagina (gesture conflict).
+- **Causa Radice**:
+  1. Generazione statica dell'SVG senza supporto per finestre temporali ritagliate (zoom e pan).
+  2. Assenza di layer vettoriali secondari per variometro (asse di zero a centro scala) e ground speed (curva normalizzata 0-70 km/h).
+  3. Assenza di un cockpit HUD digitale per l'ispezione istantanea dei parametri di volo al punto toccato o sorvolato.
+  4. Mancanza di isolamento delle direzioni di tocco (`touch-action`).
+- **Pattern Vincolante**:
+  1. **Multi-Canale a Livelli Indipendenti**: Fornire sempre pulsanti toggle chiari (`Quota`, `Vario (m/s)`, `Velocità (km/h)`) con codifica cromatica uniforme (Ciano `#38bdf8` per Quota, Smeraldo `#10b981` per Variometro, Viola `#c084fc` per Velocità).
+  2. **Zoom & Pan a Finestra Mobile con Conservazione Scala Altimetrica Globale**:
+     - Ritagliare i punti visibili in base al fattore di zoom ($1.0x - 6.0x$) e al centro frazionario di pan ($0..1$).
+     - Preservare i limiti estremi globali di altitudine (`minAlt`, `maxAlt`, `takeoffAlt`, `landingAlt`) per evitare salti o disorientamento visivo della scala durante il pan.
+     - Filtrare e proiettare selettivamente sull'asse X visibile solo i marker di termica e inversione di rollio che intersecano la finestra attiva.
+  3. **Isolamento Gestuale Mobile (`touch-action: pan-y`)**: Confinare le gesture orizzontali di trascinamento telemetrico al grafico, consentendo sempre al browser lo scorrimento verticale naturale della pagina con un singolo dito.
+  4. **Cockpit Inspection HUD a Risposta Immediata (< 16ms, Doherty Threshold)**:
+     - Aggiornare in tempo reale la riga di stato (Tempo, Quota MSL, Vario colorato per intensità di salita/discesa, Velocità km/h, Evento attivo).
+     - Aggiornare il mirino vettoriale (`#gm-chart-cursor-group`) direttamente tramite attributi DOM senza ri-generare l'intera stringa SVG a 60 FPS durante il movimento del cursore.
+  5. **Overview Pan Navigator**: Esporre una barra di scorrimento panoramica (`.gm-telemetry-navigator`) al di sotto del grafico quando lo zoom è attivo, mostrando con una maniglia mobile la porzione di volo attualmente inquadrata e permettendo lo scrub rapido dell'intera traccia.
+
+---
+
+## 128. Incapsulamento Autonomo dei Modificatori Pulsanti CSS (`.gm-btn-primary`, `.gm-btn-secondary`) contro Bevel di Default del Browser
+- **Problema**: Nel pannello di dettaglio volo (`FlightDetailSheet.js`) e nel pannello setup traccia (`TrackSetupSheet.js`), i pulsanti di azione inferiore (`Replay 3D`, `Setup Traccia`, `Scarica IGC (FAI)`) apparivano con bordi grigi 3D in rilievo ("outset bevel"), spigoli vivi quadrati e privi dello stile moderno (angoli arrotondati 12px, ombre morbide, sfondi semitrasparenti e feedback active con scala 0.98) tipico del resto dell'app.
+- **Causa Radice**:
+  1. I selettori di modifica (`.gm-btn-primary`, `.gm-btn-secondary`, `.gm-bottom-replay-btn`, `.gm-bottom-action-btn`) assumevano la presenza obbligatoria della classe base `.gm-btn` nel markup HTML per ereditare `appearance: none; border-radius: var(--gm-radius-md); font-family: inherit; cursor: pointer; border: 1px solid transparent;`.
+  2. Nei template di `FlightDetailSheet.js` e `TrackSetupSheet.js`, i pulsanti erano stati inseriti con la sola classe modificatore (es. `class="gm-btn-secondary gm-bottom-action-btn"` o `class="gm-btn-primary gm-bottom-replay-btn"`), omettendo la classe base `.gm-btn`.
+  3. In assenza di `appearance: none` e `border-radius`, i browser applicavano lo stile utente nativo per `<button>` (`border: 2px outset buttonborder; border-radius: 0; appearance: auto`), producendo il tipico artefatto visivo retrò.
+- **Pattern Vincolante**:
+  1. **Autonomia Resiliente dei Modificatori CSS**: In `css/theme.css`, includere sempre `appearance: none; -webkit-appearance: none; border-radius: var(--gm-radius-md, 12px); font-family: inherit; cursor: pointer; border: 1px solid transparent; box-sizing: border-box;` sia nella classe base `.gm-btn` sia direttamente nei modificatori `.gm-btn-primary, .gm-btn-secondary, .gm-btn-ghost, .gm-bottom-replay-btn, .gm-bottom-action-btn`. In questo modo, anche se la classe base viene accidentalmente omessa nel markup, il pulsante non regredisce mai al bevel di sistema.
+  2. **Doppio Presidio Markup**: Assicurare che tutti i tag `<button>` dichiarino esplicitamente la classe base `.gm-btn` seguita dal modificatore (`class="gm-btn gm-btn-primary ..."` o `class="gm-btn gm-btn-secondary ..."`).
+  3. **Stilizzazione Moderna Dock Bottom Bar**: La barra inferiore `.gm-flight-detail-bottom-bar` deve adottare `backdrop-filter: blur(12px)`, bordo superiore sottile ad alta fedeltà `1px solid var(--gm-border)` e ombra morbida `box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.12)`, con micro-interazioni tattili `:active { transform: scale(0.98); }`.
+
+---
+
+## 129. Riorganizzazione Ergonomica del Grafico Telemetrico: Dock Unificata, Ticker HUD a Riga Singola e Prevenzione Sovrapposizioni Multi-Canale
+- **Problema**: A seguito dell'introduzione dei layer multi-canale (variometro, velocità) e dei controlli di zoom/pan nel grafico di dettaglio volo (`FlightDetailSheet.js`), l'interfaccia soffriva di grave dispersione verticale (~130px sprecati tra due righe di comandi e un box HUD di 60px), collisione caotica tra curve ("spaghetti chart" tra quota, vario e velocità al suolo), sovrapposizione illeggibile di badge contigui (es. `T5/3P/T6`) e un'ingombrante tabella legenda a 8 righe.
+- **Causa Radice**:
+  1. I canali telemetrici e i controlli di zoom erano renderizzati in due container flex separati, frammentando lo spazio verticale utile per il grafico.
+  2. L'HUD di ispezione era strutturato come una card statica a blocchi verticali alta 60px anziché come ticker compatto a scomparsa o riga singola fluida.
+  3. Le curve di velocità e variometro condividevano l'intera altezza del canvas senza filtraggio passa-basso né partizionamento in fasce verticali dedicate.
+  4. L'algoritmo di posizionamento dei badge di manovra si basava su una semplice alternanza modulo 2 (`staggerLevel % 2`), che collassava quando 3 o più eventi si verificavano a breve distanza temporale.
+- **Pattern Vincolante**:
+  1. **Dock Toolbar Monofila (`.gm-telemetry-toolbar`)**: Raggruppare sempre i bottoni di canale (`Quota`, `Vario`, `Velocità`) e i comandi di zoom (`-`, `1.0x`, `+`, `Reset`) in una singola barra orizzontale a dock flex `justify-between`, con bottoni a pillola (`.gm-telemetry-pill-btn`) provvisti di dot semantico colorato.
+  2. **Ticker HUD a Riga Singola (`.gm-telemetry-hud-ticker`)**: Strutturare l'HUD d'ispezione come barra monofila compatta ($\le 36\text{px}$) con `overflow-x: auto`, aggiornando istantaneamente Tempo, Quota MSL, Vario colorato dinamicamente, Velocità al suolo ed Evento attivo.
+  3. **Smoothing e Partizionamento delle Bande Multi-Canale**:
+     - Applicare sempre una media mobile tri-puntuale (`(v[i-1] + v[i] + v[i+1]) / 3`) per eliminare il rumore ad alta frequenza da GNSS e sensori barometrici.
+     - Confinare la velocità al suolo nella fascia inferiore 38% del grafico ($padTop + 0.62 \cdot H \to padTop + H$), evitando qualsiasi intersezione con il profilo altimetrico.
+     - Confinare il variometro nella fascia inferiore 58% con linea di zero tratteggiata neutra.
+  4. **Algoritmo Greedy a 3 Corsie per Badge Non-Collidenti**: Utilizzare un tracker orizzontale di ingombro (`laneRightBounds = [-999, -999, -999]`) con spaziatura minima di sicurezza ($\ge 48\text{px}$) per distribuire i marker di termica e inversione sulla corsia orizzontale libera più bassa, azzerando le sovrapposizioni.
+  5. **Legenda Compatta a Gradiente Variometrico**: Sostituire tabelle testuali estese con una barra a gradiente orizzontale continua (-5 m/s discesa forte $\to$ 0 m/s $\to$ +5 m/s salita forte) e chip semantiche discrete.
+
+---
+
+## 130. Rappresentazione Grafica a Istogramma delle Precipitazioni e Formattazione Decimale dei Micro-Valori Aerologici
+- **Problema**: L'algoritmo di volabilità (`core/flyability.js`) declassava correttamente le ore con pioggia $> 0.5\text{ mm/h}$ a `NO FLY` e con pioggia $\ge 0.1\text{ mm/h}$ a `Cautela`, ma nei grafici multi-trend mancava una visualizzazione oraria dedicata. Inoltre, il generatore SVG arrotondava tutti i valori a numeri interi (`Math.round`), trasformando a schermo valori critici come $0.2$, $0.3$ o $0.4\text{ mm/h}$ in `0 mm/h`, con evidente incoerenza tra avviso semaforico e metrica mostrata.
+- **Causa Radice**:
+  1. `renderSvgTrendChart()` supportava unicamente serie a polilinea continua (`path`), inadatte a rappresentare l'intensità discreta oraria della pioggia.
+  2. Assenza di rami di formattazione condizionale per grandezze a scala ridotta ($0 - 4\text{ mm/h}$) sia sulle etichette dell'asse Y sia nel tooltip dell'ora attiva.
+  3. Nella scheda "Copertura Nuvolosa", la probabilità di precipitazione non era plottata nel grafico.
+- **Pattern Vincolante**:
+  1. **Supporto Serie a Barre in SVG Vettoriali (`type: 'bar'`)**: `renderSvgTrendChart()` deve supportare serie a istogramma generando elementi `<rect>` con larghezza proporzionale all'intervallo orario (`hRange`), `rx="1"` e opacità controllata (`var(--gm-accent-sky)`).
+  2. **Preservazione dei Decimali su Scale Ridotte ($\le 5$)**: Se `maxY <= 5`, l'asse Y e i tooltip per unità frazionarie (`mm/h`, `EDR`) devono utilizzare tassativamente `toFixed(1)` anziché `Math.round()`, garantendo la visibilità immediata delle soglie di pioviggine ($0.1\text{ mm/h}$) e limite di volo ($0.5\text{ mm/h}$).
+  3. **Integrazione Duale Multi-Trend e Schede**: Esporre un pannello dedicato `multi-chart-precipitation` nello stack dei grafici orari con soglie tratteggiate di allerta ($0.1$ gialla, $0.5$ rossa) e affiancare la polilinea tratteggiata della probabilità di pioggia (%) alla copertura nuvolosa (%) nella card espandibile.
 

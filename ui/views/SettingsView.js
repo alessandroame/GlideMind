@@ -14,12 +14,6 @@ import { applyTheme } from '../app.js';
  */
 export const SETTINGS_MAP_LAYERS = Object.freeze([
   {
-    id: 'dark',
-    name: 'Scuro',
-    label: 'Scuro (Antiriflesso)',
-    description: 'Esri Dark Canvas per contrasto elevato, penombra e risparmio energetico'
-  },
-  {
     id: 'topo',
     name: 'OpenTopo',
     label: 'OpenTopo (Curve di Livello)',
@@ -30,12 +24,6 @@ export const SETTINGS_MAP_LAYERS = Object.freeze([
     name: 'Satellite',
     label: 'Satellite (Ortofoto HD)',
     description: 'Fotografie satellitari Esri World Imagery ad alta risoluzione per studio creste e decolli'
-  },
-  {
-    id: 'streets',
-    name: 'CyclOSM',
-    label: 'CyclOSM (Outdoor & Sentieri)',
-    description: 'Cartografia outdoor specialistica con sentieri CAI, tracce sterrate e Hike & Fly'
   }
 ]);
 
@@ -108,7 +96,8 @@ export class SettingsViewController {
    */
   getActiveMapLayer() {
     const state = this.store ? this.store.getState() : {};
-    return (state.ui && state.ui.mapLayer) || 'dark';
+    const layer = (state.ui && state.ui.mapLayer) || 'topo';
+    return (layer === 'satellite') ? 'satellite' : 'topo';
   }
 
   /**
@@ -194,7 +183,7 @@ export class SettingsViewController {
         drawerOpen: false,
         highContrast: true,
         theme: 'dark',
-        mapLayer: 'dark'
+        mapLayer: 'topo'
       },
       units: {
         speed: 'km/h',

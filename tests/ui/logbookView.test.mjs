@@ -158,7 +158,7 @@ describe('LogbookView Controller & Outdoor Ergonomics (UI Layer)', () => {
     assert.ok(html.includes('+ Importa Traccia IGC / Backup'), 'Must render primary upload button in empty state');
   });
 
-  it('should render flight list with lean cards, altimetric sparklines, and glider classes', async () => {
+  it('should render flight list with lean cards and glider classes without altimetric sparkline', async () => {
     storeInstance.setState({ flights: [mockFlight1, mockFlight2] });
     await controller.mount(container);
 
@@ -178,9 +178,9 @@ describe('LogbookView Controller & Outdoor Ergonomics (UI Layer)', () => {
     assert.ok(html.includes('+420 m'), 'Must show altitude gain');
     assert.ok(html.includes('45 min'), 'Must show duration');
 
-    // Altimetric Sparkline SVG polyline
-    assert.ok(html.includes('gm-flight-sparkline'));
-    assert.ok(html.includes('0,28 20,18 40,8 60,12 80,22 100,28'));
+    // Altimetric sparkline removed from flight list cards
+    assert.ok(!html.includes('gm-flight-sparkline'), 'Must not render altimetric sparkline in flight list cards');
+    assert.ok(!html.includes('gm-flight-sparkline-wrap'), 'Must not render sparkline container');
 
     // Flight 2 Card
     assert.ok(html.includes('Bassano del Grappa'));

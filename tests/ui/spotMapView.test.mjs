@@ -43,6 +43,12 @@ function createMockElement(tagName = 'div', attributes = {}) {
       while (cur) {
         if (selector.startsWith('.') && cur.classList?.contains(selector.slice(1))) return cur;
         if (selector.startsWith('#') && cur.attributes?.id === selector.slice(1)) return cur;
+        if (selector.startsWith('[') && selector.endsWith(']')) {
+          const attrContent = selector.slice(1, -1);
+          const [k, v] = attrContent.split('=');
+          const cleanVal = v ? v.replace(/['"]/g, '') : null;
+          if (cleanVal !== null ? cur.getAttribute(k) === cleanVal : cur.hasAttribute(k)) return cur;
+        }
         cur = cur.parentElement;
       }
       return null;
@@ -185,8 +191,9 @@ describe('Spot Map View - Controller & Cartography Contracts (UI Layer)', () => 
     spotMapView.mount(mockContainer);
 
     assert.ok(mockContainer.innerHTML.includes('gm-map-canvas-controls'), 'Must contain floating canvas controls container');
-    assert.ok(mockContainer.innerHTML.includes('id="gm-map-layer-select"'), 'Must contain layer select dropdown');
-    assert.ok(mockContainer.innerHTML.includes('gm-map-ctrl-select'), 'Must have gm-map-ctrl-select class');
+    assert.ok(mockContainer.innerHTML.includes('id="gm-map-layer-toggle"'), 'Must contain layer toggle button');
+    assert.ok(mockContainer.innerHTML.includes('gm-map-layer-toggle'), 'Must have gm-map-layer-toggle class');
+    assert.ok(mockContainer.innerHTML.includes('data-action="toggle-map-layer"'), 'Must have toggle-map-layer action');
     assert.ok(mockContainer.innerHTML.includes('id="gm-map-top-spot-btn"'), 'Must contain top spot button');
     assert.ok(mockContainer.innerHTML.includes('id="gm-map-gps-btn"'), 'Must contain GPS location button');
     assert.ok(mockContainer.innerHTML.includes('gm-map-ctrl-btn'), 'Must have gm-map-ctrl-btn class');
@@ -297,20 +304,25 @@ describe('Spot Map View - Controller & Cartography Contracts (UI Layer)', () => 
   });
 
   it('should switch map layer and keep engine and store in sync without theme revert', () => {
-    store.setState({ ui: { theme: 'dark', mapLayer: 'dark' } });
+    store.setState({ ui: { theme: 'dark', mapLayer: 'topo' } });
     spotMapView.mount(mockContainer);
 
-    assert.equal(spotMapView.activeLayer, 'dark');
-    assert.equal(spotMapView.mapEngine.currentLayerId, 'dark');
-
-    // Simulate selecting OpenTopo
-    const layerSelect = mockContainer.querySelector('#gm-map-layer-select');
-    assert.ok(layerSelect, 'Must have #gm-map-layer-select');
-    layerSelect.value = 'topo';
-    layerSelect.dispatchEvent({ type: 'change', target: layerSelect });
-
     assert.equal(spotMapView.activeLayer, 'topo');
-    assert.equal(spotMapView.mapEngine.currentLayerId, 'topo', 'Engine must remain topo and not revert to dark');
+    assert.equal(spotMapView.mapEngine.currentLayerId, 'topo');
+
+    // Simulate clicking the layer toggle button
+    const layerToggle = mockContainer.querySelector('#gm-map-layer-toggle');
+    assert.ok(layerToggle, 'Must have #gm-map-layer-toggle');
+    layerToggle.dispatchEvent({ type: 'click', target: layerToggle });
+
+    assert.equal(spotMapView.activeLayer, 'satellite');
+    assert.equal(spotMapView.mapEngine.currentLayerId, 'satellite', 'Engine must switch to satellite');
+    assert.equal(store.getState().ui.mapLayer, 'satellite');
+
+    // Toggle back to topo
+    layerToggle.dispatchEvent({ type: 'click', target: layerToggle });
+    assert.equal(spotMapView.activeLayer, 'topo');
+    assert.equal(spotMapView.mapEngine.currentLayerId, 'topo');
     assert.equal(store.getState().ui.mapLayer, 'topo');
 
     // Simulate external store change to satellite

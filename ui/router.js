@@ -120,7 +120,14 @@ export function createRouter(options = {}) {
     isNavigating = true;
 
     try {
-      // 1. Unmount previous view
+      // 1. Unmount previous view and dismiss full-screen overlays
+      if (typeof document !== 'undefined') {
+        const overlays = document.querySelectorAll('.gm-flight-detail-overlay, .gm-track-setup-overlay');
+        overlays.forEach((el) => {
+          if (el && el.parentNode) el.parentNode.removeChild(el);
+        });
+      }
+
       if (currentMountedView && typeof currentMountedView.unmount === 'function') {
         try {
           currentMountedView.unmount();

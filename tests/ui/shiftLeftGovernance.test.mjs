@@ -130,6 +130,18 @@ describe('Shift-Left Quality Gate & Architectural Governance', () => {
       themeSrc.includes('--gm-text-primary'),
       'theme.css must declare text custom properties for dual-theme engine'
     );
+    assert.ok(
+      themeSrc.includes('--gm-status-flyable: #22c55e;'),
+      'theme.css must declare vibrant green status color matching dark mode'
+    );
+    assert.ok(
+      themeSrc.includes('--gm-status-caution: #eab308;'),
+      'theme.css must declare vibrant yellow status color matching dark mode'
+    );
+    assert.ok(
+      themeSrc.includes('--gm-status-unflyable: #ef4444;'),
+      'theme.css must declare vibrant red status color matching dark mode'
+    );
   });
 
   it('Gate 5 (Sobriety & Clean Microcopy): enforces absence of banned decorative emojis in view markup', () => {

@@ -14,3 +14,4 @@ coverage/
 .idea/
 .gemini/
 .agents/plugins/
+.tmp_audit_profile/

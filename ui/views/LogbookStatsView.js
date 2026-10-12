@@ -11,6 +11,7 @@
 import {
   calculatePilotPeriodMetrics,
   calculateMonthlyFlightActivity,
+  calculatePersonalRecords,
   PILOT_CURRENCY_STATUS
 } from '../../core/logbook.js';
 
@@ -438,15 +439,11 @@ export function renderLogbookStatsHtml(flights = [], options = {}) {
   });
 
   // Calculate career aggregates & personal records
+  const personalRecords = calculatePersonalRecords(safeFlights);
+
   let totalMinutes = 0;
   let totalThermals = 0;
   let totalManeuvers = 0;
-  let maxAlt = 0;
-  let maxAltSite = '';
-  let maxGain = 0;
-  let maxGainSite = '';
-  let maxDurationMin = 0;
-  let maxDist = 0;
 
   const siteCounts = new Map();
   const gliderCounts = new Map();
@@ -454,22 +451,6 @@ export function renderLogbookStatsHtml(flights = [], options = {}) {
   for (const f of safeFlights) {
     const dur = Number(f.durationMinutes) || 0;
     totalMinutes += dur;
-    if (dur > maxDurationMin) maxDurationMin = dur;
-
-    const alt = Number(f.maxAltMsl) || 0;
-    if (alt > maxAlt) {
-      maxAlt = alt;
-      maxAltSite = f.siteName || f.site || '';
-    }
-
-    const gain = Number(f.maxGainMeters) || 0;
-    if (gain > maxGain) {
-      maxGain = gain;
-      maxGainSite = f.siteName || f.site || '';
-    }
-
-    const dist = Number(f.distanceKm) || 0;
-    if (dist > maxDist) maxDist = dist;
 
     const thermals = Number(f.thermalsCount) || 0;
     totalThermals += thermals;
@@ -580,23 +561,52 @@ export function renderLogbookStatsHtml(flights = [], options = {}) {
       <section class="gm-stats-section" aria-labelledby="heading-records">
         <h3 id="heading-records" class="gm-stats-section-title">Migliori Prestazioni Personali</h3>
         <div class="gm-stats-grid">
-          <div class="gm-stats-metric-card">
-            <span class="gm-stats-metric-val">${maxAlt > 0 ? `${escapeHtml(maxAlt)} m` : '--'}</span>
+          <div
+            class="gm-stats-metric-card ${personalRecords.maxAlt.flightId ? 'gm-stats-record-clickable' : ''}"
+            ${personalRecords.maxAlt.flightId ? `data-action="open-flight-detail" data-flight-id="${escapeHtml(personalRecords.maxAlt.flightId)}" role="button" tabindex="0" aria-label="Quota Max MSL: ${personalRecords.maxAlt.val} m, Volo #${personalRecords.maxAlt.flightNumber}. Tocca per aprire il dettaglio."` : ''}
+          >
+            <div class="flex items-center justify-between gap-1">
+              <span class="gm-stats-metric-val">${personalRecords.maxAlt.val > 0 ? `${escapeHtml(personalRecords.maxAlt.val)} m` : '--'}</span>
+              ${personalRecords.maxAlt.flightNumber != null ? `<span class="gm-flight-number-badge" aria-label="Volo ${personalRecords.maxAlt.flightNumber}">#${escapeHtml(personalRecords.maxAlt.flightNumber)}</span>` : ''}
+            </div>
             <span class="gm-stats-metric-label">Quota Max MSL</span>
-            ${maxAltSite ? `<span class="gm-stats-metric-sub truncate" title="${escapeHtml(maxAltSite)}">${escapeHtml(maxAltSite)}</span>` : ''}
+            ${personalRecords.maxAlt.site ? `<span class="gm-stats-metric-sub truncate" title="${escapeHtml(personalRecords.maxAlt.site)}">${escapeHtml(personalRecords.maxAlt.site)}</span>` : ''}
           </div>
-          <div class="gm-stats-metric-card">
-            <span class="gm-stats-metric-val">${maxGain > 0 ? `+${escapeHtml(maxGain)} m` : '--'}</span>
+
+          <div
+            class="gm-stats-metric-card ${personalRecords.maxGain.flightId ? 'gm-stats-record-clickable' : ''}"
+            ${personalRecords.maxGain.flightId ? `data-action="open-flight-detail" data-flight-id="${escapeHtml(personalRecords.maxGain.flightId)}" role="button" tabindex="0" aria-label="Maggior Guadagno: +${personalRecords.maxGain.val} m, Volo #${personalRecords.maxGain.flightNumber}. Tocca per aprire il dettaglio."` : ''}
+          >
+            <div class="flex items-center justify-between gap-1">
+              <span class="gm-stats-metric-val">${personalRecords.maxGain.val > 0 ? `+${escapeHtml(personalRecords.maxGain.val)} m` : '--'}</span>
+              ${personalRecords.maxGain.flightNumber != null ? `<span class="gm-flight-number-badge" aria-label="Volo ${personalRecords.maxGain.flightNumber}">#${escapeHtml(personalRecords.maxGain.flightNumber)}</span>` : ''}
+            </div>
             <span class="gm-stats-metric-label">Maggior Guadagno</span>
-            ${maxGainSite ? `<span class="gm-stats-metric-sub truncate" title="${escapeHtml(maxGainSite)}">${escapeHtml(maxGainSite)}</span>` : ''}
+            ${personalRecords.maxGain.site ? `<span class="gm-stats-metric-sub truncate" title="${escapeHtml(personalRecords.maxGain.site)}">${escapeHtml(personalRecords.maxGain.site)}</span>` : ''}
           </div>
-          <div class="gm-stats-metric-card">
-            <span class="gm-stats-metric-val">${maxDurationMin > 0 ? `${escapeHtml(maxDurationMin)} min` : '--'}</span>
+
+          <div
+            class="gm-stats-metric-card ${personalRecords.maxDuration.flightId ? 'gm-stats-record-clickable' : ''}"
+            ${personalRecords.maxDuration.flightId ? `data-action="open-flight-detail" data-flight-id="${escapeHtml(personalRecords.maxDuration.flightId)}" role="button" tabindex="0" aria-label="Volo Più Lungo: ${personalRecords.maxDuration.val} min, Volo #${personalRecords.maxDuration.flightNumber}. Tocca per aprire il dettaglio."` : ''}
+          >
+            <div class="flex items-center justify-between gap-1">
+              <span class="gm-stats-metric-val">${personalRecords.maxDuration.val > 0 ? `${escapeHtml(personalRecords.maxDuration.val)} min` : '--'}</span>
+              ${personalRecords.maxDuration.flightNumber != null ? `<span class="gm-flight-number-badge" aria-label="Volo ${personalRecords.maxDuration.flightNumber}">#${escapeHtml(personalRecords.maxDuration.flightNumber)}</span>` : ''}
+            </div>
             <span class="gm-stats-metric-label">Volo Più Lungo</span>
+            ${personalRecords.maxDuration.site ? `<span class="gm-stats-metric-sub truncate" title="${escapeHtml(personalRecords.maxDuration.site)}">${escapeHtml(personalRecords.maxDuration.site)}</span>` : ''}
           </div>
-          <div class="gm-stats-metric-card">
-            <span class="gm-stats-metric-val">${maxDist > 0 ? `${escapeHtml(maxDist)} km` : '--'}</span>
+
+          <div
+            class="gm-stats-metric-card ${personalRecords.maxDistance.flightId ? 'gm-stats-record-clickable' : ''}"
+            ${personalRecords.maxDistance.flightId ? `data-action="open-flight-detail" data-flight-id="${escapeHtml(personalRecords.maxDistance.flightId)}" role="button" tabindex="0" aria-label="Distanza Massima: ${personalRecords.maxDistance.val} km, Volo #${personalRecords.maxDistance.flightNumber}. Tocca per aprire il dettaglio."` : ''}
+          >
+            <div class="flex items-center justify-between gap-1">
+              <span class="gm-stats-metric-val">${personalRecords.maxDistance.val > 0 ? `${escapeHtml(personalRecords.maxDistance.val)} km` : '--'}</span>
+              ${personalRecords.maxDistance.flightNumber != null ? `<span class="gm-flight-number-badge" aria-label="Volo ${personalRecords.maxDistance.flightNumber}">#${escapeHtml(personalRecords.maxDistance.flightNumber)}</span>` : ''}
+            </div>
             <span class="gm-stats-metric-label">Distanza Massima</span>
+            ${personalRecords.maxDistance.site ? `<span class="gm-stats-metric-sub truncate" title="${escapeHtml(personalRecords.maxDistance.site)}">${escapeHtml(personalRecords.maxDistance.site)}</span>` : ''}
           </div>
         </div>
       </section>

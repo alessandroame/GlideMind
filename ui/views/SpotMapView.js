@@ -29,7 +29,7 @@ import {
   findTopFlyableSpot,
   getComprensorioCoordinates
 } from '../../core/mapDataPartition.js';
-import { createMapEngine, STATUS_COLORS } from '../map/mapEngineAdapter.js';
+import { createMapEngine, STATUS_COLORS, renderLayerToggleIcon, getNextMapLayer, getMapLayerLabel } from '../map/mapEngineAdapter.js';
 import {
   formatDateIso,
   getSmartDatePresets,
@@ -544,12 +544,18 @@ export class SpotMapView {
           <!-- Floating Map Controls (Inside Map Canvas, harmonized with Flight Analysis Overlay) -->
           <div class="gm-map-canvas-controls" role="toolbar" aria-label="Controlli mappa">
             <div class="gm-map-controls-left">
-              <select id="gm-map-layer-select" class="gm-map-ctrl-select" aria-label="Seleziona layer cartografico">
-                <option value="dark" ${this.activeLayer === 'dark' ? 'selected' : ''}>Scuro</option>
-                <option value="topo" ${this.activeLayer === 'topo' ? 'selected' : ''}>OpenTopo</option>
-                <option value="satellite" ${this.activeLayer === 'satellite' ? 'selected' : ''}>Satellite</option>
-                <option value="streets" ${this.activeLayer === 'streets' ? 'selected' : ''}>CyclOSM</option>
-              </select>
+              <button 
+                type="button" 
+                id="gm-map-layer-toggle" 
+                class="gm-map-ctrl-btn gm-map-layer-toggle" 
+                data-action="toggle-map-layer" 
+                data-layer="${this.activeLayer}" 
+                aria-label="Layer mappa: ${this.activeLayer === 'satellite' ? 'Satellite (tocca per OpenTopo)' : 'OpenTopo (tocca per Satellite)'}" 
+                title="Layer mappa: ${this.activeLayer === 'satellite' ? 'Satellite (tocca per OpenTopo)' : 'OpenTopo (tocca per Satellite)'}"
+              >
+                ${renderLayerToggleIcon(this.activeLayer)}
+                <span class="gm-layer-toggle-label">${getMapLayerLabel(this.activeLayer)}</span>
+              </button>
             </div>
             <div class="gm-map-controls-right">
               <div class="gm-aim-menu-wrap" id="gm-map-aim-wrap">
@@ -681,18 +687,16 @@ export class SpotMapView {
         if (s.ui && s.ui.theme && s.ui.theme !== this.activeTheme && this.mapEngine) {
           this.activeTheme = s.ui.theme;
           this.mapEngine.setTheme(this.activeTheme);
-          this.activeLayer = (this.mapEngine.currentLayerId) || (this.activeTheme === 'light' ? 'topo' : 'dark');
-          const select = this.container?.querySelector('#gm-map-layer-select');
-          if (select) select.value = this.activeLayer;
+          this.activeLayer = (this.mapEngine.currentLayerId === 'satellite') ? 'satellite' : 'topo';
+          this.updateLayerToggleUi();
         }
         // Check map layer change
         if (s.ui && s.ui.mapLayer && s.ui.mapLayer !== this.activeLayer && this.mapEngine) {
-          this.activeLayer = s.ui.mapLayer;
-          const select = this.container?.querySelector('#gm-map-layer-select');
-          if (select) select.value = this.activeLayer;
+          this.activeLayer = s.ui.mapLayer === 'satellite' ? 'satellite' : 'topo';
           if (typeof this.mapEngine.setLayer === 'function') {
             this.mapEngine.setLayer(this.activeLayer);
           }
+          this.updateLayerToggleUi();
         }
         // Check selected spot change
         if (s.selectedSpotId && s.selectedSpotId !== this.focusedSpotId) {
@@ -823,7 +827,24 @@ export class SpotMapView {
       });
     }
 
-    // Layer switcher
+    // Layer toggle button
+    const layerToggle = this.container.querySelector('#gm-map-layer-toggle');
+    if (layerToggle) {
+      layerToggle.addEventListener('click', () => {
+        const newLayer = getNextMapLayer(this.activeLayer);
+        this.activeLayer = newLayer;
+        if (this.mapEngine && typeof this.mapEngine.setLayer === 'function') {
+          this.mapEngine.setLayer(newLayer);
+        }
+        if (typeof store.setState === 'function') {
+          const ui = (store.getState().ui) || {};
+          store.setState({ ui: { ...ui, mapLayer: newLayer } });
+        }
+        this.updateLayerToggleUi();
+      });
+    }
+
+    // Layer switcher (legacy select fallback)
     const layerSelect = this.container.querySelector('#gm-map-layer-select');
     if (layerSelect) {
       layerSelect.addEventListener('change', (e) => {
@@ -836,6 +857,7 @@ export class SpotMapView {
           const ui = (store.getState().ui) || {};
           store.setState({ ui: { ...ui, mapLayer: newLayer } });
         }
+        this.updateLayerToggleUi();
       });
     }
 
@@ -934,6 +956,27 @@ export class SpotMapView {
         }
       });
     }
+  }
+
+  /**
+   * Updates the map layer toggle button UI with active layer icon and label.
+   */
+  updateLayerToggleUi() {
+    if (!this.container) return;
+    const toggleBtn = this.container.querySelector('#gm-map-layer-toggle');
+    if (!toggleBtn) return;
+    const isSat = this.activeLayer === 'satellite';
+    const curLabel = isSat ? 'Satellite' : 'OpenTopo';
+    const nextLabel = isSat ? 'OpenTopo' : 'Satellite';
+    toggleBtn.setAttribute('data-layer', this.activeLayer);
+    toggleBtn.setAttribute('aria-label', `Layer mappa: ${curLabel} (tocca per ${nextLabel})`);
+    toggleBtn.setAttribute('title', `Layer mappa: ${curLabel} (tocca per ${nextLabel})`);
+    toggleBtn.innerHTML = `
+      ${renderLayerToggleIcon(this.activeLayer)}
+      <span class="gm-layer-toggle-label">${curLabel}</span>
+    `;
+    const select = this.container.querySelector('#gm-map-layer-select');
+    if (select) select.value = this.activeLayer;
   }
 
   /**
@@ -1736,7 +1779,18 @@ export class SpotMapView {
 
     const action = actionEl.getAttribute('data-action');
 
-    if (action === 'select-date') {
+    if (action === 'toggle-map-layer') {
+      const newLayer = getNextMapLayer(this.activeLayer);
+      this.activeLayer = newLayer;
+      if (this.mapEngine && typeof this.mapEngine.setLayer === 'function') {
+        this.mapEngine.setLayer(newLayer);
+      }
+      if (typeof store.setState === 'function') {
+        const ui = (store.getState().ui) || {};
+        store.setState({ ui: { ...ui, mapLayer: newLayer } });
+      }
+      this.updateLayerToggleUi();
+    } else if (action === 'select-date') {
       const dateAttr = actionEl.getAttribute('data-date');
       if (dateAttr) {
         this.handleDateChange(dateAttr);

@@ -945,6 +945,7 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.ok(html.includes('id="multi-chart-cape"'), 'Must render CAPE trend card');
     assert.ok(html.includes('id="multi-chart-turbulence"'), 'Must render turbulence trend card');
     assert.ok(html.includes('id="multi-chart-cloudcover"'), 'Must render cloud cover trend card');
+    assert.ok(html.includes('id="multi-chart-precipitation"'), 'Must render precipitation trend card');
     assert.ok(html.includes('id="multi-chart-landing"'), 'Must render landing trend card');
   });
 
@@ -1149,7 +1150,7 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     controller.unmount();
   });
 
-  it('should render map layer switcher in mini-map box with all available basemap layers', () => {
+  it('should render map layer toggle in mini-map box with dynamic icon and label', () => {
     const mockStore = createStore({
       selectedSpot: DEFAULT_COMPRENSORI[0],
       ui: { theme: 'dark', mapLayer: 'satellite' }
@@ -1157,19 +1158,16 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     const controller = new ForecastViewController({ store: mockStore });
 
     const html = controller.renderHtml();
-    assert.ok(html.includes('id="forecast-minimap-layer-select"'), 'Must render layer selector element');
-    assert.ok(html.includes('value="topo"'), 'Must include topo option');
-    assert.ok(html.includes('>OpenTopo</option>'), 'Must display OpenTopo label');
-    assert.ok(html.includes('value="satellite" selected'), 'Must select satellite option based on store');
-    assert.ok(html.includes('value="dark"'), 'Must include dark option');
-    assert.ok(html.includes('value="streets"'), 'Must include streets option');
-    assert.ok(html.includes('>CyclOSM</option>'), 'Must display CyclOSM label');
+    assert.ok(html.includes('id="forecast-minimap-layer-toggle"'), 'Must render layer toggle element');
+    assert.ok(html.includes('data-action="toggle-minimap-layer"'), 'Must have toggle-minimap-layer action');
+    assert.ok(html.includes('Satellite'), 'Must display Satellite label for satellite layer');
+    assert.ok(html.includes('title="Passa a OpenTopo"'), 'Must offer toggle to OpenTopo');
   });
 
-  it('should update miniMapEngine layer and persist to store when layer is switched via select', () => {
+  it('should update miniMapEngine layer and persist to store when layer is switched via toggle', () => {
     const mockStore = createStore({
       selectedSpot: DEFAULT_COMPRENSORI[0],
-      ui: { theme: 'dark', mapLayer: 'dark' }
+      ui: { theme: 'dark', mapLayer: 'topo' }
     });
     const controller = new ForecastViewController({ store: mockStore });
 
@@ -1185,22 +1183,28 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     };
 
     controller.mount(mockContainer);
-    assert.equal(controller.miniMapEngine.currentLayerId, 'dark', 'Initial layer must be dark');
+    assert.equal(controller.miniMapEngine.currentLayerId, 'topo', 'Initial layer must be topo');
 
-    // Simulate change event on forecast-minimap-layer-select
-    controller.handleChange({
+    // Simulate click event on forecast-minimap-layer-toggle
+    controller.handleClick({
       target: {
-        id: 'forecast-minimap-layer-select',
-        value: 'topo'
+        closest: (sel) => {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute: (attr) => (attr === 'data-action' ? 'toggle-minimap-layer' : null)
+            };
+          }
+          return null;
+        }
       }
     });
 
-    assert.equal(controller.miniMapEngine.currentLayerId, 'topo', 'miniMapEngine must update to topo');
-    assert.equal(mockStore.getState().ui.mapLayer, 'topo', 'Store ui.mapLayer must be updated to topo');
+    assert.equal(controller.miniMapEngine.currentLayerId, 'satellite', 'miniMapEngine must update to satellite');
+    assert.equal(mockStore.getState().ui.mapLayer, 'satellite', 'Store ui.mapLayer must be updated to satellite');
 
     // Simulate store update for mapLayer
-    mockStore.setState({ ui: { ...mockStore.getState().ui, mapLayer: 'satellite' } });
-    assert.equal(controller.miniMapEngine.currentLayerId, 'satellite', 'miniMapEngine must react to store mapLayer change');
+    mockStore.setState({ ui: { ...mockStore.getState().ui, mapLayer: 'topo' } });
+    assert.equal(controller.miniMapEngine.currentLayerId, 'topo', 'miniMapEngine must react to store mapLayer change');
 
     controller.unmount();
   });
@@ -1399,7 +1403,7 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.equal(controller.isFlightAnalysisOpen, false, 'Escape must close flight analysis overlay');
   });
 
-  it('should switch layer on flightAnalysisMapEngine when set-flight-analysis-layer change event occurs', () => {
+  it('should switch layer on flightAnalysisMapEngine when toggle-flight-analysis-layer click event occurs', () => {
     const mockStore = createStore({
       selectedSpot: DEFAULT_COMPRENSORI[0],
       ui: { theme: 'dark', mapLayer: 'topo' }
@@ -1409,17 +1413,39 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     controller.openFlightAnalysisOverlay();
     assert.equal(controller.flightAnalysisMapEngine.currentLayerId, 'topo');
 
-    // Trigger layer switch to satellite
-    controller.handleChange({
+    // Trigger layer toggle to satellite
+    controller.handleClick({
       target: {
-        getAttribute: (attr) => (attr === 'data-action' ? 'set-flight-analysis-layer' : null),
-        classList: { contains: () => false },
-        value: 'satellite'
+        closest: (sel) => {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute: (attr) => (attr === 'data-action' ? 'toggle-flight-analysis-layer' : null)
+            };
+          }
+          return null;
+        }
       }
     });
 
     assert.equal(controller.flightAnalysisMapEngine.currentLayerId, 'satellite', 'flightAnalysisMapEngine must update layer');
     assert.equal(mockStore.getState().ui.mapLayer, 'satellite', 'Store ui.mapLayer must be updated');
+
+    // Trigger layer toggle back to topo
+    controller.handleClick({
+      target: {
+        closest: (sel) => {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute: (attr) => (attr === 'data-action' ? 'toggle-flight-analysis-layer' : null)
+            };
+          }
+          return null;
+        }
+      }
+    });
+
+    assert.equal(controller.flightAnalysisMapEngine.currentLayerId, 'topo', 'flightAnalysisMapEngine must update layer back to topo');
+    assert.equal(mockStore.getState().ui.mapLayer, 'topo', 'Store ui.mapLayer must be updated back to topo');
 
     controller.closeFlightAnalysisOverlay();
   });
@@ -2355,6 +2381,185 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
 
       // 4. Anti-Echo: must not render duplicate summary footer inside side-by-side chart boxes
       assert.ok(!windCard.includes('border-t border-[var(--gm-border)]'), 'Must not render bottom duplicate summary line in side-by-side card');
+    });
+  });
+
+  describe('Precipitation Visualization & Hourly Trend Contracts', () => {
+    it('renders multi-chart-precipitation with SVG bars, threshold lines, and badge in Solo Grafici mode', () => {
+      const mockStore = createStore({ selectedSpot: DEFAULT_COMPRENSORI[0] });
+      const controller = new ForecastViewController({ store: mockStore });
+      controller.forecastMode = 'charts';
+      controller.selectedHour = 14;
+
+      const weatherData = {
+        hourly: {
+          time: Array.from({ length: 13 }, (_, i) => `2026-10-10T${String(i + 8).padStart(2, '0')}:00`),
+          windspeed_10m: Array(13).fill(12),
+          winddirection_10m: Array(13).fill(180),
+          windgusts_10m: Array(13).fill(16),
+          temperature_2m: Array(13).fill(22),
+          dewpoint_2m: Array(13).fill(10),
+          cape: Array(13).fill(150),
+          cloudcover: Array(13).fill(40),
+          precipitation: [0, 0, 0, 0, 0, 0, 1.2, 0.4, 0, 0, 0, 0, 0],
+          precipitation_probability: [0, 0, 0, 0, 10, 20, 90, 60, 10, 0, 0, 0, 0]
+        }
+      };
+
+      const html = controller.renderMultiTrendCharts(
+        { takeoff: DEFAULT_COMPRENSORI[0].takeoffs[0], landing: DEFAULT_COMPRENSORI[0].landings[0], status: 'unflyable' },
+        weatherData,
+        DEFAULT_COMPRENSORI[0],
+        GLIDER_CLASSES.EN_A,
+        DEFAULT_COMPRENSORI[0].takeoffs[0]
+      );
+
+      assert.ok(html.includes('id="multi-chart-precipitation"'), 'Must render multi-chart-precipitation card');
+      assert.ok(html.includes('Precipitazioni</span>'), 'Must display Precipitazioni label');
+      assert.ok(html.includes('mm/h</span>'), 'Must display mm/h unit');
+      assert.ok(html.includes('NO FLY: Pioggia'), 'Must indicate NO FLY: Pioggia in badge for 1.2 mm/h hour');
+      assert.ok(html.includes('<rect x='), 'Must render SVG rect bars for hourly precipitation');
+    });
+
+    it('evaluates severe NO FLY: Pioggia when hourly precipitation exceeds 0.5 mm/h in computeParamMetrics', () => {
+      const mockStore = createStore({ selectedSpot: DEFAULT_COMPRENSORI[0] });
+      const controller = new ForecastViewController({ store: mockStore });
+      controller.selectedHour = 14;
+
+      const weatherData = {
+        hourly: {
+          time: Array.from({ length: 13 }, (_, i) => `2026-10-10T${String(i + 8).padStart(2, '0')}:00`),
+          windspeed_10m: Array(13).fill(10),
+          winddirection_10m: Array(13).fill(180),
+          windgusts_10m: Array(13).fill(14),
+          temperature_2m: Array(13).fill(20),
+          dewpoint_2m: Array(13).fill(12),
+          cape: Array(13).fill(100),
+          cloudcover: Array(13).fill(90),
+          precipitation: Array(13).fill(1.5),
+          precipitation_probability: Array(13).fill(95)
+        }
+      };
+
+      const { params } = controller.computeParamMetrics(
+        { takeoff: DEFAULT_COMPRENSORI[0].takeoffs[0], landing: DEFAULT_COMPRENSORI[0].landings[0], status: 'unflyable' },
+        weatherData,
+        DEFAULT_COMPRENSORI[0],
+        GLIDER_CLASSES.EN_A,
+        DEFAULT_COMPRENSORI[0].takeoffs[0]
+      );
+
+      const cloudParam = params.find(p => p.id === 'copertura');
+      assert.ok(cloudParam, 'Copertura card must exist');
+      assert.equal(cloudParam.status, 'severe');
+      assert.equal(cloudParam.statusLabel, 'NO FLY: Pioggia');
+      assert.ok(cloudParam.value.includes('Pioggia (1.5 mm/h)'));
+      assert.ok(cloudParam.advice.includes('Pioggia in atto o imminente'));
+      assert.ok(cloudParam.advice.includes('stallo paracadutale'));
+
+      const precipDetail = cloudParam.details.find(d => d.label === 'Precipitazioni Orarie');
+      assert.ok(precipDetail);
+      assert.equal(precipDetail.value, '1.5 mm/h');
+
+      const probDetail = cloudParam.details.find(d => d.label === 'Probabilità Pioggia');
+      assert.ok(probDetail);
+      assert.equal(probDetail.value, '95%');
+    });
+
+    it('evaluates caution Pioviggine when hourly precipitation is between 0.1 and 0.5 mm/h', () => {
+      const mockStore = createStore({ selectedSpot: DEFAULT_COMPRENSORI[0] });
+      const controller = new ForecastViewController({ store: mockStore });
+      controller.selectedHour = 12;
+
+      const weatherData = {
+        hourly: {
+          time: Array.from({ length: 13 }, (_, i) => `2026-10-10T${String(i + 8).padStart(2, '0')}:00`),
+          windspeed_10m: Array(13).fill(10),
+          winddirection_10m: Array(13).fill(180),
+          windgusts_10m: Array(13).fill(14),
+          temperature_2m: Array(13).fill(20),
+          dewpoint_2m: Array(13).fill(12),
+          cape: Array(13).fill(100),
+          cloudcover: Array(13).fill(70),
+          precipitation: Array(13).fill(0.3),
+          precipitation_probability: Array(13).fill(50)
+        }
+      };
+
+      const { params } = controller.computeParamMetrics(
+        { takeoff: DEFAULT_COMPRENSORI[0].takeoffs[0], landing: DEFAULT_COMPRENSORI[0].landings[0], status: 'caution' },
+        weatherData,
+        DEFAULT_COMPRENSORI[0],
+        GLIDER_CLASSES.EN_A,
+        DEFAULT_COMPRENSORI[0].takeoffs[0]
+      );
+
+      const cloudParam = params.find(p => p.id === 'copertura');
+      assert.ok(cloudParam);
+      assert.equal(cloudParam.status, 'caution');
+      assert.equal(cloudParam.statusLabel, 'Pioviggine');
+      assert.ok(cloudParam.value.includes('Pioviggine (0.3 mm/h)'));
+      assert.ok(cloudParam.advice.includes('volo sconsigliato'));
+    });
+
+    it('renders dual series Copertura Nuvolosa and Probabilità Pioggia in param-chart-cloud', () => {
+      const mockStore = createStore({ selectedSpot: DEFAULT_COMPRENSORI[0] });
+      const controller = new ForecastViewController({ store: mockStore });
+
+      const weatherData = {
+        hourly: {
+          time: Array.from({ length: 13 }, (_, i) => `2026-10-10T${String(i + 8).padStart(2, '0')}:00`),
+          windspeed_10m: Array(13).fill(10),
+          winddirection_10m: Array(13).fill(180),
+          windgusts_10m: Array(13).fill(14),
+          temperature_2m: Array(13).fill(20),
+          dewpoint_2m: Array(13).fill(12),
+          cape: Array(13).fill(100),
+          cloudcover: Array(13).fill(50),
+          precipitation: Array(13).fill(0),
+          precipitation_probability: Array(13).fill(25)
+        }
+      };
+
+      const { params } = controller.computeParamMetrics(
+        { takeoff: DEFAULT_COMPRENSORI[0].takeoffs[0], landing: DEFAULT_COMPRENSORI[0].landings[0], status: 'flyable' },
+        weatherData,
+        DEFAULT_COMPRENSORI[0],
+        GLIDER_CLASSES.EN_A,
+        DEFAULT_COMPRENSORI[0].takeoffs[0]
+      );
+
+      const cloudParam = params.find(p => p.id === 'copertura');
+      assert.ok(cloudParam?.chartOptions);
+      assert.equal(cloudParam.chartOptions.series.length, 2);
+      assert.equal(cloudParam.chartOptions.series[0].name, 'Copertura');
+      assert.equal(cloudParam.chartOptions.series[1].name, 'Probabilità Pioggia');
+    });
+
+    it('renders SVG rect elements when renderSvgTrendChart is provided a series with type bar', () => {
+      const controller = new ForecastViewController({ store: createStore() });
+      const svg = controller.renderSvgTrendChart({
+        id: 'test-bar-chart',
+        title: 'Precipitazioni Test',
+        unit: 'mm/h',
+        minY: 0,
+        maxY: 5,
+        series: [
+          {
+            name: 'Precipitazioni',
+            type: 'bar',
+            points: [
+              { hour: 10, value: 0 },
+              { hour: 12, value: 2.5 },
+              { hour: 14, value: 4.0 }
+            ],
+            fill: 'var(--gm-accent-sky, #0ea5e9)'
+          }
+        ]
+      });
+
+      assert.ok(svg.includes('<rect x='), 'Must render SVG rect bars');
+      assert.ok(svg.includes('var(--gm-accent-sky, #0ea5e9)'), 'Must use sky accent variable for bars');
     });
   });
 });

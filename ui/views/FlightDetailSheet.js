@@ -17,18 +17,37 @@
 
 import { logbookManager } from '../../core/logbookDb.js';
 import { store } from '../../core/store.js';
-import { DEFAULT_SEED_FLIGHTS } from '../../core/logbook.js';
 import { closeSheet } from '../sheetManager.js';
+import {
+  DEFAULT_SEED_FLIGHTS,
+  calculatePersonalRecords,
+  checkFlightRecordFlags
+} from '../../core/logbook.js';
 import {
   sampleVarioRgb
 } from '../../core/flightTelemetry.js';
 import { detectTrimPoints } from '../../core/flightTrimming.js';
 import { openTrackSetupView } from './TrackSetupSheet.js';
+import {
+  createMapEngine,
+  renderLayerToggleIcon,
+  getNextMapLayer,
+  getMapLayerLabel
+} from '../map/mapEngineAdapter.js';
 
 let activeDetailOverlay = null;
 let previousActiveEl = null;
 let escapeKeyHandler = null;
 let hashChangeHandler = null;
+let flightDetailMapEngine = null;
+
+/**
+ * Returns the active flight detail map engine instance if mounted.
+ * @returns {Object|null}
+ */
+export function getActiveFlightDetailMapEngine() {
+  return flightDetailMapEngine;
+}
 
 /**
  * Escapes unsafe HTML characters.
@@ -155,14 +174,56 @@ export function formatManeuverDetails(m) {
 }
 
 /**
- * Generates an SVG altimetric chart with variometer-based gradient, thermal sections, and probe markers.
+ * Returns point variometer (m/s) with fallback calculation from altitude change.
+ * @param {Object} p
+ * @param {number} idx
+ * @param {Array<Object>} pts
+ * @returns {number}
+ */
+export function getPointVario(p, idx, pts) {
+  if (typeof p?.vario === 'number' && !isNaN(p.vario)) return p.vario;
+  if (idx > 0 && Array.isArray(pts) && pts[idx - 1]) {
+    const prev = pts[idx - 1];
+    const dt = Math.max(0.5, (p.timeSeconds ?? idx) - (prev.timeSeconds ?? (idx - 1)));
+    return ((p.alt || 0) - (prev.alt || 0)) / dt;
+  }
+  return 0;
+}
+
+/**
+ * Returns point ground speed (km/h) with fallback calculation from coordinates.
+ * @param {Object} p
+ * @param {number} idx
+ * @param {Array<Object>} pts
+ * @returns {number}
+ */
+export function getPointSpeed(p, idx, pts) {
+  if (typeof p?.speedKmh === 'number' && !isNaN(p.speedKmh)) return p.speedKmh;
+  if (idx > 0 && Array.isArray(pts) && pts[idx - 1]) {
+    const prev = pts[idx - 1];
+    if (typeof p.lat === 'number' && typeof p.lon === 'number' && typeof prev.lat === 'number' && typeof prev.lon === 'number') {
+      const dt = Math.max(0.5, (p.timeSeconds ?? idx) - (prev.timeSeconds ?? (idx - 1)));
+      const R = 6371;
+      const dLat = (p.lat - prev.lat) * Math.PI / 180;
+      const dLon = (p.lon - prev.lon) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(prev.lat * Math.PI / 180) * Math.cos(p.lat * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return (R * c) / (dt / 3600);
+    }
+  }
+  return 36.0;
+}
+
+/**
+ * Generates an SVG altimetric chart with variometer-based gradient, thermal sections, probe markers,
+ * and optional multi-channel zoom/pan, variometer curve, and ground speed curve.
  * @param {Array<Object>} points
  * @param {number} [width=600]
- * @param {number} [height=140]
+ * @param {number} [height=220]
  * @param {Object} [options={}]
  * @returns {string} SVG inner HTML
  */
-export function generateExpandedSvgChart(points, width = 600, height = 150, options = {}) {
+export function generateExpandedSvgChart(points, width = 600, height = 220, options = {}) {
   if (!points || !Array.isArray(points) || points.length < 2) {
     return `
       <div class="flex items-center justify-center h-full text-xs text-[var(--gm-text-muted)]">
@@ -171,19 +232,41 @@ export function generateExpandedSvgChart(points, width = 600, height = 150, opti
     `;
   }
 
+  const n = points.length;
+  const zoom = Math.max(1.0, Math.min(8.0, Number(options.zoom) || 1.0));
+  const pan = Math.max(0.0, Math.min(1.0, typeof options.pan === 'number' ? options.pan : 0.5));
+  const showAlt = options.showAlt !== false;
+  const showVario = options.showVario === true;
+  const showSpeed = options.showSpeed === true;
+  const cursorIndex = typeof options.cursorIndex === 'number' ? options.cursorIndex : null;
+
+  // Window bounds calculation for zoom & pan
+  let startIdx = 0;
+  let endIdx = n - 1;
+  if (zoom > 1.0) {
+    const windowLen = Math.max(6, Math.round(n / zoom));
+    const centerIdx = Math.round(pan * (n - 1));
+    startIdx = Math.max(0, Math.min(n - windowLen, centerIdx - Math.floor(windowLen / 2)));
+    endIdx = Math.min(n - 1, startIdx + windowLen - 1);
+  }
+
+  const visiblePoints = points.slice(startIdx, endIdx + 1);
+  const visibleN = visiblePoints.length;
+
+  // Altimetric bounds (consistent scale using overall min/max so altitude profile doesn't wildly scale during pan)
   const alts = points.map((p) => (typeof p.alt === 'number' && !isNaN(p.alt) ? p.alt : 0));
   const minAlt = Math.min(...alts);
   const maxAlt = Math.max(...alts);
   const range = Math.max(1, maxAlt - minAlt);
-  const padTop = 32;
+  const padTop = 30;
   const padBottom = 22;
   const chartHeight = height - padTop - padBottom;
 
-  const n = points.length;
-  const polyCoords = points.map((p, idx) => {
-    const x = Math.round((idx / (n - 1)) * width * 10) / 10;
+  const polyCoords = visiblePoints.map((p, vIdx) => {
+    const origIdx = startIdx + vIdx;
+    const x = Math.round((vIdx / (visibleN - 1)) * width * 10) / 10;
     const y = Math.round((padTop + (1 - (p.alt - minAlt) / range) * chartHeight) * 10) / 10;
-    return { x, y };
+    return { x, y, origIdx, point: p };
   });
 
   const polyPoints = polyCoords.map((c) => `${c.x},${c.y}`).join(' ');
@@ -196,98 +279,107 @@ export function generateExpandedSvgChart(points, width = 600, height = 150, opti
   const probes = Array.isArray(options.thermalProbes) ? options.thermalProbes : [];
   const rollInversions = Array.isArray(options.rollInversions) ? options.rollInversions : [];
 
-  // Variometer gradient stops along the flight trajectory
-  const maxStops = Math.min(80, Math.max(10, n));
+  // Variometer gradient stops along the visible trajectory
+  const maxStops = Math.min(80, Math.max(10, visibleN));
   const stops = [];
   for (let s = 0; s <= maxStops; s++) {
     const frac = s / maxStops;
-    const idx = Math.min(n - 1, Math.floor(frac * (n - 1)));
-    const p = points[idx];
-    let vario = p.vario;
-    if (typeof vario !== 'number' || isNaN(vario)) {
-      if (idx > 0) {
-        const prev = points[idx - 1];
-        const dt = Math.max(0.5, (p.timeSeconds || idx) - (prev.timeSeconds || (idx - 1)));
-        vario = ((p.alt || 0) - (prev.alt || 0)) / dt;
-      } else {
-        vario = 0;
-      }
-    }
+    const vIdx = Math.min(visibleN - 1, Math.floor(frac * (visibleN - 1)));
+    const p = visiblePoints[vIdx];
+    const origIdx = startIdx + vIdx;
+    const vario = getPointVario(p, origIdx, points);
     const colorBand = sampleVarioRgb(vario);
     const offsetPct = (frac * 100).toFixed(1);
     stops.push(`<stop offset="${offsetPct}%" stop-color="${colorBand.css}" />`);
   }
 
-  // Collect event markers (thermals and roll inversions) for anti-collision positioning
+  // Collect event markers (thermals and roll inversions) visible within [startIdx, endIdx]
   const eventItems = [];
 
   thermals.forEach((th, idx) => {
     const sIdx = typeof th.startIndex === 'number' ? Math.max(0, Math.min(th.startIndex, n - 1)) : 0;
     const eIdx = typeof th.endIndex === 'number' ? Math.max(0, Math.min(th.endIndex, n - 1)) : (n - 1);
-    const x1 = Math.round((sIdx / (n - 1)) * width * 10) / 10;
-    const x2 = Math.round((eIdx / (n - 1)) * width * 10) / 10;
-    const bandW = Math.max(12, x2 - x1);
-    const cx = Math.round((x1 + bandW / 2) * 10) / 10;
-    eventItems.push({
-      type: 'thermal',
-      x1,
-      x2,
-      bandW,
-      cx,
-      label: `T${th.thermalIndex || (idx + 1)}`,
-      rawObj: th
-    });
+
+    if (eIdx >= startIdx && sIdx <= endIdx) {
+      const visS = Math.max(startIdx, sIdx);
+      const visE = Math.min(endIdx, eIdx);
+      const x1 = Math.round(((visS - startIdx) / (visibleN - 1)) * width * 10) / 10;
+      const x2 = Math.round(((visE - startIdx) / (visibleN - 1)) * width * 10) / 10;
+      const bandW = Math.max(12, x2 - x1);
+      const cx = Math.round((x1 + bandW / 2) * 10) / 10;
+      eventItems.push({
+        type: 'thermal',
+        x1,
+        x2,
+        bandW,
+        cx,
+        label: `T${th.thermalIndex || (idx + 1)}`,
+        rawObj: th
+      });
+    }
   });
 
   rollInversions.forEach((inv) => {
     const sIdx = typeof inv.startIndex === 'number' ? Math.max(0, Math.min(inv.startIndex, n - 1)) : 0;
     const eIdx = typeof inv.endIndex === 'number' ? Math.max(0, Math.min(inv.endIndex, n - 1)) : sIdx;
-    const coord1 = polyCoords[sIdx] || { x: (width / 2), y: (padTop + chartHeight / 2) };
-    const coord2 = polyCoords[eIdx] || coord1;
-    const x1 = Math.min(coord1.x, coord2.x);
-    const x2 = Math.max(coord1.x, coord2.x);
-    const bandW = Math.max(14, x2 - x1);
-    const cx = Math.round((x1 + bandW / 2) * 10) / 10;
-    const pCount = getPendolateCount(inv);
-    const label = pCount ? `${pCount}P` : 'Inv';
-    eventItems.push({
-      type: 'roll',
-      x1,
-      x2,
-      bandW,
-      cx,
-      label,
-      pCount,
-      rawObj: inv
-    });
+
+    if (eIdx >= startIdx && sIdx <= endIdx) {
+      const visS = Math.max(startIdx, sIdx);
+      const visE = Math.min(endIdx, eIdx);
+      const x1 = Math.round(((visS - startIdx) / (visibleN - 1)) * width * 10) / 10;
+      const x2 = Math.round(((visE - startIdx) / (visibleN - 1)) * width * 10) / 10;
+      const bandW = Math.max(14, x2 - x1);
+      const cx = Math.round((x1 + bandW / 2) * 10) / 10;
+      const pCount = getPendolateCount(inv);
+      const label = pCount ? `${pCount}P` : 'Inv';
+      eventItems.push({
+        type: 'roll',
+        x1,
+        x2,
+        bandW,
+        cx,
+        label,
+        pCount,
+        rawObj: inv
+      });
+    }
   });
 
-  // Sort by horizontal position and stagger adjacent badges to prevent text collisions
+  // Sort by horizontal position and allocate 3 non-colliding vertical lanes
   eventItems.sort((a, b) => a.cx - b.cx);
-  let lastCx = -999;
-  let staggerLevel = 0;
+  const laneRightBounds = [-999, -999, -999];
   eventItems.forEach((ev) => {
-    if (ev.cx - lastCx < 36) {
-      staggerLevel = (staggerLevel + 1) % 2;
-    } else {
-      staggerLevel = 0;
+    const pillW = ev.type === 'roll'
+      ? Math.max(22, (ev.label ? ev.label.length : 2) * 7 + 8)
+      : 24;
+    const leftBound = ev.cx - pillW / 2;
+
+    let chosenLane = 0;
+    if (leftBound < laneRightBounds[0] + 5) {
+      if (leftBound < laneRightBounds[1] + 5) {
+        chosenLane = 2;
+      } else {
+        chosenLane = 1;
+      }
     }
-    ev.yLevel = staggerLevel;
-    lastCx = ev.cx;
+    ev.yLevel = chosenLane;
+    laneRightBounds[chosenLane] = ev.cx + pillW / 2;
   });
 
   // Render thermal bands
   const thermalBandsSvg = eventItems
     .filter((ev) => ev.type === 'thermal')
     .map((ev) => {
-      const badgeY = padTop + (ev.yLevel === 0 ? 12 : 25);
+      const badgeY = padTop + 9 + ev.yLevel * 13;
       const pillW = 24;
-      const pillH = 13;
+      const pillH = 12;
+      const sIdx = ev.rawObj?.startIndex ?? 0;
+      const eIdx = ev.rawObj?.endIndex ?? (n - 1);
       return `
-        <g class="gm-chart-thermal-band">
-          <rect x="${ev.x1}" y="${padTop}" width="${ev.bandW}" height="${chartHeight}" fill="rgba(245, 158, 11, 0.16)" stroke="rgba(245, 158, 11, 0.45)" stroke-width="1" stroke-dasharray="3,2" rx="3" />
-          <rect x="${ev.cx - pillW / 2}" y="${badgeY - 10}" width="${pillW}" height="${pillH}" fill="rgba(15, 23, 42, 0.88)" stroke="#f59e0b" stroke-width="0.8" rx="2.5" />
-          <text x="${ev.cx}" y="${badgeY}" text-anchor="middle" font-size="9" font-family="monospace" font-weight="800" fill="#f59e0b">${escapeHtml(ev.label)}</text>
+        <g class="gm-chart-thermal-band" data-phase-type="thermal" data-phase-label="${escapeHtml(ev.label)}" data-start-index="${sIdx}" data-end-index="${eIdx}" style="cursor: pointer;">
+          <rect x="${ev.x1}" y="${padTop}" width="${ev.bandW}" height="${chartHeight}" fill="rgba(245, 158, 11, 0.14)" stroke="rgba(245, 158, 11, 0.45)" stroke-width="1" stroke-dasharray="3,2" rx="3" />
+          <rect x="${ev.cx - pillW / 2}" y="${badgeY - 9}" width="${pillW}" height="${pillH}" fill="rgba(15, 23, 42, 0.92)" stroke="#f59e0b" stroke-width="0.8" rx="2.5" />
+          <text x="${ev.cx}" y="${badgeY}" text-anchor="middle" font-size="8.5" font-family="monospace" font-weight="800" fill="#f59e0b">${escapeHtml(ev.label)}</text>
         </g>
       `;
     })
@@ -297,41 +389,145 @@ export function generateExpandedSvgChart(points, width = 600, height = 150, opti
   const rollMarkersSvg = eventItems
     .filter((ev) => ev.type === 'roll')
     .map((ev) => {
-      const badgeY = padTop + (ev.yLevel === 0 ? 12 : 25);
+      const badgeY = padTop + 9 + ev.yLevel * 13;
       const pillW = Math.max(22, ev.label.length * 7 + 8);
-      const pillH = 13;
+      const pillH = 12;
+      const sIdx = ev.rawObj?.startIndex ?? 0;
+      const eIdx = ev.rawObj?.endIndex ?? sIdx;
       return `
-        <g class="gm-chart-roll-marker" role="img" aria-label="Inversione di rollio (${ev.pCount ? `${ev.pCount} pendolate` : ''})">
-          <rect x="${ev.x1}" y="${padTop + 2}" width="${ev.bandW}" height="${chartHeight}" fill="rgba(234, 88, 12, 0.15)" stroke="rgba(234, 88, 12, 0.7)" stroke-width="1" stroke-dasharray="2,2" rx="2" />
-          <rect x="${ev.cx - pillW / 2}" y="${badgeY - 10}" width="${pillW}" height="${pillH}" fill="rgba(15, 23, 42, 0.88)" stroke="#ea580c" stroke-width="0.8" rx="2.5" />
-          <text x="${ev.cx}" y="${badgeY}" text-anchor="middle" font-size="9" font-family="monospace" font-weight="800" fill="#ea580c">${escapeHtml(ev.label)}</text>
+        <g class="gm-chart-roll-marker" role="img" aria-label="Inversione di rollio (${ev.pCount ? `${ev.pCount} pendolate` : ''})" data-phase-type="roll" data-phase-label="${escapeHtml(ev.label)}" data-start-index="${sIdx}" data-end-index="${eIdx}" style="cursor: pointer;">
+          <rect x="${ev.x1}" y="${padTop + 2}" width="${ev.bandW}" height="${chartHeight}" fill="rgba(234, 88, 12, 0.14)" stroke="rgba(234, 88, 12, 0.7)" stroke-width="1" stroke-dasharray="2,2" rx="2" />
+          <rect x="${ev.cx - pillW / 2}" y="${badgeY - 9}" width="${pillW}" height="${pillH}" fill="rgba(15, 23, 42, 0.92)" stroke="#ea580c" stroke-width="0.8" rx="2.5" />
+          <text x="${ev.cx}" y="${badgeY}" text-anchor="middle" font-size="8.5" font-family="monospace" font-weight="800" fill="#ea580c">${escapeHtml(ev.label)}</text>
         </g>
       `;
     })
     .join('');
 
-  // Thermal probe (test 360) markers on the altimetric line
-  const probeMarkersSvg = probes.map((pr) => {
-    const sIdx = typeof pr.startIndex === 'number' ? Math.max(0, Math.min(pr.startIndex, n - 1)) : 0;
-    const coord = polyCoords[sIdx] || { x: (width / 2), y: (padTop + chartHeight / 2) };
-    return `
-      <g class="gm-chart-probe-marker">
-        <line x1="${coord.x}" y1="${padTop + 2}" x2="${coord.x}" y2="${height - padBottom}" stroke="rgba(14, 165, 233, 0.45)" stroke-width="1.5" stroke-dasharray="2,2" />
-        <circle cx="${coord.x}" cy="${coord.y}" r="3.5" fill="#0284c7" stroke="#ffffff" stroke-width="1" />
+  // Thermal probe (test 360) markers on the visible window
+  const probeMarkersSvg = probes
+    .filter((pr) => {
+      const sIdx = typeof pr.startIndex === 'number' ? pr.startIndex : 0;
+      return sIdx >= startIdx && sIdx <= endIdx;
+    })
+    .map((pr) => {
+      const sIdx = pr.startIndex;
+      const vIdx = sIdx - startIdx;
+      const coord = polyCoords[vIdx] || { x: (width / 2), y: (padTop + chartHeight / 2) };
+      const eIdx = Math.min(n - 1, sIdx + 4);
+      return `
+        <g class="gm-chart-probe-marker" data-phase-type="probe" data-phase-label="Sondaggio 360°" data-start-index="${sIdx}" data-end-index="${eIdx}" style="cursor: pointer;">
+          <line x1="${coord.x}" y1="${padTop + 2}" x2="${coord.x}" y2="${height - padBottom}" stroke="rgba(14, 165, 233, 0.45)" stroke-width="1.5" stroke-dasharray="2,2" />
+          <circle cx="${coord.x}" cy="${coord.y}" r="3.5" fill="#0284c7" stroke="#ffffff" stroke-width="1" />
+        </g>
+      `;
+    })
+    .join('');
+
+  // Selected phase highlight overlay box
+  let selectedPhaseBoxSvg = '';
+  if (options.selectedPhase && typeof options.selectedPhase.startIndex === 'number') {
+    const selS = options.selectedPhase.startIndex;
+    const selE = options.selectedPhase.endIndex ?? selS;
+    if (selE >= startIdx && selS <= endIdx) {
+      const visS = Math.max(startIdx, selS);
+      const visE = Math.min(endIdx, selE);
+      const x1 = Math.round(((visS - startIdx) / (visibleN - 1)) * width * 10) / 10;
+      const x2 = Math.round(((visE - startIdx) / (visibleN - 1)) * width * 10) / 10;
+      const bandW = Math.max(12, x2 - x1);
+      selectedPhaseBoxSvg = `
+        <g class="gm-chart-phase-selected-group" aria-label="Fase selezionata ${escapeHtml(options.selectedPhase.label || '')}">
+          <rect class="gm-chart-phase-selected-rect" x="${x1}" y="${padTop}" width="${bandW}" height="${chartHeight}" fill="rgba(56, 189, 248, 0.18)" stroke="#38bdf8" stroke-width="2" stroke-dasharray="4,2" rx="3" />
+        </g>
+      `;
+    }
+  }
+
+  // Optional Variometer Curve Layer (Smoothed 3-point moving average)
+  let varioSvg = '';
+  if (showVario) {
+    const varioLimit = 5.0; // +/- 5 m/s scale
+    const varioZeroY = Math.round((padTop + chartHeight * 0.58) * 10) / 10;
+    const varioCoords = visiblePoints.map((p, vIdx) => {
+      const origIdx = startIdx + vIdx;
+      const vRaw = getPointVario(p, origIdx, points);
+      const vPrev = getPointVario(visiblePoints[Math.max(0, vIdx - 1)], Math.max(0, origIdx - 1), points);
+      const vNext = getPointVario(visiblePoints[Math.min(visibleN - 1, vIdx + 1)], Math.min(n - 1, origIdx + 1), points);
+      const vSmooth = (vPrev + vRaw * 2 + vNext) / 4;
+      const clampedV = Math.max(-varioLimit, Math.min(varioLimit, vSmooth));
+      const x = Math.round((vIdx / (visibleN - 1)) * width * 10) / 10;
+      const y = Math.round((varioZeroY - (clampedV / varioLimit) * (chartHeight * 0.28)) * 10) / 10;
+      return `${x},${y}`;
+    }).join(' ');
+
+    varioSvg = `
+      <g class="gm-chart-vario-layer" aria-label="Curva Variometro">
+        <line x1="0" y1="${varioZeroY}" x2="${width}" y2="${varioZeroY}" stroke="#10b981" stroke-dasharray="2,3" stroke-width="1" opacity="0.45" />
+        <text x="${width - 6}" y="${varioZeroY - 3}" text-anchor="end" font-size="8.5" font-family="monospace" fill="#10b981" opacity="0.8">0 m/s</text>
+        <polyline points="${varioCoords}" fill="none" stroke="#10b981" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.85" />
       </g>
     `;
-  }).join('');
+  }
+
+  // Optional Ground Speed Curve Layer (Smoothed and scaled to lower 40% band)
+  let speedSvg = '';
+  if (showSpeed) {
+    const speedLimit = 70.0; // 0 to 70 km/h scale
+    const speedBandH = chartHeight * 0.38;
+    const speedBaselineY = padTop + chartHeight;
+    const speedCoords = visiblePoints.map((p, vIdx) => {
+      const origIdx = startIdx + vIdx;
+      const spRaw = getPointSpeed(p, origIdx, points);
+      const spPrev = getPointSpeed(visiblePoints[Math.max(0, vIdx - 1)], Math.max(0, origIdx - 1), points);
+      const spNext = getPointSpeed(visiblePoints[Math.min(visibleN - 1, vIdx + 1)], Math.min(n - 1, origIdx + 1), points);
+      const spSmooth = (spPrev + spRaw * 2 + spNext) / 4;
+      const clampedSp = Math.max(0, Math.min(speedLimit, spSmooth));
+      const x = Math.round((vIdx / (visibleN - 1)) * width * 10) / 10;
+      const y = Math.round((speedBaselineY - (clampedSp / speedLimit) * speedBandH) * 10) / 10;
+      return `${x},${y}`;
+    }).join(' ');
+
+    const speed70Y = Math.round((speedBaselineY - speedBandH) * 10) / 10;
+    speedSvg = `
+      <g class="gm-chart-speed-layer" aria-label="Curva Velocità al Suolo">
+        <line x1="0" y1="${speed70Y}" x2="${width}" y2="${speed70Y}" stroke="#c084fc" stroke-dasharray="2,3" stroke-width="0.8" opacity="0.35" />
+        <text x="6" y="${speed70Y + 9}" font-size="8" font-family="monospace" fill="#c084fc" opacity="0.8">70 km/h</text>
+        <polyline points="${speedCoords}" fill="none" stroke="#c084fc" stroke-width="1.6" stroke-dasharray="4,2" stroke-linecap="round" stroke-linejoin="round" opacity="0.8" />
+      </g>
+    `;
+  }
+
+  // Inspection Crosshair Cursor
+  let cursorX = 0;
+  let cursorY = 0;
+  let hasValidCursor = false;
+  if (cursorIndex !== null && cursorIndex >= startIdx && cursorIndex <= endIdx) {
+    const vIdx = cursorIndex - startIdx;
+    const coord = polyCoords[vIdx];
+    if (coord) {
+      cursorX = coord.x;
+      cursorY = coord.y;
+      hasValidCursor = true;
+    }
+  }
+
+  const cursorSvg = `
+    <g id="gm-chart-cursor-group" style="${hasValidCursor ? '' : 'display:none;'}" pointer-events="none">
+      <line id="gm-chart-cursor-line" x1="${cursorX}" y1="${padTop}" x2="${cursorX}" y2="${height - padBottom}" stroke="var(--gm-accent-sky, #38bdf8)" stroke-width="1.5" stroke-dasharray="3,3" />
+      <circle id="gm-chart-cursor-dot" cx="${cursorX}" cy="${cursorY}" r="4.5" fill="#38bdf8" stroke="#ffffff" stroke-width="1.5" />
+    </g>
+  `;
 
   // Time labels
-  let startTime = points[0].timeFormatted || points[0].time;
-  if (!startTime && points[0].timeSeconds != null) startTime = formatSecondsToTime(points[0].timeSeconds);
+  let startTime = visiblePoints[0].timeFormatted || visiblePoints[0].time;
+  if (!startTime && visiblePoints[0].timeSeconds != null) startTime = formatSecondsToTime(visiblePoints[0].timeSeconds);
   if (!startTime) startTime = '00:00';
 
-  let endTime = points[n - 1].timeFormatted || points[n - 1].time;
-  if (!endTime && points[n - 1].timeSeconds != null) endTime = formatSecondsToTime(points[n - 1].timeSeconds);
+  let endTime = visiblePoints[visibleN - 1].timeFormatted || visiblePoints[visibleN - 1].time;
+  if (!endTime && visiblePoints[visibleN - 1].timeSeconds != null) endTime = formatSecondsToTime(visiblePoints[visibleN - 1].timeSeconds);
 
   return `
-    <svg viewBox="0 0 ${width} ${height}" class="w-full h-full" preserveAspectRatio="none" role="img" aria-label="Grafico altimetrico del volo: Quota massima ${maxAlt} m, Minima ${minAlt} m">
+    <svg viewBox="0 0 ${width} ${height}" width="100%" height="100%" class="w-full h-full" preserveAspectRatio="none" role="img" aria-label="Grafico altimetrico del volo: Quota massima ${maxAlt} m, Minima ${minAlt} m">
       <defs>
         <linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="0%">
           ${stops.join('\n          ')}
@@ -366,15 +562,27 @@ export function generateExpandedSvgChart(points, width = 600, height = 150, opti
       <!-- Thermal probe lines -->
       ${probeMarkersSvg}
 
+      <!-- Selected phase highlight box -->
+      ${selectedPhaseBoxSvg}
+
+      <!-- Optional Vario layer -->
+      ${varioSvg}
+
+      <!-- Optional Speed layer -->
+      ${speedSvg}
+
       <!-- Area fill below path -->
-      <polygon points="0,${height - padBottom} ${polyPoints} ${width},${height - padBottom}" fill="url(#${gradId}-area)" />
+      ${showAlt ? `<polygon points="0,${height - padBottom} ${polyPoints} ${width},${height - padBottom}" fill="url(#${gradId}-area)" />` : ''}
 
       <!-- Main altitude polyline colored by variometer -->
-      <polyline points="${polyPoints}" fill="none" stroke="url(#${gradId})" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+      ${showAlt ? `<polyline points="${polyPoints}" fill="none" stroke="url(#${gradId})" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />` : ''}
+
+      <!-- Inspection cursor crosshair -->
+      ${cursorSvg}
 
       <!-- Time axis labels -->
-      <text x="8" y="${height - 5}" fill="var(--gm-text-muted)" font-size="10" font-family="monospace">${escapeHtml(startTime)}</text>
-      ${endTime ? `<text x="${width - 8}" y="${height - 5}" text-anchor="end" fill="var(--gm-text-muted)" font-size="10" font-family="monospace">${escapeHtml(endTime)}</text>` : ''}
+      <text x="8" y="${height - 6}" fill="var(--gm-text-muted)" font-size="10" font-family="monospace">${escapeHtml(startTime)}</text>
+      ${endTime ? `<text x="${width - 8}" y="${height - 6}" text-anchor="end" fill="var(--gm-text-muted)" font-size="10" font-family="monospace">${escapeHtml(endTime)}</text>` : ''}
     </svg>
   `;
 }
@@ -455,10 +663,26 @@ export function generateEducationalDebriefing(bundle) {
  * @param {Object} bundle - { meta, raw, telemetry }
  * @returns {string} HTML string
  */
-export function renderFlightDetailHtml(bundle) {
+export function renderFlightDetailHtml(bundle, options = {}) {
   const meta = bundle.meta || {};
   const raw = bundle.raw || {};
   const tel = bundle.telemetry || {};
+
+  const opt = options || {};
+  const stateStore = (opt.store || bundle?.options?.store || store);
+  const appState = (stateStore && typeof stateStore.getState === 'function') ? stateStore.getState() : {};
+  const activeLayer = (appState.ui && appState.ui.mapLayer) || 'topo';
+
+  // Career personal records calculation & matching
+  let careerRecords = opt.careerRecords || bundle?.careerRecords;
+  if (!careerRecords) {
+    let allFlights = opt.allFlights || bundle?.allFlights;
+    if (!Array.isArray(allFlights) || allFlights.length === 0) {
+      allFlights = Array.isArray(appState.flights) && appState.flights.length > 0 ? appState.flights : DEFAULT_SEED_FLIGHTS;
+    }
+    careerRecords = calculatePersonalRecords(allFlights);
+  }
+  const recordFlags = checkFlightRecordFlags(meta, careerRecords);
 
   const flightId = String(meta.id || meta.flightId || '');
   const flightNumber = meta.flightNumber != null ? meta.flightNumber : null;
@@ -479,7 +703,7 @@ export function renderFlightDetailHtml(bundle) {
   const rollInversions = allManeuvers.filter((m) => m.type === 'inversioni' || String(m.type).toLowerCase().includes('inversion'));
   const dynamicManeuvers = allManeuvers.filter((m) => m.type !== '360°' && m.type !== 'SINGLE_360' && m.type !== 'sondaggio_termica');
 
-  const svgChartHtml = generateExpandedSvgChart(points, 600, 140, {
+  const svgChartHtml = generateExpandedSvgChart(points, 600, 220, {
     thermals,
     thermalProbes,
     rollInversions
@@ -551,7 +775,7 @@ export function renderFlightDetailHtml(bundle) {
           <button
             type="button"
             id="btn-open-track-setup"
-            class="gm-btn-secondary gm-topbar-setup-btn"
+            class="gm-btn gm-btn-secondary gm-topbar-setup-btn"
             aria-label="Setup Traccia"
             title="Setup Traccia (Trimming e Calibrazione Quote)"
           >
@@ -584,10 +808,12 @@ export function renderFlightDetailHtml(bundle) {
                   ${siteSub ? `<span class="text-[var(--gm-text-secondary)]">(${escapeHtml(siteSub)})</span>` : ''}
                   <span class="text-[var(--gm-text-muted)]">•</span>
                   <span class="font-bold text-amber-400">${escapeHtml(duration)}</span>
+                  ${recordFlags.isMaxDuration ? '<span class="gm-record-badge" title="Record Personale: Volo Più Lungo">Record</span>' : ''}
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                   ${meta.isTrimmed ? '<span class="gm-status-pill gm-status-pill-amber">Traccia Trimmata</span>' : ''}
                   ${meta.elevationCorrection ? '<span class="gm-status-pill gm-status-pill-emerald">Quote Calibrate</span>' : ''}
+                  ${recordFlags.hasAnyRecord ? '<span class="gm-status-pill gm-status-pill-record">Record Personale</span>' : ''}
                   <span class="text-xs font-medium text-[var(--gm-text-secondary)]">${escapeHtml(glider)}</span>
                 </div>
               </div>
@@ -600,53 +826,142 @@ export function renderFlightDetailHtml(bundle) {
           </div>
         </div>
 
-        <!-- Altimetric Profile -->
+        <!-- 2D Flight Track Mini-Map (Above Altimetric Profile) -->
+        <section class="gm-flight-detail-section" aria-label="Mappa 2D Traccia Volo">
+          <div class="flex items-center justify-between gap-2 mb-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <h3 class="gm-flight-detail-section-title" style="margin: 0;">Mappa 2D Traccia</h3>
+              <span id="gm-flight-map-phase-badge" class="gm-flight-map-phase-pill" style="display: none;" aria-live="polite"></span>
+            </div>
+            <div class="flex items-center gap-1.5 flex-shrink-0">
+              <button
+                type="button"
+                id="btn-flight-map-reset-selection"
+                class="gm-flight-map-reset-btn"
+                style="display: none;"
+                title="Deseleziona fase e mostra traccia intera"
+                aria-label="Mostra traccia completa"
+              >
+                Mostra Tutto
+              </button>
+              <button
+                type="button"
+                id="flight-detail-map-layer-toggle"
+                class="gm-mini-map-layer-toggle"
+                data-action="toggle-flight-map-layer"
+                data-layer="${activeLayer}"
+                aria-label="Layer mappa: ${activeLayer === 'satellite' ? 'Satellite (tocca per OpenTopo)' : 'OpenTopo (tocca per Satellite)'}"
+                title="Passa a ${activeLayer === 'satellite' ? 'OpenTopo' : 'Satellite'}"
+              >
+                ${renderLayerToggleIcon(activeLayer)}
+                <span class="gm-layer-toggle-label">${getMapLayerLabel(activeLayer)}</span>
+              </button>
+            </div>
+          </div>
+
+          <div id="flight-detail-map-container" class="gm-flight-minimap-box" style="position: relative; width: 100%; height: 210px; border-radius: var(--gm-radius-md); overflow: hidden; border: 1px solid var(--gm-border); background: var(--gm-bg-card);">
+            <div id="flight-detail-map-canvas" class="gm-flight-map-canvas" style="width: 100%; height: 100%; touch-action: pan-y;"></div>
+            <div id="flight-detail-map-legend" class="gm-flight-map-hud-legend">
+              <span class="gm-map-legend-dot gm-map-legend-dot-takeoff"></span><span>Decollo</span>
+              <span class="gm-map-legend-dot gm-map-legend-dot-landing"></span><span>Atterraggio</span>
+              <span class="gm-map-legend-pill gm-map-legend-vario">Traccia Vario (m/s)</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Altimetric Profile & Interactive Telemetry -->
         <section class="gm-flight-detail-section" aria-label="Profilo Altimetrico">
-          <h3 class="gm-flight-detail-section-title">Profilo Altimetrico</h3>
-          <div class="gm-flight-detail-alt-chart">
+          <div class="flex items-center justify-between gap-2 mb-2">
+            <h3 class="gm-flight-detail-section-title">Profilo Altimetrico</h3>
+          </div>
+
+          <!-- Telemetry Toolbar: Channel Toggles & Zoom Controls (Single-Row Segmented Dock) -->
+          <div class="gm-telemetry-toolbar mb-2" role="toolbar" aria-label="Controlli Telemetria">
+            <div class="gm-telemetry-segmented-dock gm-telemetry-toggles" role="group" aria-label="Canali Telemetrici">
+              <button type="button" id="btn-toggle-alt" class="gm-telemetry-pill-btn gm-telemetry-btn active-alt" aria-pressed="true" title="Visualizza/Nascondi Quota">
+                <span class="gm-telemetry-dot dot-alt"></span>
+                <span>Quota</span>
+              </button>
+              <button type="button" id="btn-toggle-vario" class="gm-telemetry-pill-btn gm-telemetry-btn" aria-pressed="false" title="Attiva curva Variometro (m/s)">
+                <span class="gm-telemetry-dot dot-vario"></span>
+                <span>Vario</span>
+              </button>
+              <button type="button" id="btn-toggle-speed" class="gm-telemetry-pill-btn gm-telemetry-btn" aria-pressed="false" title="Attiva curva Velocità al Suolo (km/h)">
+                <span class="gm-telemetry-dot dot-speed"></span>
+                <span class="hidden sm:inline">Velocità</span>
+                <span class="sm:hidden">Vel.</span>
+              </button>
+            </div>
+            <div class="gm-telemetry-zoom-dock gm-telemetry-zoom-group" role="group" aria-label="Zoom Grafico">
+              <button type="button" id="btn-chart-zoom-out" class="gm-telemetry-zoom-btn" title="Zoom Indietro" aria-label="Zoom indietro">−</button>
+              <span id="gm-chart-zoom-level" class="gm-telemetry-zoom-val" aria-live="polite">1.0x</span>
+              <button type="button" id="btn-chart-zoom-in" class="gm-telemetry-zoom-btn" title="Zoom Avanti" aria-label="Zoom avanti">+</button>
+              <button type="button" id="btn-chart-zoom-reset" class="gm-telemetry-zoom-btn text-xs px-1" title="Ripristina Zoom (1x)" aria-label="Ripristina zoom">1x</button>
+            </div>
+          </div>
+
+          <!-- Real-time Cockpit Inspection Ticker (Single Row Compact Banner) -->
+          <div id="gm-chart-inspection-hud" class="gm-telemetry-hud-ticker gm-telemetry-hud mb-1.5" role="region" aria-label="HUD Ispezione Telemetria">
+            <div class="gm-hud-ticker-item gm-telemetry-hud-item">
+              <span class="gm-hud-ticker-lbl gm-telemetry-hud-label">Tempo:</span>
+              <span id="gm-hud-time" class="gm-hud-ticker-val gm-telemetry-hud-val">--:--</span>
+            </div>
+            <div class="gm-hud-ticker-item gm-telemetry-hud-item">
+              <span class="gm-hud-ticker-lbl gm-telemetry-hud-label">Quota:</span>
+              <span id="gm-hud-alt" class="gm-hud-ticker-val gm-telemetry-hud-val text-sky-400">-- m</span>
+            </div>
+            <div class="gm-hud-ticker-item gm-telemetry-hud-item">
+              <span class="gm-hud-ticker-lbl gm-telemetry-hud-label">Vario:</span>
+              <span id="gm-hud-vario" class="gm-hud-ticker-val gm-telemetry-hud-val text-emerald-400">-- m/s</span>
+            </div>
+            <div class="gm-hud-ticker-item gm-telemetry-hud-item">
+              <span class="gm-hud-ticker-lbl gm-telemetry-hud-label">Vel:</span>
+              <span id="gm-hud-speed" class="gm-hud-ticker-val gm-telemetry-hud-val text-purple-300">-- km/h</span>
+            </div>
+            <div class="gm-hud-ticker-item gm-telemetry-hud-item gm-hud-event-item">
+              <span id="gm-hud-event" class="gm-hud-ticker-val gm-telemetry-hud-val text-amber-400">--</span>
+            </div>
+          </div>
+
+          <!-- Interactive SVG Chart Container -->
+          <div id="gm-interactive-chart-container" class="gm-flight-detail-alt-chart" style="touch-action: pan-y; cursor: crosshair;">
             ${svgChartHtml}
           </div>
 
-          <!-- Variometer & Thermal Legend -->
-          <div class="gm-vario-legend-bar">
-            <div class="gm-vario-legend-item">
-              <span class="gm-vario-color-box gm-vario-color-strong-climb"></span>
-              <span>Salita forte (&gt;+3 m/s)</span>
+          <!-- Overview Pan Navigator Track -->
+          <div id="gm-chart-navigator" class="gm-telemetry-navigator" style="display: none;" role="slider" aria-label="Navigatore Panoramico Traccia" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50">
+            <div id="gm-chart-nav-handle" class="gm-telemetry-nav-handle" style="left: 0%; width: 100%;"></div>
+          </div>
+
+          <!-- Variometer & Thermal Compact Legend -->
+          <div class="gm-vario-legend-compact gm-vario-legend-bar">
+            <div class="gm-vario-gradient-bar-wrap">
+              <span class="gm-legend-scale-lbl">&lt;-2 m/s</span>
+              <div class="gm-vario-gradient-strip" aria-hidden="true"></div>
+              <span class="gm-legend-scale-lbl">Planata</span>
+              <div class="gm-vario-gradient-strip strip-climb" aria-hidden="true"></div>
+              <span class="gm-legend-scale-lbl">&gt;+3 m/s</span>
             </div>
-            <div class="gm-vario-legend-item">
-              <span class="gm-vario-color-box gm-vario-color-climb"></span>
-              <span>Termica (&gt;+0.2 m/s)</span>
+            <div class="gm-legend-chips-wrap">
+              ${thermals.length > 0 ? `
+                <div class="gm-legend-chip">
+                  <span class="gm-thermal-legend-icon">T</span>
+                  <span>Termica (${thermals.length})</span>
+                </div>
+              ` : ''}
+              ${thermalProbes.length > 0 ? `
+                <div class="gm-legend-chip">
+                  <span class="gm-probe-legend-icon">•</span>
+                  <span>Sondaggio (test 360°)</span>
+                </div>
+              ` : ''}
+              ${rollInversions.length > 0 ? `
+                <div class="gm-legend-chip">
+                  <span class="gm-roll-legend-icon">P</span>
+                  <span>Inversioni (P)</span>
+                </div>
+              ` : ''}
             </div>
-            <div class="gm-vario-legend-item">
-              <span class="gm-vario-color-box gm-vario-color-glide"></span>
-              <span>Planata (-0.8..+0.2 m/s)</span>
-            </div>
-            <div class="gm-vario-legend-item">
-              <span class="gm-vario-color-box gm-vario-color-sink"></span>
-              <span>Discesa (&lt;-0.8 m/s)</span>
-            </div>
-            <div class="gm-vario-legend-item">
-              <span class="gm-vario-color-box gm-vario-color-strong-sink"></span>
-              <span>Discesa rapida (&lt;-2 m/s)</span>
-            </div>
-            ${thermals.length > 0 ? `
-              <div class="gm-vario-legend-item">
-                <span class="gm-thermal-band-indicator"></span>
-                <span>Sezione Termica (T1, T2...)</span>
-              </div>
-            ` : ''}
-            ${thermalProbes.length > 0 ? `
-              <div class="gm-vario-legend-item">
-                <span class="gm-probe-dot-indicator"></span>
-                <span>Sondaggio (test 360°)</span>
-              </div>
-            ` : ''}
-            ${rollInversions.length > 0 ? `
-              <div class="gm-vario-legend-item">
-                <span class="gm-roll-marker-indicator"></span>
-                <span>Inversioni (P)</span>
-              </div>
-            ` : ''}
           </div>
         </section>
 
@@ -654,20 +969,29 @@ export function renderFlightDetailHtml(bundle) {
         <section class="gm-flight-detail-section" aria-label="Cinematica e Prestazioni">
           <h3 class="gm-flight-detail-section-title">Cinematica &amp; Prestazioni</h3>
           <div class="gm-flight-metrics-grid">
-            <div class="gm-flight-metric-card">
-              <span class="gm-flight-metric-num">${escapeHtml(maxAlt)}</span>
+            <div class="gm-flight-metric-card ${recordFlags.isMaxAlt ? 'gm-flight-metric-card-record' : ''}">
+              <div class="flex items-center justify-between gap-1">
+                <span class="gm-flight-metric-num">${escapeHtml(maxAlt)}</span>
+                ${recordFlags.isMaxAlt ? '<span class="gm-record-badge" title="Record Personale: Quota Massima MSL">Record</span>' : ''}
+              </div>
               <span class="gm-flight-metric-desc">Quota Massima MSL</span>
             </div>
-            <div class="gm-flight-metric-card">
-              <span class="gm-flight-metric-num ${meta.maxGainMeters ? 'text-emerald-400' : ''}">${escapeHtml(maxGain)}</span>
+            <div class="gm-flight-metric-card ${recordFlags.isMaxGain ? 'gm-flight-metric-card-record' : ''}">
+              <div class="flex items-center justify-between gap-1">
+                <span class="gm-flight-metric-num ${meta.maxGainMeters ? 'text-emerald-400' : ''}">${escapeHtml(maxGain)}</span>
+                ${recordFlags.isMaxGain ? '<span class="gm-record-badge" title="Record Personale: Maggior Guadagno">Record</span>' : ''}
+              </div>
               <span class="gm-flight-metric-desc">Guadagno dal Decollo</span>
             </div>
             <div class="gm-flight-metric-card">
               <span class="gm-flight-metric-num ${thermals.length > 0 ? 'text-amber-400 font-bold' : ''}">${thermals.length}</span>
               <span class="gm-flight-metric-desc">Termiche Agganciate</span>
             </div>
-            <div class="gm-flight-metric-card">
-              <span class="gm-flight-metric-num text-emerald-400">${escapeHtml(climbRate)}</span>
+            <div class="gm-flight-metric-card ${recordFlags.isMaxClimbRate ? 'gm-flight-metric-card-record' : ''}">
+              <div class="flex items-center justify-between gap-1">
+                <span class="gm-flight-metric-num text-emerald-400">${escapeHtml(climbRate)}</span>
+                ${recordFlags.isMaxClimbRate ? '<span class="gm-record-badge" title="Record Personale: Salita Massima">Record</span>' : ''}
+              </div>
               <span class="gm-flight-metric-desc">Salita Massima (Vario)</span>
             </div>
             <div class="gm-flight-metric-card">
@@ -678,8 +1002,11 @@ export function renderFlightDetailHtml(bundle) {
               <span class="gm-flight-metric-num">${escapeHtml(accumClimb)}</span>
               <span class="gm-flight-metric-desc">Dislivello Cumulato</span>
             </div>
-            <div class="gm-flight-metric-card">
-              <span class="gm-flight-metric-num">${escapeHtml(distance)}</span>
+            <div class="gm-flight-metric-card ${recordFlags.isMaxDistance ? 'gm-flight-metric-card-record' : ''}">
+              <div class="flex items-center justify-between gap-1">
+                <span class="gm-flight-metric-num">${escapeHtml(distance)}</span>
+                ${recordFlags.isMaxDistance ? '<span class="gm-record-badge" title="Record Personale: Distanza Massima">Record</span>' : ''}
+              </div>
               <span class="gm-flight-metric-desc">Distanza Orizzontale</span>
             </div>
             <div class="gm-flight-metric-card">
@@ -709,11 +1036,14 @@ export function renderFlightDetailHtml(bundle) {
                 const turns = t.turnCount != null ? t.turnCount : t.turns;
                 const turnDir = t.turnDirection || t.turnDir;
                 const eff = t.efficiencyPercent != null ? t.efficiencyPercent : t.efficiency;
+                const sIdx = typeof t.startIndex === 'number' ? t.startIndex : 0;
+                const eIdx = typeof t.endIndex === 'number' ? t.endIndex : (points.length - 1);
+                const tNum = t.thermalIndex || (idx + 1);
 
                 return `
-                  <div class="gm-thermal-card">
+                  <div class="gm-thermal-card" data-action="select-phase" data-phase-type="thermal" data-phase-label="T${tNum}" data-start-index="${sIdx}" data-end-index="${eIdx}" style="cursor: pointer;" title="Visualizza termica T${tNum} sulla mappa">
                     <div class="flex items-center gap-3">
-                      <div class="gm-thermal-index-badge">#${t.thermalIndex || (idx + 1)}</div>
+                      <div class="gm-thermal-index-badge">#${tNum}</div>
                       <div class="flex flex-col">
                         <span class="font-bold text-sm text-[var(--gm-text-primary)]">
                           +${gain} m
@@ -762,8 +1092,10 @@ export function renderFlightDetailHtml(bundle) {
                   const details = formatManeuverDetails(m);
                   const isInv = m.type === 'inversioni' || String(m.type).toLowerCase().includes('inversion');
                   const pCount = isInv ? getPendolateCount(m) : null;
+                  const sIdx = typeof m.startIndex === 'number' ? m.startIndex : 0;
+                  const eIdx = typeof m.endIndex === 'number' ? m.endIndex : sIdx;
                   return `
-                    <div class="gm-maneuver-card">
+                    <div class="gm-maneuver-card" data-action="select-phase" data-phase-type="maneuver" data-phase-label="${escapeHtml(title)}" data-start-index="${sIdx}" data-end-index="${eIdx}" style="cursor: pointer;" title="Visualizza manovra sulla mappa">
                       <div class="gm-maneuver-header">
                         <div class="flex items-center gap-2">
                           <span class="gm-maneuver-badge">${escapeHtml(title)}</span>
@@ -793,8 +1125,10 @@ export function renderFlightDetailHtml(bundle) {
                   ${thermalProbes.map((m, idx) => {
                     const dur = m.durationSeconds ? `${Math.round(m.durationSeconds)}s` : '';
                     const details = formatManeuverDetails(m) || (m.details || 'Giro 360° singolo');
+                    const sIdx = typeof m.startIndex === 'number' ? m.startIndex : 0;
+                    const eIdx = typeof m.endIndex === 'number' ? m.endIndex : Math.min(points.length - 1, sIdx + 4);
                     return `
-                      <div class="gm-maneuver-card" style="border-style: dashed;">
+                      <div class="gm-maneuver-card" data-action="select-phase" data-phase-type="probe" data-phase-label="Sondaggio #${idx + 1}" data-start-index="${sIdx}" data-end-index="${eIdx}" style="border-style: dashed; cursor: pointer;" title="Visualizza sondaggio sulla mappa">
                         <div class="gm-maneuver-header">
                           <span class="gm-maneuver-badge text-sky-400">Sondaggio Termico #${idx + 1} (360°)</span>
                           ${dur ? `<span class="text-xs font-mono text-[var(--gm-text-muted)]">${dur}</span>` : ''}
@@ -836,7 +1170,7 @@ export function renderFlightDetailHtml(bundle) {
             <button
               type="button"
               id="btn-save-flight-notes"
-              class="gm-btn-secondary"
+              class="gm-btn gm-btn-secondary"
               style="min-height: var(--gm-touch-min, 48px); padding: 0 20px;"
             >
               Salva Note
@@ -864,7 +1198,7 @@ export function renderFlightDetailHtml(bundle) {
           <button
             type="button"
             id="btn-replay-from-detail"
-            class="gm-btn-primary gm-bottom-replay-btn"
+            class="gm-btn gm-btn-primary gm-bottom-replay-btn"
             style="min-height: var(--gm-touch-min, 48px);"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -876,7 +1210,7 @@ export function renderFlightDetailHtml(bundle) {
           <button
             type="button"
             id="btn-setup-from-detail"
-            class="gm-btn-secondary gm-bottom-action-btn"
+            class="gm-btn gm-btn-secondary gm-bottom-action-btn"
             style="min-height: var(--gm-touch-min, 48px);"
             title="Setup Traccia"
             aria-label="Setup Traccia"
@@ -898,7 +1232,7 @@ export function renderFlightDetailHtml(bundle) {
           <button
             type="button"
             id="btn-download-from-detail"
-            class="gm-btn-secondary gm-bottom-action-btn"
+            class="gm-btn gm-btn-secondary gm-bottom-action-btn"
             style="min-height: var(--gm-touch-min, 48px);"
             title="Scarica Traccia IGC (FAI)"
             aria-label="Scarica Traccia IGC (FAI)"
@@ -921,6 +1255,13 @@ export function renderFlightDetailHtml(bundle) {
  * Closes and removes the active full-screen flight detail view.
  */
 export function closeFlightDetailView() {
+  if (flightDetailMapEngine) {
+    try {
+      flightDetailMapEngine.destroy();
+    } catch (_) {}
+    flightDetailMapEngine = null;
+  }
+
   if (escapeKeyHandler && typeof window !== 'undefined') {
     window.removeEventListener('keydown', escapeKeyHandler);
     escapeKeyHandler = null;
@@ -947,6 +1288,382 @@ export function closeFlightDetailView() {
     previousActiveEl.focus();
     previousActiveEl = null;
   }
+}
+
+/**
+ * Attaches interactive controls to the flight telemetry chart:
+ * - Multi-channel layer toggles (Altitude, Variometer, Ground Speed)
+ * - Zoom controls (Zoom In, Zoom Out, Reset 1x)
+ * - Cockpit inspection HUD updating on hover/touch (<16ms)
+ * - Overview pan scrub navigator bar
+ * - Horizontal drag to pan across zoomed track with touch-action: pan-y isolation
+ * @param {HTMLElement} overlayEl
+ * @param {Object} bundle
+ */
+export function attachInteractiveFlightChart(overlayEl, bundle) {
+  if (!overlayEl || typeof overlayEl.querySelector !== 'function') return;
+
+  const chartContainer = overlayEl.querySelector('#gm-interactive-chart-container');
+  if (!chartContainer) return;
+
+  const raw = bundle?.raw || {};
+  const points = (raw.decimatedPoints && raw.decimatedPoints.length > 0)
+    ? raw.decimatedPoints
+    : (raw.points || []);
+
+  if (!Array.isArray(points) || points.length < 2) return;
+
+  const tel = bundle?.telemetry || {};
+  const thermals = Array.isArray(tel.thermals) ? tel.thermals : [];
+  const thermalProbes = Array.isArray(tel.thermalProbes) ? tel.thermalProbes : [];
+  const rollInversions = Array.isArray(tel.maneuvers)
+    ? tel.maneuvers.filter((m) => m.type === 'inversioni' || String(m.type).toLowerCase().includes('inversion'))
+    : [];
+
+  const btnToggleAlt = overlayEl.querySelector('#btn-toggle-alt');
+  const btnToggleVario = overlayEl.querySelector('#btn-toggle-vario');
+  const btnToggleSpeed = overlayEl.querySelector('#btn-toggle-speed');
+
+  const btnZoomIn = overlayEl.querySelector('#btn-chart-zoom-in');
+  const btnZoomOut = overlayEl.querySelector('#btn-chart-zoom-out');
+  const btnZoomReset = overlayEl.querySelector('#btn-chart-zoom-reset');
+  const zoomLevelEl = overlayEl.querySelector('#gm-chart-zoom-level');
+
+  const hudTime = overlayEl.querySelector('#gm-hud-time');
+  const hudAlt = overlayEl.querySelector('#gm-hud-alt');
+  const hudVario = overlayEl.querySelector('#gm-hud-vario');
+  const hudSpeed = overlayEl.querySelector('#gm-hud-speed');
+  const hudEvent = overlayEl.querySelector('#gm-hud-event');
+
+  const navTrack = overlayEl.querySelector('#gm-chart-navigator');
+  const navHandle = overlayEl.querySelector('#gm-chart-nav-handle');
+
+  const state = {
+    zoom: 1.0,
+    pan: 0.5,
+    showAlt: true,
+    showVario: false,
+    showSpeed: false,
+    cursorIndex: null
+  };
+
+  const updateHud = (pointIndex) => {
+    if (pointIndex == null || pointIndex < 0 || pointIndex >= points.length) {
+      if (hudTime) hudTime.textContent = '--:--';
+      if (hudAlt) hudAlt.textContent = '-- m';
+      if (hudVario) hudVario.textContent = '-- m/s';
+      if (hudSpeed) hudSpeed.textContent = '-- km/h';
+      if (hudEvent) hudEvent.textContent = '--';
+      return;
+    }
+
+    const p = points[pointIndex];
+    let timeStr = p.timeFormatted || p.time;
+    if (!timeStr && p.timeSeconds != null) timeStr = formatSecondsToTime(p.timeSeconds);
+    if (hudTime) hudTime.textContent = timeStr || '--:--';
+
+    const altVal = Math.round(p.alt || 0);
+    if (hudAlt) hudAlt.textContent = `${altVal} m`;
+
+    const varioVal = Math.round(getPointVario(p, pointIndex, points) * 10) / 10;
+    if (hudVario) {
+      const sign = varioVal > 0 ? '+' : '';
+      hudVario.textContent = `${sign}${varioVal.toFixed(1)} m/s`;
+      if (varioVal >= 2.0) {
+        hudVario.className = 'gm-telemetry-hud-val text-emerald-400 font-bold';
+      } else if (varioVal >= 0.2) {
+        hudVario.className = 'gm-telemetry-hud-val text-emerald-300';
+      } else if (varioVal > -0.8) {
+        hudVario.className = 'gm-telemetry-hud-val text-sky-300';
+      } else if (varioVal > -2.0) {
+        hudVario.className = 'gm-telemetry-hud-val text-amber-400';
+      } else {
+        hudVario.className = 'gm-telemetry-hud-val text-rose-400 font-bold';
+      }
+    }
+
+    const speedVal = Math.round(getPointSpeed(p, pointIndex, points) * 10) / 10;
+    if (hudSpeed) hudSpeed.textContent = `${speedVal.toFixed(1)} km/h`;
+
+    let eventText = '--';
+    const th = thermals.find((t) => pointIndex >= (t.startIndex ?? 0) && pointIndex <= (t.endIndex ?? 0));
+    if (th) {
+      const gain = th.altGain || th.netGain;
+      eventText = `T${th.thermalIndex || ''} (${gain ? `+${gain}m` : 'Termica'})`;
+    } else {
+      const roll = rollInversions.find((r) => pointIndex >= (r.startIndex ?? 0) && pointIndex <= (r.endIndex ?? 0));
+      if (roll) {
+        const pCount = getPendolateCount(roll);
+        eventText = `Inversione (${pCount ? `${pCount}P` : 'Rollio'})`;
+      } else {
+        const pr = thermalProbes.find((prb) => Math.abs((prb.startIndex ?? 0) - pointIndex) <= 3);
+        if (pr) {
+          eventText = 'Sondaggio 360°';
+        }
+      }
+    }
+    if (hudEvent) hudEvent.textContent = eventText;
+  };
+
+  const renderSvg = () => {
+    const width = chartContainer.clientWidth || 600;
+    const height = chartContainer.clientHeight || 220;
+
+    const html = generateExpandedSvgChart(points, width, height, {
+      zoom: state.zoom,
+      pan: state.pan,
+      showAlt: state.showAlt,
+      showVario: state.showVario,
+      showSpeed: state.showSpeed,
+      cursorIndex: state.cursorIndex,
+      thermals,
+      thermalProbes,
+      rollInversions
+    });
+
+    chartContainer.innerHTML = html;
+
+    if (zoomLevelEl) {
+      zoomLevelEl.textContent = `${state.zoom.toFixed(1)}x`;
+    }
+
+    if (navTrack && navHandle) {
+      if (state.zoom > 1.0) {
+        navTrack.style.display = 'block';
+        const winFrac = 1 / state.zoom;
+        const leftFrac = Math.max(0, Math.min(1 - winFrac, state.pan - winFrac / 2));
+        navHandle.style.left = `${(leftFrac * 100).toFixed(1)}%`;
+        navHandle.style.width = `${(winFrac * 100).toFixed(1)}%`;
+        navTrack.setAttribute('aria-valuenow', Math.round(state.pan * 100));
+      } else {
+        navTrack.style.display = 'none';
+      }
+    }
+  };
+
+  const updateCursorGroup = (pointIndex) => {
+    const cursorGroup = chartContainer.querySelector('#gm-chart-cursor-group');
+    if (!cursorGroup) {
+      renderSvg();
+      return;
+    }
+
+    const n = points.length;
+    let startIdx = 0;
+    let endIdx = n - 1;
+    if (state.zoom > 1.0) {
+      const windowLen = Math.max(6, Math.round(n / state.zoom));
+      const centerIdx = Math.round(state.pan * (n - 1));
+      startIdx = Math.max(0, Math.min(n - windowLen, centerIdx - Math.floor(windowLen / 2)));
+      endIdx = Math.min(n - 1, startIdx + windowLen - 1);
+    }
+
+    if (pointIndex < startIdx || pointIndex > endIdx) {
+      cursorGroup.style.display = 'none';
+      return;
+    }
+
+    const visibleN = endIdx - startIdx + 1;
+    const vIdx = pointIndex - startIdx;
+    const width = chartContainer.clientWidth || 600;
+    const height = chartContainer.clientHeight || 220;
+    const padTop = 30;
+    const padBottom = 22;
+    const chartHeight = height - padTop - padBottom;
+
+    const alts = points.map((p) => (typeof p.alt === 'number' && !isNaN(p.alt) ? p.alt : 0));
+    const minAlt = Math.min(...alts);
+    const maxAlt = Math.max(...alts);
+    const range = Math.max(1, maxAlt - minAlt);
+
+    const p = points[pointIndex];
+    const x = Math.round((vIdx / (visibleN - 1)) * width * 10) / 10;
+    const y = Math.round((padTop + (1 - ((p.alt || 0) - minAlt) / range) * chartHeight) * 10) / 10;
+
+    const line = cursorGroup.querySelector('#gm-chart-cursor-line');
+    const dot = cursorGroup.querySelector('#gm-chart-cursor-dot');
+    if (line) {
+      line.setAttribute('x1', x);
+      line.setAttribute('x2', x);
+    }
+    if (dot) {
+      dot.setAttribute('cx', x);
+      dot.setAttribute('cy', y);
+    }
+    cursorGroup.style.display = '';
+  };
+
+  const getPointIndexFromEvent = (e) => {
+    const rect = chartContainer.getBoundingClientRect();
+    if (!rect || rect.width <= 0) return 0;
+    const clientX = e.clientX ?? (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+    const relX = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+
+    const n = points.length;
+    if (state.zoom > 1.0) {
+      const windowLen = Math.max(6, Math.round(n / state.zoom));
+      const centerIdx = Math.round(state.pan * (n - 1));
+      const startIdx = Math.max(0, Math.min(n - windowLen, centerIdx - Math.floor(windowLen / 2)));
+      return Math.round(startIdx + relX * (windowLen - 1));
+    }
+    return Math.round(relX * (n - 1));
+  };
+
+  // 1. Channel toggles
+  if (btnToggleAlt) {
+    btnToggleAlt.addEventListener('click', () => {
+      state.showAlt = !state.showAlt;
+      btnToggleAlt.classList.toggle('active-alt', state.showAlt);
+      btnToggleAlt.setAttribute('aria-pressed', state.showAlt ? 'true' : 'false');
+      renderSvg();
+    });
+  }
+
+  if (btnToggleVario) {
+    btnToggleVario.addEventListener('click', () => {
+      state.showVario = !state.showVario;
+      btnToggleVario.classList.toggle('active-vario', state.showVario);
+      btnToggleVario.setAttribute('aria-pressed', state.showVario ? 'true' : 'false');
+      renderSvg();
+    });
+  }
+
+  if (btnToggleSpeed) {
+    btnToggleSpeed.addEventListener('click', () => {
+      state.showSpeed = !state.showSpeed;
+      btnToggleSpeed.classList.toggle('active-speed', state.showSpeed);
+      btnToggleSpeed.setAttribute('aria-pressed', state.showSpeed ? 'true' : 'false');
+      renderSvg();
+    });
+  }
+
+  // 2. Zoom controls
+  if (btnZoomIn) {
+    btnZoomIn.addEventListener('click', () => {
+      state.zoom = Math.min(6.0, Math.round((state.zoom + 0.5) * 10) / 10);
+      renderSvg();
+    });
+  }
+
+  if (btnZoomOut) {
+    btnZoomOut.addEventListener('click', () => {
+      state.zoom = Math.max(1.0, Math.round((state.zoom - 0.5) * 10) / 10);
+      renderSvg();
+    });
+  }
+
+  if (btnZoomReset) {
+    btnZoomReset.addEventListener('click', () => {
+      state.zoom = 1.0;
+      state.pan = 0.5;
+      renderSvg();
+    });
+  }
+
+  // 3. Pointer & Pan Dragging on chart container
+  let isPointerDown = false;
+  let startX = 0;
+  let startPan = 0.5;
+
+  chartContainer.addEventListener('pointerdown', (e) => {
+    isPointerDown = true;
+    startX = e.clientX;
+    startPan = state.pan;
+    if (typeof chartContainer.setPointerCapture === 'function') {
+      try { chartContainer.setPointerCapture(e.pointerId); } catch (_) {}
+    }
+
+    const idx = getPointIndexFromEvent(e);
+    state.cursorIndex = idx;
+    updateHud(idx);
+    updateCursorGroup(idx);
+  });
+
+  chartContainer.addEventListener('pointermove', (e) => {
+    const idx = getPointIndexFromEvent(e);
+
+    if (isPointerDown && state.zoom > 1.0) {
+      const deltaX = e.clientX - startX;
+      if (Math.abs(deltaX) > 4) {
+        const rect = chartContainer.getBoundingClientRect();
+        const panDelta = -(deltaX / rect.width) * (1 / state.zoom);
+        state.pan = Math.max(0.0, Math.min(1.0, startPan + panDelta));
+        state.cursorIndex = idx;
+        updateHud(idx);
+        renderSvg();
+        return;
+      }
+    }
+
+    state.cursorIndex = idx;
+    updateHud(idx);
+    updateCursorGroup(idx);
+  });
+
+  const onPointerUp = (e) => {
+    if (!isPointerDown) return;
+    isPointerDown = false;
+    if (typeof chartContainer.releasePointerCapture === 'function') {
+      try { chartContainer.releasePointerCapture(e.pointerId); } catch (_) {}
+    }
+  };
+
+  chartContainer.addEventListener('pointerup', onPointerUp);
+  chartContainer.addEventListener('pointercancel', onPointerUp);
+
+  chartContainer.addEventListener('pointerleave', () => {
+    if (!isPointerDown) {
+      state.cursorIndex = null;
+      const cursorGroup = chartContainer.querySelector('#gm-chart-cursor-group');
+      if (cursorGroup) cursorGroup.style.display = 'none';
+    }
+  });
+
+  // 4. Scrub bar / navigator dragging
+  if (navTrack) {
+    let isNavDragging = false;
+
+    const handleNavEvent = (e) => {
+      const rect = navTrack.getBoundingClientRect();
+      if (!rect || rect.width <= 0) return;
+      const clientX = e.clientX ?? (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+      const frac = Math.max(0.0, Math.min(1.0, (clientX - rect.left) / rect.width));
+      state.pan = frac;
+      renderSvg();
+    };
+
+    navTrack.addEventListener('pointerdown', (e) => {
+      isNavDragging = true;
+      if (typeof navTrack.setPointerCapture === 'function') {
+        try { navTrack.setPointerCapture(e.pointerId); } catch (_) {}
+      }
+      handleNavEvent(e);
+    });
+
+    navTrack.addEventListener('pointermove', (e) => {
+      if (isNavDragging) {
+        handleNavEvent(e);
+      }
+    });
+
+    const onNavUp = (e) => {
+      if (!isNavDragging) return;
+      isNavDragging = false;
+      if (typeof navTrack.releasePointerCapture === 'function') {
+        try { navTrack.releasePointerCapture(e.pointerId); } catch (_) {}
+      }
+    };
+
+    navTrack.addEventListener('pointerup', onNavUp);
+    navTrack.addEventListener('pointercancel', onNavUp);
+  }
+
+  // 5. Initialize HUD with highest altitude or starting point
+  const alts = points.map((p) => (typeof p.alt === 'number' && !isNaN(p.alt) ? p.alt : 0));
+  const maxAlt = Math.max(...alts);
+  const maxIdx = alts.indexOf(maxAlt);
+  const initialPointIdx = maxIdx >= 0 ? maxIdx : 0;
+  updateHud(initialPointIdx);
 }
 
 /**
@@ -1055,7 +1772,7 @@ export async function openFlightDetailView(flightId, options = {}) {
   const siteTitle = bundle.meta.siteName || bundle.meta.site || 'Dettaglio Volo';
   const dateFormatted = bundle.meta.date || '';
   const title = `${siteTitle} • ${dateFormatted}`;
-  const html = renderFlightDetailHtml(bundle);
+  const html = renderFlightDetailHtml(bundle, options);
 
   // Test environment mock support
   if (typeof globalThis !== 'undefined' && typeof globalThis.__mockOpenSheet === 'function') {
@@ -1076,6 +1793,9 @@ export async function openFlightDetailView(flightId, options = {}) {
   document.body.appendChild(overlayEl);
   document.body.style.overflow = 'hidden';
   activeDetailOverlay = overlayEl;
+
+  // 0. Attach interactive telemetry chart controls (zoom, pan, vario, speed, HUD)
+  attachInteractiveFlightChart(overlayEl, bundle);
 
   // 1. Back button click handler
   const backBtn = overlayEl.querySelector('#btn-flight-detail-back');
