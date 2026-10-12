@@ -2385,7 +2385,7 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
   });
 
   describe('Precipitation Visualization & Hourly Trend Contracts', () => {
-    it('renders multi-chart-precipitation with SVG bars, threshold lines, and Windy-style probability heatmap in Solo Grafici mode', () => {
+    it('renders multi-chart-precipitation with Parameteo spline probability curve, threshold lines, and SVG bars for rain accumulation in Solo Grafici mode', () => {
       const mockStore = createStore({ selectedSpot: DEFAULT_COMPRENSORI[0] });
       const controller = new ForecastViewController({ store: mockStore });
       controller.forecastMode = 'charts';
@@ -2416,14 +2416,15 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
 
       assert.ok(html.includes('id="multi-chart-precipitation"'), 'Must render multi-chart-precipitation card');
       assert.ok(html.includes('Precipitazioni</span>'), 'Must display Precipitazioni label');
-      assert.ok(html.includes('mm/h</span>'), 'Must display mm/h unit');
-      assert.ok(html.includes('NO FLY: Pioggia'), 'Must indicate NO FLY: Pioggia in badge for 1.2 mm/h hour');
+      assert.ok(html.includes('% prob.</span>'), 'Must display % prob. unit');
+      assert.ok(html.includes('>90</span>'), 'Must display 90% probability value');
+      assert.ok(html.includes('NO FLY: Pioggia (1.2 mm/h)'), 'Must indicate NO FLY: Pioggia (1.2 mm/h) in badge for 1.2 mm/h hour');
       assert.ok(html.includes('<rect x='), 'Must render SVG rect bars for hourly precipitation');
-      assert.ok(html.includes('>Prob.<'), 'Must render Windy-style heatmap row label Prob.');
-      assert.ok(html.includes('>90%<'), 'Must render 90% probability label in heatmap cell');
+      assert.ok(html.includes('rgba(14, 165, 233, 0.18)'), 'Must render smooth spline area for precipitation probability');
+      assert.ok(!html.includes('>Prob.<'), 'Must eliminate cramped legacy heatmap row label');
     });
 
-    it('renders caution badge and Windy-style probability heatmap when accumulation is 0 mm/h but precipitation_probability is significant (e.g. 39%)', () => {
+    it('renders caution badge and Parameteo probability curve when accumulation is 0 mm/h but precipitation_probability is significant (e.g. 39%)', () => {
       const mockStore = createStore({ selectedSpot: DEFAULT_COMPRENSORI[0] });
       const controller = new ForecastViewController({ store: mockStore });
       controller.forecastMode = 'charts';
@@ -2452,14 +2453,15 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
         DEFAULT_COMPRENSORI[0].takeoffs[0]
       );
 
-      // Value must be 0.0 mm/h
-      assert.ok(html.includes('>0.0</span>'), 'Must display 0.0 mm/h accumulation');
-      // Sub-badge must NOT say 'Assenti' or be 'status-flyable', it must warn with probability
+      // Value must be 39% prob.
+      assert.ok(html.includes('>39</span>'), 'Must display 39% probability value');
+      assert.ok(html.includes('% prob.</span>'), 'Must display % prob. unit');
+      // Sub-badge must warn with probability and indicate 0.0 mm/h
       assert.ok(html.includes('status-caution'), 'Must have status-caution badge class for 39% rain probability');
-      assert.ok(html.includes('39% prob. pioggia'), 'Must show 39% prob. pioggia in sub-badge');
-      // Chart must render probability heatmap cells with 39% label even with 0 mm/h accumulation
-      assert.ok(html.includes('>Prob.<'), 'Must render heatmap row label Prob.');
-      assert.ok(html.includes('>39%<'), 'Must render 39% probability label in heatmap strip');
+      assert.ok(html.includes('39% prob. pioggia (0.0 mm/h)'), 'Must show 39% prob. pioggia (0.0 mm/h) in sub-badge');
+      // Must render smooth Bézier curve for probability and eliminate cramped heatmap row
+      assert.ok(html.includes('rgba(14, 165, 233, 0.18)'), 'Must render smooth spline area for probability');
+      assert.ok(!html.includes('>Prob.<'), 'Must eliminate unreadable cramped heatmap row');
     });
 
     it('evaluates severe NO FLY: Pioggia when hourly precipitation exceeds 0.5 mm/h in computeParamMetrics', () => {

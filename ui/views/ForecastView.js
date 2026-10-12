@@ -2323,7 +2323,7 @@ export class ForecastViewController {
     const yMax = H - (hasHeatmap ? (compact ? 36 : 42) : (compact ? 18 : 22));
     const yRange = Math.max(1, maxY - minY);
 
-    const primarySeries = series[0] || { points: [] };
+    const primarySeries = series.find(s => s.isPrimary) || series.find(s => s.type !== 'bar') || series[0] || { points: [] };
     const daylight = this.getDaylightWindow();
     const sH = (typeof startHour === 'number') ? startHour : (primarySeries.points?.[0]?.hour ?? daylight.sunriseHour);
     const eH = (typeof endHour === 'number') ? endHour : (primarySeries.points?.[primarySeries.points.length - 1]?.hour ?? daylight.sunsetHour);
@@ -2721,54 +2721,60 @@ export class ForecastViewController {
       {
         id: 'multi-chart-precipitation',
         label: 'Precipitazioni',
-        val: `${(activePoint.precip || 0).toFixed(1)}`,
-        unit: 'mm/h',
+        val: `${Math.round(activePoint.precipProb || 0)}`,
+        unit: '% prob.',
         subHtml: (() => {
           const curPrecip = activePoint.precip || 0;
           const curProb = Math.round(activePoint.precipProb || 0);
           if (curPrecip > 0.5) {
-            return `<span class="gm-trend-sub-badge status-unflyable">NO FLY: Pioggia</span>`;
+            return `<span class="gm-trend-sub-badge status-unflyable">NO FLY: Pioggia (${curPrecip.toFixed(1)} mm/h)</span>`;
           }
           if (curPrecip >= 0.1) {
-            return `<span class="gm-trend-sub-badge status-caution">Pioviggine</span>`;
+            return `<span class="gm-trend-sub-badge status-caution">Pioviggine (${curPrecip.toFixed(1)} mm/h)</span>`;
           }
           if (curProb >= 50) {
-            return `<span class="gm-trend-sub-badge status-alert">${curProb}% prob. rovesci</span>`;
+            return `<span class="gm-trend-sub-badge status-alert">${curProb}% prob. rovesci (${curPrecip.toFixed(1)} mm/h)</span>`;
           }
           if (curProb >= 25) {
-            return `<span class="gm-trend-sub-badge status-caution">${curProb}% prob. pioggia</span>`;
+            return `<span class="gm-trend-sub-badge status-caution">${curProb}% prob. pioggia (${curPrecip.toFixed(1)} mm/h)</span>`;
           }
           if (curProb > 0) {
-            return `<span class="gm-trend-sub-badge status-flyable">${curProb}% prob.</span>`;
+            return `<span class="gm-trend-sub-badge status-flyable">${curProb}% prob. (${curPrecip.toFixed(1)} mm/h)</span>`;
           }
-          return `<span class="gm-trend-sub-badge status-flyable">Assenti</span>`;
+          return `<span class="gm-trend-sub-badge status-flyable">Assenti (0.0 mm/h)</span>`;
         })(),
         chartHtml: this.renderSvgTrendChart({
           id: 'multi-precipitation',
           title: 'Precipitazioni',
-          unit: 'mm/h',
+          unit: '%',
           minY: 0,
-          maxY: Math.max(3, Math.ceil(Math.max(...hourlyPoints.map(p => p.precip || 0), 0) * 1.5)),
+          maxY: 100,
           compact: true,
           hideTooltip: true,
           hideThresholdLabels: true,
           thresholds: [
-            { value: 0.1, stroke: 'var(--gm-status-caution)', strokeDasharray: '4,3' },
-            { value: 0.5, stroke: 'var(--gm-status-unflyable)', strokeDasharray: '4,3' }
+            { value: 30, stroke: 'var(--gm-status-caution)', strokeDasharray: '4,3', label: '30%' },
+            { value: 60, stroke: 'var(--gm-status-unflyable)', strokeDasharray: '4,3', label: '60%' }
           ],
           series: [
-            {
+            ...(hourlyPoints.some(p => (p.precip || 0) > 0) ? [{
               name: 'Accumulo Pioggia',
               type: 'bar',
               points: hourlyPoints.map(p => ({ hour: p.hour, value: p.precip || 0 })),
+              minY: 0,
+              maxY: Math.max(3, Math.ceil(Math.max(...hourlyPoints.map(p => p.precip || 0), 0) * 1.5)),
               fill: 'var(--gm-accent-sky, #0ea5e9)',
-              opacity: 0.85
+              opacity: 0.55
+            }] : []),
+            {
+              name: 'Probabilità Pioggia',
+              isPrimary: true,
+              points: hourlyPoints.map(p => ({ hour: p.hour, value: p.precipProb || 0 })),
+              stroke: 'var(--gm-accent-sky, #0ea5e9)',
+              strokeWidth: 2.4,
+              fillArea: 'rgba(14, 165, 233, 0.18)'
             }
-          ],
-          heatmapRow: {
-            label: 'Prob.',
-            points: hourlyPoints.map(p => ({ hour: p.hour, value: p.precipProb || 0 }))
-          }
+          ]
         })
       },
       {
