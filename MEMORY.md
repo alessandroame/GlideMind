@@ -1901,4 +1901,40 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
      - Ago scrubber verticale sottile da 1.5px con indicatore concentrico (bullseye ciano/bianco) posizionato esattamente sulla quota istantanea.
      - Barra delle fasi superiore assottigliata a 3px con angoli arrotondati.
 
+---
+
+## 143. Grafico Interattivo Volo: Posizionamento Badge Fasi in Basso, Separazione Scrubber/Pan Gestuale e Fedeltà Cromatica Variometrica su Mappa
+- **Problema**:
+  1. I badge delle fasi di volo (`T1`, `1P`, `WO`, `Spirale`) erano posizionati nella parte superiore del grafico (`padTop + 9 + ev.yLevel * 13`), collidendo con le quote MSL e la curva altimetrica, risultando poco leggibili a causa delle dimensioni ridotte (12px altezza, font 8.5px).
+  2. Con zoom attivo, qualsiasi trascinamento orizzontale muoveva la finestra di pan del grafico anziché consentire lo scrubbing immediato del cursore e la lettura istantanea delle metriche HUD.
+  3. Sulla mini-mappa 2D, la selezione di una fase di termica mostrava una traccia prevalentemente azzurra/blu anziché gialla/arancione (incongruenza aeronautica: blu = discendenza/affondata).
+- **Causa Radice**:
+  1. Coordinate `badgeY` legate al `padTop` anziché alla base del grafico cartesiano (`height - padBottom`).
+  2. Nel listener `pointermove`, la condizione `state.zoom > 1.0 && deltaX > 4` attivava il pan senza distinguere tra swipe rapido (scrubber) e pressione prolungata (pan).
+  3. `LeafletMapEngine.highlightFlightTrackRange` inseriva in `phaseHighlightGroup` una polilinea continua di alone con `color: '#38bdf8'` (Sky Blue), `weight: 7` e `opacity: 0.6`, che si sovrapponeva ai segmenti sottostanti della traccia, tingendoli di blu. Inoltre `safePoints` in `FlightDetailSheet.js` ometteva `vario`, esponendo il rendering della mappa al rumore non filtrato delle quote GNSS.
+- **Pattern Vincolante**:
+  1. **Badge Posizionati alla Base (`bottomY = height - padBottom`)**:
+     - `badgeY = bottomY - 3 - ev.yLevel * 18`, con rettangolo pill `y = badgeY - 16`, altezza `16px` e raggio `3.5px`.
+     - Testo `y = badgeY - 4`, font `10.5px` monospace bold (`800`) e colori ad alto contrasto abbinati alla fase (`#fbbf24` ambra per termiche, `#fb923c` per rollio, `#e9d5ff` per manovre dinamiche).
+  2. **Macchina a Stati Gestuale con Timer a 350ms**:
+     - `pointerdown`: avvia un timer a 350ms. Se l'utente sposta il puntatore prima dei 350ms (`deltaX > 6px`), il timer si annulla e la gesture agisce unicamente da **SCRUBBER** continuo (aggiorna `cursorIndex`, HUD e cursore mappa, lasciando inalterato `state.pan`).
+     - Se il tocco è mantenuto fermo per $\ge 350\text{ms}$, si attiva `isPanMode = true`, consentendo il trascinamento della finestra di zoom (`state.pan`).
+     - Tocco breve (<350ms, movimento <6px): seleziona la fase sotto il punto o deseleziona su spazio neutro.
+  3. **Fedeltà Cromatica Variometrica Assoluta su Mappa**:
+     - Mai sovrapporre polilinee colorate fittizie (come aloni ciano `#38bdf8`) sopra la traccia reale.
+     - Il trimming cartografico si esegue portando in primo piano i segmenti attivi (`poly.bringToFront()`) con spessore `5.5px` e `opacity: 1.0`, attenuando i restanti a `opacity: 0.15`.
+     - I punti passati alla mappa devono sempre includere il `vario` filtrato con media mobile a 3 punti per riflettere fedelmente le variazioni di quota.
+
+---
+
+## 144. Calibrazione Spessore Minimo Visivo della Traccia 3D (Scala Proiettiva 3D vs Web Mercator 2D, Pavimento 4px)
+- **Problema**: 
+  1. Con clamp rigido a $1.2\text{ m}$, la traccia 3D appariva come un filo subpixel invisibile in panoramica (<0.2px).
+  2. Applicando ciecamente la formula 2D di Web Mercator ($6.64\text{ m/px}$ a zoom 14), la traccia si è trasformata in un'autostrada larga $26.5\text{ m}$ che a schermo misurava $60-80\text{ pixel}$, inglobando l'intero parapendio.
+- **Causa Radice**: La risoluzione Web Mercator calcola la scala ortografica per tile 2D a livello del mare. Nella scena Three.js, la telecamera prospettica 3D (pitch $62^\circ$) è puntata sull'avatar a quota orografica: a zoom 14, 1 pixel sullo schermo corrisponde a $\approx 0.13\text{ metri}$ (13 cm), non a 6.64 metri.
+- **Pattern Vincolante**:
+  1. **Scala Proiettiva Reale ($\text{metersPerPixel} = \frac{2129.92}{2^z}$)**: A zoom 14 la risoluzione della telecamera al target è di $0.13\text{ m/px}$.
+  2. **Target 4px Reale ($0.52\text{ m}$ a zoom 14)**: Con $W = 0.52\text{ metri}$ ($52\text{ cm}$), la traccia misura esattamente 4 pixel a schermo, inserendosi armoniosamente al di sotto dell'imbrago ($60\text{ cm}$) senza competere con l'apertura alare ($13.2\text{ m}$).
+  3. **Scala Dinamica Multi-Zoom**: A zoom 12 scala a $2.08\text{ m}$ (4px), a zoom 10 a $8.32\text{ m}$ (4px), con clamp $0.35\text{ m} \le W \le 25.0\text{ m}$.
+  4. **Proporzione Volumetrica Prismatica (`heightRatio = 0.6`)**: Sezione a diamante $52\text{ cm} \times 31\text{ cm}$ con vertici colorati secondo la scala variometrica FAI.
 

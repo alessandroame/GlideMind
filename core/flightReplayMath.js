@@ -385,33 +385,31 @@ export function projectTrackToThreeLocal(points, origin = null, { relativeAltitu
 }
 
 /**
- * Calculates dynamic 3D track ribbon width and height in meters based on map zoom and geographic latitude.
- * Maintains a consistent, crisp visual screen width across all zoom levels,
- * preventing the track from appearing gigantically thick when zoomed in (shrinks dynamically)
- * or vanishing into subpixels when zoomed out.
+ * Calculates dynamic 3D track ribbon width and height in meters based on 3D perspective camera zoom.
+ * In MapLibre 3D with perspective projection, maintains a consistent, crisp visual screen width
+ * of at least 4 pixels across all zoom levels without engulfing the paraglider avatar or vanishing.
  * 
  * @param {number} zoom Current map zoom level (e.g. 10 - 20)
- * @param {number} [latitude=46.0] Geographic latitude for Web Mercator scale distortion
+ * @param {number} [_latitude=46.0] Geographic latitude (retained for backward compatibility)
  * @param {object} [options]
- * @param {number} [options.targetPixels=1.8] Target visual thickness on screen in pixels
+ * @param {number} [options.targetPixels=4.0] Target visual thickness on screen in pixels (minimum 4px)
  * @param {number} [options.minWidthMeters=0.35] Minimum physical width clamp in meters (close-up)
- * @param {number} [options.maxWidthMeters=1.2] Maximum physical width clamp in meters (overview)
- * @param {number} [options.heightRatio=0.5] Ratio of vertical thickness to horizontal width
+ * @param {number} [options.maxWidthMeters=25.0] Maximum physical width clamp in meters (overview)
+ * @param {number} [options.heightRatio=0.6] Ratio of vertical thickness to horizontal width
  * @returns {{ widthMeters: number, heightMeters: number, halfWidth: number, halfHeight: number, metersPerPixel: number }}
  */
-export function calculateRibbonDimensions(zoom, latitude = 46.0, options = {}) {
-  const targetPixels = options.targetPixels ?? 1.8;
+export function calculateRibbonDimensions(zoom, _latitude = 46.0, options = {}) {
+  const targetPixels = options.targetPixels ?? 4.0;
   const minWidth = options.minWidthMeters ?? 0.35;
-  const maxWidth = options.maxWidthMeters ?? 1.2;
-  const heightRatio = options.heightRatio ?? 0.5;
+  const maxWidth = options.maxWidthMeters ?? 25.0;
+  const heightRatio = options.heightRatio ?? 0.6;
 
-  const latRad = ((Number(latitude) || 46.0) * Math.PI) / 180;
-  const cosLat = Math.max(0.1, Math.cos(latRad));
   const z = typeof zoom === 'number' && !isNaN(zoom) ? zoom : 14;
 
-  // Ground resolution in meters per pixel in Web Mercator:
-  // S = (40075016.686 * cos(lat)) / (256 * 2^zoom) = (156543.03392 * cos(lat)) / (2^zoom)
-  const metersPerPixel = (156543.03392 * cosLat) / Math.pow(2, z);
+  // Perspective 3D resolution scale at target object in MapLibre 3D:
+  // At zoom 14, 1 screen pixel corresponds to ~0.13 meters in the 3D perspective camera frame.
+  // Across zoom levels, scale doubles/halves with factor 2^(14 - z).
+  const metersPerPixel = (0.13 * 16384) / Math.pow(2, z);
 
   const rawWidth = metersPerPixel * targetPixels;
   const clampedWidth = Math.max(minWidth, Math.min(maxWidth, rawWidth));

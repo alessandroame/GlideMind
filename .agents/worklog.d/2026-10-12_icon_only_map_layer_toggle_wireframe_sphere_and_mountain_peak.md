@@ -24,13 +24,18 @@ In risposta al feedback dell'utente:
      - Icone rigorosamente bianche (`#ffffff` / `stroke="currentColor"`).
      - Sfumatura sottostante nera profonda (`rgba(0, 0, 0, 0.70)` al centro, decadimento continuo a 40% e 70%, dissolvenza completa `transparent 95%` al perimetro).
      - Applicata uniformemente su qualsiasi mappa (Topo, Satellite, Dark, Light theme) eliminando la sfumatura chiara per garantire contrasto e leggibilità massimi.
-5. **Presidio Ergonomico (Fitts's Law)**:
+5. **Adozione Icone Opzione 2 (GIS & Navigazione Moderna)**:
+   - Su preferenza espressa dall'utente, integrate le nuove icone vettoriali:
+     - **Satellite**: Globo terrestre geografico (`r=7.5`) con anello orbitale ellittico inclinato (`rotate(-30)`) e satellite in orbita (`circle r=1.3 fill="currentColor"`).
+     - **OpenTopo**: Mappa cartografica a 3 sezioni/pieghe (folded map) con piegature verticali e isoipsa orografica interna.
+   - Tratto pulito (1.8px), terminazioni raccordate (`round`), bilanciamento ottico centrato a $24\times 24\text{px}$.
+6. **Presidio Ergonomico (Fitts's Law)**:
    - Pseudo-elemento invisibile `::before` a pavimento $\ge 48\times 48\text{px}$ su tutti i controlli flottanti per garantire usabilità sul campo con guanti e all'aperto.
 
 ---
 
 ## 2. File Modificati
-- `ui/map/mapEngineAdapter.js`: Aggiornato `renderLayerToggleIcon(layerId, size = 20)` con la geometria simmetrica della vetta alpina con nevaio.
+- `ui/map/mapEngineAdapter.js`: Aggiornato `renderLayerToggleIcon(layerId, size = 20)` con le nuove geometrie dell'Opzione 2 (Globo con anello orbitale per Satellite e Mappa a 3 pieghe con isoipsa per OpenTopo).
 - `ui/views/SpotMapView.js`: Sincronizzazione `data-layer` su `#gm-map-aim-trigger` e rimozione classe rigida da `#gm-map-layer-toggle`.
 - `ui/views/ForecastView.js`: Sincronizzazione `data-layer` su `.gm-aim-menu-trigger` e rimozione classe rigida da `#forecast-flight-analysis-layer-toggle`.
 - `css/theme.css`: Ridisegnata la sfumatura radiale nera profonda con icone bianche pure per tutti i controlli mappa (toggle layer, expand mini-mappa e trigger mirino), azzerati blur e bordi.
@@ -39,6 +44,7 @@ In risposta al feedback dell'utente:
 ---
 
 ## 3. Verifica e Governance
-- Suite globale eseguita con successo: **123 suite, 705 test passati, 0 fallimenti, 1 saltato**.
+- Suite globale eseguita con successo: **124 suite, 708 test passati, 0 fallimenti, 1 saltato**.
 - Tutti i quality gate architetturali Shift-Left verificati e superati.
+
 

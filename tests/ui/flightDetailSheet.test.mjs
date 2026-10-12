@@ -619,6 +619,9 @@ describe('FlightDetailSheet - Telemetry Analysis & Educational Debriefing (UI La
       assert.ok(html.includes('id="flight-detail-map-canvas"'), 'Must contain map canvas');
       assert.ok(html.includes('id="flight-detail-map-legend"'), 'Must contain map HUD legend');
       assert.ok(html.includes('id="flight-detail-map-layer-toggle"'), 'Must contain layer toggle button');
+      assert.ok(html.includes('id="flight-detail-map-expand-btn"'), 'Must contain expand button');
+      assert.ok(html.includes('class="gm-mini-map-expand-btn"'), 'Must have gm-mini-map-expand-btn class');
+      assert.ok(html.includes('class="gm-mini-map-box gm-flight-minimap-box"'), 'Container must have gm-mini-map-box class');
       assert.ok(html.includes('id="gm-flight-map-phase-badge"'), 'Must contain phase badge element');
       assert.ok(html.includes('id="btn-flight-map-reset-selection"'), 'Must contain reset selection button');
       assert.ok(html.includes('data-action="select-phase"'), 'Must include select-phase attributes on cards');
@@ -648,6 +651,7 @@ describe('FlightDetailSheet - Telemetry Analysis & Educational Debriefing (UI La
       const phaseBadge = createMockElement('gm-flight-map-phase-badge');
       const resetBtn = createMockElement('btn-flight-map-reset-selection');
       const layerToggle = createMockElement('flight-detail-map-layer-toggle', [], 'button', { 'data-layer': 'topo' });
+      const expandBtn = createMockElement('flight-detail-map-expand-btn', [], 'button');
 
       // Add a thermal card inside overlay
       const thermalCard = createMockElement('card-t1', ['gm-thermal-card'], 'div', {
@@ -662,6 +666,7 @@ describe('FlightDetailSheet - Telemetry Analysis & Educational Debriefing (UI La
       overlay.appendChild(phaseBadge);
       overlay.appendChild(resetBtn);
       overlay.appendChild(layerToggle);
+      overlay.appendChild(expandBtn);
       overlay.appendChild(chartContainer);
       overlay.appendChild(thermalCard);
 
@@ -709,6 +714,20 @@ describe('FlightDetailSheet - Telemetry Analysis & Educational Debriefing (UI La
       chartContainer.dispatchEvent({ type: 'pointerup', pointerId: 1 });
       chartContainer.dispatchEvent({ type: 'pointerleave' });
       assert.strictEqual(mapEngine.cursorPointIndex, null, 'Cursor must be cleared on pointerleave');
+
+      // Test expand button navigation
+      let targetHash = null;
+      const origWindow = globalThis.window;
+      globalThis.window = {
+        ...origWindow,
+        location: {
+          get hash() { return targetHash; },
+          set hash(v) { targetHash = v; }
+        }
+      };
+      expandBtn.dispatchEvent({ type: 'click', stopPropagation: () => {} });
+      assert.strictEqual(targetHash, `#replay?flightId=${mockBundle.meta.id}`, 'Expand button must navigate to 3D Replay');
+      globalThis.window = origWindow;
 
       // Test cleanup on closeFlightDetailView
       closeFlightDetailView();
@@ -986,6 +1005,185 @@ describe('FlightDetailSheet - Telemetry Analysis & Educational Debriefing (UI La
       assert.ok(!html.includes('gm-status-pill-record'), 'Non-record flight must NOT show Record Personale pill');
       assert.ok(!html.includes('gm-record-badge'), 'Non-record flight must NOT render record badges');
       assert.ok(!html.includes('gm-flight-metric-card-record'), 'Non-record flight must NOT apply record card highlight class');
+    });
+  });
+
+  describe('Interactive Chart Bottom Badges, Scrubber vs Pan Gestures, and Map Vario Colors', () => {
+    it('should position maneuver badge tags at the bottom with 16px height and 10.5px bold font', () => {
+      const svg = generateExpandedSvgChart(mockBundle.raw.decimatedPoints, 600, 210, {
+        thermals: [{ thermalIndex: 1, startIndex: 1, endIndex: 3 }],
+        dynamicManeuvers: [{ type: 'wingover', startIndex: 4, endIndex: 5 }]
+      });
+
+      // Bottom placement: for height 210 and padBottom 22, bottomY is 188. Badges are at y >= 165
+      assert.ok(svg.includes('class="gm-chart-thermal-band"'), 'Must render thermal band');
+      assert.ok(svg.includes('font-size="10.5"'), 'Must render high-contrast 10.5px font');
+      assert.ok(svg.includes('font-weight="800"'), 'Must render bold 800 weight font');
+      assert.ok(svg.includes('height="16"'), 'Must have 16px height pill');
+      assert.ok(svg.includes('fill="#fbbf24"'), 'Thermal text must have amber color');
+      assert.ok(svg.includes('stroke="#fbbf24"'), 'Thermal pill stroke must be amber');
+      assert.ok(svg.includes('y="169"') || svg.includes('y="181"'), 'Must be positioned near the bottom of chart');
+
+      // Maneuver badge
+      assert.ok(svg.includes('class="gm-chart-maneuver-marker"'), 'Must render maneuver marker');
+      assert.ok(svg.includes('fill="#e9d5ff"'), 'Maneuver text must be high-contrast light purple');
+      assert.ok(svg.includes('stroke="#c084fc"'), 'Maneuver pill stroke must be purple');
+    });
+
+    it('should support short-press scrubbing without altering chart pan, and require long-press (>=350ms) to pan', async () => {
+      const testBundle = {
+        meta: { id: 'fl_gesture_test' },
+        raw: {
+          decimatedPoints: [
+            { timeSeconds: 0, alt: 1000, lat: 45.80, lon: 9.20 },
+            { timeSeconds: 60, alt: 1100, lat: 45.81, lon: 9.21 },
+            { timeSeconds: 120, alt: 1200, lat: 45.82, lon: 9.22 },
+            { timeSeconds: 180, alt: 1300, lat: 45.83, lon: 9.23 },
+            { timeSeconds: 240, alt: 1400, lat: 45.84, lon: 9.24 },
+            { timeSeconds: 300, alt: 1500, lat: 45.85, lon: 9.25 }
+          ]
+        },
+        telemetry: {}
+      };
+
+      const overlay = createMockElement('flight-detail-overlay');
+      const chartContainer = createMockElement('gm-interactive-chart-container');
+      const mapCanvas = createMockElement('flight-detail-map-canvas');
+      const btnZoomIn = createMockElement('btn-chart-zoom-in');
+      const hudTime = createMockElement('gm-hud-time');
+
+      overlay.appendChild(mapCanvas);
+      overlay.appendChild(btnZoomIn);
+      overlay.appendChild(hudTime);
+      overlay.appendChild(chartContainer);
+
+      attachInteractiveFlightChart(overlay, testBundle);
+
+      // Zoom in to 2.0x so panning is enabled
+      btnZoomIn.dispatchEvent({ type: 'click' });
+      btnZoomIn.dispatchEvent({ type: 'click' }); // zoom = 2.0
+
+      // 1. Short-press scrubbing: drag immediately across chart (<350ms)
+      chartContainer.dispatchEvent({ type: 'pointerdown', clientX: 200, clientY: 100, pointerId: 1 });
+      chartContainer.dispatchEvent({ type: 'pointermove', clientX: 350, clientY: 100, pointerId: 1 }); // deltaX = 150px
+      chartContainer.dispatchEvent({ type: 'pointerup', clientX: 350, clientY: 100, pointerId: 1 });
+
+      const mapEngine = getActiveFlightDetailMapEngine();
+      // Map cursor updated to scrubbed position
+      assert.ok(mapEngine.cursorIndex !== null, 'Cursor must update during short-press scrub');
+
+      // 2. Long-press pan: hold for >=350ms, then move
+      chartContainer.dispatchEvent({ type: 'pointerdown', clientX: 200, clientY: 100, pointerId: 2 });
+      await new Promise((r) => setTimeout(r, 380)); // wait for long-press timer to fire
+      chartContainer.dispatchEvent({ type: 'pointermove', clientX: 350, clientY: 100, pointerId: 2 });
+      chartContainer.dispatchEvent({ type: 'pointerup', clientX: 350, clientY: 100, pointerId: 2 });
+
+      // Clean up
+      closeFlightDetailView();
+    });
+
+    it('should render authentic variometer colors on the map without blue overlay when trimmed to a thermal', async () => {
+      const originalWindow = globalThis.window;
+      const createdLayers = [];
+      const featureGroups = [];
+
+      class MockPolyline {
+        constructor(coords, opts = {}) {
+          this.coords = coords;
+          this.opts = { ...opts };
+          this.isBroughtToFront = false;
+        }
+        setStyle(style) {
+          this.opts = { ...this.opts, ...style };
+        }
+        bringToFront() {
+          this.isBroughtToFront = true;
+        }
+        remove() {}
+      }
+
+      class MockFeatureGroup {
+        constructor() {
+          this.layers = [];
+          featureGroups.push(this);
+        }
+        addLayer(l) { this.layers.push(l); createdLayers.push(l); return this; }
+        removeLayer(l) { this.layers = this.layers.filter(x => x !== l); }
+        clearLayers() { this.layers = []; }
+        addTo() { return this; }
+      }
+
+      globalThis.window = {
+        L: {
+          polyline: (coords, opts) => new MockPolyline(coords, opts),
+          featureGroup: () => new MockFeatureGroup(),
+          layerGroup: () => ({ addTo: () => ({}) }),
+          control: { zoom: () => ({ addTo: () => {} }) },
+          marker: (coords, opts) => ({ coords, opts, remove: () => {} }),
+          divIcon: (opts) => ({ opts }),
+          latLngBounds: (coords) => ({ coords }),
+          map: () => ({
+            addLayer: () => {},
+            removeLayer: () => {},
+            remove: () => {},
+            fitBounds: () => {},
+            getZoom: () => 14,
+            setView: () => {},
+            on: () => {},
+            off: () => {}
+          }),
+          tileLayer: () => ({ addTo: () => {}, remove: () => {} })
+        }
+      };
+
+      const { LeafletMapEngine } = await import('../../ui/map/mapEngineAdapter.js');
+      const engine = new LeafletMapEngine(null, { isMiniMap: true });
+      const mockMap = {
+        addLayer: () => {},
+        removeLayer: () => {},
+        remove: () => {},
+        fitBounds: () => {},
+        getZoom: () => 14,
+        setView: () => {},
+        on: () => {},
+        off: () => {}
+      };
+      engine.map = mockMap;
+      engine.overlayLayerGroup = window.L.featureGroup();
+      engine.phaseHighlightGroup = window.L.featureGroup();
+      engine.trackBounds = { _isInitialBounds: true };
+
+      // 4 points in a climbing thermal (+2.0 m/s climb)
+      engine.renderFlightTrack(null, {
+        points: [
+          { lat: 45.80, lon: 9.20, alt: 1000, timeSeconds: 0, vario: 2.0 },
+          { lat: 45.81, lon: 9.21, alt: 1020, timeSeconds: 10, vario: 2.0 },
+          { lat: 45.82, lon: 9.22, alt: 1040, timeSeconds: 20, vario: 2.0 },
+          { lat: 45.83, lon: 9.23, alt: 1060, timeSeconds: 30, vario: 2.0 }
+        ]
+      });
+
+      // Verify the generated track polylines have warm thermal colors (orange #ea580c)
+      const thermalPoly = engine.flightTrackPolylines[0];
+      assert.strictEqual(thermalPoly.opts.color, '#ea580c', 'Thermal segment color must be warm orange for +2.0 m/s');
+
+      // Highlight thermal range [0, 3]
+      engine.highlightFlightTrackRange(0, 3, { label: 'T1' });
+
+      // Overlapping polyline must be brought to front with weight 5.5 and opacity 1.0
+      assert.strictEqual(thermalPoly.isBroughtToFront, true, 'Active phase polyline must be brought to front');
+      assert.strictEqual(thermalPoly.opts.weight, 5.5, 'Active phase polyline must have prominent weight 5.5');
+      assert.strictEqual(thermalPoly.opts.opacity, 1.0, 'Active phase polyline must have full opacity 1.0');
+
+      // Crucial: check that phaseHighlightGroup does NOT contain a blue #38bdf8 polyline!
+      const bluePolylines = engine.phaseHighlightGroup.layers.filter(
+        l => l instanceof MockPolyline && l.opts.color === '#38bdf8'
+      );
+      assert.strictEqual(bluePolylines.length, 0, 'Must NOT draw blue #38bdf8 halo over authentic variometer colors');
+
+      // Clean up
+      engine.destroy();
+      globalThis.window = originalWindow;
     });
   });
 });

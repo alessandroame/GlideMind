@@ -1480,4 +1480,28 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Test suite globale al 100% verde: 706 test (123 suite), 705 passanti, 0 falliti, 1 skipped.
   - Registrata la Lezione Appresa #142 in [MEMORY.md](file:///MEMORY.md).
 
+---
+
+## 2026-10-12 - UI / Telemetria: Badge Fasi in Basso, Separazione Scrubber/Pan Gestuale e Colori Variometrici su Mappa
+- **Tipo**: Bugfix / UI / Ergonomia Mobile / Telemetria / Cartografia 2D
+- **Dettagli**: [.agents/worklog.d/2026-10-12_bottom_badges_scrub_pan_gesture_and_map_vario_colors.md](file:///.agents/worklog.d/2026-10-12_bottom_badges_scrub_pan_gesture_and_map_vario_colors.md)
+- **Sintesi**:
+  - Riprogettati e riposizionati i tag delle fasi di volo (`T1`, `1P`, `WO`, `Spirale`) alla base del grafico cartesiano (`bottomY = height - padBottom`, `badgeY = bottomY - 3 - ev.yLevel * 18`) in `FlightDetailSheet.js`, eliminando qualsiasi collisione con la curva di quota e le scritte di testata; aumentata l'altezza del pill a 16px con font 10.5px bold (800) e bordi ad alto contrasto abbinati alla fase.
+  - Disaccoppiato lo scrubber dal pan con macchina a stati gestuale a 350ms: la pressione breve con movimento orizzontale opera esclusivamente come scrubber (aggiornamento cursore, HUD e mappa senza alterare la finestra del grafico), mentre il pan dello zoom richiede una pressione prolungata $\ge 350\text{ms}$. Il tocco breve rapido (<350ms, <6px) preserva la selezione/deselezione della fase.
+  - Risolta la dominanza di blu sulla traccia trimmata della mini-mappa 2D in `LeafletMapEngine.highlightFlightTrackRange`: rimosso l'alone azzurro `#38bdf8` che copriva la traccia, portati in primo piano i segmenti attivi (`poly.bringToFront()`) con spessore 5.5px e opacità piena 1.0; introdotta la media mobile a 3 punti del variometro in `renderFlightTrack` e `safePoints` per eliminare il rumore GNSS e riflettere fedelmente i colori caldi (arancio/giallo) delle termiche.
+  - Suite di test globale al 100% verde: 709 test (124 suite), 708 passanti, 0 falliti, 1 skipped.
+  - Registrata la Lezione Appresa #141 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-12 - 3D Replay / Geodesia: Spessore Minimo Visivo della Traccia 3D (Scala Proiettiva 3D vs Web Mercator 2D, Floor >= 4px)
+- **Tipo**: Bugfix / 3D Replay / Geodesia / Rendering WebGL
+- **Dettagli**: [.agents/worklog.d/2026-10-12_flight_track_3d_render_minimum_4px_thickness.md](file:///.agents/worklog.d/2026-10-12_flight_track_3d_render_minimum_4px_thickness.md)
+- **Sintesi**:
+  - Risolta la discrepanza ottica tra la risoluzione ortografica 2D di Web Mercator (che creava un'autostrada larga 26.5m e 80px a schermo) e la telecamera prospettica 3D inclinata di Three.js: ricalibrata `calculateRibbonDimensions` in `core/flightReplayMath.js` con la scala proiettiva reale $\text{metersPerPixel}(z) = \frac{2129.92}{2^z}$.
+  - A zoom 14 (inseguimento e cockpit), la larghezza fisica metrica della traccia è calibrata a $0.52\text{ metri}$ ($52\text{ cm}$), corrispondente esattamente a **4 pixel a schermo**; la traccia scorre ordinata sotto l'imbrago ($60\text{ cm}$) senza mai inglobare il profilo della vela ($13.2\text{ m}$).
+  - A zoom panoramico la larghezza scala dinamicamente ($2.08\text{ m}$ a zoom 12, $8.32\text{ m}$ a zoom 10) garantendo la visibilità a 4 pixel sull'intero comprensorio.
+  - Aggiornati i test in `tests/core/flightReplayMath.test.mjs` per validare le dimensioni a 4px esatti e l'adattamento dinamico.
+  - Test suite globale al 100% verde: 711 test (124 suite), 710 passanti, 0 falliti, 1 skipped.
+  - Registrata la Lezione Appresa #144 in [MEMORY.md](file:///MEMORY.md).
 

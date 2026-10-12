@@ -53,9 +53,9 @@ export const MAP_THEMES = Object.freeze({
  */
 export function renderLayerToggleIcon(layerId, size = 20) {
   if (layerId === 'satellite') {
-    return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="gm-layer-icon gm-icon-satellite"><circle cx="12" cy="12" r="9.5"></circle><line x1="2.5" y1="12" x2="21.5" y2="12"></line><line x1="12" y1="2.5" x2="12" y2="21.5"></line><ellipse cx="12" cy="12" rx="4.5" ry="9.5"></ellipse><ellipse cx="12" cy="12" rx="9.5" ry="4.5"></ellipse></svg>`;
+    return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="gm-layer-icon gm-icon-satellite"><circle cx="12" cy="12" r="7.5"></circle><ellipse cx="12" cy="12" rx="10" ry="3.8" transform="rotate(-30 12 12)"></ellipse><circle cx="20.2" cy="7.2" r="1.3" fill="currentColor"></circle></svg>`;
   }
-  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="gm-layer-icon gm-icon-topo"><path d="M12 2.5L2.5 20.5h19L12 2.5z"></path><path d="M6.8 12.5L9.5 14.5L12 12.2L14.5 14.5L17.2 12.5"></path></svg>`;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="gm-layer-icon gm-icon-topo"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"></polygon><line x1="9" y1="3" x2="9" y2="18"></line><line x1="15" y1="6" x2="15" y2="21"></line><path d="M5.5 12.5c1.2-1 2.2 0.8 3.5 0"></path></svg>`;
 }
 
 /**
@@ -604,7 +604,13 @@ export class LeafletMapEngine {
     }
 
     // Create persistent layer group for spots
-    this.overlayLayerGroup = window.L.layerGroup().addTo(this.map);
+    if (typeof window.L.layerGroup === 'function') {
+      this.overlayLayerGroup = window.L.layerGroup().addTo(this.map);
+    } else if (typeof window.L.featureGroup === 'function') {
+      this.overlayLayerGroup = window.L.featureGroup().addTo(this.map);
+    } else {
+      this.overlayLayerGroup = null;
+    }
 
     // Create dedicated Canvas renderer for scalable vector markers
     if (!this.isMiniMap && typeof window.L.canvas === 'function') {
@@ -1514,14 +1520,32 @@ export class LeafletMapEngine {
     this.validTrackPoints = validPoints;
     if (validPoints.length === 0) return this;
 
+    // Smooth vario across points to eliminate GNSS altitude noise and match chart 1:1
+    const pointVarios = validPoints.map((p, i) => {
+      if (typeof p.vario === 'number' && !isNaN(p.vario)) return p.vario;
+      if (i > 0) {
+        const prev = validPoints[i - 1];
+        const dt = Math.max(0.5, (p.timeSeconds ?? i) - (prev.timeSeconds ?? (i - 1)));
+        return ((p.alt || 0) - (prev.alt || 0)) / dt;
+      }
+      return 0;
+    });
+
+    const smoothedVarios = pointVarios.map((v, i) => {
+      if (typeof validPoints[i].vario === 'number' && !isNaN(validPoints[i].vario)) {
+        return validPoints[i].vario;
+      }
+      const prev = pointVarios[Math.max(0, i - 1)];
+      const next = pointVarios[Math.min(pointVarios.length - 1, i + 1)];
+      return (prev + v * 2 + next) / 4;
+    });
+
     // Segment points by continuous variometer color bands
     const segments = [];
     let curSeg = null;
     for (let i = 0; i < validPoints.length; i++) {
       const p = validPoints[i];
-      const vario = typeof p.vario === 'number' && !isNaN(p.vario)
-        ? p.vario
-        : (i > 0 ? ((p.alt || 0) - (validPoints[i - 1].alt || 0)) / Math.max(0.5, (p.timeSeconds ?? i) - (validPoints[i - 1].timeSeconds ?? (i - 1))) : 0);
+      const vario = smoothedVarios[i];
       const band = sampleVarioRgb(vario);
       const color = band.css;
       const pt = [p.lat, p.lon];
@@ -1627,13 +1651,16 @@ export class LeafletMapEngine {
       return this;
     }
 
-    // Trim visualization: Dim background track and highlight active phase
+    // Trim visualization: Dim background track and highlight active phase with authentic vario colors
     if (this.flightTrackPolylines) {
       for (const poly of this.flightTrackPolylines) {
         const seg = poly.segmentData;
         const overlaps = seg && !(seg.endIdx < sIdx || seg.startIdx > eIdx);
         if (overlaps) {
-          poly.setStyle({ opacity: 1.0, weight: 5 });
+          poly.setStyle({ opacity: 1.0, weight: 5.5 });
+          if (typeof poly.bringToFront === 'function') {
+            poly.bringToFront();
+          }
         } else {
           poly.setStyle({ opacity: 0.15, weight: 1.5 });
         }
@@ -1644,14 +1671,6 @@ export class LeafletMapEngine {
       const phasePoints = this.validTrackPoints.filter(p => p.origIdx >= sIdx && p.origIdx <= eIdx);
       if (phasePoints.length >= 2) {
         const phaseCoords = phasePoints.map(p => [p.lat, p.lon]);
-        const halo = window.L.polyline(phaseCoords, {
-          color: '#38bdf8',
-          weight: 7,
-          opacity: 0.6,
-          lineCap: 'round',
-          lineJoin: 'round'
-        });
-        this.phaseHighlightGroup.addLayer(halo);
 
         const badgeIcon = window.L.divIcon({
           className: 'gm-map-div-icon',

@@ -402,17 +402,16 @@ export function generateExpandedSvgChart(points, width = 600, height = 220, opti
   });
 
   // Sort by horizontal position and allocate 3 non-colliding vertical lanes
+  // Sort by horizontal position and allocate 3 non-colliding vertical lanes stacked from the bottom
   eventItems.sort((a, b) => a.cx - b.cx);
   const laneRightBounds = [-999, -999, -999];
   eventItems.forEach((ev) => {
-    const pillW = ev.type === 'roll'
-      ? Math.max(22, (ev.label ? ev.label.length : 2) * 7 + 8)
-      : 24;
+    const pillW = Math.max(26, (ev.label ? ev.label.length : 2) * 8 + 10);
     const leftBound = ev.cx - pillW / 2;
 
     let chosenLane = 0;
-    if (leftBound < laneRightBounds[0] + 5) {
-      if (leftBound < laneRightBounds[1] + 5) {
+    if (leftBound < laneRightBounds[0] + 6) {
+      if (leftBound < laneRightBounds[1] + 6) {
         chosenLane = 2;
       } else {
         chosenLane = 1;
@@ -422,20 +421,22 @@ export function generateExpandedSvgChart(points, width = 600, height = 220, opti
     laneRightBounds[chosenLane] = ev.cx + pillW / 2;
   });
 
+  const bottomY = height - padBottom;
+  const pillH = 16;
+
   // Render thermal bands
   const thermalBandsSvg = eventItems
     .filter((ev) => ev.type === 'thermal')
     .map((ev) => {
-      const badgeY = padTop + 9 + ev.yLevel * 13;
-      const pillW = 24;
-      const pillH = 12;
+      const pillW = Math.max(26, ev.label.length * 8 + 10);
+      const badgeY = bottomY - 3 - ev.yLevel * 18;
       const sIdx = ev.sIdx;
       const eIdx = ev.eIdx;
       return `
         <g class="gm-chart-thermal-band" data-phase-type="thermal" data-phase-label="${escapeHtml(ev.label)}" data-start-index="${sIdx}" data-end-index="${eIdx}" data-start-time="${ev.rawObj?.startTimeSeconds ?? ''}" data-end-time="${ev.rawObj?.endTimeSeconds ?? ''}" style="cursor: pointer;">
           <rect x="${ev.x1}" y="${padTop}" width="${ev.bandW}" height="${chartHeight}" fill="rgba(245, 158, 11, 0.14)" stroke="rgba(245, 158, 11, 0.45)" stroke-width="1" stroke-dasharray="3,2" rx="3" />
-          <rect x="${ev.cx - pillW / 2}" y="${badgeY - 9}" width="${pillW}" height="${pillH}" fill="rgba(15, 23, 42, 0.92)" stroke="#f59e0b" stroke-width="0.8" rx="2.5" />
-          <text x="${ev.cx}" y="${badgeY}" text-anchor="middle" font-size="8.5" font-family="monospace" font-weight="800" fill="#f59e0b">${escapeHtml(ev.label)}</text>
+          <rect x="${ev.cx - pillW / 2}" y="${badgeY - pillH}" width="${pillW}" height="${pillH}" fill="rgba(15, 23, 42, 0.95)" stroke="#fbbf24" stroke-width="1.2" rx="3.5" />
+          <text x="${ev.cx}" y="${badgeY - 4}" text-anchor="middle" font-size="10.5" font-family="monospace" font-weight="800" fill="#fbbf24">${escapeHtml(ev.label)}</text>
         </g>
       `;
     })
@@ -445,16 +446,15 @@ export function generateExpandedSvgChart(points, width = 600, height = 220, opti
   const rollMarkersSvg = eventItems
     .filter((ev) => ev.type === 'roll')
     .map((ev) => {
-      const badgeY = padTop + 9 + ev.yLevel * 13;
-      const pillW = Math.max(22, ev.label.length * 7 + 8);
-      const pillH = 12;
+      const pillW = Math.max(26, ev.label.length * 8 + 10);
+      const badgeY = bottomY - 3 - ev.yLevel * 18;
       const sIdx = ev.sIdx;
       const eIdx = ev.eIdx;
       return `
         <g class="gm-chart-roll-marker" role="img" aria-label="Inversione di rollio (${ev.pCount ? `${ev.pCount} pendolate` : ''})" data-phase-type="roll" data-phase-label="${escapeHtml(ev.label)}" data-start-index="${sIdx}" data-end-index="${eIdx}" data-start-time="${ev.rawObj?.startTimeSeconds ?? ''}" data-end-time="${ev.rawObj?.endTimeSeconds ?? ''}" style="cursor: pointer;">
           <rect x="${ev.x1}" y="${padTop + 2}" width="${ev.bandW}" height="${chartHeight}" fill="rgba(234, 88, 12, 0.14)" stroke="rgba(234, 88, 12, 0.7)" stroke-width="1" stroke-dasharray="2,2" rx="2" />
-          <rect x="${ev.cx - pillW / 2}" y="${badgeY - 9}" width="${pillW}" height="${pillH}" fill="rgba(15, 23, 42, 0.92)" stroke="#ea580c" stroke-width="0.8" rx="2.5" />
-          <text x="${ev.cx}" y="${badgeY}" text-anchor="middle" font-size="8.5" font-family="monospace" font-weight="800" fill="#ea580c">${escapeHtml(ev.label)}</text>
+          <rect x="${ev.cx - pillW / 2}" y="${badgeY - pillH}" width="${pillW}" height="${pillH}" fill="rgba(15, 23, 42, 0.95)" stroke="#fb923c" stroke-width="1.2" rx="3.5" />
+          <text x="${ev.cx}" y="${badgeY - 4}" text-anchor="middle" font-size="10.5" font-family="monospace" font-weight="800" fill="#fb923c">${escapeHtml(ev.label)}</text>
         </g>
       `;
     })
@@ -464,16 +464,15 @@ export function generateExpandedSvgChart(points, width = 600, height = 220, opti
   const maneuverMarkersSvg = eventItems
     .filter((ev) => ev.type === 'maneuver')
     .map((ev) => {
-      const badgeY = padTop + 9 + ev.yLevel * 13;
-      const pillW = Math.max(24, ev.label.length * 7 + 8);
-      const pillH = 12;
+      const pillW = Math.max(26, ev.label.length * 8 + 10);
+      const badgeY = bottomY - 3 - ev.yLevel * 18;
       const sIdx = ev.sIdx;
       const eIdx = ev.eIdx;
       return `
         <g class="gm-chart-maneuver-marker" role="img" aria-label="Manovra ${escapeHtml(ev.fullTitle || ev.label)}" data-phase-type="maneuver" data-phase-label="${escapeHtml(ev.fullTitle || ev.label)}" data-start-index="${sIdx}" data-end-index="${eIdx}" data-start-time="${ev.rawObj?.startTimeSeconds ?? ''}" data-end-time="${ev.rawObj?.endTimeSeconds ?? ''}" style="cursor: pointer;">
           <rect x="${ev.x1}" y="${padTop + 2}" width="${ev.bandW}" height="${chartHeight}" fill="rgba(192, 132, 252, 0.14)" stroke="rgba(192, 132, 252, 0.7)" stroke-width="1" stroke-dasharray="2,2" rx="2" />
-          <rect x="${ev.cx - pillW / 2}" y="${badgeY - 9}" width="${pillW}" height="${pillH}" fill="rgba(15, 23, 42, 0.92)" stroke="#c084fc" stroke-width="0.8" rx="2.5" />
-          <text x="${ev.cx}" y="${badgeY}" text-anchor="middle" font-size="8.5" font-family="monospace" font-weight="800" fill="#c084fc">${escapeHtml(ev.label)}</text>
+          <rect x="${ev.cx - pillW / 2}" y="${badgeY - pillH}" width="${pillW}" height="${pillH}" fill="rgba(15, 23, 42, 0.95)" stroke="#c084fc" stroke-width="1.2" rx="3.5" />
+          <text x="${ev.cx}" y="${badgeY - 4}" text-anchor="middle" font-size="10.5" font-family="monospace" font-weight="800" fill="#e9d5ff">${escapeHtml(ev.label)}</text>
         </g>
       `;
     })
@@ -972,33 +971,49 @@ export function renderFlightDetailHtml(bundle, options = {}) {
               <h3 class="gm-flight-detail-section-title" style="margin: 0;">Mappa 2D Traccia</h3>
               <span id="gm-flight-map-phase-badge" class="gm-flight-map-phase-pill" style="display: none;" aria-live="polite"></span>
             </div>
-            <div class="flex items-center gap-1.5 flex-shrink-0">
-              <button
-                type="button"
-                id="btn-flight-map-reset-selection"
-                class="gm-flight-map-reset-btn"
-                style="display: none;"
-                title="Deseleziona fase e mostra traccia intera"
-                aria-label="Mostra traccia completa"
-              >
-                Mostra Tutto
-              </button>
-              <button
-                type="button"
-                id="flight-detail-map-layer-toggle"
-                class="gm-mini-map-layer-toggle"
-                data-action="toggle-flight-map-layer"
-                data-layer="${activeLayer}"
-                aria-label="Layer mappa: ${activeLayer === 'satellite' ? 'Satellite (tocca per OpenTopo)' : 'OpenTopo (tocca per Satellite)'}"
-                title="Passa a ${activeLayer === 'satellite' ? 'OpenTopo' : 'Satellite'}"
-              >
-                ${renderLayerToggleIcon(activeLayer, 20)}
-              </button>
-            </div>
+            <button
+              type="button"
+              id="btn-flight-map-reset-selection"
+              class="gm-flight-map-reset-btn"
+              style="display: none;"
+              title="Deseleziona fase e mostra traccia intera"
+              aria-label="Mostra traccia completa"
+            >
+              Mostra Tutto
+            </button>
           </div>
 
-          <div id="flight-detail-map-container" class="gm-flight-minimap-box" style="position: relative; width: 100%; height: 210px; border-radius: var(--gm-radius-md); overflow: hidden; border: 1px solid var(--gm-border); background: var(--gm-bg-card);">
+          <div id="flight-detail-map-container" class="gm-mini-map-box gm-flight-minimap-box" data-map-layer="${activeLayer}" style="position: relative; width: 100%; height: 210px; border-radius: var(--gm-radius-md); overflow: hidden; border: 1px solid var(--gm-border); background: var(--gm-bg-card);">
             <div id="flight-detail-map-canvas" class="gm-flight-map-canvas" style="width: 100%; height: 100%; touch-action: pan-y;"></div>
+            
+            <button
+              type="button"
+              id="flight-detail-map-layer-toggle"
+              class="gm-mini-map-layer-toggle"
+              data-action="toggle-flight-map-layer"
+              data-layer="${activeLayer}"
+              aria-label="Layer mappa: ${activeLayer === 'satellite' ? 'Satellite (tocca per OpenTopo)' : 'OpenTopo (tocca per Satellite)'}"
+              title="Passa a ${activeLayer === 'satellite' ? 'OpenTopo' : 'Satellite'}"
+            >
+              ${renderLayerToggleIcon(activeLayer, 20)}
+            </button>
+
+            <button
+              type="button"
+              id="flight-detail-map-expand-btn"
+              class="gm-mini-map-expand-btn"
+              data-action="expand-flight-map"
+              aria-label="Visualizza Replay 3D della traccia"
+              title="Visualizza Replay 3D della traccia"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <polyline points="9 21 3 21 3 15"></polyline>
+                <line x1="21" y1="3" x2="14" y2="10"></line>
+                <line x1="3" y1="21" x2="10" y2="14"></line>
+              </svg>
+            </button>
+
             <div id="flight-detail-map-legend" class="gm-flight-map-hud-legend">
               <span class="gm-map-legend-dot gm-map-legend-dot-takeoff"></span><span>Decollo</span>
               <span class="gm-map-legend-dot gm-map-legend-dot-landing"></span><span>Atterraggio</span>
@@ -1492,20 +1507,26 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
   const phaseBadgeEl = overlayEl.querySelector('#gm-flight-map-phase-badge');
   const resetPhaseBtn = overlayEl.querySelector('#btn-flight-map-reset-selection');
   const layerToggleBtn = overlayEl.querySelector('#flight-detail-map-layer-toggle');
+  const expandMapBtn = overlayEl.querySelector('#flight-detail-map-expand-btn');
 
   const targetStore = bundle?.options?.store || store;
   const currentAppState = (targetStore && typeof targetStore.getState === 'function') ? targetStore.getState() : {};
   const activeTheme = currentAppState.ui?.theme || 'dark';
   let activeLayer = currentAppState.ui?.mapLayer || 'topo';
 
-  // Ensure points have fallback coordinates for mock/synthesized tracks
+  // Ensure points have fallback coordinates and smoothed variometer to match chart 1:1
+  const rawVarios = points.map((p, idx) => getPointVario(p, idx, points));
   const safePoints = points.map((p, idx) => {
     const lat = (typeof p.lat === 'number' && !isNaN(p.lat)) ? p.lat : (45.8 + idx * 0.0008);
     const lon = (typeof p.lon === 'number' && !isNaN(p.lon)) ? p.lon : (9.29 + idx * 0.0006);
+    const prevV = rawVarios[Math.max(0, idx - 1)];
+    const nextV = rawVarios[Math.min(points.length - 1, idx + 1)];
+    const vario = (prevV + rawVarios[idx] * 2 + nextV) / 4;
     return {
       ...p,
       lat,
-      lon
+      lon,
+      vario
     };
   });
 
@@ -1777,9 +1798,25 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
         flightDetailMapEngine.setLayer(nextLayer);
       }
 
+      const mapContainer = overlayEl.querySelector('#flight-detail-map-container');
+      if (mapContainer) {
+        mapContainer.setAttribute('data-map-layer', nextLayer);
+      }
+
       if (targetStore && typeof targetStore.setState === 'function') {
         const prevUi = targetStore.getState().ui || {};
         targetStore.setState({ ui: { ...prevUi, mapLayer: nextLayer } });
+      }
+    });
+  }
+
+  if (expandMapBtn) {
+    expandMapBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const flightId = bundle?.meta?.id;
+      if (flightId) {
+        closeFlightDetailView();
+        window.location.hash = `#replay?flightId=${encodeURIComponent(flightId)}`;
       }
     });
   }
@@ -1998,14 +2035,17 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
     });
   }
 
-  // 3. Pointer & Pan Dragging on chart container
+  // 3. Pointer, Scrubber & Pan Dragging on chart container
   let isPointerDown = false;
+  let isPanMode = false;
   let startX = 0;
   let startY = 0;
   let pointerDownTime = 0;
-  let hasDragged = false;
+  let hasMoved = false;
   let startPan = 0.5;
+  let panStartX = 0;
   let lastSelectionTime = 0;
+  let longPressTimer = null;
 
   const handleChartPointSelection = (e) => {
     if (Date.now() - lastSelectionTime < 250) return;
@@ -2022,11 +2062,26 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
 
   chartContainer.addEventListener('pointerdown', (e) => {
     isPointerDown = true;
+    isPanMode = false;
+    hasMoved = false;
     startX = e.clientX ?? 0;
     startY = e.clientY ?? 0;
     pointerDownTime = Date.now();
-    hasDragged = false;
     startPan = state.pan;
+    panStartX = startX;
+
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+    }
+    longPressTimer = setTimeout(() => {
+      if (isPointerDown && !hasMoved) {
+        isPanMode = true;
+        panStartX = startX;
+        startPan = state.pan;
+        chartContainer.style.cursor = 'grab';
+      }
+    }, 350);
+
     if (typeof chartContainer.setPointerCapture === 'function') {
       try { chartContainer.setPointerCapture(e.pointerId); } catch (_) {}
     }
@@ -2049,14 +2104,34 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
       const curY = e.clientY ?? 0;
       const deltaX = Math.abs(curX - startX);
       const deltaY = Math.abs(curY - startY);
+
       if (deltaX > 6 || deltaY > 6) {
-        hasDragged = true;
+        hasMoved = true;
       }
 
-      if (state.zoom > 1.0 && deltaX > 4) {
+      if (!isPanMode) {
+        // Short-press movement cancels the long-press timer -> acts purely as scrubber
+        if (longPressTimer) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+
+        // Update scrubber cursor and HUD without changing pan window
+        state.cursorIndex = idx;
+        updateHud(idx);
+        updateCursorGroup(idx);
+        if (flightDetailMapEngine && typeof flightDetailMapEngine.setFlightTrackCursor === 'function') {
+          const pt = points[idx];
+          flightDetailMapEngine.setFlightTrackCursor(idx, points.length, pt?.timeSeconds);
+        }
+        return;
+      }
+
+      // Long-press pan mode active
+      if (state.zoom > 1.0) {
         const rect = chartContainer.getBoundingClientRect();
         const w = (rect && rect.width > 0) ? rect.width : (chartContainer.clientWidth || 600);
-        const panDelta = -((curX - startX) / w) * (1 / state.zoom);
+        const panDelta = -((curX - panStartX) / w) * (1 / state.zoom);
         state.pan = Math.max(0.0, Math.min(1.0, startPan + panDelta));
         state.cursorIndex = idx;
         updateHud(idx);
@@ -2089,12 +2164,24 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
 
   const onPointerUp = (e) => {
     if (!isPointerDown) return;
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+    }
+    const wasPanMode = isPanMode;
+    const didMove = hasMoved;
+    const elapsed = Date.now() - pointerDownTime;
+
     isPointerDown = false;
+    isPanMode = false;
+    hasMoved = false;
+
     if (typeof chartContainer.releasePointerCapture === 'function') {
       try { chartContainer.releasePointerCapture(e.pointerId); } catch (_) {}
     }
-    const elapsed = Date.now() - pointerDownTime;
-    if (!hasDragged && elapsed < 500) {
+
+    // Clean tap: short click without moving and without entering pan mode
+    if (!didMove && !wasPanMode && elapsed < 350) {
       handleChartPointSelection(e);
     }
   };
@@ -2103,6 +2190,10 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
   chartContainer.addEventListener('pointercancel', onPointerUp);
 
   chartContainer.addEventListener('pointerleave', () => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+    }
     chartContainer.style.cursor = '';
     chartContainer.title = '';
     if (!isPointerDown) {
