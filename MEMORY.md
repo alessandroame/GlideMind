@@ -2031,3 +2031,49 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
   3. **Prevenzione Duplicazione Decollo (`isTakeoffRedundant`)**: Verificare sistematicamente se `flight.site` coincide o è contenuto in `title`/`siteName`. In caso positivo, omettere `siteArea` dalla seconda riga, lasciando la sequenza ariosa `Data • Ore HH:MM • Modello Vela`.
   4. **Rimozione del Vincolo Lunghezza Vela**: Rimuovere `max-w-[140px]` dallo span della vela, consentendo ai nomi composti di estendersi naturalmente nello spazio liberato.
 
+---
+
+## 149. Rendering Dinamico del Nastro 3D di Volo Fino all'Istante di Riproduzione (BufferGeometry.setDrawRange & Dynamic Avatar-Attached Leading Vertex)
+- **Problema**:
+  1. Nel replay 3D del volo (`FlightReplayView` / `MapLibreThreeEngine`), l'intera traiettoria volumetrica veniva renderizzata fin dal montaggio della vista ($p = 0$). Quando l'utente premeva "Play", il parapendio si muoveva lungo un nastro già completamente tracciato nel cielo, privando il pilota della sensazione realistica di "disegnare" la traccia nell'aria man mano che il volo procedeva.
+  2. Ricreare o riallocare i buffer WebGL dei vertici ad ogni fotogramma di riproduzione ($60\text{ FPS}$) avrebbe provocato elevata pressione sul garbage collector, micro-stutter e thermal throttling su dispositivi mobili outdoor.
+- **Causa Radice**:
+  Le geometrie Three.js (`trackRibbonMesh`, `centerLineMesh`, `curtainMesh`) mantenevano il `drawRange` predefinito all'intero buffer (`count: Infinity`), senza agganciare il range di rasterizzazione WebGL alla variabile temporale `currentTimeSec` o al progresso $p \in [0.0, 1.0]$.
+- **Pattern Vincolante**:
+  1. **Controllo del Range di Disegno a $O(1)$ (`BufferGeometry.setDrawRange`)**:
+     - Preallocare l'intero nastro volumetrico, la spina dorsale variometrica e la cortina di caduta al suolo durante `_buildTrackRibbon()` e `_buildDropCurtain()`.
+     - A $p = 0$ (prima del play / decollo): impostare `geometry.setDrawRange(0, 0)`, nascondendo completamente il nastro ma mantenendo visibili l'avatar e i marker 3D di decollo e atterraggio.
+     - A $0 < p < 1.0$: individuare il segmento attivo `idx` via binary search su `currentTimeSec` e impostare `trackRibbonMesh.geometry.setDrawRange(0, (idx + 1) * 24)` (24 indici per segmento quad), `centerLineMesh.geometry.setDrawRange(0, nextIdx + 1)` e `curtainMesh.geometry.setDrawRange(0, curtainDrawCount)`.
+     - A $p = 1.0$ (touchdown all'atterraggio): ripristinare il range completo `(n - 1) * 24`.
+  2. **Aggancio Continuo del Vertice di Testa all'Avatar (`_updateTraveledTrack`)**:
+     - Poiché il velivolo si trova in una posizione interpolata continua `currentPoint` tra due campioni GPS discreti `idx` e `nextIdx`, aggiornare in-place nel `Float32BufferAttribute` i 4 vertici del nastro corrispondenti a `nextIdx` per farli coincidere con le coordinate $(x, y, z)$ e il colore FAI del parapendio (`posAttr.needsUpdate = true`).
+     - Al passaggio di segmento o durante lo scrubbing a ritroso, invocare `_restoreRibbonPoint(i)` per ripristinare le coordinate e i colori precalcolati del punto precedente, prevenendo deformazioni permanenti della geometria.
+  3. **Contratto Headless**:
+     - [`HeadlessReplayEngine.js`](file:///ui/3d/HeadlessReplayEngine.js) espone il metodo `getTraveledPoints()`, restituendo l'array dei punti percorsi fino al progresso attivo per test automatici a 0ms in puro Node.js.
+
+
+
+---
+
+## 150. Invarianza Rigorosa di Spazio-Schermo a 6.0px del Nastro 3D della Traiettoria di Volo in MapLibre WebGL
+- **Problema**:
+  1. Nel replay 3D del volo (`MapLibreThreeEngine`), la traccia della traiettoria volumetrica oscillava tra due estremi inadatti all'uso outdoor:
+     - Una "strada autostradale" spessa oltre 80px a zoom ravvicinato (cockpit o inseguimento), causata da dimensioni fisse in metri ($26.5\text{ m}$) calcolate una tantum senza aggiornamento durante lo zoom.
+     - Un filo sub-pixel quasi invisibile ($0.15\text{ px}$) generato da un fattore di scala prospettico arbitrario ($0.13\text{ m/px}$ a zoom 14 anziché i reali $3.32\text{ m/px}$ di Web Mercator).
+  2. L'utente ha esplicitamente richiesto: *"falla sempre larga 6px indipendentemente dal livello di zoom"*.
+- **Causa Radice**:
+  - In MapLibre 3D con proiezione prospettica, la scala geografica al suolo a latitudine $\phi$ e zoom $z$ è rigorosamente determinata dalla formula Web Mercator:
+    $$\text{metersPerPixel}(z, \phi) = \frac{40075016.686 \cdot \cos(\phi)}{512 \cdot 2^z}$$
+  - Un oggetto con spessore fisico costante in metri cambia dimensione apparente in pixel su schermo in modo inversamente proporzionale a $2^z$. Per ottenere una dimensione apparente costante in pixel (spazio-schermo invariante), la dimensione geometrica in metri deve scalare proporzionalmente alla risoluzione in metri per pixel ad ogni livello di zoom.
+- **Pattern Vincolante**:
+  1. **Calcolo Deterministico dello Spessore Invariante a 6px (`core/flightReplayMath.js`)**:
+     - `calculateRibbonDimensions(zoom, latitude = 46.0, options = {})`:
+       - `targetPixels = options.targetPixels ?? 6.0`
+       - `metersPerPixel = (40075016.686 * Math.cos(latRad)) / (512 * Math.pow(2, z))`
+       - `widthMeters = Math.max(0.20, Math.min(1000.0, metersPerPixel * targetPixels))`
+       - `heightMeters = widthMeters * 0.6`
+     - Questa formula garantisce matematicamente che $\frac{\text{widthMeters}}{\text{metersPerPixel}} \equiv 6.0\text{ px}$ su tutto l'intervallo $z \in [10, 19]$.
+  2. **Aggiornamento Dinamico a 60 FPS Senza Riallocazione GPU (`ui/3d/MapLibreThreeEngine.js`)**:
+     - Registrare il listener dell'evento `'zoom'` della mappa (`this.map.on('zoom', this._onMapZoom)`) per intercettare lo zoom interattivo continuo (rotella mouse, pinch to zoom mobile) e stringere il delta di controllo nel loop di rendering a $> 0.02$ di zoom per le animazioni di camera.
+     - Modulare i vertici del nastro prismatico 3D in-place su `posAttr.array` sfruttando le normali unitarie precalcolate `_ribbonNormals`, senza allocare nuove geometrie né sollecitare il garbage collector.
+     - Pulire il listener in `destroy()` con `this.map.off('zoom', this._onMapZoom)`.

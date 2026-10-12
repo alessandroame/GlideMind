@@ -269,42 +269,44 @@ describe('Flight Replay Math - Headless Core Kinematics & Coordinates', () => {
   describe('calculateRibbonDimensions - Dynamic Zoom-Adaptive 3D Track Scaling', () => {
     it('should calculate slender ribbon dimensions when zoomed in close to the paraglider (zoom 18)', () => {
       const dims = calculateRibbonDimensions(18, 46.0);
-      assert.ok(dims.widthMeters <= 0.5, `Expected close-up ribbon width <= 0.5m, got ${dims.widthMeters}`);
-      assert.ok(dims.widthMeters >= 0.35, `Width must respect min clamp >= 0.35m, got ${dims.widthMeters}`);
+      assert.equal(dims.widthMeters, 1.24, `Expected close-up ribbon width 1.24m at zoom 18, got ${dims.widthMeters}`);
+      assert.equal(dims.heightMeters, 0.74, `Expected close-up ribbon height 0.74m at zoom 18, got ${dims.heightMeters}`);
       assert.ok(dims.heightMeters < dims.widthMeters, 'Height should be proportional to width');
       assert.equal(dims.halfWidth, Math.round((dims.widthMeters / 2) * 100) / 100);
       assert.equal(dims.halfHeight, Math.round((dims.heightMeters / 2) * 100) / 100);
     });
 
-    it('should calculate slender 4px ribbon in chase replay view (zoom 14)', () => {
+    it('should calculate exact 6px invariant ribbon in chase replay view (zoom 14)', () => {
       const dims = calculateRibbonDimensions(14, 46.0);
-      // At zoom 14, 0.52m gives exactly 4px on screen without engulfing the 13.2m canopy
-      assert.equal(dims.widthMeters, 0.52, `Expected zoom 14 width 0.52m (~4px), got ${dims.widthMeters}`);
-      assert.equal(dims.heightMeters, 0.31, `Expected zoom 14 height 0.31m, got ${dims.heightMeters}`);
+      // At zoom 14, 19.91m gives exactly 6px on screen at 3.32 m/px resolution
+      assert.equal(dims.widthMeters, 19.91, `Expected zoom 14 width 19.91m (6px), got ${dims.widthMeters}`);
+      assert.equal(dims.heightMeters, 11.95, `Expected zoom 14 height 11.95m, got ${dims.heightMeters}`);
     });
 
-    it('should shrink dynamically when zoomed in close and expand at overview (zoom 12 vs 19)', () => {
+    it('should adapt dynamically across zoom levels (zoom 12 vs 19)', () => {
       const closeDims = calculateRibbonDimensions(19, 46.0);
       const overviewDims = calculateRibbonDimensions(12, 46.0);
 
-      // Close up at zoom 19 should be clamped (0.35m) compared to overview width (2.08m)
       assert.ok(closeDims.widthMeters < overviewDims.widthMeters,
         `Expected close width (${closeDims.widthMeters}m) to be less than overview width (${overviewDims.widthMeters}m)`);
-      assert.equal(overviewDims.widthMeters, 2.08, `Expected overview width 2.08m, got ${overviewDims.widthMeters}`);
-      assert.equal(closeDims.widthMeters, 0.35, `Expected close width clamped to 0.35m, got ${closeDims.widthMeters}`);
+      assert.equal(overviewDims.widthMeters, 79.65, `Expected overview width 79.65m, got ${overviewDims.widthMeters}`);
+      assert.equal(closeDims.widthMeters, 0.62, `Expected close width 0.62m, got ${closeDims.widthMeters}`);
     });
 
-    it('should guarantee a minimum of 4 screen pixels across typical flight zooms (12 to 18)', () => {
-      for (let z = 12; z <= 18; z++) {
+    it('should guarantee exactly 6 screen pixels across all flight zooms (10 to 19)', () => {
+      for (let z = 10; z <= 19; z++) {
         const dims = calculateRibbonDimensions(z, 46.0);
         const screenPixels = dims.widthMeters / dims.metersPerPixel;
-        assert.ok(screenPixels >= 3.99, `Zoom ${z} should have at least 4 screen pixels, got ${screenPixels.toFixed(2)}`);
+        assert.ok(
+          Math.abs(screenPixels - 6.0) < 0.05,
+          `Zoom ${z} should have 6.0 screen pixels (tolerance 0.05), got ${screenPixels.toFixed(3)}`
+        );
       }
     });
 
     it('should respect custom options for targetPixels, clamps, and heightRatio', () => {
       const customDims = calculateRibbonDimensions(16, 46.0, {
-        targetPixels: 5.0,
+        targetPixels: 4.0,
         minWidthMeters: 2.0,
         maxWidthMeters: 200.0,
         heightRatio: 0.5
@@ -323,10 +325,10 @@ describe('Flight Replay Math - Headless Core Kinematics & Coordinates', () => {
       assert.ok(nanDims.widthMeters > 0);
 
       const extremeClose = calculateRibbonDimensions(25, 46.0);
-      assert.equal(extremeClose.widthMeters, 0.35, 'Must clamp to minWidthMeters (0.35m) at extreme close zoom');
+      assert.equal(extremeClose.widthMeters, 0.20, 'Must clamp to minWidthMeters (0.20m) at extreme close zoom');
 
       const extremeFar = calculateRibbonDimensions(1, 46.0);
-      assert.equal(extremeFar.widthMeters, 25.0, 'Must clamp to maxWidthMeters (25m) at extreme wide zoom');
+      assert.equal(extremeFar.widthMeters, 1000.0, 'Must clamp to maxWidthMeters (1000m) at extreme wide zoom');
     });
   });
 });

@@ -1571,3 +1571,32 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Aggiunti test di validazione in `tests/ui/logbookView.test.mjs`. Test suite logbook al 100% verde (65/65 test passanti).
   - Registrata la Lezione Appresa #148 in [MEMORY.md](file:///MEMORY.md).
 
+---
+
+## 2026-10-12 - 3D Replay: Rendering Dinamico della Traccia Percorsa Fino all'Istante di Riproduzione
+- **Tipo**: Feature / UI / 3D Graphics / Three.js WebGL / Ergonomia Replay
+- **Dettagli**: [.agents/worklog.d/2026-10-12_dynamic_traveled_track_rendering_up_to_playback_instant.md](file:///.agents/worklog.d/2026-10-12_dynamic_traveled_track_rendering_up_to_playback_instant.md)
+- **Sintesi**:
+  - Implementato il rendering dinamico della traccia di volo 3D in [`MapLibreThreeEngine.js`](file:///ui/3d/MapLibreThreeEngine.js): durante la riproduzione o lo scrubbing, viene visualizzata esclusivamente la porzione di traccia percorsa dal decollo fino all'istante corrente (`currentTimeSec`), lasciando il cielo limpido davanti alla vela anziché mostrare l'intero percorso pre-disegnato.
+  - Utilizzata l'indicizzazione WebGL ad alte prestazioni `BufferGeometry.setDrawRange(0, count)`: zero riallocazioni GPU o instabilità di memoria a 60 FPS.
+  - Implementato l'aggancio continuo del vertice di testa all'avatar (`_updateTraveledTrack`): modifica in-place dei vertici del segmento attivo (`nextIdx`) per connettere la scia direttamente alla posizione 3D interpolata del parapendio, con ripristino istantaneo dei vertici originali (`_restoreRibbonPoint`) in caso di seek avanti/indietro.
+  - Allineati i range di disegno di spina dorsale variometrica e piloni di profondità verso il suolo (`curtainMesh`). A decollo ($p = 0$) la traccia ha draw range a 0 con marker e avatar visibili; all'atterraggio ($p = 1.0$) la traccia è disegnata per intero.
+  - Esposto il contratto headless `getTraveledPoints()` in [`HeadlessReplayEngine.js`](file:///ui/3d/HeadlessReplayEngine.js) per test in puro Node.js.
+  - Aggiunta la sezione 4 di test dedicati in [`tests/ui/replayTakeoffLandingTrackVisibility.test.mjs`](file:///tests/ui/replayTakeoffLandingTrackVisibility.test.mjs) (20/20 test passanti).
+  - Test suite globale al 100% verde: 721 test (125 suite), 720 passanti, 0 falliti, 1 skipped.
+  - Registrata la Lezione Appresa #149 in [MEMORY.md](file:///MEMORY.md).
+
+
+
+---
+
+## 2026-10-12 - 3D Replay: Spessore Invariante a 6px del Nastro Traiettoria su Qualsiasi Livello di Zoom
+- **Tipo**: Refactoring / UI / 3D Graphics / Three.js WebGL / Matematica Geodesica / Ergonomia Outdoor
+- **Dettagli**: [.agents/worklog.d/2026-10-12_constant_6px_screen_invariant_3d_flight_track.md](file:///.agents/worklog.d/2026-10-12_constant_6px_screen_invariant_3d_flight_track.md)
+- **Sintesi**:
+  - Calibrata la dimensione geometrica del nastro volumetrico 3D in [`core/flightReplayMath.js`](file:///core/flightReplayMath.js) (`calculateRibbonDimensions`): adottata la risoluzione al suolo Web Mercator $\text{metersPerPixel} = \frac{40075016.686 \cdot \cos(\phi)}{512 \cdot 2^z}$ e target predefinito `targetPixels = 6.0` con clamp di sicurezza fisica $[0.20\text{m}, 1000\text{m}]$ e rapporto di spessore verticale `heightRatio = 0.6`.
+  - Risolti definitivamente i difetti opposti dell'autostrada sproporzionata (~80px a zoom ravvicinato) e della linea sub-pixel quasi invisibile ($0.15\text{px}$ dovuta a un fattore di scala prospettico errato a $0.13\text{m/px}$).
+  - Aggiunto il listener dinamico dell'evento `'zoom'` della mappa in [`ui/3d/MapLibreThreeEngine.js`](file:///ui/3d/MapLibreThreeEngine.js) (`this.map.on('zoom', this._onMapZoom)`) per aggiornare istantaneamente la geometria del nastro a 60 FPS durante lo zoom continuo da rotella o pinch-to-zoom su smartphone, con soglia differenziale a $> 0.02$ nel loop di rendering per le animazioni di camera.
+  - Aggiornati i test in [`tests/core/flightReplayMath.test.mjs`](file:///tests/core/flightReplayMath.test.mjs), verificando la convergenza rigorosa a 6.0 pixel di spazio-schermo ($|\text{pixels} - 6.0| < 0.05$) su tutto l'arco dei livelli di zoom da 10 a 19.
+  - Test suite globale al 100% verde: 721 test (125 suite), 720 passanti, 0 falliti, 1 skipped.
+  - Registrata la Lezione Appresa #150 in [MEMORY.md](file:///MEMORY.md).
