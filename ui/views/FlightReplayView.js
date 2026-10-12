@@ -40,7 +40,7 @@ export class FlightReplayView {
     this.currentBundle = null;
     this.activeCameraMode = 'chase';
     this.activeSpeed = 1;
-    this.activeLayer = options.mapLayer === 'satellite' ? 'satellite' : 'topo';
+    this.activeLayer = options.mapLayer === 'topo' ? 'topo' : 'satellite';
     this.isPlaying = false;
     this.elevationOffset = 0;
     this.flightEvents = [];
@@ -58,7 +58,7 @@ export class FlightReplayView {
     if (this.engine) return this.engine;
     if (typeof window !== 'undefined' && typeof document !== 'undefined') {
       const state = (store && typeof store.getState === 'function') ? store.getState() : {};
-      const layerId = (this.activeLayer === 'satellite' || state.ui?.mapLayer === 'satellite') ? 'satellite' : 'topo';
+      const layerId = (this.activeLayer === 'topo' || state.ui?.mapLayer === 'topo') ? 'topo' : 'satellite';
       return new MapLibreThreeEngine({ mapLayer: layerId });
     }
     return new HeadlessReplayEngine();
@@ -315,7 +315,7 @@ export class FlightReplayView {
     });
 
     const state = (store && typeof store.getState === 'function') ? store.getState() : {};
-    this.activeLayer = (state.ui?.mapLayer === 'satellite' || this.activeLayer === 'satellite') ? 'satellite' : 'topo';
+    this.activeLayer = (state.ui?.mapLayer === 'topo' || this.activeLayer === 'topo') ? 'topo' : 'satellite';
 
     if (store && typeof store.subscribe === 'function') {
       this._boundStoreListener = store.subscribe(() => {
@@ -712,7 +712,7 @@ export class FlightReplayView {
                 <line x1="19" y1="12" x2="5" y2="12"></line>
                 <polyline points="12 19 5 12 12 5"></polyline>
               </svg>
-              <span>Flight Log</span>
+              <span class="gm-replay-back-text">Flight Log</span>
             </button>
             <div class="gm-replay-flight-meta">
               <h1 class="gm-replay-flight-title" id="replay-flight-title">${escapeHtml(siteTitle)}</h1>
@@ -736,7 +736,7 @@ export class FlightReplayView {
               </button>
             </div>
             <div class="gm-replay-camera-group" role="radiogroup" aria-label="Modalità Telecamera">
-              <button type="button" class="gm-replay-cam-btn ${this.activeCameraMode === 'chase' ? 'gm-active' : ''}" data-camera="chase" aria-pressed="${this.activeCameraMode === 'chase'}">Inseguimento</button>
+              <button type="button" class="gm-replay-cam-btn ${this.activeCameraMode === 'chase' ? 'gm-active' : ''}" data-camera="chase" aria-pressed="${this.activeCameraMode === 'chase'}">Segui</button>
               <button type="button" class="gm-replay-cam-btn ${this.activeCameraMode === 'cockpit' ? 'gm-active' : ''}" data-camera="cockpit" aria-pressed="${this.activeCameraMode === 'cockpit'}">Pilota</button>
               <button type="button" class="gm-replay-cam-btn ${this.activeCameraMode === 'free' ? 'gm-active' : ''}" data-camera="free" aria-pressed="${this.activeCameraMode === 'free'}">Libera</button>
             </div>

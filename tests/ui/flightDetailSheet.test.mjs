@@ -799,6 +799,105 @@ describe('FlightDetailSheet - Telemetry Analysis & Educational Debriefing (UI La
       // Cleanup
       globalThis.window = originalWindow;
     });
+
+    it('should select maneuver phase when clicking or tapping directly on the altimetric chart, and clear on neutral glide space', async () => {
+      const maneuverBundle = {
+        meta: {
+          id: 'fl_maneuvers_chart_test',
+          date: '2026-10-12',
+          takeoffTime: '14:00',
+          landingTime: '14:30',
+          durationMinutes: 30,
+          site: 'Cornizzolo',
+          glider: 'EN-A Safe'
+        },
+        raw: {
+          decimatedPoints: [
+            { timeSeconds: 0, alt: 1000, lat: 45.80, lon: 9.20 },
+            { timeSeconds: 60, alt: 1050, lat: 45.81, lon: 9.21 },
+            { timeSeconds: 120, alt: 1200, lat: 45.82, lon: 9.22 },
+            { timeSeconds: 180, alt: 1350, lat: 45.83, lon: 9.23 },
+            { timeSeconds: 240, alt: 1300, lat: 45.84, lon: 9.24 },
+            { timeSeconds: 300, alt: 1250, lat: 45.85, lon: 9.25 },
+            { timeSeconds: 360, alt: 1200, lat: 45.86, lon: 9.26 },
+            { timeSeconds: 420, alt: 1100, lat: 45.87, lon: 9.27 },
+            { timeSeconds: 480, alt: 900, lat: 45.88, lon: 9.28 },
+            { timeSeconds: 540, alt: 500, lat: 45.89, lon: 9.29 }
+          ]
+        },
+        telemetry: {
+          thermals: [
+            { thermalIndex: 1, startIndex: 1, endIndex: 3, altGain: 300 }
+          ],
+          maneuvers: [
+            { type: 'wingover', startIndex: 6, endIndex: 7, durationSeconds: 20 },
+            { type: 'inversioni', startIndex: 8, endIndex: 8, pendolateCount: 3 }
+          ]
+        }
+      };
+
+      const overlay = createMockElement('flight-detail-overlay');
+      const chartContainer = createMockElement('gm-interactive-chart-container');
+      const mapCanvas = createMockElement('flight-detail-map-canvas');
+      const phaseBadge = createMockElement('gm-flight-map-phase-badge');
+      const resetBtn = createMockElement('btn-flight-map-reset-selection');
+      const layerToggle = createMockElement('flight-detail-map-layer-toggle', [], 'button', { 'data-layer': 'topo' });
+
+      overlay.appendChild(mapCanvas);
+      overlay.appendChild(phaseBadge);
+      overlay.appendChild(resetBtn);
+      overlay.appendChild(layerToggle);
+      overlay.appendChild(chartContainer);
+
+      attachInteractiveFlightChart(overlay, maneuverBundle);
+
+      const mapEngine = getActiveFlightDetailMapEngine();
+      assert.ok(mapEngine, 'Map engine must be initialized');
+
+      // 1. Hover test: over wingover at x = 400 (corresponds to point index 6)
+      chartContainer.dispatchEvent({ type: 'pointermove', clientX: 400 });
+      assert.strictEqual(chartContainer.style.cursor, 'pointer', 'Cursor must be pointer when hovering over a maneuver');
+      assert.ok(chartContainer.title.includes('Wingover'), 'Hover title must prompt to select Wingover');
+
+      // Hover over glide at x = 0 (point index 0, neutral glide)
+      chartContainer.dispatchEvent({ type: 'pointermove', clientX: 0 });
+      assert.strictEqual(chartContainer.style.cursor, 'crosshair', 'Cursor must be crosshair when hovering over neutral glide');
+      assert.strictEqual(chartContainer.title, '', 'Hover title must be empty on neutral space');
+
+      // 2. Tap selection test: tap on wingover at x = 400 (point index 6)
+      chartContainer.dispatchEvent({ type: 'pointerdown', clientX: 400, clientY: 100, pointerId: 1 });
+      chartContainer.dispatchEvent({ type: 'pointerup', clientX: 400, clientY: 100, pointerId: 1 });
+
+      assert.ok(mapEngine.highlightedRange, 'Map engine must highlight range');
+      assert.strictEqual(mapEngine.highlightedRange.startIndex, 6);
+      assert.strictEqual(mapEngine.highlightedRange.endIndex, 7);
+      assert.strictEqual(mapEngine.highlightedRange.options.label, 'Wingover');
+      assert.strictEqual(mapEngine.isTrimmedToPhase, true);
+      assert.strictEqual(phaseBadge.textContent, 'Wingover');
+      assert.strictEqual(phaseBadge.style.display, 'inline-flex');
+      assert.strictEqual(resetBtn.style.display, 'inline-flex');
+
+      // 3. Click outside maneuvers on neutral glide space (x = 0) -> clears selection
+      // Wait for debounce guard
+      await new Promise((r) => setTimeout(r, 260));
+      chartContainer.dispatchEvent({ type: 'pointerdown', clientX: 0, clientY: 100, pointerId: 1 });
+      chartContainer.dispatchEvent({ type: 'pointerup', clientX: 0, clientY: 100, pointerId: 1 });
+
+      assert.strictEqual(mapEngine.highlightedRange, null, 'Highlighted range must be cleared when tapping neutral glide space');
+      assert.strictEqual(phaseBadge.textContent, '');
+      assert.strictEqual(phaseBadge.style.display, 'none');
+      assert.strictEqual(resetBtn.style.display, 'none');
+
+      // 4. Drag test: moving > 6px must NOT select phase
+      await new Promise((r) => setTimeout(r, 260));
+      chartContainer.dispatchEvent({ type: 'pointerdown', clientX: 400, clientY: 100, pointerId: 1 });
+      chartContainer.dispatchEvent({ type: 'pointermove', clientX: 430, clientY: 100, pointerId: 1 }); // delta = 30px
+      chartContainer.dispatchEvent({ type: 'pointerup', clientX: 430, clientY: 100, pointerId: 1 });
+
+      assert.strictEqual(mapEngine.highlightedRange, null, 'Drag action must NOT trigger phase selection');
+
+      closeFlightDetailView();
+    });
   });
 
   describe('Personal Career Records Badges in Flight Detail', () => {

@@ -1450,3 +1450,34 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Test suite globale al 100% verde: 705 test (123 suite), 704 passanti, 0 falliti, 1 skipped.
   - Registrata la Lezione Appresa #139 in [MEMORY.md](file:///MEMORY.md).
 
+---
+
+## 2026-10-12 - UI / Telemetria: Selezione Fasi di Volo e Manovre tramite Puntamento Diretto su Grafico Altimetrico
+- **Tipo**: Feature / Ergonomia Outdoor / Telemetria / Grafico SVG & Mappa 2D
+- **Dettagli**: [.agents/worklog.d/2026-10-12_chart_point_maneuver_selection.md](file:///.agents/worklog.d/2026-10-12_chart_point_maneuver_selection.md)
+- **Sintesi**:
+  - Implementata la selezione reattiva delle fasi di volo (termiche, manovre dinamiche, inversioni di rollio, sondaggi 360°) tramite puntamento, tap o click diretto su qualsiasi punto della colonna temporale del grafico altimetrico SVG in `FlightDetailSheet.js`.
+  - Disattivata l'intercettazione dei pointer events sul layer decorativo dell'area sfumata sottostante la quota (`<polygon ... fill="url(#...-area)" pointer-events="none" />`), consentendo ai marker di manovra e al contenitore del grafico di ricevere gli eventi utente.
+  - Introdotto il risolutore basato su coordinate `findPhaseAtPoint(pointIndex)` che associa le coordinate del cursore ai metadati di manovra (`dynamicManeuvers`, `thermals`, `thermalProbes`) con fallback temporale e tolleranza di tocco per manovre brevi.
+  - Implementato il disaccoppiamento deterministico tra gesto di trascinamento (>6px, destinato al pan/scrubbing dello zoom) e tocco discreto (<6px, <500ms, destinato alla selezione di fase) nel gestore eventi unificato `chartContainer`.
+  - Integrata la deselezione automatica su tocco di spazio neutro di planata (`clearPhaseSelection()`) con ripristino istantaneo di zoom e mappa globale.
+  - Aggiunto feedback visivo reattivo all'hover con cambio del cursore a `pointer` e tooltip contestuale ("Tocca per selezionare [Manovra]").
+  - Aggiunti test completi di integrazione in `tests/ui/flightDetailSheet.test.mjs`.
+  - Test suite globale al 100% verde: 706 test (123 suite), 705 passanti, 0 falliti, 1 skipped.
+  - Registrata la Lezione Appresa #140 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-12 - 3D Replay / UI: Traiettoria 3D Slanciata, Basemap Satellitare Predefinita & Riprogettazione Scrubber Altimetrico
+- **Tipo**: Refactoring / UI / Ergonomia Mobile / 3D Replay / Telemetria
+- **Dettagli**: [.agents/worklog.d/2026-10-12_slender_3d_track_ribbon_satellite_default_telemetry_chart_redesign.md](file:///.agents/worklog.d/2026-10-12_slender_3d_track_ribbon_satellite_default_telemetry_chart_redesign.md)
+- **Sintesi**:
+  - Calibrato il dimensionamento volumetrico della traccia in `core/flightReplayMath.js` (`calculateRibbonDimensions`): impostato `minWidthMeters = 0.35`, `maxWidthMeters = 1.2`, `targetPixels = 1.8`, `heightRatio = 0.5`. In vista ravvicinata e inseguimento la traccia scende fino a 35cm (contro i precedenti 23m-46m), posizionandosi perfettamente al di sotto dell'imbrago senza mai coprire la calotta (10.5m) o il fascio funicolare.
+  - Impostata la basemap predefinita a `satellite` (Esri World Imagery) in `MapLibreThreeEngine.js` e `FlightReplayView.js`, eliminando la distorsione di etichette e curve di livello 2D sul rilievo montuoso DEM.
+  - Risolta la collisione nella top bar su dispositivi mobili: il pulsante back comprime l'etichetta testuale (`.gm-replay-back-text { display: none }`), le etichette delle telecamere sono state concisamente abbreviate in "Segui", "Pilota", "Libera" (risparmiando >80px), e il titolo/sottotitolo del volo è stato protetto con overflow ed ellipsis.
+  - Isolato il layout a schermo intero: aggiunta la regola `#main-view:has(.gm-flight-replay-fullscreen)` per azzerare padding e `#app-root:has(.gm-flight-replay-fullscreen)` per nascondere `#bottom-nav-bar` e `#desktop-nav-bar`.
+  - Riprogettato lo scrubber altimetrico 2D in `ui/3d/ReplayTelemetryCanvas.js`: sostituite le sbarre verticali a tutta altezza con micro-tacche sul bordo inferiore, aggiunte linee di quota tratteggiate tenui a 33% e 66%, etichette quota minima e massima, riempimento sfumato ciano trasparente, curva continua smussata e ago verticale da 1.5px con cursore a cerchi concentrici (bullseye).
+  - Test suite globale al 100% verde: 706 test (123 suite), 705 passanti, 0 falliti, 1 skipped.
+  - Registrata la Lezione Appresa #142 in [MEMORY.md](file:///MEMORY.md).
+
+

@@ -191,8 +191,8 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
       this.container.appendChild(mapContainer);
 
       const isLight = document.documentElement && document.documentElement.getAttribute('data-theme') === 'light';
-      const activeLayerKey = this.options.mapLayer || (isLight ? 'topo' : 'dark');
-      const baseConfig = BASEMAP_LAYERS_3D[activeLayerKey] || (isLight ? BASEMAP_LAYERS_3D.topo : BASEMAP_LAYERS_3D.dark);
+      const activeLayerKey = this.options.mapLayer || 'satellite';
+      const baseConfig = BASEMAP_LAYERS_3D[activeLayerKey] || BASEMAP_LAYERS_3D.satellite;
 
       const defaultStyle = {
         version: 8,
@@ -833,7 +833,7 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     const mat = new THREE.LineBasicMaterial({
       vertexColors: true,
       transparent: true,
-      opacity: 0.40,
+      opacity: 0.25,
       depthTest: true,
       polygonOffset: true,
       polygonOffsetFactor: -1.0,

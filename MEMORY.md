@@ -1828,8 +1828,77 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
        - $0\%$: Grigio neutro attenuato (`rgba(148, 163, 184, 0.12)`).
      - La cella dell'ora attiva selezionata dallo scrubber riceve un contorno di evidenziazione (`stroke="var(--gm-accent)" stroke-width="1.6"`).
      - Il cursore orario verticale si prolunga attraverso la striscia heatmap per mantenere perfetta continuità temporale.
-  3. **Typography & Layout Guard**:
-     - Impostare la larghezza del side panel `.gm-trend-side-panel` ad almeno `98px` (padding `10px 6px 8px 8px`).
-     - Applicare `font-size: 0.62rem`, `letter-spacing: 0.02em` e `text-overflow: ellipsis` a `.gm-trend-side-label`.
+---
+
+## 140. Selezione Fasi di Volo e Manovre Tramite Puntamento Diretto su Grafico Altimetrico: Risoluzione di Layering SVG e Disaccoppiamento Gesto Tap vs Dragging
+- **Problema**:
+  1. Facendo clic o toccando direttamente sul profilo altimetrico in corrispondenza di una termica o manovra dinamica (es. wingover, spirale, inversione di rollio, test 360°), la fase di volo non veniva selezionata; la selezione funzionava solo cliccando sulle card sottostanti al grafico.
+  2. Il layer SVG dell'area sfumata sottostante la quota (`<polygon ... fill="url(#...-area)">`) intercettava tutti gli eventi di puntamento (`pointerdown`, `click`), impedendo ai gruppi grafici degli eventi sottostanti (`<g class="gm-chart-thermal-band">`, `.gm-chart-maneuver-marker`) di ricevere l'evento click.
+  3. L'affidamento esclusivo a `e.target.closest('[data-phase-type]')` causava frequenti fallimenti di intercettazione quando l'utente toccava la curva della quota, una linea di griglia o lo spazio vuoto all'interno della colonna temporale della manovra.
+  4. L'assenza di differenziazione tra trascinamento (pan dello zoom) e tocco discreto (selezione) generava conflitti di interazione.
+- **Causa Radice**:
+  1. Sovrapposizione geometrica nel DOM SVG priva di `pointer-events="none"` sul poligono dell'area di quota.
+  2. Mancanza di un risolutore coordinate-based (`findPhaseAtPoint(pointIndex)`) che correla la coordinata X del puntatore (`clientX`) all'indice del trackpoint del volo, verificando l'appartenenza all'intervallo temporale/indice di tutte le manovre (termiche, inversioni, manovre dinamiche, sondaggi).
+- **Pattern Vincolante**:
+  1. **Disattivazione Pointer Events su Layer Decorativi**: Assegnare tassativamente `pointer-events="none"` a riempimenti d'area SVG (`polygon`), reticoli di sfondo e linee di griglia che si estendono sopra le fasce temporali.
+  2. **Risoluzione di Fase Basata su Coordinate (`findPhaseAtPoint`)**:
+     - Calcolare la coordinata normalizzata X del tocco sul grafico: $\text{relX} = \text{clamp}(0, 1, \frac{X - \text{rect.left}}{\text{rect.width}})$.
+     - Mappare su indice del punto visibile tenendo conto della finestra attiva di zoom e pan.
+     - Scansionare l'indice risultante contro i metadati di manovra (`dynamicManeuvers`, `thermals`, `thermalProbes`) con fallback robusto su matching temporale (`timeSeconds`) e tolleranza di tocco per manovre brevi ($\pm 2$ campioni).
+  3. **Disaccoppiamento Rigido Gesto Tap vs Drag Pan (Laws of UX / Fitts's Law)**:
+     - Durante `pointerdown`, memorizzare posizione iniziale (`startX`, `startY`) e timestamp (`pointerDownTime`).
+     - Durante `pointermove`, se la distanza euclidea o orizzontale supera 6px (`Math.abs(deltaX) > 6`), marcare l'interazione come trascinamento (`hasDragged = true`) ed eseguire esclusivamente pan/scrubbing.
+     - In `pointerup` (o `click`), scatenare la selezione della fase `selectPhase(matched)` solo se `!hasDragged && elapsed < 500ms`.
+  4. **Feedback Visivo Reattivo all'Hover**: Al passaggio del mouse (`!isPointerDown`), se il punto corrisponde a una fase, impostare `chartContainer.style.cursor = 'pointer'` con tooltip informativo ("Tocca per selezionare [Manovra]"); su segmenti neutri di planata impostare `cursor = 'crosshair'`.
+  5. **Deselezione su Spazio Neutro di Planata**: Un tocco su una porzione di planata priva di manovre mentre è attiva una fase deseleziona la fase (`clearPhaseSelection()`), ripristinando istantaneamente zoom/pan a 1.0x e centrando la mappa globale.
+
+---
+
+## 141. Icone Flottanti Cartografiche Bianco Assoluto su Sfumatura Radiale Nera (Uniform High-Contrast Scrim)
+- **Problema**: L'adattamento cromatico dei controlli flottanti su mappa (pulsanti layer, mirino di centratura, espansione mini-mappa) in modalità topo o tema chiaro — con icone scure #0f172a su sfumatura radiale bianca rgba(255, 255, 255, 0.75) — generava scarso contrasto percepito e dissonanza visiva rispetto al layout aeronautico, specialmente in presenza di rilievi chiari, roccia, neve o curve di livello fitte.
+- **Causa Radice**: La cartografia orografica all'aperto presenta variazioni estreme di luminanza locale (pendii soleggiati vs valli in ombra, neve, ortofoto). Una sfumatura chiara con icone scure perde leggibilità quando sovrapposta a sfondi misti o ad alta frequenza visiva.
+- **Pattern Vincolante**:
+  1. **Iconografia Bianca Pura Uniforme (`#ffffff` / `stroke="currentColor"`)**: Tutte le icone dei controlli flottanti su mappa (`.gm-map-layer-toggle`, `.gm-replay-layer-toggle`, `.gm-aim-menu-trigger`, `.gm-mini-map-layer-toggle`, `.gm-mini-map-expand-btn`) devono essere rigorosamente bianche (`color: #ffffff !important; stroke: currentColor;`), indipendentemente dal layer attivo (topo, satellite, streets) o dal tema dell'app (`[data-theme="light"]` o dark).
+  2. **Sfumatura Radiale Nera Profonda a Dissolvenza Perimetrale Totale**:
+     - Centro opaco al 70%: `rgba(0, 0, 0, 0.70)` a 0%
+     - Decadimento continuo: `rgba(0, 0, 0, 0.40)` a 40%, `rgba(0, 0, 0, 0.10)` a 70%
+     - Dissolvenza al 100% sul bordo: `transparent 95%`.
+     - Zero bordi rigidi (`border: none !important`), zero ombre esterne e zero `backdrop-filter` per evitare artefatti a disco di sfocatura ritagliato.
+  3. **Adattamento Geometrico della Sfumatura**: Cerchio perfetto (`circle at center`) per controlli simmetrici quadrati/tondi; ellisse orizzontale (`ellipse at center`) per controlli asimmetrici o rettangolari a pillola come il mirino con freccia (`.gm-aim-menu-trigger`).
+
+---
+
+## 142. Traiettoria 3D Slanciata (Anti-Inglobamento Parapendio), Basemap Satellitare Predefinita & Design Rigoroso del Grafico Scrubber Altimetrico
+- **Problema**:
+  1. La traccia 3D nel replay volumetrico risultava eccessivamente larga (23m-46m a zoom 12-14), inglobando completamente il parapendio (apertura alare 10.5m, imbrago 0.5m) e coprendo pilota e linee in vista ravvicinata ed inseguimento.
+  2. Lo sfondo della vista 3D risultava visivamente sgradevole ("sputtanato") a causa del default su OpenTopoMap, le cui etichette e quote 2D venivano stirate e deformate sul terreno 3D DEM, e a causa dei padding residui di `#main-view` e delle barre di navigazione dell'app visibili.
+  3. Nella barra superiore, il titolo e sottotitolo del volo entravano in collisione geometrica con il selettore layer e il gruppo telecamere (`Inseguimento | Pilota | Libera`), finendo renderizzati al di sotto dei controlli su viewport mobile (360-390px).
+  4. Il grafico altimetrico dello scrubber (`ReplayTelemetryCanvas`) appariva disordinato e carico di rumore visivo a causa di decine di barre verticali colorate a tutta altezza (64px) che attraversavano la curva della quota come sbarre.
+- **Causa Radice**:
+  1. Default di `calculateRibbonDimensions` con `targetPixels = 3.5` e tetto di clamp a 400m, che dimensionava la traccia per visibilità macroscopica autostradale anziché come spina dorsale aerodinamica compatibile con le proporzioni dell'ala.
+  2. Mancanza di impostazione esplicita della basemap predefinita su `'satellite'` in 3D Replay, e assenza di regole CSS `#main-view:has(.gm-flight-replay-fullscreen)` per disattivare padding e nascondere `#bottom-nav-bar` e `#desktop-nav-bar`.
+  3. Etichetta estesa del pulsante back ("Flight Log", ~110px) e delle telecamere ("Inseguimento", 12 caratteri, ~105px) che saturavano la riga orizzontale su schermi $\le 390\text{px}$.
+  4. Generazione degli eventi milestone (`_renderEventMarkers`) con `position: absolute; top: 0; bottom: 0; width: 3px`, tagliando il grafico cartesiano dall'alto in basso.
+- **Pattern Vincolante**:
+  1. **Nastro 3D Slanciato (`calculateRibbonDimensions`)**:
+     - Parametri di default rigidamente controllati: `minWidthMeters = 0.35`, `maxWidthMeters = 1.2`, `targetPixels = 1.8`, `heightRatio = 0.5`.
+     - In vista ravvicinata e cockpit la larghezza scende dinamicamente fino a 35cm, posizionandosi perfettamente al di sotto dell'imbrago senza mai coprire la calotta (10.5m) o il fascio funicolare.
+     - Opacità del drop curtain verso il terreno DEM ridotta a 0.25 con colorazione FAI, garantendo percezione di quota senza appesantire la scena.
+  2. **Basemap Satellitare Predefinita (Esri World Imagery)**:
+     - `MapLibreThreeEngine` e `FlightReplayView` inizializzano per default `activeLayer = 'satellite'`. Le ortofoto aeree non contengono testi 2D deformabili dal DEM a forte inclinazione (60°-75° pitch).
+     - `#main-view:has(.gm-flight-replay-fullscreen)` imposta `padding: 0; max-width: 100%; overflow: hidden;`.
+     - `#app-root:has(.gm-flight-replay-fullscreen)` nasconde completamente `#bottom-nav-bar` e `#desktop-nav-bar` (`display: none !important`).
+  3. **Top Bar Responsive & Anti-Collisione**:
+     - Altezza dinamica: `min-height: 56px; height: calc(56px + env(safe-area-inset-top, 0px))`.
+     - Su schermi $\le 640\text{px}$, il pulsante back nasconde l'etichetta testuale (`.gm-replay-back-text { display: none }`) trasformandosi in un touch target compatto 48x48px centrato sull'icona.
+     - Etichette telecamera concise: "Segui", "Pilota", "Libera" (risparmio di oltre 80px orizzontali).
+     - Titolo e sottotitolo con `flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis;`.
+  4. **Grafico Altimetrico Scrubber Ridisegnato**:
+     - Marcatori di eventi convertiti in micro-tacche sul bordo inferiore: `bottom: 0; height: 6px; width: 4px; border-radius: 2px 2px 0 0; opacity: 0.85`.
+     - Griglia orizzontale di riferimento tratteggiata e tenue (a 33% e 66% della quota relativa).
+     - Etichette filigrana di quota minima e massima in monospace discreto (`rgba(148, 163, 184, 0.40)`).
+     - Riempimento d'area sfumato ciano trasparente (`rgba(56, 189, 248, 0.22)` a `0.01`).
+     - Ago scrubber verticale sottile da 1.5px con indicatore concentrico (bullseye ciano/bianco) posizionato esattamente sulla quota istantanea.
+     - Barra delle fasi superiore assottigliata a 3px con angoli arrotondati.
 
 

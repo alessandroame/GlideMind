@@ -393,17 +393,17 @@ export function projectTrackToThreeLocal(points, origin = null, { relativeAltitu
  * @param {number} zoom Current map zoom level (e.g. 10 - 20)
  * @param {number} [latitude=46.0] Geographic latitude for Web Mercator scale distortion
  * @param {object} [options]
- * @param {number} [options.targetPixels=3.5] Target visual thickness on screen in pixels
- * @param {number} [options.minWidthMeters=1.0] Minimum physical width clamp in meters (close-up)
- * @param {number} [options.maxWidthMeters=400.0] Maximum physical width clamp in meters (overview)
- * @param {number} [options.heightRatio=0.65] Ratio of vertical thickness to horizontal width
+ * @param {number} [options.targetPixels=1.8] Target visual thickness on screen in pixels
+ * @param {number} [options.minWidthMeters=0.35] Minimum physical width clamp in meters (close-up)
+ * @param {number} [options.maxWidthMeters=1.2] Maximum physical width clamp in meters (overview)
+ * @param {number} [options.heightRatio=0.5] Ratio of vertical thickness to horizontal width
  * @returns {{ widthMeters: number, heightMeters: number, halfWidth: number, halfHeight: number, metersPerPixel: number }}
  */
 export function calculateRibbonDimensions(zoom, latitude = 46.0, options = {}) {
-  const targetPixels = options.targetPixels ?? 3.5;
-  const minWidth = options.minWidthMeters ?? 1.0;
-  const maxWidth = options.maxWidthMeters ?? 400.0;
-  const heightRatio = options.heightRatio ?? 0.65;
+  const targetPixels = options.targetPixels ?? 1.8;
+  const minWidth = options.minWidthMeters ?? 0.35;
+  const maxWidth = options.maxWidthMeters ?? 1.2;
+  const heightRatio = options.heightRatio ?? 0.5;
 
   const latRad = ((Number(latitude) || 46.0) * Math.PI) / 180;
   const cosLat = Math.max(0.1, Math.cos(latRad));

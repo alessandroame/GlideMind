@@ -260,7 +260,9 @@ button, input, select, textarea {
 #main-view.gm-view-forecast,
 #main-view:has(.gm-forecast-view),
 #main-view.gm-view-map,
-#main-view:has(.gm-map-view) {
+#main-view:has(.gm-map-view),
+#main-view.gm-view-replay,
+#main-view:has(.gm-flight-replay-fullscreen) {
   padding: 0;
   overflow: hidden;
 }
@@ -276,10 +278,17 @@ button, input, select, textarea {
   #main-view.gm-view-forecast,
   #main-view:has(.gm-forecast-view),
   #main-view.gm-view-map,
-  #main-view:has(.gm-map-view) {
+  #main-view:has(.gm-map-view),
+  #main-view.gm-view-replay,
+  #main-view:has(.gm-flight-replay-fullscreen) {
     padding: 0;
     max-width: 100%;
   }
+}
+
+#app-root:has(.gm-flight-replay-fullscreen) #bottom-nav-bar,
+#app-root:has(.gm-flight-replay-fullscreen) #desktop-nav-bar {
+  display: none !important;
 }
 
 /* -------------------------------------------------------------
@@ -5527,12 +5536,12 @@ input.gm-input:focus {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(circle at center, rgba(15, 23, 42, 0.65) 0%, rgba(15, 23, 42, 0.35) 40%, rgba(15, 23, 42, 0.08) 70%, transparent 95%);
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.70) 0%, rgba(0, 0, 0, 0.40) 40%, rgba(0, 0, 0, 0.10) 70%, transparent 95%) !important;
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
-  color: #f8fafc;
+  color: #ffffff !important;
   border: none !important;
-  border-radius: 50%;
+  border-radius: 50% !important;
   box-shadow: none !important;
   outline: none;
   cursor: pointer;
@@ -5553,10 +5562,12 @@ input.gm-input:focus {
 
 .gm-mini-map-layer-toggle:hover {
   transform: scale(1.08);
-  background: radial-gradient(circle at center, rgba(15, 23, 42, 0.80) 0%, rgba(15, 23, 42, 0.45) 40%, rgba(15, 23, 42, 0.12) 70%, transparent 95%);
-  color: var(--gm-accent, #38bdf8);
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.50) 40%, rgba(0, 0, 0, 0.15) 70%, transparent 95%) !important;
+  color: #ffffff !important;
   border: none !important;
   box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 .gm-mini-map-layer-toggle:active {
@@ -5578,13 +5589,13 @@ input.gm-input:focus {
   min-width: 32px;
   min-height: 32px;
   padding: 0;
-  border-radius: 50%;
+  border-radius: 50% !important;
   border: none !important;
-  background: radial-gradient(circle at center, rgba(15, 23, 42, 0.65) 0%, rgba(15, 23, 42, 0.35) 40%, rgba(15, 23, 42, 0.08) 70%, transparent 95%);
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.70) 0%, rgba(0, 0, 0, 0.40) 40%, rgba(0, 0, 0, 0.10) 70%, transparent 95%) !important;
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
   box-shadow: none !important;
-  color: #f8fafc;
+  color: #ffffff !important;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -5608,10 +5619,12 @@ input.gm-input:focus {
 
 .gm-mini-map-expand-btn:hover {
   transform: scale(1.08);
-  background: radial-gradient(circle at center, rgba(15, 23, 42, 0.80) 0%, rgba(15, 23, 42, 0.45) 40%, rgba(15, 23, 42, 0.12) 70%, transparent 95%);
-  color: var(--gm-accent, #38bdf8);
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.50) 40%, rgba(0, 0, 0, 0.15) 70%, transparent 95%) !important;
+  color: #ffffff !important;
   border: none !important;
   box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 .gm-mini-map-expand-btn:active {
@@ -5638,12 +5651,12 @@ input.gm-input:focus {
 .gm-mini-map-box[data-map-layer="topo"] .gm-mini-map-expand-btn,
 .gm-mini-map-box[data-map-layer="streets"] .gm-mini-map-layer-toggle,
 .gm-mini-map-box[data-map-layer="streets"] .gm-mini-map-expand-btn {
-  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.40) 40%, rgba(255, 255, 255, 0.10) 70%, transparent 95%) !important;
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.70) 0%, rgba(0, 0, 0, 0.40) 40%, rgba(0, 0, 0, 0.10) 70%, transparent 95%) !important;
   border: none !important;
   box-shadow: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  color: #0f172a !important;
+  color: #ffffff !important;
 }
 
 .gm-mini-map-box[data-map-layer="topo"] .gm-mini-map-layer-select:hover,
@@ -5660,8 +5673,8 @@ input.gm-input:focus {
 .gm-mini-map-box[data-map-layer="topo"] .gm-mini-map-expand-btn:hover,
 .gm-mini-map-box[data-map-layer="streets"] .gm-mini-map-layer-toggle:hover,
 .gm-mini-map-box[data-map-layer="streets"] .gm-mini-map-expand-btn:hover {
-  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.90) 0%, rgba(255, 255, 255, 0.50) 40%, rgba(255, 255, 255, 0.15) 70%, transparent 95%) !important;
-  color: #0284c7 !important;
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.50) 40%, rgba(0, 0, 0, 0.15) 70%, transparent 95%) !important;
+  color: #ffffff !important;
   border: none !important;
   box-shadow: none !important;
   backdrop-filter: none !important;
@@ -5689,12 +5702,12 @@ input.gm-input:focus {
 .gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-expand-btn,
 .gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-layer-toggle,
 .gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-expand-btn {
-  background: radial-gradient(circle at center, rgba(15, 23, 42, 0.65) 0%, rgba(15, 23, 42, 0.35) 40%, rgba(15, 23, 42, 0.08) 70%, transparent 95%) !important;
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.70) 0%, rgba(0, 0, 0, 0.40) 40%, rgba(0, 0, 0, 0.10) 70%, transparent 95%) !important;
   border: none !important;
   box-shadow: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  color: #f8fafc !important;
+  color: #ffffff !important;
 }
 
 .gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-layer-select:hover,
@@ -5711,8 +5724,8 @@ input.gm-input:focus {
 .gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-expand-btn:hover,
 .gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-layer-toggle:hover,
 .gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-expand-btn:hover {
-  background: radial-gradient(circle at center, rgba(15, 23, 42, 0.80) 0%, rgba(15, 23, 42, 0.45) 40%, rgba(15, 23, 42, 0.12) 70%, transparent 95%) !important;
-  color: #38bdf8 !important;
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.50) 40%, rgba(0, 0, 0, 0.15) 70%, transparent 95%) !important;
+  color: #ffffff !important;
   border: none !important;
   box-shadow: none !important;
   backdrop-filter: none !important;
@@ -5839,18 +5852,18 @@ input.gm-input:focus {
 
 [data-theme="light"] .gm-mini-map-expand-btn,
 [data-theme="light"] .gm-mini-map-layer-toggle {
-  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.40) 40%, rgba(255, 255, 255, 0.10) 70%, transparent 95%) !important;
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.70) 0%, rgba(0, 0, 0, 0.40) 40%, rgba(0, 0, 0, 0.10) 70%, transparent 95%) !important;
   border: none !important;
   box-shadow: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  color: #0f172a !important;
+  color: #ffffff !important;
 }
 
 [data-theme="light"] .gm-mini-map-expand-btn:hover,
 [data-theme="light"] .gm-mini-map-layer-toggle:hover {
-  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.90) 0%, rgba(255, 255, 255, 0.50) 40%, rgba(255, 255, 255, 0.15) 70%, transparent 95%) !important;
-  color: #0284c7 !important;
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.50) 40%, rgba(0, 0, 0, 0.15) 70%, transparent 95%) !important;
+  color: #ffffff !important;
   border: none !important;
   box-shadow: none !important;
   backdrop-filter: none !important;
@@ -5882,20 +5895,20 @@ input.gm-input:focus {
 [data-theme="light"] .gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-expand-btn,
 [data-theme="light"] .gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-layer-toggle,
 [data-theme="light"] .gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-expand-btn {
-  background: radial-gradient(circle at center, rgba(15, 23, 42, 0.65) 0%, rgba(15, 23, 42, 0.35) 40%, rgba(15, 23, 42, 0.08) 70%, transparent 95%) !important;
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.70) 0%, rgba(0, 0, 0, 0.40) 40%, rgba(0, 0, 0, 0.10) 70%, transparent 95%) !important;
   border: none !important;
   box-shadow: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  color: #f8fafc !important;
+  color: #ffffff !important;
 }
 
 [data-theme="light"] .gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-layer-toggle:hover,
 [data-theme="light"] .gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-expand-btn:hover,
 [data-theme="light"] .gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-layer-toggle:hover,
 [data-theme="light"] .gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-expand-btn:hover {
-  background: radial-gradient(circle at center, rgba(15, 23, 42, 0.80) 0%, rgba(15, 23, 42, 0.45) 40%, rgba(15, 23, 42, 0.12) 70%, transparent 95%) !important;
-  color: #38bdf8 !important;
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.50) 40%, rgba(0, 0, 0, 0.15) 70%, transparent 95%) !important;
+  color: #ffffff !important;
   border: none !important;
   box-shadow: none !important;
   backdrop-filter: none !important;
@@ -6205,11 +6218,11 @@ input.gm-input:focus {
   border-radius: 50% !important;
   border: none !important;
   outline: none;
-  background: radial-gradient(circle at center, rgba(15, 23, 42, 0.65) 0%, rgba(15, 23, 42, 0.35) 40%, rgba(15, 23, 42, 0.08) 70%, transparent 95%) !important;
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.70) 0%, rgba(0, 0, 0, 0.40) 40%, rgba(0, 0, 0, 0.10) 70%, transparent 95%) !important;
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
   box-shadow: none !important;
-  color: #f8fafc;
+  color: #ffffff !important;
   cursor: pointer;
   transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
@@ -6229,53 +6242,33 @@ input.gm-input:focus {
 
 .gm-map-layer-toggle[data-layer="topo"],
 .gm-replay-layer-toggle[data-layer="topo"],
+.gm-map-layer-toggle[data-layer="satellite"],
+.gm-replay-layer-toggle[data-layer="satellite"],
 [data-theme="light"] .gm-map-layer-toggle,
 [data-theme="light"] .gm-replay-layer-toggle,
 [data-theme="light"] .gm-map-ctrl-btn.gm-map-layer-toggle,
 [data-theme="light"] .gm-flight-analysis-ctrl-btn.gm-map-layer-toggle {
-  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.40) 40%, rgba(255, 255, 255, 0.10) 70%, transparent 95%) !important;
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.70) 0%, rgba(0, 0, 0, 0.40) 40%, rgba(0, 0, 0, 0.10) 70%, transparent 95%) !important;
   border: none !important;
   box-shadow: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  color: #0f172a !important;
-}
-
-.gm-map-layer-toggle[data-layer="satellite"],
-.gm-replay-layer-toggle[data-layer="satellite"] {
-  background: radial-gradient(circle at center, rgba(15, 23, 42, 0.65) 0%, rgba(15, 23, 42, 0.35) 40%, rgba(15, 23, 42, 0.08) 70%, transparent 95%) !important;
-  border: none !important;
-  box-shadow: none !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  color: #f8fafc !important;
+  color: #ffffff !important;
 }
 
 .gm-map-layer-toggle:hover,
-.gm-replay-layer-toggle:hover {
-  transform: scale(1.08);
-  border: none !important;
-  box-shadow: none !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-}
-
+.gm-replay-layer-toggle:hover,
 .gm-map-layer-toggle[data-layer="topo"]:hover,
 .gm-replay-layer-toggle[data-layer="topo"]:hover,
-[data-theme="light"] .gm-map-layer-toggle:hover,
-[data-theme="light"] .gm-replay-layer-toggle:hover {
-  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.90) 0%, rgba(255, 255, 255, 0.50) 40%, rgba(255, 255, 255, 0.15) 70%, transparent 95%) !important;
-  color: #0284c7 !important;
-  border: none !important;
-  box-shadow: none !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-}
-
 .gm-map-layer-toggle[data-layer="satellite"]:hover,
-.gm-replay-layer-toggle[data-layer="satellite"]:hover {
-  background: radial-gradient(circle at center, rgba(15, 23, 42, 0.80) 0%, rgba(15, 23, 42, 0.45) 40%, rgba(15, 23, 42, 0.12) 70%, transparent 95%) !important;
-  color: #38bdf8 !important;
+.gm-replay-layer-toggle[data-layer="satellite"]:hover,
+[data-theme="light"] .gm-map-layer-toggle:hover,
+[data-theme="light"] .gm-replay-layer-toggle:hover,
+[data-theme="light"] .gm-map-ctrl-btn.gm-map-layer-toggle:hover,
+[data-theme="light"] .gm-flight-analysis-ctrl-btn.gm-map-layer-toggle:hover {
+  transform: scale(1.08);
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.50) 40%, rgba(0, 0, 0, 0.15) 70%, transparent 95%) !important;
+  color: #ffffff !important;
   border: none !important;
   box-shadow: none !important;
   backdrop-filter: none !important;
@@ -6331,11 +6324,11 @@ input.gm-input:focus {
   border-radius: var(--gm-radius-full, 9999px) !important;
   border: none !important;
   outline: none;
-  background: radial-gradient(ellipse at center, rgba(15, 23, 42, 0.65) 0%, rgba(15, 23, 42, 0.35) 40%, rgba(15, 23, 42, 0.08) 70%, transparent 95%) !important;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.70) 0%, rgba(0, 0, 0, 0.40) 40%, rgba(0, 0, 0, 0.10) 70%, transparent 95%) !important;
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
   box-shadow: none !important;
-  color: #f8fafc;
+  color: #ffffff !important;
   cursor: pointer;
   transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
@@ -6354,46 +6347,31 @@ input.gm-input:focus {
 }
 
 .gm-aim-menu-trigger[data-layer="topo"],
+.gm-aim-menu-trigger[data-layer="satellite"],
 [data-theme="light"] .gm-aim-menu-trigger,
 [data-theme="light"] .gm-map-ctrl-btn.gm-aim-menu-trigger,
 [data-theme="light"] .gm-flight-analysis-ctrl-btn.gm-aim-menu-trigger {
-  background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.40) 40%, rgba(255, 255, 255, 0.10) 70%, transparent 95%) !important;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.70) 0%, rgba(0, 0, 0, 0.40) 40%, rgba(0, 0, 0, 0.10) 70%, transparent 95%) !important;
   border: none !important;
   box-shadow: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  color: #0f172a !important;
+  color: #ffffff !important;
 }
 
-.gm-aim-menu-trigger[data-layer="satellite"] {
-  background: radial-gradient(ellipse at center, rgba(15, 23, 42, 0.65) 0%, rgba(15, 23, 42, 0.35) 40%, rgba(15, 23, 42, 0.08) 70%, transparent 95%) !important;
-  border: none !important;
-  box-shadow: none !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  color: #f8fafc !important;
-}
-
-.gm-aim-menu-trigger:hover {
-  transform: scale(1.08);
-  border: none !important;
-  box-shadow: none !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-}
-
+.gm-aim-menu-trigger:hover,
 .gm-aim-menu-trigger[data-layer="topo"]:hover,
+.gm-aim-menu-trigger[data-layer="satellite"]:hover,
 [data-theme="light"] .gm-aim-menu-trigger:hover,
-[data-theme="light"] .gm-map-ctrl-btn.gm-aim-menu-trigger:hover {
-  background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.90) 0%, rgba(255, 255, 255, 0.50) 40%, rgba(255, 255, 255, 0.15) 70%, transparent 95%) !important;
-  color: #0284c7 !important;
+[data-theme="light"] .gm-map-ctrl-btn.gm-aim-menu-trigger:hover,
+[data-theme="light"] .gm-flight-analysis-ctrl-btn.gm-aim-menu-trigger:hover {
+  transform: scale(1.08);
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.50) 40%, rgba(0, 0, 0, 0.15) 70%, transparent 95%) !important;
+  color: #ffffff !important;
   border: none !important;
-}
-
-.gm-aim-menu-trigger[data-layer="satellite"]:hover {
-  background: radial-gradient(ellipse at center, rgba(15, 23, 42, 0.80) 0%, rgba(15, 23, 42, 0.45) 40%, rgba(15, 23, 42, 0.12) 70%, transparent 95%) !important;
-  color: #38bdf8 !important;
-  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 .gm-aim-menu-trigger:active {
@@ -6410,6 +6388,16 @@ input.gm-input:focus {
 
 .gm-aim-menu-trigger.open .gm-aim-chevron {
   transform: rotate(180deg);
+}
+
+/* Explicit white stroke and fill for all floating map icons */
+.gm-map-layer-toggle svg,
+.gm-replay-layer-toggle svg,
+.gm-aim-menu-trigger svg,
+.gm-mini-map-layer-toggle svg,
+.gm-mini-map-expand-btn svg {
+  stroke: currentColor;
+  color: #ffffff !important;
 }
 
 .gm-aim-dropdown {
@@ -9041,18 +9029,19 @@ input.gm-input:focus {
   top: 0;
   left: 0;
   right: 0;
-  height: 56px;
-  background: rgba(11, 15, 25, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  min-height: 56px;
+  height: calc(56px + env(safe-area-inset-top, 0px));
+  background: rgba(11, 15, 25, 0.90);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--gm-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
-  padding-top: env(safe-area-inset-top, 0px);
+  padding: env(safe-area-inset-top, 0px) 16px 0 16px;
   z-index: 20;
   box-sizing: border-box;
+  gap: 12px;
 }
 
 .gm-replay-top-left {
@@ -9060,11 +9049,13 @@ input.gm-input:focus {
   align-items: center;
   gap: 12px;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .gm-replay-back-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   min-height: var(--gm-touch-min, 48px);
   min-width: var(--gm-touch-min, 48px);
@@ -9073,12 +9064,25 @@ input.gm-input:focus {
   font-size: 0.86rem;
   color: var(--gm-text-primary);
   flex-shrink: 0;
+  border-radius: var(--gm-radius-sm);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--gm-border);
+  cursor: pointer;
+  transition: all var(--gm-transition-fast);
+}
+
+.gm-replay-back-btn:hover,
+.gm-replay-back-btn:focus-visible {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--gm-accent);
 }
 
 .gm-replay-flight-meta {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
 }
 
 .gm-replay-flight-title {
@@ -9154,6 +9158,39 @@ input.gm-input:focus {
   border-radius: calc(var(--gm-radius-sm) - 2px);
   cursor: pointer;
   transition: all var(--gm-transition-fast);
+}
+
+@media (max-width: 640px) {
+  .gm-replay-top-bar {
+    padding-left: 8px;
+    padding-right: 8px;
+    gap: 8px;
+  }
+  .gm-replay-top-left {
+    gap: 8px;
+  }
+  .gm-replay-back-btn {
+    padding: 0;
+    width: var(--gm-touch-min, 48px);
+  }
+  .gm-replay-back-text {
+    display: none;
+  }
+  .gm-replay-flight-title {
+    font-size: 0.85rem;
+  }
+  .gm-replay-flight-subtitle {
+    font-size: 0.68rem;
+  }
+  .gm-replay-camera-group {
+    gap: 2px;
+    padding: 1px;
+  }
+  .gm-replay-cam-btn {
+    padding: 6px 8px;
+    font-size: 0.70rem;
+    min-width: 44px;
+  }
 }
 
 .gm-replay-cam-btn.gm-active {

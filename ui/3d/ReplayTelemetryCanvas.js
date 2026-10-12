@@ -93,13 +93,13 @@ export class ReplayTelemetryCanvas {
     // 2. Dual-Track Scrubber Wrapper
     const canvasWrap = document.createElement('div');
     canvasWrap.className = 'gm-replay-canvas-wrapper';
-    canvasWrap.style.cssText = 'position: relative; width: 100%; height: 64px; touch-action: pan-y; cursor: ew-resize; overflow: hidden; border-radius: var(--gm-radius-sm, 6px);';
+    canvasWrap.style.cssText = 'position: relative; width: 100%; height: 64px; touch-action: pan-y; cursor: ew-resize; overflow: hidden; border-radius: var(--gm-radius-sm, 6px); border: 1px solid rgba(255, 255, 255, 0.10); background: rgba(11, 15, 25, 0.85);';
 
     // Top Phase Gradient Track
     const phaseGradient = this.flight ? generateFlightPhaseGradient(this.flight) : `linear-gradient(to right, ${FLIGHT_PHASE_COLORS.glide} 0%, ${FLIGHT_PHASE_COLORS.glide} 100%)`;
     this.phaseBarEl = document.createElement('div');
     this.phaseBarEl.className = 'gm-replay-phase-track';
-    this.phaseBarEl.style.cssText = `position: absolute; top: 0; left: 0; right: 0; height: 5px; background: ${phaseGradient}; pointer-events: none; z-index: 2; opacity: 0.9;`;
+    this.phaseBarEl.style.cssText = `position: absolute; top: 0; left: 0; right: 0; height: 3px; background: ${phaseGradient}; border-radius: 3px 3px 0 0; pointer-events: none; z-index: 2; opacity: 0.85;`;
     canvasWrap.appendChild(this.phaseBarEl);
 
     // 2D Canvas Altitude Profile
@@ -108,7 +108,7 @@ export class ReplayTelemetryCanvas {
     this.canvasEl.style.cssText = 'display: block; width: 100%; height: 100%;';
     canvasWrap.appendChild(this.canvasEl);
 
-    // Event Milestone Tick Markers Overlay
+    // Event Milestone Tick Markers Overlay (subtle bottom notches)
     this.markersEl = document.createElement('div');
     this.markersEl.className = 'gm-replay-event-markers';
     this.markersEl.style.cssText = 'position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 3;';
@@ -136,7 +136,7 @@ export class ReplayTelemetryCanvas {
   }
 
   /**
-   * Renders vertical tick markers on the scrubber for each flight event.
+   * Renders subtle bottom tick markers on the scrubber for each flight event.
    * @param {HTMLElement} container
    */
   _renderEventMarkers(container) {
@@ -149,7 +149,7 @@ export class ReplayTelemetryCanvas {
       return `
         <div data-event-id="${ev.id}" data-event-progress="${ev.progress}"
              class="replay-event-marker"
-             style="position: absolute; top: 0; bottom: 0; width: 3px; margin-left: -1.5px; left: ${pct}%; background-color: ${ev.color}; opacity: 0.85; pointer-events: auto; cursor: pointer; transition: transform 0.15s ease;"
+             style="position: absolute; bottom: 0; width: 4px; height: 6px; margin-left: -2px; left: ${pct}%; background-color: ${ev.color}; border-radius: 2px 2px 0 0; opacity: 0.85; pointer-events: auto; cursor: pointer; transition: transform 0.15s ease;"
              title="${ev.label}: ${ev.detail}"></div>
       `;
     }).join('');
@@ -390,13 +390,13 @@ export class ReplayTelemetryCanvas {
 
     // Clear background
     ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = 'rgba(11, 17, 32, 0.85)';
+    ctx.fillStyle = 'rgba(11, 15, 25, 0.90)';
     ctx.fillRect(0, 0, w, h);
 
     const pts = this.trackPoints;
     const n = pts.length;
     if (n < 2) {
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(0, h / 2);
@@ -406,8 +406,8 @@ export class ReplayTelemetryCanvas {
     }
 
     const altRange = Math.max(10, this.maxAlt - this.minAlt);
-    const padTop = 8;
-    const padBottom = 6;
+    const padTop = 10;
+    const padBottom = 8;
     const drawH = h - padTop - padBottom;
 
     const getY = (alt) => {
@@ -415,26 +415,45 @@ export class ReplayTelemetryCanvas {
       return h - padBottom - (normalized * drawH);
     };
 
+    // Draw subtle horizontal reference gridlines
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    const yMid1 = getY(this.minAlt + altRange * 0.33);
+    const yMid2 = getY(this.minAlt + altRange * 0.66);
+    ctx.moveTo(0, yMid1);
+    ctx.lineTo(w, yMid1);
+    ctx.moveTo(0, yMid2);
+    ctx.lineTo(w, yMid2);
+    ctx.stroke();
+
+    // Min & Max Altitude Watermark Labels
+    ctx.fillStyle = 'rgba(148, 163, 184, 0.40)';
+    ctx.font = '9px monospace';
+    ctx.fillText(`${this.maxAlt}m`, 6, padTop + 2);
+    ctx.fillText(`${this.minAlt}m`, 6, h - padBottom + 2);
+
     // Draw altitude area fill
     ctx.beginPath();
     ctx.moveTo(0, h);
     for (let i = 0; i < n; i++) {
       const x = (i / (n - 1)) * w;
       const y = getY(pts[i].alt);
-      if (i === 0) ctx.lineTo(x, y);
-      else ctx.lineTo(x, y);
+      ctx.lineTo(x, y);
     }
     ctx.lineTo(w, h);
     ctx.closePath();
 
-    const areaGrad = ctx.createLinearGradient(0, 0, 0, h);
-    areaGrad.addColorStop(0, 'rgba(14, 165, 233, 0.35)');
-    areaGrad.addColorStop(1, 'rgba(14, 165, 233, 0.05)');
+    const areaGrad = ctx.createLinearGradient(0, padTop, 0, h - padBottom);
+    areaGrad.addColorStop(0, 'rgba(56, 189, 248, 0.22)');
+    areaGrad.addColorStop(1, 'rgba(56, 189, 248, 0.01)');
     ctx.fillStyle = areaGrad;
     ctx.fill();
 
     // Draw line segments with FAI vario coloring
     ctx.lineWidth = 2;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
     for (let i = 0; i < n - 1; i++) {
       const x1 = (i / (n - 1)) * w;
       const y1 = getY(pts[i].alt);
@@ -451,26 +470,30 @@ export class ReplayTelemetryCanvas {
       ctx.stroke();
     }
 
-    // Draw vertical tracking cursor
+    // Draw vertical tracking cursor (scrubber needle)
     const cursorX = Math.max(0, Math.min(w, this.progress * w));
     ctx.beginPath();
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.85)';
+    ctx.lineWidth = 1.5;
     ctx.moveTo(cursorX, 0);
     ctx.lineTo(cursorX, h);
     ctx.stroke();
 
-    // Draw cursor circle head
+    // Draw cursor concentric bullseye indicator
     const cursorAlt = this.currentSample?.alt ?? pts[Math.min(n - 1, Math.floor(this.progress * (n - 1)))].alt;
     const cursorY = getY(cursorAlt);
 
+    // Outer cyan ring
+    ctx.beginPath();
+    ctx.fillStyle = '#38bdf8';
+    ctx.arc(cursorX, cursorY, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Inner bright core
     ctx.beginPath();
     ctx.fillStyle = '#ffffff';
-    ctx.arc(cursorX, cursorY, 4, 0, Math.PI * 2);
+    ctx.arc(cursorX, cursorY, 2.5, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = '#0284c7';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
   }
 
   /**

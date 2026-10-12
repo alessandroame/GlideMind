@@ -19,7 +19,12 @@ In risposta al feedback dell'utente:
 3. **Estensione della Sfumatura al Menu Puntamento (Aim / Mirino)**:
    - Applicata la medesima finitura visiva borderless con sfumatura radiale al trigger del menu mirino/puntamento (`.gm-aim-menu-trigger`), eliminando la capsula bianca opaca con bordo e ombra.
    - Sagoma a pillola ergonomica ($36\text{px}$ altezza), sincronizzazione dinamica dell'attributo `data-layer` al cambio cartografia e pavimento di tocco Fitts $\ge 48\times 48\text{px}$.
-4. **Presidio Ergonomico (Fitts's Law)**:
+4. **Inversione Cromatica Unificata (Icone Bianche su Sfumatura Nera)**:
+   - Su esplicita richiesta utente, uniformati tutti i controlli flottanti su cartografia (`.gm-map-layer-toggle`, `.gm-replay-layer-toggle`, `.gm-aim-menu-trigger`, `.gm-mini-map-layer-toggle`, `.gm-mini-map-expand-btn`):
+     - Icone rigorosamente bianche (`#ffffff` / `stroke="currentColor"`).
+     - Sfumatura sottostante nera profonda (`rgba(0, 0, 0, 0.70)` al centro, decadimento continuo a 40% e 70%, dissolvenza completa `transparent 95%` al perimetro).
+     - Applicata uniformemente su qualsiasi mappa (Topo, Satellite, Dark, Light theme) eliminando la sfumatura chiara per garantire contrasto e leggibilità massimi.
+5. **Presidio Ergonomico (Fitts's Law)**:
    - Pseudo-elemento invisibile `::before` a pavimento $\ge 48\times 48\text{px}$ su tutti i controlli flottanti per garantire usabilità sul campo con guanti e all'aperto.
 
 ---
@@ -28,11 +33,12 @@ In risposta al feedback dell'utente:
 - `ui/map/mapEngineAdapter.js`: Aggiornato `renderLayerToggleIcon(layerId, size = 20)` con la geometria simmetrica della vetta alpina con nevaio.
 - `ui/views/SpotMapView.js`: Sincronizzazione `data-layer` su `#gm-map-aim-trigger` e rimozione classe rigida da `#gm-map-layer-toggle`.
 - `ui/views/ForecastView.js`: Sincronizzazione `data-layer` su `.gm-aim-menu-trigger` e rimozione classe rigida da `#forecast-flight-analysis-layer-toggle`.
-- `css/theme.css`: Ridisegnata la sfumatura radiale (perimetro trasparente, centro semitrasparente, rimozione del blur filter) su toggle layer, expand mini-mappa e trigger mirino.
-- `MEMORY.md`: Aggiornata la Lezione 136.
+- `css/theme.css`: Ridisegnata la sfumatura radiale nera profonda con icone bianche pure per tutti i controlli mappa (toggle layer, expand mini-mappa e trigger mirino), azzerati blur e bordi.
+- `MEMORY.md`: Aggiunta Lezione 141 (Uniform High-Contrast Scrim).
 
 ---
 
 ## 3. Verifica e Governance
-- Suite globale eseguita con successo: **123 suite, 704 test passati, 0 fallimenti, 1 saltato**.
+- Suite globale eseguita con successo: **123 suite, 705 test passati, 0 fallimenti, 1 saltato**.
 - Tutti i quality gate architetturali Shift-Left verificati e superati.
+
