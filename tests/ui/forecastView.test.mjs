@@ -2419,6 +2419,47 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
       assert.ok(html.includes('mm/h</span>'), 'Must display mm/h unit');
       assert.ok(html.includes('NO FLY: Pioggia'), 'Must indicate NO FLY: Pioggia in badge for 1.2 mm/h hour');
       assert.ok(html.includes('<rect x='), 'Must render SVG rect bars for hourly precipitation');
+      assert.ok(html.includes('stroke-dasharray="3,3"'), 'Must render dashed line for precipitation probability');
+      assert.ok(html.includes('100%'), 'Must render secondary right-axis label for 100%');
+    });
+
+    it('renders caution badge and secondary probability curve when accumulation is 0 mm/h but precipitation_probability is significant (e.g. 39%)', () => {
+      const mockStore = createStore({ selectedSpot: DEFAULT_COMPRENSORI[0] });
+      const controller = new ForecastViewController({ store: mockStore });
+      controller.forecastMode = 'charts';
+      controller.selectedHour = 14;
+
+      const weatherData = {
+        hourly: {
+          time: Array.from({ length: 13 }, (_, i) => `2026-10-10T${String(i + 8).padStart(2, '0')}:00`),
+          windspeed_10m: Array(13).fill(12),
+          winddirection_10m: Array(13).fill(180),
+          windgusts_10m: Array(13).fill(16),
+          temperature_2m: Array(13).fill(18),
+          dewpoint_2m: Array(13).fill(11),
+          cape: Array(13).fill(120),
+          cloudcover: Array(13).fill(95),
+          precipitation: Array(13).fill(0), // 0.0 mm/h accumulation (like Chialamberto)
+          precipitation_probability: [0, 5, 10, 15, 25, 30, 39, 35, 20, 10, 5, 0, 0] // Up to 39% probability
+        }
+      };
+
+      const html = controller.renderMultiTrendCharts(
+        { takeoff: DEFAULT_COMPRENSORI[0].takeoffs[0], landing: DEFAULT_COMPRENSORI[0].landings[0], status: 'caution' },
+        weatherData,
+        DEFAULT_COMPRENSORI[0],
+        GLIDER_CLASSES.EN_A,
+        DEFAULT_COMPRENSORI[0].takeoffs[0]
+      );
+
+      // Value must be 0.0 mm/h
+      assert.ok(html.includes('>0.0</span>'), 'Must display 0.0 mm/h accumulation');
+      // Sub-badge must NOT say 'Assenti' or be 'status-flyable', it must warn with probability
+      assert.ok(html.includes('status-caution'), 'Must have status-caution badge class for 39% rain probability');
+      assert.ok(html.includes('39% prob. pioggia'), 'Must show 39% prob. pioggia in sub-badge');
+      // Chart must render probability curve even with 0 mm/h accumulation
+      assert.ok(html.includes('stroke-dasharray="3,3"'), 'Must render probability line path');
+      assert.ok(html.includes('100%'), 'Must render right-axis percentage marker');
     });
 
     it('evaluates severe NO FLY: Pioggia when hourly precipitation exceeds 0.5 mm/h in computeParamMetrics', () => {

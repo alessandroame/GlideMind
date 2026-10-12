@@ -673,9 +673,10 @@ describe('FlightDetailSheet - Telemetry Analysis & Educational Debriefing (UI La
       assert.ok(mapEngine.renderedTrack, 'Track must be rendered on map engine');
       assert.strictEqual(mapEngine.renderedTrack.points.length, mockBundle.raw.decimatedPoints.length);
 
-      // Test cursor synchronization
+      // Test cursor synchronization with proportional total count
       chartContainer.dispatchEvent({ type: 'pointerdown', clientX: 200, pointerId: 1 });
       assert.ok(mapEngine.cursorPointIndex !== null, 'Cursor point index must be updated on pointerdown');
+      assert.strictEqual(mapEngine.cursorTotalCount, mockBundle.raw.decimatedPoints.length, 'Total count must be passed for proportional mapping');
 
       // Test phase selection from card click
       overlay.dispatchEvent({
@@ -684,6 +685,7 @@ describe('FlightDetailSheet - Telemetry Analysis & Educational Debriefing (UI La
       });
 
       assert.ok(mapEngine.highlightedRange, 'Highlighted range must be set on map engine');
+      assert.strictEqual(mapEngine.isTrimmedToPhase, true, 'isTrimmedToPhase must be true on map engine');
       assert.strictEqual(mapEngine.highlightedRange.startIndex, 1);
       assert.strictEqual(mapEngine.highlightedRange.endIndex, 3);
       assert.strictEqual(mapEngine.highlightedRange.options.label, 'T1');
@@ -698,6 +700,7 @@ describe('FlightDetailSheet - Telemetry Analysis & Educational Debriefing (UI La
       // Test reset button
       resetBtn.dispatchEvent({ type: 'click', stopPropagation: () => {} });
       assert.strictEqual(mapEngine.highlightedRange, null, 'Highlighted range must be cleared');
+      assert.strictEqual(mapEngine.isTrimmedToPhase, false, 'isTrimmedToPhase must be false after reset');
       assert.strictEqual(phaseBadge.textContent, '');
       assert.strictEqual(phaseBadge.style.display, 'none');
       assert.strictEqual(resetBtn.style.display, 'none');
@@ -711,6 +714,91 @@ describe('FlightDetailSheet - Telemetry Analysis & Educational Debriefing (UI La
       closeFlightDetailView();
       assert.strictEqual(getActiveFlightDetailMapEngine(), null, 'Map engine must be destroyed and reset to null');
     });
+
+    it('should test LeafletMapEngine proportional cursor reaching 100% of flight track without compression', async () => {
+      const { LeafletMapEngine } = await import('../../ui/map/mapEngineAdapter.js');
+
+      // Setup minimal mock window.L
+      const originalWindow = globalThis.window;
+      let fitBoundsCalledWith = null;
+      const mockLayers = [];
+
+      const mockMap = {
+        fitBounds: (b, opts) => { fitBoundsCalledWith = { bounds: b, opts }; },
+        on: () => {},
+        removeLayer: () => {}
+      };
+
+      globalThis.window = {
+        L: {
+          map: () => mockMap,
+          tileLayer: () => ({ addTo: () => {} }),
+          layerGroup: () => ({ addTo: () => ({}) }),
+          control: {
+            zoom: () => ({ addTo: () => {} })
+          },
+          latLngBounds: (coords) => ({ coords, _isBounds: true }),
+          polyline: (coords, opts) => ({
+            coords,
+            opts,
+            setStyle: function (s) { this.style = s; }
+          }),
+          divIcon: (opts) => opts,
+          marker: (coords, opts) => ({
+            coords,
+            opts,
+            addTo: function () { return this; },
+            setLatLng: function (c) { this.coords = c; },
+            remove: function () {}
+          }),
+          featureGroup: () => ({
+            layers: [],
+            addTo: function () { return this; },
+            addLayer: function (l) { mockLayers.push(l); this.layers.push(l); },
+            clearLayers: function () { this.layers = []; }
+          })
+        }
+      };
+
+      const engine = new LeafletMapEngine(null, { isMiniMap: true });
+      engine.map = mockMap;
+      engine.overlayLayerGroup = window.L.featureGroup();
+      engine.phaseHighlightGroup = window.L.featureGroup();
+      engine.trackBounds = { _isInitialBounds: true };
+
+      // Sample track with 4 points
+      const points = [
+        { lat: 45.80, lon: 9.20, timeSeconds: 100 },
+        { lat: 45.81, lon: 9.21, timeSeconds: 200 },
+        { lat: 45.82, lon: 9.22, timeSeconds: 300 },
+        { lat: 45.83, lon: 9.23, timeSeconds: 400 }
+      ];
+
+      engine.renderFlightTrack(null, { points });
+      assert.strictEqual(engine.validTrackPoints.length, 4);
+
+      // 1. Moving cursor to index 3 (end of chart, totalCount = 4)
+      engine.setFlightTrackCursor(3, 4, 400);
+      assert.ok(engine.trackCursorMarker, 'Cursor marker must be created');
+      assert.deepStrictEqual(engine.trackCursorMarker.coords, [45.83, 9.23], 'Cursor must be at 100% end of track (landing)');
+
+      // 2. Moving cursor to index 0 (takeoff)
+      engine.setFlightTrackCursor(0, 4, 100);
+      assert.deepStrictEqual(engine.trackCursorMarker.coords, [45.80, 9.20], 'Cursor must be at 0% start of track (takeoff)');
+
+      // 3. Highlight flight phase range with trimming
+      engine.highlightFlightTrackRange(1, 2, { label: 'T1' });
+      assert.ok(fitBoundsCalledWith, 'fitBounds must be called for phase bounds');
+      assert.strictEqual(fitBoundsCalledWith.opts.maxZoom, 17);
+      assert.strictEqual(fitBoundsCalledWith.opts.animate, true);
+
+      // 4. Reset flight phase
+      engine.highlightFlightTrackRange(null);
+      assert.strictEqual(fitBoundsCalledWith.bounds, engine.trackBounds, 'Resetting must fit bounds back to initial full track bounds');
+
+      // Cleanup
+      globalThis.window = originalWindow;
+    });
   });
 
   describe('Personal Career Records Badges in Flight Detail', () => {
@@ -722,7 +810,18 @@ describe('FlightDetailSheet - Telemetry Analysis & Educational Debriefing (UI La
           maxAltMsl: 2037, // Record
           maxGainMeters: 850, // Record
           durationMinutes: 120, // Record
-          distanceKm: 25.5 // Record
+          distanceKm: 25.5, // Record
+          thermalsCount: 8, // Record
+          maxClimbRate: 5.2, // Record
+          maxSinkRate: -4.5 // Record
+        },
+        telemetry: {
+          ...mockBundle.telemetry,
+          thermals: [
+            { thermalIndex: 1, altGain: 300 },
+            { thermalIndex: 2, altGain: 250 },
+            { thermalIndex: 3, altGain: 300 }
+          ]
         }
       };
 
@@ -731,7 +830,9 @@ describe('FlightDetailSheet - Telemetry Analysis & Educational Debriefing (UI La
         maxGain: { val: 850, flightId: 'fl_cornizzolo_detail' },
         maxDuration: { val: 120, flightId: 'fl_cornizzolo_detail' },
         maxDistance: { val: 25.5, flightId: 'fl_cornizzolo_detail' },
-        maxClimbRate: { val: 5.0, flightId: 'other' }
+        maxThermals: { val: 8, flightId: 'fl_cornizzolo_detail' },
+        maxClimbRate: { val: 5.2, flightId: 'fl_cornizzolo_detail' },
+        maxSinkRate: { val: -4.5, flightId: 'fl_cornizzolo_detail' }
       };
 
       const html = renderFlightDetailHtml(recordBundle, { careerRecords });
@@ -741,12 +842,15 @@ describe('FlightDetailSheet - Telemetry Analysis & Educational Debriefing (UI La
       assert.ok(html.includes('Record Personale'), 'Must contain Record Personale text');
       assert.ok(html.includes('title="Record Personale: Volo Più Lungo"'), 'Must have duration record badge');
 
-      // Metric cards for Alt, Gain, Distance should have record badges and highlight classes
+      // Metric cards for Alt, Gain, Distance, Thermals, Climb, Sink should have record badges and highlight classes
       assert.ok(html.includes('gm-record-badge'), 'Must render record badges on metric cards');
       assert.ok(html.includes('gm-flight-metric-card-record'), 'Must apply record card highlight class');
       assert.ok(html.includes('title="Record Personale: Quota Massima MSL"'), 'Must highlight maxAlt record');
       assert.ok(html.includes('title="Record Personale: Maggior Guadagno"'), 'Must highlight maxGain record');
       assert.ok(html.includes('title="Record Personale: Distanza Massima"'), 'Must highlight distance record');
+      assert.ok(html.includes('title="Record Personale: Termiche Massime"'), 'Must highlight thermals record');
+      assert.ok(html.includes('title="Record Personale: Salita Massima (Max Vario)"'), 'Must highlight max climb/vario record');
+      assert.ok(html.includes('title="Record Personale: Discesa Massima (Min Vario)"'), 'Must highlight min vario/sink record');
     });
 
     it('should NOT render record badges or highlight classes on metrics below career records', () => {
@@ -758,7 +862,13 @@ describe('FlightDetailSheet - Telemetry Analysis & Educational Debriefing (UI La
           maxGainMeters: 300,
           durationMinutes: 30,
           distanceKm: 5.0,
-          maxClimbRate: 1.5
+          thermalsCount: 1,
+          maxClimbRate: 1.5,
+          maxSinkRate: -1.2
+        },
+        telemetry: {
+          ...mockBundle.telemetry,
+          thermals: [{ thermalIndex: 1, altGain: 150 }]
         }
       };
 
@@ -767,7 +877,9 @@ describe('FlightDetailSheet - Telemetry Analysis & Educational Debriefing (UI La
         maxGain: { val: 850, flightId: 'other-2' },
         maxDuration: { val: 120, flightId: 'other-3' },
         maxDistance: { val: 25.5, flightId: 'other-4' },
-        maxClimbRate: { val: 4.5, flightId: 'other-5' }
+        maxThermals: { val: 8, flightId: 'other-5' },
+        maxClimbRate: { val: 4.5, flightId: 'other-6' },
+        maxSinkRate: { val: -4.5, flightId: 'other-7' }
       };
 
       const html = renderFlightDetailHtml(nonRecordBundle, { careerRecords });

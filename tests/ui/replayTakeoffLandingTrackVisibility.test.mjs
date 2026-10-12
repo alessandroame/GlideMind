@@ -283,7 +283,7 @@ describe('3D Flight Replay - Headless Takeoff & Landing Track Visibility Contrac
       assert.equal(pLast.y, 260 - 1060, 'Last point must be at -800m relative to takeoff');
     });
 
-    it('should build a volumetric 3D diamond tube with 4 vertices per point and solid 20m width and 14m height', () => {
+    it('should build a volumetric 3D diamond tube with FAI variometer vertex colors and dynamic zoom-adaptive width', () => {
       engine.THREE = mockThree;
       const cornizzoloFlight = DEFAULT_SEED_FLIGHTS[0];
       const pts = view._generateFallbackTrackPoints(cornizzoloFlight);
@@ -294,9 +294,10 @@ describe('3D Flight Replay - Headless Takeoff & Landing Track Visibility Contrac
           y: p.alt - 1060,
           z: -i * 10,
           heading: 170,
-          vario: p.vario
+          vario: i === 0 ? 3.5 : (i === 1 ? -2.5 : p.vario)
         }))
       };
+      engine.origin = engine.projectedTrack.origin;
       engine.threeScene = new mockThree.Scene();
 
       engine._buildTrackRibbon();
@@ -304,23 +305,40 @@ describe('3D Flight Replay - Headless Takeoff & Landing Track Visibility Contrac
       assert.ok(engine.trackRibbonMesh, 'Track ribbon mesh must be created');
       const geom = engine.trackRibbonMesh.geometry;
       assert.ok(geom.attributes.position, 'Must have position attribute');
+      assert.ok(geom.attributes.color, 'Must have color attribute for FAI vario coloring');
 
       const posArray = geom.attributes.position.array;
+      const colorArray = geom.attributes.color.array;
       const n = pts.length;
       // 4 vertices per track point (Top, Right, Bottom, Left) * 3 coords (x, y, z)
       assert.equal(posArray.length, n * 4 * 3, `Expected ${n * 4 * 3} position floats, got ${posArray.length}`);
+      assert.equal(colorArray.length, n * 4 * 3, `Expected ${n * 4 * 3} color floats, got ${colorArray.length}`);
 
-      // Check first point diamond cross-section thickness
-      // V0: Top (y = pt.y + 7.0)
-      const v0y = posArray[1];
-      // V2: Bottom (y = pt.y - 7.0)
-      const v2y = posArray[7];
-      const verticalThickness = v0y - v2y;
-      assert.ok(Math.abs(verticalThickness - 14.0) < 0.01, `Vertical thickness must be 14m, got ${verticalThickness}`);
+      // First point has strong climb vario = 3.5 m/s -> Salita Forte (#dc2626: r=0.86, g=0.15, b=0.15)
+      assert.ok(Math.abs(colorArray[0] - 0.86) < 0.05, `First point color R must be ~0.86, got ${colorArray[0]}`);
+
+      // Second point has strong sink vario = -2.5 m/s -> Discesa Forte (#4338ca: r=0.26, g=0.22, b=0.79)
+      const p1ColorStart = 4 * 3; // 4 vertices * 3 coords
+      assert.ok(Math.abs(colorArray[p1ColorStart + 2] - 0.79) < 0.05, `Second point color B must be ~0.79, got ${colorArray[p1ColorStart + 2]}`);
 
       // Indices must form 8 triangles (4 quads) per segment
       const numSegments = n - 1;
       assert.equal(geom.indices.length, numSegments * 4 * 6, `Expected ${numSegments * 24} indices for 4 quads`);
+
+      // Test dynamic zoom adaptation: zooming in to 18 should shrink the ribbon cross-section
+      const initV0y = posArray[1];
+      const initV2y = posArray[7];
+      const initialThickness = initV0y - initV2y;
+
+      engine._updateRibbonDimensions(18);
+      const zoomedV0y = posArray[1];
+      const zoomedV2y = posArray[7];
+      const zoomedThickness = zoomedV0y - zoomedV2y;
+
+      assert.ok(zoomedThickness < initialThickness,
+        `Zooming in must shrink ribbon thickness: zoomed (${zoomedThickness}m) < initial (${initialThickness}m)`);
+      assert.ok(zoomedThickness < 2.5,
+        `Zoomed in ribbon thickness must be slender (< 2.5m), got ${zoomedThickness}m`);
     });
 
     it('should create takeoff marker at P0 (green ring) and landing marker at PN (cyan ring)', () => {

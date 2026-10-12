@@ -296,9 +296,31 @@ export function generateExpandedSvgChart(points, width = 600, height = 220, opti
   // Collect event markers (thermals and roll inversions) visible within [startIdx, endIdx]
   const eventItems = [];
 
+  const resolveIndices = (item, defaultEndSpan = null) => {
+    let sIdx = 0;
+    let eIdx = n - 1;
+    if (typeof item.startTimeSeconds === 'number' && typeof points[0]?.timeSeconds === 'number') {
+      let fS = points.findIndex((p) => (p.timeSeconds ?? 0) >= item.startTimeSeconds);
+      sIdx = fS === -1 ? n - 1 : fS;
+      if (typeof item.endTimeSeconds === 'number') {
+        let fE = points.findIndex((p) => (p.timeSeconds ?? 0) >= item.endTimeSeconds);
+        eIdx = fE === -1 ? n - 1 : fE;
+      } else {
+        eIdx = defaultEndSpan !== null ? Math.min(n - 1, sIdx + defaultEndSpan) : sIdx;
+      }
+    } else if (typeof item.startIndex === 'number') {
+      const origN = (options.sourceCount && options.sourceCount > 1) ? options.sourceCount : (item.startIndex >= n ? item.startIndex + 1 : n);
+      const sFrac = Math.max(0, Math.min(1, item.startIndex / Math.max(1, origN - 1)));
+      const eRaw = item.endIndex ?? (defaultEndSpan !== null ? item.startIndex + defaultEndSpan : item.startIndex);
+      const eFrac = Math.max(0, Math.min(1, eRaw / Math.max(1, origN - 1)));
+      sIdx = Math.max(0, Math.min(n - 1, Math.round(sFrac * (n - 1))));
+      eIdx = Math.max(sIdx, Math.min(n - 1, Math.round(eFrac * (n - 1))));
+    }
+    return { sIdx: Math.min(sIdx, eIdx), eIdx: Math.max(sIdx, eIdx) };
+  };
+
   thermals.forEach((th, idx) => {
-    const sIdx = typeof th.startIndex === 'number' ? Math.max(0, Math.min(th.startIndex, n - 1)) : 0;
-    const eIdx = typeof th.endIndex === 'number' ? Math.max(0, Math.min(th.endIndex, n - 1)) : (n - 1);
+    const { sIdx, eIdx } = resolveIndices(th);
 
     if (eIdx >= startIdx && sIdx <= endIdx) {
       const visS = Math.max(startIdx, sIdx);
@@ -309,6 +331,8 @@ export function generateExpandedSvgChart(points, width = 600, height = 220, opti
       const cx = Math.round((x1 + bandW / 2) * 10) / 10;
       eventItems.push({
         type: 'thermal',
+        sIdx,
+        eIdx,
         x1,
         x2,
         bandW,
@@ -320,8 +344,7 @@ export function generateExpandedSvgChart(points, width = 600, height = 220, opti
   });
 
   rollInversions.forEach((inv) => {
-    const sIdx = typeof inv.startIndex === 'number' ? Math.max(0, Math.min(inv.startIndex, n - 1)) : 0;
-    const eIdx = typeof inv.endIndex === 'number' ? Math.max(0, Math.min(inv.endIndex, n - 1)) : sIdx;
+    const { sIdx, eIdx } = resolveIndices(inv);
 
     if (eIdx >= startIdx && sIdx <= endIdx) {
       const visS = Math.max(startIdx, sIdx);
@@ -334,6 +357,8 @@ export function generateExpandedSvgChart(points, width = 600, height = 220, opti
       const label = pCount ? `${pCount}P` : 'Inv';
       eventItems.push({
         type: 'roll',
+        sIdx,
+        eIdx,
         x1,
         x2,
         bandW,
@@ -373,10 +398,10 @@ export function generateExpandedSvgChart(points, width = 600, height = 220, opti
       const badgeY = padTop + 9 + ev.yLevel * 13;
       const pillW = 24;
       const pillH = 12;
-      const sIdx = ev.rawObj?.startIndex ?? 0;
-      const eIdx = ev.rawObj?.endIndex ?? (n - 1);
+      const sIdx = ev.sIdx;
+      const eIdx = ev.eIdx;
       return `
-        <g class="gm-chart-thermal-band" data-phase-type="thermal" data-phase-label="${escapeHtml(ev.label)}" data-start-index="${sIdx}" data-end-index="${eIdx}" style="cursor: pointer;">
+        <g class="gm-chart-thermal-band" data-phase-type="thermal" data-phase-label="${escapeHtml(ev.label)}" data-start-index="${sIdx}" data-end-index="${eIdx}" data-start-time="${ev.rawObj?.startTimeSeconds ?? ''}" data-end-time="${ev.rawObj?.endTimeSeconds ?? ''}" style="cursor: pointer;">
           <rect x="${ev.x1}" y="${padTop}" width="${ev.bandW}" height="${chartHeight}" fill="rgba(245, 158, 11, 0.14)" stroke="rgba(245, 158, 11, 0.45)" stroke-width="1" stroke-dasharray="3,2" rx="3" />
           <rect x="${ev.cx - pillW / 2}" y="${badgeY - 9}" width="${pillW}" height="${pillH}" fill="rgba(15, 23, 42, 0.92)" stroke="#f59e0b" stroke-width="0.8" rx="2.5" />
           <text x="${ev.cx}" y="${badgeY}" text-anchor="middle" font-size="8.5" font-family="monospace" font-weight="800" fill="#f59e0b">${escapeHtml(ev.label)}</text>
@@ -392,10 +417,10 @@ export function generateExpandedSvgChart(points, width = 600, height = 220, opti
       const badgeY = padTop + 9 + ev.yLevel * 13;
       const pillW = Math.max(22, ev.label.length * 7 + 8);
       const pillH = 12;
-      const sIdx = ev.rawObj?.startIndex ?? 0;
-      const eIdx = ev.rawObj?.endIndex ?? sIdx;
+      const sIdx = ev.sIdx;
+      const eIdx = ev.eIdx;
       return `
-        <g class="gm-chart-roll-marker" role="img" aria-label="Inversione di rollio (${ev.pCount ? `${ev.pCount} pendolate` : ''})" data-phase-type="roll" data-phase-label="${escapeHtml(ev.label)}" data-start-index="${sIdx}" data-end-index="${eIdx}" style="cursor: pointer;">
+        <g class="gm-chart-roll-marker" role="img" aria-label="Inversione di rollio (${ev.pCount ? `${ev.pCount} pendolate` : ''})" data-phase-type="roll" data-phase-label="${escapeHtml(ev.label)}" data-start-index="${sIdx}" data-end-index="${eIdx}" data-start-time="${ev.rawObj?.startTimeSeconds ?? ''}" data-end-time="${ev.rawObj?.endTimeSeconds ?? ''}" style="cursor: pointer;">
           <rect x="${ev.x1}" y="${padTop + 2}" width="${ev.bandW}" height="${chartHeight}" fill="rgba(234, 88, 12, 0.14)" stroke="rgba(234, 88, 12, 0.7)" stroke-width="1" stroke-dasharray="2,2" rx="2" />
           <rect x="${ev.cx - pillW / 2}" y="${badgeY - 9}" width="${pillW}" height="${pillH}" fill="rgba(15, 23, 42, 0.92)" stroke="#ea580c" stroke-width="0.8" rx="2.5" />
           <text x="${ev.cx}" y="${badgeY}" text-anchor="middle" font-size="8.5" font-family="monospace" font-weight="800" fill="#ea580c">${escapeHtml(ev.label)}</text>
@@ -406,17 +431,16 @@ export function generateExpandedSvgChart(points, width = 600, height = 220, opti
 
   // Thermal probe (test 360) markers on the visible window
   const probeMarkersSvg = probes
-    .filter((pr) => {
-      const sIdx = typeof pr.startIndex === 'number' ? pr.startIndex : 0;
-      return sIdx >= startIdx && sIdx <= endIdx;
-    })
     .map((pr) => {
-      const sIdx = pr.startIndex;
-      const vIdx = sIdx - startIdx;
-      const coord = polyCoords[vIdx] || { x: (width / 2), y: (padTop + chartHeight / 2) };
-      const eIdx = Math.min(n - 1, sIdx + 4);
+      const { sIdx, eIdx } = resolveIndices(pr, 4);
+      return { pr, sIdx, eIdx };
+    })
+    .filter(({ sIdx, eIdx }) => eIdx >= startIdx && sIdx <= endIdx)
+    .map(({ pr, sIdx, eIdx }) => {
+      const visIdx = Math.max(0, Math.min(visibleN - 1, sIdx - startIdx));
+      const coord = polyCoords[visIdx] || { x: (width / 2), y: (padTop + chartHeight / 2) };
       return `
-        <g class="gm-chart-probe-marker" data-phase-type="probe" data-phase-label="Sondaggio 360°" data-start-index="${sIdx}" data-end-index="${eIdx}" style="cursor: pointer;">
+        <g class="gm-chart-probe-marker" data-phase-type="probe" data-phase-label="Sondaggio 360°" data-start-index="${sIdx}" data-end-index="${eIdx}" data-start-time="${pr.startTimeSeconds ?? ''}" data-end-time="${pr.endTimeSeconds ?? ''}" style="cursor: pointer;">
           <line x1="${coord.x}" y1="${padTop + 2}" x2="${coord.x}" y2="${height - padBottom}" stroke="rgba(14, 165, 233, 0.45)" stroke-width="1.5" stroke-dasharray="2,2" />
           <circle cx="${coord.x}" cy="${coord.y}" r="3.5" fill="#0284c7" stroke="#ffffff" stroke-width="1" />
         </g>
@@ -914,8 +938,7 @@ export function renderFlightDetailHtml(bundle, options = {}) {
                 aria-label="Layer mappa: ${activeLayer === 'satellite' ? 'Satellite (tocca per OpenTopo)' : 'OpenTopo (tocca per Satellite)'}"
                 title="Passa a ${activeLayer === 'satellite' ? 'OpenTopo' : 'Satellite'}"
               >
-                ${renderLayerToggleIcon(activeLayer)}
-                <span class="gm-layer-toggle-label">${getMapLayerLabel(activeLayer)}</span>
+                ${renderLayerToggleIcon(activeLayer, 20)}
               </button>
             </div>
           </div>
@@ -1048,19 +1071,25 @@ export function renderFlightDetailHtml(bundle, options = {}) {
               </div>
               <span class="gm-flight-metric-desc">Guadagno dal Decollo</span>
             </div>
-            <div class="gm-flight-metric-card">
-              <span class="gm-flight-metric-num ${thermals.length > 0 ? 'text-amber-400 font-bold' : ''}">${thermals.length}</span>
+            <div class="gm-flight-metric-card ${recordFlags.isMaxThermals ? 'gm-flight-metric-card-record' : ''}">
+              <div class="flex items-center justify-between gap-1">
+                <span class="gm-flight-metric-num ${thermals.length > 0 ? 'text-amber-400 font-bold' : ''}">${thermals.length}</span>
+                ${recordFlags.isMaxThermals ? '<span class="gm-record-badge" title="Record Personale: Termiche Massime">Record</span>' : ''}
+              </div>
               <span class="gm-flight-metric-desc">Termiche Agganciate</span>
             </div>
             <div class="gm-flight-metric-card ${recordFlags.isMaxClimbRate ? 'gm-flight-metric-card-record' : ''}">
               <div class="flex items-center justify-between gap-1">
                 <span class="gm-flight-metric-num text-emerald-400">${escapeHtml(climbRate)}</span>
-                ${recordFlags.isMaxClimbRate ? '<span class="gm-record-badge" title="Record Personale: Salita Massima">Record</span>' : ''}
+                ${recordFlags.isMaxClimbRate ? '<span class="gm-record-badge" title="Record Personale: Salita Massima (Max Vario)">Record</span>' : ''}
               </div>
               <span class="gm-flight-metric-desc">Salita Massima (Vario)</span>
             </div>
-            <div class="gm-flight-metric-card">
-              <span class="gm-flight-metric-num text-sky-400">${escapeHtml(sinkRate)}</span>
+            <div class="gm-flight-metric-card ${recordFlags.isMaxSinkRate ? 'gm-flight-metric-card-record' : ''}">
+              <div class="flex items-center justify-between gap-1">
+                <span class="gm-flight-metric-num text-sky-400">${escapeHtml(sinkRate)}</span>
+                ${recordFlags.isMaxSinkRate ? '<span class="gm-record-badge" title="Record Personale: Discesa Massima (Min Vario)">Record</span>' : ''}
+              </div>
               <span class="gm-flight-metric-desc">Discesa Massima</span>
             </div>
             <div class="gm-flight-metric-card">
@@ -1106,7 +1135,7 @@ export function renderFlightDetailHtml(bundle, options = {}) {
                 const tNum = t.thermalIndex || (idx + 1);
 
                 return `
-                  <div class="gm-thermal-card" data-action="select-phase" data-phase-type="thermal" data-phase-label="T${tNum}" data-start-index="${sIdx}" data-end-index="${eIdx}" style="cursor: pointer;" title="Visualizza termica T${tNum} sulla mappa">
+                  <div class="gm-thermal-card" data-action="select-phase" data-phase-type="thermal" data-phase-label="T${tNum}" data-start-index="${sIdx}" data-end-index="${eIdx}" data-start-time="${t.startTimeSeconds ?? ''}" data-end-time="${t.endTimeSeconds ?? ''}" style="cursor: pointer;" title="Visualizza termica T${tNum} sulla mappa">
                     <div class="flex items-center gap-3">
                       <div class="gm-thermal-index-badge">#${tNum}</div>
                       <div class="flex flex-col">
@@ -1160,7 +1189,7 @@ export function renderFlightDetailHtml(bundle, options = {}) {
                   const sIdx = typeof m.startIndex === 'number' ? m.startIndex : 0;
                   const eIdx = typeof m.endIndex === 'number' ? m.endIndex : sIdx;
                   return `
-                    <div class="gm-maneuver-card" data-action="select-phase" data-phase-type="maneuver" data-phase-label="${escapeHtml(title)}" data-start-index="${sIdx}" data-end-index="${eIdx}" style="cursor: pointer;" title="Visualizza manovra sulla mappa">
+                    <div class="gm-maneuver-card" data-action="select-phase" data-phase-type="maneuver" data-phase-label="${escapeHtml(title)}" data-start-index="${sIdx}" data-end-index="${eIdx}" data-start-time="${m.startTimeSeconds ?? ''}" data-end-time="${m.endTimeSeconds ?? ''}" style="cursor: pointer;" title="Visualizza manovra sulla mappa">
                       <div class="gm-maneuver-header">
                         <div class="flex items-center gap-2">
                           <span class="gm-maneuver-badge">${escapeHtml(title)}</span>
@@ -1193,7 +1222,7 @@ export function renderFlightDetailHtml(bundle, options = {}) {
                     const sIdx = typeof m.startIndex === 'number' ? m.startIndex : 0;
                     const eIdx = typeof m.endIndex === 'number' ? m.endIndex : Math.min(points.length - 1, sIdx + 4);
                     return `
-                      <div class="gm-maneuver-card" data-action="select-phase" data-phase-type="probe" data-phase-label="Sondaggio #${idx + 1}" data-start-index="${sIdx}" data-end-index="${eIdx}" style="border-style: dashed; cursor: pointer;" title="Visualizza sondaggio sulla mappa">
+                      <div class="gm-maneuver-card" data-action="select-phase" data-phase-type="probe" data-phase-label="Sondaggio #${idx + 1}" data-start-index="${sIdx}" data-end-index="${eIdx}" data-start-time="${m.startTimeSeconds ?? ''}" data-end-time="${m.endTimeSeconds ?? ''}" style="border-style: dashed; cursor: pointer;" title="Visualizza sondaggio sulla mappa">
                         <div class="gm-maneuver-header">
                           <span class="gm-maneuver-badge text-sky-400">Sondaggio Termico #${idx + 1} (360°)</span>
                           ${dur ? `<span class="text-xs font-mono text-[var(--gm-text-muted)]">${dur}</span>` : ''}
@@ -1468,10 +1497,39 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
 
   const selectPhase = (phase) => {
     if (!phase) return;
-    const startIndex = Math.max(0, Math.min(points.length - 1, parseInt(phase.startIndex ?? 0, 10)));
-    const endIndex = Math.max(startIndex, Math.min(points.length - 1, parseInt(phase.endIndex ?? startIndex, 10)));
     const label = phase.label || 'Fase Volo';
     const type = phase.type || 'phase';
+
+    let startIndex = 0;
+    let endIndex = 0;
+
+    const startTimeSec = (phase.startTime != null && phase.startTime !== '') ? parseFloat(phase.startTime) : null;
+    const endTimeSec = (phase.endTime != null && phase.endTime !== '') ? parseFloat(phase.endTime) : null;
+
+    if (startTimeSec !== null && !isNaN(startTimeSec) && points.length > 0 && typeof points[0].timeSeconds === 'number') {
+      let foundS = points.findIndex((p) => (p.timeSeconds ?? 0) >= startTimeSec);
+      if (foundS === -1) foundS = points.length - 1;
+      let foundE = foundS;
+      if (endTimeSec !== null && !isNaN(endTimeSec)) {
+        const matchE = points.findIndex((p) => (p.timeSeconds ?? 0) >= endTimeSec);
+        foundE = matchE === -1 ? points.length - 1 : matchE;
+      }
+      startIndex = Math.min(foundS, foundE);
+      endIndex = Math.max(foundS, foundE);
+    } else {
+      let rawS = parseInt(phase.startIndex ?? 0, 10);
+      let rawE = parseInt(phase.endIndex ?? rawS, 10);
+      const totalSource = (raw.originalPoints?.length || points.length);
+      if (totalSource > points.length && rawS < totalSource) {
+        const sFrac = Math.max(0, Math.min(1, rawS / (totalSource - 1)));
+        const eFrac = Math.max(0, Math.min(1, rawE / (totalSource - 1)));
+        startIndex = Math.max(0, Math.min(points.length - 1, Math.round(sFrac * (points.length - 1))));
+        endIndex = Math.max(startIndex, Math.min(points.length - 1, Math.round(eFrac * (points.length - 1))));
+      } else {
+        startIndex = Math.max(0, Math.min(points.length - 1, rawS));
+        endIndex = Math.max(startIndex, Math.min(points.length - 1, rawE));
+      }
+    }
 
     state.selectedPhase = {
       type,
@@ -1479,6 +1537,14 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
       startIndex,
       endIndex
     };
+
+    // Trim/focus altimetric chart to the phase window
+    const n = points.length;
+    const phaseSpan = Math.max(2, endIndex - startIndex + 1);
+    const spanFrac = phaseSpan / n;
+    state.zoom = Math.min(5.0, Math.max(1.5, Math.round((1 / (spanFrac * 1.8)) * 10) / 10));
+    const midIdx = (startIndex + endIndex) / 2;
+    state.pan = Math.max(0.0, Math.min(1.0, midIdx / Math.max(1, n - 1)));
 
     if (phaseBadgeEl) {
       phaseBadgeEl.textContent = label;
@@ -1491,7 +1557,8 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
     if (flightDetailMapEngine && typeof flightDetailMapEngine.highlightFlightTrackRange === 'function') {
       flightDetailMapEngine.highlightFlightTrackRange(startIndex, endIndex, {
         label,
-        type
+        type,
+        trimToPhase: true
       });
     }
 
@@ -1500,6 +1567,8 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
 
   const clearPhaseSelection = () => {
     state.selectedPhase = null;
+    state.zoom = 1.0;
+    state.pan = 0.5;
 
     if (phaseBadgeEl) {
       phaseBadgeEl.textContent = '';
@@ -1532,10 +1601,7 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
       layerToggleBtn.setAttribute('data-layer', nextLayer);
       layerToggleBtn.setAttribute('aria-label', `Layer mappa: ${nextLayer === 'satellite' ? 'Satellite (tocca per OpenTopo)' : 'OpenTopo (tocca per Satellite)'}`);
       layerToggleBtn.setAttribute('title', `Passa a ${nextLayer === 'satellite' ? 'OpenTopo' : 'Satellite'}`);
-      layerToggleBtn.innerHTML = `
-        ${renderLayerToggleIcon(nextLayer)}
-        <span class="gm-layer-toggle-label">${getMapLayerLabel(nextLayer)}</span>
-      `;
+      layerToggleBtn.innerHTML = renderLayerToggleIcon(nextLayer, 20);
 
       if (flightDetailMapEngine && typeof flightDetailMapEngine.setLayer === 'function') {
         flightDetailMapEngine.setLayer(nextLayer);
@@ -1780,7 +1846,8 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
     updateHud(idx);
     updateCursorGroup(idx);
     if (flightDetailMapEngine && typeof flightDetailMapEngine.setFlightTrackCursor === 'function') {
-      flightDetailMapEngine.setFlightTrackCursor(idx);
+      const pt = points[idx];
+      flightDetailMapEngine.setFlightTrackCursor(idx, points.length, pt?.timeSeconds);
     }
   });
 
@@ -1797,7 +1864,8 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
         updateHud(idx);
         renderSvg();
         if (flightDetailMapEngine && typeof flightDetailMapEngine.setFlightTrackCursor === 'function') {
-          flightDetailMapEngine.setFlightTrackCursor(idx);
+          const pt = points[idx];
+          flightDetailMapEngine.setFlightTrackCursor(idx, points.length, pt?.timeSeconds);
         }
         return;
       }
@@ -1807,7 +1875,8 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
     updateHud(idx);
     updateCursorGroup(idx);
     if (flightDetailMapEngine && typeof flightDetailMapEngine.setFlightTrackCursor === 'function') {
-      flightDetailMapEngine.setFlightTrackCursor(idx);
+      const pt = points[idx];
+      flightDetailMapEngine.setFlightTrackCursor(idx, points.length, pt?.timeSeconds);
     }
   });
 
@@ -1880,7 +1949,9 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
       const label = phaseTarget.getAttribute('data-phase-label');
       const startIndex = parseInt(phaseTarget.getAttribute('data-start-index'), 10);
       const endIndex = parseInt(phaseTarget.getAttribute('data-end-index'), 10);
-      selectPhase({ type, label, startIndex, endIndex });
+      const startTime = phaseTarget.getAttribute('data-start-time');
+      const endTime = phaseTarget.getAttribute('data-end-time');
+      selectPhase({ type, label, startIndex, endIndex, startTime, endTime });
     }
   });
 
@@ -1891,7 +1962,9 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
       const label = cardTarget.getAttribute('data-phase-label');
       const startIndex = parseInt(cardTarget.getAttribute('data-start-index'), 10);
       const endIndex = parseInt(cardTarget.getAttribute('data-end-index'), 10);
-      selectPhase({ type, label, startIndex, endIndex });
+      const startTime = cardTarget.getAttribute('data-start-time');
+      const endTime = cardTarget.getAttribute('data-end-time');
+      selectPhase({ type, label, startIndex, endIndex, startTime, endTime });
       if (mapCanvasEl && typeof mapCanvasEl.scrollIntoView === 'function') {
         try { mapCanvasEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (_) {}
       }

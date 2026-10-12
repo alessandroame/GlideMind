@@ -18,7 +18,8 @@ import { IReplay3dEngine } from './IReplay3dEngine.js';
 import {
   projectTrackToThreeLocal,
   interpolateTrackSample,
-  calculateAvatarMinScale
+  calculateAvatarMinScale,
+  calculateRibbonDimensions
 } from '../../core/flightReplayMath.js';
 import { sampleVarioRgb } from '../../core/flightTelemetry.js';
 import { loadScriptOnce } from '../scriptLoader.js';
@@ -92,6 +93,8 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     this.takeoffMarker = null;
     this.landingMarker = null;
     this.curtainMesh = null;
+    this._ribbonNormals = null;
+    this._currentRibbonZoom = null;
 
     // Trajectory & Geodesic Projection State
     this.rawPoints = [];
@@ -537,6 +540,14 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
           self.threeCamera.projectionMatrix = mProj.multiply(coordTransform);
         }
 
+        // Check for zoom changes to dynamically adapt ribbon width and height
+        const currentZoom = (self.map && typeof self.map.getZoom === 'function') ? self.map.getZoom() : null;
+        if (currentZoom !== null && self.trackRibbonMesh && self._currentRibbonZoom !== null) {
+          if (Math.abs(currentZoom - self._currentRibbonZoom) > 0.08) {
+            self._updateRibbonDimensions(currentZoom);
+          }
+        }
+
         self.threeRenderer.resetState();
         self.threeRenderer.render(self.threeScene, self.threeCamera);
 
@@ -554,7 +565,8 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
   }
 
   /**
-   * Builds the 3D trajectory ribbon mesh with vertex colors derived from vario.
+   * Builds the 3D trajectory ribbon mesh with vertex colors derived from vario
+   * and dynamic zoom-adaptive width/height dimensions.
    */
   _buildTrackRibbon() {
     if (!this.THREE || !this.projectedTrack || !this.projectedTrack.points.length) return;
@@ -563,10 +575,17 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     const n = pts.length;
     if (n < 2) return;
 
-    // Volumetric 3D Diamond Tube: 20m wide, 14m tall
-    // Guarantees thick, solid, bold visibility from any camera angle and pitch
-    const ribbonHalfWidth = 10.0;
-    const ribbonHalfHeight = 7.0;
+    const currentZoom = (this.map && typeof this.map.getZoom === 'function')
+      ? this.map.getZoom()
+      : (this.cameraMode === 'cockpit' ? 16.5 : 14);
+
+    const dims = calculateRibbonDimensions(currentZoom, this.origin?.lat);
+    const ribbonHalfWidth = dims.halfWidth;
+    const ribbonHalfHeight = dims.halfHeight;
+    this._currentRibbonZoom = currentZoom;
+
+    // Cache precomputed heading unit normals for 60 FPS zoom-adaptive updates
+    this._ribbonNormals = new Float32Array(n * 2);
 
     const positions = [];
     const colors = [];
@@ -575,45 +594,43 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     const linePositions = [];
     const lineColors = [];
 
-    // High-visibility Electric Magenta (#ff007f) for satellite computer vision and human recognition
-    const ribbonR = 1.0;
-    const ribbonG = 0.0;
-    const ribbonB = 0.498;
-
-    // Luminous Neon Yellow (#ffe600) for track spine
-    const spineR = 1.0;
-    const spineG = 0.902;
-    const spineB = 0.0;
-
     for (let i = 0; i < n; i++) {
       const pt = pts[i];
+      const varioCol = sampleVarioRgb(pt.vario);
+      const r = varioCol.r;
+      const g = varioCol.g;
+      const b = varioCol.b;
 
-      // Center line points (Neon Yellow)
+      // Centerline points colored by FAI variometer
       linePositions.push(pt.x, pt.y, pt.z);
-      lineColors.push(spineR, spineG, spineB);
+      lineColors.push(r, g, b);
 
       // Compute normal to horizontal segment (heading + 90 deg)
       const headingRad = ((pt.heading || 0) * Math.PI) / 180;
-      // Heading 0 is North (-Z), East is +X
-      const dx = Math.cos(headingRad) * ribbonHalfWidth;
-      const dz = Math.sin(headingRad) * ribbonHalfWidth;
+      const nx = Math.cos(headingRad);
+      const nz = Math.sin(headingRad);
+      this._ribbonNormals[i * 2] = nx;
+      this._ribbonNormals[i * 2 + 1] = nz;
 
-      // 4 Vertices forming a 3D Diamond Prism cross-section (Electric Magenta):
+      const dx = nx * ribbonHalfWidth;
+      const dz = nz * ribbonHalfWidth;
+
+      // 4 Vertices forming a 3D Diamond Prism cross-section (FAI variometer vertex colors):
       // V0: Top (+Y)
       positions.push(pt.x, pt.y + ribbonHalfHeight, pt.z);
-      colors.push(ribbonR, ribbonG, ribbonB);
+      colors.push(r, g, b);
 
       // V1: Right (+X/Z lateral)
       positions.push(pt.x + dx, pt.y, pt.z + dz);
-      colors.push(ribbonR, ribbonG, ribbonB);
+      colors.push(r, g, b);
 
       // V2: Bottom (-Y)
       positions.push(pt.x, pt.y - ribbonHalfHeight, pt.z);
-      colors.push(ribbonR, ribbonG, ribbonB);
+      colors.push(r, g, b);
 
       // V3: Left (-X/Z lateral)
       positions.push(pt.x - dx, pt.y, pt.z - dz);
-      colors.push(ribbonR, ribbonG, ribbonB);
+      colors.push(r, g, b);
     }
 
     for (let i = 0; i < n - 1; i++) {
@@ -663,7 +680,7 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     this.trackRibbonMesh = new THREE.Mesh(geom, mat);
     this.threeScene.add(this.trackRibbonMesh);
 
-    // Guaranteed 1px line overlay along trajectory (Luminous Neon Yellow)
+    // Variometer-colored centerline spine
     const lineGeom = new THREE.BufferGeometry();
     lineGeom.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3));
     lineGeom.setAttribute('color', new THREE.Float32BufferAttribute(lineColors, 3));
@@ -715,7 +732,64 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
   }
 
   /**
+   * Dynamically adjusts ribbon cross-section dimensions in response to zoom changes,
+   * maintaining a constant, elegant visual screen thickness without GPU re-allocation.
+   * 
+   * @param {number} zoom
+   */
+  _updateRibbonDimensions(zoom) {
+    if (!this.trackRibbonMesh || !this.projectedTrack || !this._ribbonNormals) return;
+    const dims = calculateRibbonDimensions(zoom, this.origin?.lat);
+    this._currentRibbonZoom = zoom;
+
+    const geom = this.trackRibbonMesh.geometry;
+    const posAttr = (geom && typeof geom.getAttribute === 'function')
+      ? geom.getAttribute('position')
+      : geom?.attributes?.position;
+    if (!posAttr || !posAttr.array) return;
+
+    const pos = posAttr.array;
+    const pts = this.projectedTrack.points;
+    const n = pts.length;
+    const hw = dims.halfWidth;
+    const hh = dims.halfHeight;
+    const normals = this._ribbonNormals;
+
+    let idx = 0;
+    for (let i = 0; i < n; i++) {
+      const pt = pts[i];
+      const nx = normals[i * 2];
+      const nz = normals[i * 2 + 1];
+
+      // V0: Top (+Y)
+      pos[idx]     = pt.x;
+      pos[idx + 1] = pt.y + hh;
+      pos[idx + 2] = pt.z;
+
+      // V1: Right (+X/Z lateral)
+      pos[idx + 3] = pt.x + nx * hw;
+      pos[idx + 4] = pt.y;
+      pos[idx + 5] = pt.z + nz * hw;
+
+      // V2: Bottom (-Y)
+      pos[idx + 6] = pt.x;
+      pos[idx + 7] = pt.y - hh;
+      pos[idx + 8] = pt.z;
+
+      // V3: Left (-X/Z lateral)
+      pos[idx + 9]  = pt.x - nx * hw;
+      pos[idx + 10] = pt.y;
+      pos[idx + 11] = pt.z - nz * hw;
+
+      idx += 12;
+    }
+
+    posAttr.needsUpdate = true;
+  }
+
+  /**
    * Builds vertical drop curtain lines from track to ground for depth perception.
+   * Lines are colored matching the FAI variometer value at each point.
    */
   _buildDropCurtain() {
     if (!this.THREE || !this.projectedTrack) return;
@@ -727,6 +801,7 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     // Place vertical pylon lines every ~10-15 points
     const step = Math.max(4, Math.floor(n / 40));
     const linePositions = [];
+    const lineColors = [];
 
     const originAlt = this.origin?.alt ?? this.projectedTrack?.origin?.alt ?? 0;
 
@@ -742,17 +817,23 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
       const groundY = groundMsl - originAlt;
       const targetY = Math.min(pt.y, groundY);
 
+      const varioCol = sampleVarioRgb(pt.vario);
+
       linePositions.push(pt.x, pt.y, pt.z);
       linePositions.push(pt.x, targetY, pt.z);
+
+      lineColors.push(varioCol.r, varioCol.g, varioCol.b);
+      lineColors.push(varioCol.r, varioCol.g, varioCol.b);
     }
 
     const geom = new THREE.BufferGeometry();
     geom.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3));
+    geom.setAttribute('color', new THREE.Float32BufferAttribute(lineColors, 3));
 
     const mat = new THREE.LineBasicMaterial({
-      color: 0xffb3d9,
+      vertexColors: true,
       transparent: true,
-      opacity: 0.65,
+      opacity: 0.40,
       depthTest: true,
       polygonOffset: true,
       polygonOffsetFactor: -1.0,
@@ -1042,6 +1123,8 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     this._reusableVec3A = null;
     this._reusableVec3B = null;
     this._lastValidCenterElevation = 0;
+    this._ribbonNormals = null;
+    this._currentRibbonZoom = null;
 
     if (this.map) {
       const mapCanvas = this.map.getCanvas();

@@ -648,4 +648,59 @@ describe('LogbookView to FlightDetailSheet Interaction (Headless Integration)', 
     const titleText = overlay.querySelector('#gm-flight-detail-title-text');
     assert.ok(titleText && titleText.textContent.includes('Col Rodella'));
   });
+
+  it('should open FlightDetailSheet when clicking a personal record card in the Stats tab', async () => {
+    await controller.mount(logbookContainer);
+
+    // Switch to stats tab
+    const statsTabBtn = logbookContainer.querySelector('[data-tab="stats"]');
+    assert.ok(statsTabBtn, 'Stats tab button must exist');
+    await controller.handleClick({
+      type: 'click',
+      target: statsTabBtn,
+      bubbles: true,
+      stopPropagation() {},
+      preventDefault() {}
+    });
+
+    // Check that personal record cards are rendered with open-flight-detail action and flight numbers
+    const recordCard = logbookContainer.querySelector('.gm-stats-record-clickable');
+    assert.ok(recordCard, 'At least one clickable personal record card must exist in Stats tab');
+    assert.strictEqual(recordCard.getAttribute('data-action'), 'open-flight-detail');
+    assert.strictEqual(recordCard.getAttribute('role'), 'button');
+    assert.strictEqual(recordCard.getAttribute('tabindex'), '0');
+
+    const flightId = recordCard.getAttribute('data-flight-id');
+    assert.ok(flightId, 'Record card must have data-flight-id attribute');
+
+    const badge = recordCard.querySelector('.gm-flight-number-badge');
+    assert.ok(badge, 'Record card must display flight number badge');
+
+    // Click the personal record card
+    await controller.handleClick({
+      type: 'click',
+      target: recordCard,
+      bubbles: true,
+      stopPropagation() {},
+      preventDefault() {}
+    });
+
+    // Flight detail overlay must open for the corresponding flight
+    const overlay = mockDocument.getElementById('flight-detail-overlay');
+    assert.ok(overlay, 'Flight detail overlay must open when clicking personal record card');
+    assert.strictEqual(overlay.getAttribute('data-flight-id'), flightId);
+
+    // Keyboard navigation (Enter / Space) on record card
+    closeFlightDetailView();
+    assert.strictEqual(mockDocument.getElementById('flight-detail-overlay'), null);
+
+    let preventedDefault = false;
+    await controller.handleKeyDown({
+      key: 'Enter',
+      target: recordCard,
+      preventDefault() { preventedDefault = true; }
+    });
+    assert.strictEqual(preventedDefault, true);
+    assert.ok(mockDocument.getElementById('flight-detail-overlay'), 'Flight detail must open on Enter key from record card');
+  });
 });

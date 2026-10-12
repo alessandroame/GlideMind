@@ -280,7 +280,9 @@ describe('GlideMind Flight Logbook & Pilot Currency Analytics (Headless Core)', 
         maxGainMeters: 260,
         durationMinutes: 36,
         distanceKm: 19.7,
-        maxClimbRate: 3.5
+        thermalsCount: 5,
+        maxClimbRate: 3.5,
+        maxSinkRate: -4.2
       },
       {
         id: 'fl-2',
@@ -291,7 +293,9 @@ describe('GlideMind Flight Logbook & Pilot Currency Analytics (Headless Core)', 
         maxGainMeters: 850,
         durationMinutes: 120,
         distanceKm: 14.2,
-        maxClimbRate: 4.1
+        thermalsCount: 2,
+        maxClimbRate: 4.1,
+        maxSinkRate: -2.1
       },
       {
         id: 'fl-3',
@@ -302,7 +306,9 @@ describe('GlideMind Flight Logbook & Pilot Currency Analytics (Headless Core)', 
         maxGainMeters: 400,
         durationMinutes: 45,
         distanceKm: 8.0,
-        maxClimbRate: 2.0
+        thermalsCount: 1,
+        maxClimbRate: 2.0,
+        maxSinkRate: -1.8
       }
     ];
 
@@ -331,10 +337,22 @@ describe('GlideMind Flight Logbook & Pilot Currency Analytics (Headless Core)', 
       assert.equal(records.maxDistance.flightId, 'fl-1');
       assert.equal(records.maxDistance.flightNumber, 10);
 
-      // Max climb rate: fl-2 (4.1 m/s, #9)
+      // Max thermals: fl-1 (5 thermals, #10)
+      assert.equal(records.maxThermals.val, 5);
+      assert.equal(records.maxThermals.flightId, 'fl-1');
+      assert.equal(records.maxThermals.flightNumber, 10);
+
+      // Max climb rate (max vario): fl-2 (4.1 m/s, #9)
       assert.equal(records.maxClimbRate.val, 4.1);
       assert.equal(records.maxClimbRate.flightId, 'fl-2');
       assert.equal(records.maxClimbRate.flightNumber, 9);
+      assert.equal(records.maxVario.val, 4.1);
+
+      // Max sink rate (min vario): fl-1 (-4.2 m/s, #10)
+      assert.equal(records.maxSinkRate.val, -4.2);
+      assert.equal(records.maxSinkRate.flightId, 'fl-1');
+      assert.equal(records.maxSinkRate.flightNumber, 10);
+      assert.equal(records.minVario.val, -4.2);
     });
 
     it('should deduce flightNumber from progressive position when omitted', () => {
@@ -358,35 +376,47 @@ describe('GlideMind Flight Logbook & Pilot Currency Analytics (Headless Core)', 
       assert.equal(records.maxGain.val, 0);
       assert.equal(records.maxDuration.val, 0);
       assert.equal(records.maxDistance.val, 0);
+      assert.equal(records.maxThermals.val, 0);
       assert.equal(records.maxClimbRate.val, 0);
+      assert.equal(records.maxSinkRate.val, 0);
     });
 
     it('should identify which metrics of a specific flight are records with checkFlightRecordFlags', () => {
       const records = calculatePersonalRecords(testFlights);
 
-      // fl-1 has maxAlt (2037) and maxDistance (19.7)
+      // fl-1 has maxAlt (2037), maxDistance (19.7), maxThermals (5), maxSinkRate (-4.2)
       const flags1 = checkFlightRecordFlags(testFlights[0], records);
       assert.equal(flags1.isMaxAlt, true);
       assert.equal(flags1.isMaxDistance, true);
+      assert.equal(flags1.isMaxThermals, true);
+      assert.equal(flags1.isMaxSinkRate, true);
+      assert.equal(flags1.isMinVario, true);
       assert.equal(flags1.isMaxGain, false);
       assert.equal(flags1.isMaxDuration, false);
+      assert.equal(flags1.isMaxClimbRate, false);
       assert.equal(flags1.hasAnyRecord, true);
 
       // fl-2 has maxGain (850), maxDuration (120), maxClimbRate (4.1)
       const flags2 = checkFlightRecordFlags(testFlights[1], records);
       assert.equal(flags2.isMaxAlt, false);
       assert.equal(flags2.isMaxDistance, false);
+      assert.equal(flags2.isMaxThermals, false);
+      assert.equal(flags2.isMaxSinkRate, false);
       assert.equal(flags2.isMaxGain, true);
       assert.equal(flags2.isMaxDuration, true);
       assert.equal(flags2.isMaxClimbRate, true);
+      assert.equal(flags2.isMaxVario, true);
       assert.equal(flags2.hasAnyRecord, true);
 
       // fl-3 has no records
       const flags3 = checkFlightRecordFlags(testFlights[2], records);
       assert.equal(flags3.isMaxAlt, false);
       assert.equal(flags3.isMaxDistance, false);
+      assert.equal(flags3.isMaxThermals, false);
+      assert.equal(flags3.isMaxSinkRate, false);
       assert.equal(flags3.isMaxGain, false);
       assert.equal(flags3.isMaxDuration, false);
+      assert.equal(flags3.isMaxClimbRate, false);
       assert.equal(flags3.hasAnyRecord, false);
     });
 

@@ -1363,3 +1363,75 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
 
 
 
+
+
+---
+
+## 2026-10-12 - Logbook & Statistiche: Numero di Volo nei Record Personali, Navigazione al Dettaglio ed Evidenziazione Metriche Record
+- **Tipo**: Feature / Logbook UI / Headless Core / Ergonomia
+- **Dettagli**: [.agents/worklog.d/2026-10-12_personal_records_flight_number_and_detail_badges.md](file:///.agents/worklog.d/2026-10-12_personal_records_flight_number_and_detail_badges.md)
+- **Sintesi**:
+  - Nel modulo core `core/logbook.js`, implementate `calculatePersonalRecords(flights)` e `checkFlightRecordFlags(flightMeta, careerRecords)` per associare in modo deterministico a ogni record di carriera (`maxAlt`, `maxGain`, `maxDuration`, `maxDistance`, `maxClimbRate`) l'ID e il numero progressivo del volo (`flightNumber`), sia esso memorizzato o calcolato a partire dall'ordinamento cronologico.
+  - In `ui/views/LogbookStatsView.js`, arricchite le 4 card delle Migliori Prestazioni Personali con badge a vista `#N` del volo (`.gm-flight-number-badge`), interattività al tap (`.gm-stats-record-clickable`, `data-action="open-flight-detail"`), sottotitolo del sito e conformità accessibile WCAG AA (`role="button"`, `tabindex="0"`, `aria-label`).
+  - In `ui/views/LogbookView.js`, garantita la delega dei click e dei tasti Enter/Space per aprire direttamente la scheda `FlightDetailSheet` del volo selezionato.
+  - In `ui/views/FlightDetailSheet.js`, introdotta la segnalazione esplicita dei primati personali del volo visualizzato: pill semantica `.gm-status-pill-record` ("Record Personale") nella testata, badge `.gm-record-badge` ("Record") accanto alla durata se volo più lungo, e classe di evidenziazione `.gm-flight-metric-card-record` con badge nelle card della griglia cinematica (Quota Massima MSL, Guadagno dal Decollo, Salita Massima Vario, Distanza Orizzontale).
+  - Definiti stili e token dedicati in `css/theme.css` con pieno supporto dual-theme Dark Cockpit e Sunlight Mode (`[data-theme="light"]`).
+  - Implementata suite completa di test unitari e di integrazione headless in `tests/core/logbook.test.mjs`, `tests/ui/logbookStatsView.test.mjs`, `tests/ui/flightDetailSheet.test.mjs` e `tests/ui/logbookFlightDetailInteraction.test.mjs`.
+  - Suite di test globale al 100% verde: 698 test (122 suite), 697 passanti, 0 falliti, 1 skipped.
+  - Registrata la Lezione Appresa #134 in [MEMORY.md](file:///MEMORY.md).
+
+
+---
+
+## 2026-10-12 - UI / Cartografia: Icon-Only Map Layer Toggle con Sfera Wireframe, Vetta di Montagna e Sfumatura Radiale Soffice
+- **Tipo**: UI / Ergonomia Outdoor / Cartografia / Icon Design
+- **Dettagli**: [.agents/worklog.d/2026-10-12_icon_only_map_layer_toggle_wireframe_sphere_and_mountain_peak.md](file:///.agents/worklog.d/2026-10-12_icon_only_map_layer_toggle_wireframe_sphere_and_mountain_peak.md)
+- **Sintesi**:
+  - Rimozione delle etichette testuali ridondanti da tutti i controlli toggle di mappa nell'applicazione (`SpotMapView`, `ForecastView`, `FlightDetailSheet`, `FlightReplayView`), riducendo l'ingombro visivo e passando a un'interfaccia icon-only pura.
+  - Introdotte nuove icone SVG dedicate ad alta precisione: sfera wireframe 3D (meridiano, parallelo ed ellissi coordinate) per il layer Satellite; vetta alpina con cresta d'arête e curve orografiche per il layer OpenTopo.
+  - Ridisegnato lo sfondo dei pulsanti: sagoma circolare (`border-radius: 50%`), eliminazione completa di qualsiasi bordo (`border: none !important`), adozione di sfumatura radiale soffice (`radial-gradient`) e sfocatura ottica del terreno sottostante (`backdrop-filter: blur(4px)`).
+  - Adattamento cromatico ad alto contrasto per ambo i layer (alone scuro con icona bianca su Satellite; alone chiaro con icona scura su Topo).
+  - Armonizzato con la medesima estetica borderless anche il pulsante circolare di espansione della mini-mappa (`.gm-mini-map-expand-btn`).
+  - Pavimento ergonomico di tocco $\ge 48\times 48\text{px}$ garantito su tutti i dispositivi touch (Fitts's Law).
+  - 122 suite, 698 test eseguiti con successo al 100%. Registrata la Lezione Appresa #136 in `MEMORY.md`.
+
+
+---
+
+## 2026-10-12 - Logbook & Statistiche: Estensione Record con Termiche Max, Max Vario e Min Vario
+- **Tipo**: Feature / Logbook UI / Headless Core / Telemetria
+- **Dettagli**: [.agents/worklog.d/2026-10-12_personal_records_thermals_max_vario_min_vario.md](file:///.agents/worklog.d/2026-10-12_personal_records_thermals_max_vario_min_vario.md)
+- **Sintesi**:
+  - Esteso il calcolo dei primati personali in `core/logbook.js` con: `maxThermals` (numero massimo di termiche agganciate), `maxClimbRate` / `maxVario` (massimo rateo di salita $+X.X\text{ m/s}$), e `maxSinkRate` / `minVario` (minimo rateo variometrico / discesa massima $-X.X\text{ m/s}$).
+  - Aggiunti i flag di verifica in `checkFlightRecordFlags`: `isMaxThermals`, `isMaxClimbRate` (`isMaxVario`), `isMaxSinkRate` (`isMinVario`).
+  - Inserite in `ui/views/LogbookStatsView.js` 3 nuove card cliccabili con badge `#N` del volo ("Termiche Max", "Max Vario", "Min Vario") collegate direttamente all'apertura del rispettivo `FlightDetailSheet`.
+  - In `ui/views/FlightDetailSheet.js`, arricchita la griglia cinematica con il badge `Record` e il bordo di evidenziazione ambra sulle schede "Termiche Agganciate", "Salita Massima (Vario)" e "Discesa Massima".
+  - Aggiornate e ampliate le test suite in `tests/core/logbook.test.mjs`, `tests/ui/logbookStatsView.test.mjs` e `tests/ui/flightDetailSheet.test.mjs`.
+  - Suite di test globale al 100% verde: 699 test (122 suite), 698 passanti, 0 falliti, 1 skipped.
+
+---
+
+## 2026-10-12 - UI / Telemetria: Sincronizzazione Cursore Proporzionale Mappa, Zoom e Trim Bidirezionale di Fase
+- **Tipo**: Bugfix / Telemetria / Ergonomia UX / Cartografia 2D
+- **Dettagli**: [.agents/worklog.d/2026-10-12_flight_detail_map_phase_trim_cursor.md](file:///.agents/worklog.d/2026-10-12_flight_detail_map_phase_trim_cursor.md)
+- **Sintesi**:
+  - Risolto il difetto di compressione orizzontale del cursore cartografico sulla mini-mappa 2D in `FlightDetailSheet.js`: introdotta la mappatura proporzionale a 4 livelli in `setFlightTrackCursor` (`timeSeconds`, frazione continua X $\in [0, 1]$, `origIdx`, clamp), garantendo perfetta coincidenza $0\% \to$ Decollo e $100\% \to$ Atterraggio.
+  - Risolta la mancata attivazione dello zoom su selezione di fase (termiche, sondaggi 360°, dinamiche): resa polimorfica la firma di `highlightFlightTrackRange` in `LeafletMapEngine` per accettare sia oggetti che parametri posizionali `(startIndex, endIndex, options)`, con esecuzione automatica di `map.fitBounds(phaseBounds)` su coordinate della fase.
+  - Implementato il trim visivo simmetrico della traccia: sulla mappa i segmenti esterni alla fase vengono attenuati (`opacity: 0.15`), il segmento attivo riceve un alone luminoso ciano (`#38bdf8`, weight 7), pin d'ingresso ed uscita; sul grafico altimetrico la visuale viene automaticamente zoomata e centrata sulla finestra temporale della fase, con ripristino istantaneo a 1.0x tramite pulsante "Mostra Tutto".
+  - Suite di test completa al 100% verde: 700 test eseguiti (122 suite), 699 passati, 0 falliti, 1 skipped.
+  - Registrata la Lezione Appresa #137 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-12 - Replay 3D: Spessore Dinamico Zoom-Adattivo della Traccia e Colorazione Variometrica FAI
+- **Tipo**: Feature / 3D Graphics / Telemetria / Ergonomia Outdoor
+- **Dettagli**: [.agents/worklog.d/2026-10-12_dynamic_zoom_adaptive_3d_track_ribbon_and_fai_vario_colors.md](file:///.agents/worklog.d/2026-10-12_dynamic_zoom_adaptive_3d_track_ribbon_and_fai_vario_colors.md)
+- **Sintesi**:
+  - Risolta la visualizzazione sproporzionata della traccia 3D in `MapLibreThreeEngine.js`: sostituito il prisma metrico rigido di 20m x 14m con l'algoritmo di dimensionamento dinamico zoom-adattivo `calculateRibbonDimensions` in `core/flightReplayMath.js`.
+  - Calcolato lo spessore orografico in base alla risoluzione di Web Mercator per mantenere un target visivo costante su schermo di ~3.5 pixel: la traccia a zoom 18 si riduce a soli ~1.45m di larghezza (14% dell'apertura alare del parapendio), presentandosi come un nastro aerodinamico sottile e pulito che non occlude la vela né il pilota, mentre a zoom panoramico scala proporzionalmente senza mai scomparire in subpixel invisibili.
+  - Implementato l'aggiornamento a 60 FPS senza allocazioni GPU in `_updateRibbonDimensions(zoom)` sfruttando la precomputazione dei vettori normali di prua `_ribbonNormals` e l'aggiornamento in-place del buffer geometry.
+  - Applicata la colorazione variometrica FAI standard (`sampleVarioRgb(pt.vario)`): rosso/arancione per le termiche in salita, verde smeraldo per le planate, azzurro/indaco per le discendenze.
+  - Estesa la colorazione variometrica FAI anche alla linea dorsale centrale e ai segmenti di caduta verticale verso il terreno (drop curtain lines, con opacità 0.40).
+  - Aggiunte suite di test in `tests/core/flightReplayMath.test.mjs` e aggiornati i contratti di integrazione in `tests/ui/replayTakeoffLandingTrackVisibility.test.mjs`.
+  - Test suite globale al 100% verde: 704 test (123 suite), 703 passanti, 0 falliti, 1 skipped.
+  - Registrata la Lezione Appresa #138 in [MEMORY.md](file:///MEMORY.md).

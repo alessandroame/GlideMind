@@ -1528,10 +1528,7 @@ export class ForecastViewController {
     toggleBtn.setAttribute('data-layer', newLayer);
     toggleBtn.setAttribute('aria-label', `Layer mappa: ${curLabel} (tocca per ${nextLabel})`);
     toggleBtn.setAttribute('title', `Layer mappa: ${curLabel} (tocca per ${nextLabel})`);
-    toggleBtn.innerHTML = `
-      ${renderLayerToggleIcon(newLayer)}
-      <span class="gm-layer-toggle-label">${curLabel}</span>
-    `;
+    toggleBtn.innerHTML = renderLayerToggleIcon(newLayer, 20);
     const select = this.container.querySelector('#forecast-minimap-layer-select');
     if (select) select.value = newLayer;
   }
@@ -1551,10 +1548,7 @@ export class ForecastViewController {
     toggleBtn.setAttribute('data-layer', newLayer);
     toggleBtn.setAttribute('aria-label', `Layer mappa: ${curLabel} (tocca per ${nextLabel})`);
     toggleBtn.setAttribute('title', `Layer mappa: ${curLabel} (tocca per ${nextLabel})`);
-    toggleBtn.innerHTML = `
-      ${renderLayerToggleIcon(newLayer)}
-      <span class="gm-layer-toggle-label">${curLabel}</span>
-    `;
+    toggleBtn.innerHTML = renderLayerToggleIcon(newLayer, 20);
     const select = root.querySelector('.gm-flight-analysis-layer-select');
     if (select) select.value = newLayer;
   }
@@ -1577,8 +1571,7 @@ export class ForecastViewController {
           aria-label="Layer mappa: ${activeLayer === 'satellite' ? 'Satellite (tocca per OpenTopo)' : 'OpenTopo (tocca per Satellite)'}" 
           title="Passa a ${activeLayer === 'satellite' ? 'OpenTopo' : 'Satellite'}"
         >
-          ${renderLayerToggleIcon(activeLayer)}
-          <span class="gm-layer-toggle-label">${getMapLayerLabel(activeLayer)}</span>
+          ${renderLayerToggleIcon(activeLayer, 20)}
         </button>
         <button 
           type="button" 
@@ -2314,14 +2307,18 @@ export class ForecastViewController {
     hideTooltip = false,
     hideThresholdLabels = false,
     startHour = null,
-    endHour = null
+    endHour = null,
+    secondaryAxis = null,
+    legendText = null,
+    heatmapRow = null
   }) {
     const W = 350;
-    const H = compact ? 85 : 120;
+    const hasHeatmap = Boolean(heatmapRow && Array.isArray(heatmapRow.points) && heatmapRow.points.length > 0);
+    const H = compact ? (hasHeatmap ? 92 : 85) : (hasHeatmap ? 128 : 120);
     const xMin = 36;
-    const xMax = 335;
+    const xMax = secondaryAxis ? 322 : 335;
     const yMin = compact ? 8 : 14;
-    const yMax = H - (compact ? 18 : 22);
+    const yMax = H - (hasHeatmap ? (compact ? 36 : 42) : (compact ? 18 : 22));
     const yRange = Math.max(1, maxY - minY);
 
     const primarySeries = series[0] || { points: [] };
@@ -2337,17 +2334,22 @@ export class ForecastViewController {
     const mid2 = minY + yRange * 0.66;
 
     const renderedSeries = series.map(s => {
+      const sMinY = (typeof s.minY === 'number') ? s.minY : minY;
+      const sMaxY = (typeof s.maxY === 'number') ? s.maxY : maxY;
+      const sYRange = Math.max(1, sMaxY - sMinY);
+      const getSeriesY = (val) => Math.round(yMax - ((Math.min(sMaxY, Math.max(sMinY, val)) - sMinY) / sYRange) * (yMax - yMin));
+
       if (s.type === 'bar') {
         const barWidth = s.barWidth || Math.max(4, Math.round(((xMax - xMin) / hRange) * 0.55));
         const barsMarkup = (s.points || []).map(p => {
           const x = Math.round(getX(p.hour) - barWidth / 2);
-          const y = getY(p.value);
+          const y = getSeriesY(p.value);
           const h = Math.max(0, yMax - y);
           return `<rect x="${x}" y="${y}" width="${barWidth}" height="${h}" fill="${s.fill || s.stroke || 'var(--gm-accent-sky, #0ea5e9)'}" rx="${s.rx ?? 1}" opacity="${s.opacity ?? 0.85}" />`;
         }).join('');
         return barsMarkup;
       }
-      const coords = (s.points || []).map(p => ({ x: getX(p.hour), y: getY(p.value) }));
+      const coords = (s.points || []).map(p => ({ x: getX(p.hour), y: getSeriesY(p.value) }));
       let areaMarkup = '';
       if (s.fillArea && coords.length > 0) {
         const areaPath = buildSmoothAreaPath(coords, yMax);
@@ -2378,7 +2380,10 @@ export class ForecastViewController {
 
     const activeMarkerX = getX(selectedHour);
     const activePoint = (primarySeries.points || []).find(p => p.hour === selectedHour) || primarySeries.points?.[0] || { value: 0 };
-    const activeMarkerY = getY(activePoint.value);
+    const pMinY = (typeof primarySeries.minY === 'number') ? primarySeries.minY : minY;
+    const pMaxY = (typeof primarySeries.maxY === 'number') ? primarySeries.maxY : maxY;
+    const pYRange = Math.max(1, pMaxY - pMinY);
+    const activeMarkerY = Math.round(yMax - ((Math.min(pMaxY, Math.max(pMinY, activePoint.value)) - pMinY) / pYRange) * (yMax - yMin));
 
     const numLabels = hRange <= 8 ? 3 : (hRange <= 12 ? 4 : 5);
     const labelHours = [];
@@ -2386,6 +2391,50 @@ export class ForecastViewController {
       const h = Math.round(sH + (i * hRange) / (numLabels - 1));
       if (!labelHours.includes(h)) labelHours.push(h);
     }
+
+    const stripY = yMax + 5;
+    const stripH = 13;
+    const stepX = (xMax - xMin) / hRange;
+    const cellW = Math.max(12, Math.round(stepX * 0.85));
+
+    const renderedHeatmap = hasHeatmap ? `
+      <!-- Heatmap Row Label -->
+      <text x="4" y="${stripY + 9.5}" font-size="7" font-weight="700" fill="var(--gm-text-muted)" text-anchor="start">${escapeHtml(heatmapRow.label || 'Prob.')}</text>
+      <!-- Heatmap Cells -->
+      ${heatmapRow.points.map(p => {
+        const hourX = getX(p.hour);
+        const cellX = Math.round(hourX - cellW / 2);
+        const val = Math.round(p.value || 0);
+        let cellFill = 'rgba(148, 163, 184, 0.12)';
+        let cellText = 'var(--gm-text-muted)';
+        let cellWeight = '500';
+
+        if (val >= 60) {
+          cellFill = 'var(--gm-status-unflyable, #ef4444)';
+          cellText = '#ffffff';
+          cellWeight = '700';
+        } else if (val >= 35) {
+          cellFill = 'var(--gm-status-caution, #f59e0b)';
+          cellText = '#ffffff';
+          cellWeight = '700';
+        } else if (val >= 20) {
+          cellFill = 'var(--gm-accent-sky, #0ea5e9)';
+          cellText = '#ffffff';
+          cellWeight = '700';
+        } else if (val > 0) {
+          cellFill = 'rgba(14, 165, 233, 0.28)';
+          cellText = 'var(--gm-accent-sky, #0ea5e9)';
+          cellWeight = '600';
+        }
+
+        const isActive = p.hour === selectedHour;
+        const activeStroke = isActive ? 'stroke="var(--gm-accent)" stroke-width="1.6"' : '';
+        return `
+          <rect x="${cellX}" y="${stripY}" width="${cellW}" height="${stripH}" rx="2" fill="${cellFill}" ${activeStroke} />
+          <text x="${hourX}" y="${stripY + 9.5}" font-size="6.8" font-weight="${cellWeight}" fill="${cellText}" text-anchor="middle">${val > 0 ? val + '%' : '0%'}</text>
+        `;
+      }).join('')}
+    ` : '';
 
     return `
       <div id="${id}-box" class="gm-chart-box">
@@ -2399,20 +2448,32 @@ export class ForecastViewController {
           <text x="${xMin - 4}" y="${getY(minY) + 3}" font-size="8" fill="var(--gm-text-muted)" text-anchor="end">${maxY <= 5 ? minY.toFixed(1) : Math.round(minY)}</text>
           <text x="${xMin - 4}" y="${getY(mid2) + 3}" font-size="8" fill="var(--gm-text-muted)" text-anchor="end">${maxY <= 5 ? mid2.toFixed(1) : Math.round(mid2)}</text>
           <text x="${xMin - 4}" y="${getY(maxY) + 7}" font-size="8" fill="var(--gm-text-muted)" text-anchor="end">${maxY <= 5 ? maxY.toFixed(1) : Math.round(maxY)}</text>
+          ${secondaryAxis ? `
+          <text x="${W - 2}" y="${getY(maxY) + 7}" font-size="7.5" fill="var(--gm-text-muted)" text-anchor="end">${secondaryAxis.maxY}${secondaryAxis.unit || ''}</text>
+          <text x="${W - 2}" y="${getY(minY) + 3}" font-size="7.5" fill="var(--gm-text-muted)" text-anchor="end">${secondaryAxis.minY}${secondaryAxis.unit || ''}</text>
+          ` : ''}
 
           <!-- Threshold lines -->
           ${renderedThresholds}
 
+          ${legendText ? `
+          <!-- Micro-Legend Text -->
+          <text x="${xMin}" y="${yMin - 1}" font-size="6.8" fill="var(--gm-text-muted)" opacity="0.85">${escapeHtml(legendText)}</text>
+          ` : ''}
+
           <!-- Series paths -->
           ${renderedSeries}
 
+          <!-- Heatmap Row (if present) -->
+          ${renderedHeatmap}
+
           <!-- Hourly X Axis Labels -->
           ${labelHours.map(lh => `
-            <text x="${getX(lh)}" y="${H - 4}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">${String(lh).padStart(2, '0')}</text>
+            <text x="${getX(lh)}" y="${H - 3}" font-size="8" fill="var(--gm-text-muted)" text-anchor="middle">${String(lh).padStart(2, '0')}</text>
           `).join('')}
 
           <!-- Active Hour Vertical Marker -->
-          <line x1="${activeMarkerX}" y1="${yMin}" x2="${activeMarkerX}" y2="${yMax}" stroke="var(--gm-accent)" stroke-width="1.8" stroke-dasharray="3,3" />
+          <line x1="${activeMarkerX}" y1="${yMin}" x2="${activeMarkerX}" y2="${hasHeatmap ? (stripY + stripH) : yMax}" stroke="var(--gm-accent)" stroke-width="1.8" stroke-dasharray="3,3" />
           <circle cx="${activeMarkerX}" cy="${activeMarkerY}" r="4" fill="var(--gm-accent)" stroke="var(--gm-bg-base)" stroke-width="1.8" />
           ${!hideTooltip ? `
           <rect x="${Math.max(xMin, Math.min(xMax - 54, activeMarkerX - 27))}" y="2" width="54" height="13" rx="3" fill="var(--gm-accent)" />
@@ -2660,13 +2721,34 @@ export class ForecastViewController {
         label: 'Precipitazioni',
         val: `${(activePoint.precip || 0).toFixed(1)}`,
         unit: 'mm/h',
-        subHtml: `<span class="gm-trend-sub-badge ${(activePoint.precip || 0) > 0.5 ? 'status-unflyable' : (activePoint.precip || 0) > 0 ? 'status-caution' : 'status-flyable'}">${(activePoint.precip || 0) > 0.5 ? 'NO FLY: Pioggia' : (activePoint.precip || 0) > 0 ? 'Pioviggine' : ((activePoint.precipProb || 0) > 30 ? `${Math.round(activePoint.precipProb)}% prob.` : 'Assenti')}</span>`,
+        subHtml: (() => {
+          const curPrecip = activePoint.precip || 0;
+          const curProb = Math.round(activePoint.precipProb || 0);
+          if (curPrecip > 0.5) {
+            return `<span class="gm-trend-sub-badge status-unflyable">NO FLY: Pioggia</span>`;
+          }
+          if (curPrecip >= 0.1) {
+            return `<span class="gm-trend-sub-badge status-caution">Pioviggine</span>`;
+          }
+          if (curProb >= 50) {
+            return `<span class="gm-trend-sub-badge status-alert">${curProb}% prob. rovesci</span>`;
+          }
+          if (curProb >= 25) {
+            return `<span class="gm-trend-sub-badge status-caution">${curProb}% prob. pioggia</span>`;
+          }
+          if (curProb > 0) {
+            return `<span class="gm-trend-sub-badge status-flyable">${curProb}% prob.</span>`;
+          }
+          return `<span class="gm-trend-sub-badge status-flyable">Assenti</span>`;
+        })(),
         chartHtml: this.renderSvgTrendChart({
           id: 'multi-precipitation',
           title: 'Precipitazioni',
           unit: 'mm/h',
           minY: 0,
           maxY: Math.max(3, Math.ceil(Math.max(...hourlyPoints.map(p => p.precip || 0), 0) * 1.5)),
+          secondaryAxis: { unit: '%', minY: 0, maxY: 100 },
+          legendText: 'Barre: mm/h · Tratteggio: % prob.',
           compact: true,
           hideTooltip: true,
           hideThresholdLabels: true,
@@ -2674,13 +2756,25 @@ export class ForecastViewController {
             { value: 0.1, stroke: 'var(--gm-status-caution)', strokeDasharray: '4,3' },
             { value: 0.5, stroke: 'var(--gm-status-unflyable)', strokeDasharray: '4,3' }
           ],
-          series: [{
-            name: 'Precipitazioni',
-            type: 'bar',
-            points: hourlyPoints.map(p => ({ hour: p.hour, value: p.precip || 0 })),
-            fill: 'var(--gm-accent-sky, #0ea5e9)',
-            opacity: 0.85
-          }]
+          series: [
+            {
+              name: 'Accumulo Pioggia',
+              type: 'bar',
+              points: hourlyPoints.map(p => ({ hour: p.hour, value: p.precip || 0 })),
+              fill: 'var(--gm-accent-sky, #0ea5e9)',
+              opacity: 0.85
+            },
+            {
+              name: 'Probabilità Pioggia',
+              points: hourlyPoints.map(p => ({ hour: p.hour, value: p.precipProb || 0 })),
+              stroke: 'var(--gm-accent-sky, #0ea5e9)',
+              strokeWidth: 1.8,
+              strokeDasharray: '3,3',
+              fillArea: 'rgba(14, 165, 233, 0.12)',
+              minY: 0,
+              maxY: 100
+            }
+          ]
         })
       },
       {
@@ -4769,14 +4863,13 @@ export class ForecastViewController {
               <button 
                 type="button" 
                 id="forecast-flight-analysis-layer-toggle" 
-                class="gm-flight-analysis-ctrl-btn gm-map-layer-toggle" 
+                class="gm-map-layer-toggle" 
                 data-action="toggle-flight-analysis-layer" 
                 data-layer="${activeLayer}" 
                 aria-label="Layer mappa: ${activeLayer === 'satellite' ? 'Satellite (tocca per OpenTopo)' : 'OpenTopo (tocca per Satellite)'}" 
                 title="Layer mappa: ${activeLayer === 'satellite' ? 'Satellite (tocca per OpenTopo)' : 'OpenTopo (tocca per Satellite)'}"
               >
-                ${renderLayerToggleIcon(activeLayer)}
-                <span class="gm-layer-toggle-label">${getMapLayerLabel(activeLayer)}</span>
+                ${renderLayerToggleIcon(activeLayer, 20)}
               </button>
             </div>
             <div class="gm-flight-analysis-controls-right">

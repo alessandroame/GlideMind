@@ -19,7 +19,9 @@ describe('LogbookStatsView Component (UI Layer)', () => {
       maxGainMeters: 116,
       thermalsCount: 2,
       maneuversCount: 0,
-      distanceKm: 13.8
+      distanceKm: 13.8,
+      maxClimbRate: 2.8,
+      maxSinkRate: -3.5
     },
     {
       id: 'fl-2',
@@ -30,9 +32,11 @@ describe('LogbookStatsView Component (UI Layer)', () => {
       glider: 'Ozone Rush 6',
       maxAltMsl: 1650,
       maxGainMeters: 750,
-      thermalsCount: 3,
+      thermalsCount: 6,
       maneuversCount: 2,
-      distanceKm: 15.2
+      distanceKm: 15.2,
+      maxClimbRate: 4.2,
+      maxSinkRate: -1.9
     }
   ];
 
@@ -57,7 +61,7 @@ describe('LogbookStatsView Component (UI Layer)', () => {
     // Career Totals (45 + 60 = 105 min = 1.8 h)
     assert.ok(html.includes('1.8 h') || html.includes('2 h'));
     assert.ok(html.includes('2'), 'Must show 2 total flights');
-    assert.ok(html.includes('5'), 'Must show 5 total thermals (2 + 3)');
+    assert.ok(html.includes('8'), 'Must show 8 total thermals (2 + 6)');
     assert.ok(html.includes('2'), 'Must show 2 total maneuvers');
 
     // Personal Records
@@ -65,6 +69,12 @@ describe('LogbookStatsView Component (UI Layer)', () => {
     assert.ok(html.includes('+750 m'), 'Max gain must be +750m');
     assert.ok(html.includes('60 min'), 'Longest flight must be 60 min');
     assert.ok(html.includes('15.2 km'), 'Max distance must be 15.2 km');
+    assert.ok(html.includes('Termiche Max'), 'Must render Termiche Max card');
+    assert.ok(html.includes('>6<'), 'Must show max thermals 6');
+    assert.ok(html.includes('Max Vario'), 'Must render Max Vario card');
+    assert.ok(html.includes('+4.2 m/s'), 'Must show max vario +4.2 m/s');
+    assert.ok(html.includes('Min Vario'), 'Must render Min Vario card');
+    assert.ok(html.includes('-3.5 m/s'), 'Must show min vario -3.5 m/s');
 
     // Flight number badges visible on personal records
     assert.ok(html.includes('gm-flight-number-badge'), 'Must render flight number badge on personal records');

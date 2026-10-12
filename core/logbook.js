@@ -517,9 +517,14 @@ export function calculateMonthlyFlightActivity(flights = [], options = {}) {
  * @returns {{
  *   maxAlt: { val: number, flightId: string|null, flightNumber: number|null, site: string, date: string },
  *   maxGain: { val: number, flightId: string|null, flightNumber: number|null, site: string, date: string },
+ * @returns {{
+ *   maxAlt: { val: number, flightId: string|null, flightNumber: number|null, site: string, date: string },
+ *   maxGain: { val: number, flightId: string|null, flightNumber: number|null, site: string, date: string },
  *   maxDuration: { val: number, flightId: string|null, flightNumber: number|null, site: string, date: string },
  *   maxDistance: { val: number, flightId: string|null, flightNumber: number|null, site: string, date: string },
- *   maxClimbRate: { val: number, flightId: string|null, flightNumber: number|null, site: string, date: string }
+ *   maxThermals: { val: number, flightId: string|null, flightNumber: number|null, site: string, date: string },
+ *   maxClimbRate: { val: number, flightId: string|null, flightNumber: number|null, site: string, date: string },
+ *   maxSinkRate: { val: number, flightId: string|null, flightNumber: number|null, site: string, date: string }
  * }}
  */
 export function calculatePersonalRecords(flights = []) {
@@ -531,7 +536,11 @@ export function calculatePersonalRecords(flights = []) {
     maxGain: { val: 0, flightId: null, flightNumber: null, site: '', date: '' },
     maxDuration: { val: 0, flightId: null, flightNumber: null, site: '', date: '' },
     maxDistance: { val: 0, flightId: null, flightNumber: null, site: '', date: '' },
-    maxClimbRate: { val: 0, flightId: null, flightNumber: null, site: '', date: '' }
+    maxThermals: { val: 0, flightId: null, flightNumber: null, site: '', date: '' },
+    maxClimbRate: { val: 0, flightId: null, flightNumber: null, site: '', date: '' },
+    maxSinkRate: { val: 0, flightId: null, flightNumber: null, site: '', date: '' },
+    get maxVario() { return this.maxClimbRate; },
+    get minVario() { return this.maxSinkRate; }
   };
 
   safeFlights.forEach((f, index) => {
@@ -561,9 +570,22 @@ export function calculatePersonalRecords(flights = []) {
       records.maxDistance = { val: dist, flightId, flightNumber: flightNum, site, date };
     }
 
-    const climb = Number(f.maxClimbRate) || 0;
+    const thermals = Number(f.thermalsCount != null ? f.thermalsCount : (Array.isArray(f.telemetry?.thermals) ? f.telemetry.thermals.length : (Array.isArray(f.thermals) ? f.thermals.length : 0))) || 0;
+    if (thermals > records.maxThermals.val) {
+      records.maxThermals = { val: thermals, flightId, flightNumber: flightNum, site, date };
+    }
+
+    const climb = Number(f.maxClimbRate != null ? f.maxClimbRate : (f.maxClimb != null ? f.maxClimb : f.maxVario)) || 0;
     if (climb > records.maxClimbRate.val) {
       records.maxClimbRate = { val: climb, flightId, flightNumber: flightNum, site, date };
+    }
+
+    const rawSink = Number(f.maxSinkRate != null ? f.maxSinkRate : (f.maxSink != null ? f.maxSink : f.minVario)) || 0;
+    if (rawSink !== 0) {
+      const sinkVal = -Math.abs(rawSink);
+      if (records.maxSinkRate.val === 0 || sinkVal < records.maxSinkRate.val) {
+        records.maxSinkRate = { val: sinkVal, flightId, flightNumber: flightNum, site, date };
+      }
     }
   });
 
@@ -580,7 +602,11 @@ export function calculatePersonalRecords(flights = []) {
  *   isMaxGain: boolean,
  *   isMaxDuration: boolean,
  *   isMaxDistance: boolean,
+ *   isMaxThermals: boolean,
  *   isMaxClimbRate: boolean,
+ *   isMaxSinkRate: boolean,
+ *   isMaxVario: boolean,
+ *   isMinVario: boolean,
  *   hasAnyRecord: boolean
  * }}
  */
@@ -591,7 +617,11 @@ export function checkFlightRecordFlags(flightMeta, careerRecords) {
       isMaxGain: false,
       isMaxDuration: false,
       isMaxDistance: false,
+      isMaxThermals: false,
       isMaxClimbRate: false,
+      isMaxSinkRate: false,
+      isMaxVario: false,
+      isMinVario: false,
       hasAnyRecord: false
     };
   }
@@ -608,16 +638,27 @@ export function checkFlightRecordFlags(flightMeta, careerRecords) {
   const dist = Number(flightMeta.distanceKm) || 0;
   const isMaxDistance = dist > 0 && careerRecords.maxDistance?.val > 0 && dist >= careerRecords.maxDistance.val;
 
-  const climb = Number(flightMeta.maxClimbRate) || 0;
+  const thermals = Number(flightMeta.thermalsCount != null ? flightMeta.thermalsCount : (Array.isArray(flightMeta.telemetry?.thermals) ? flightMeta.telemetry.thermals.length : (Array.isArray(flightMeta.thermals) ? flightMeta.thermals.length : 0))) || 0;
+  const isMaxThermals = thermals > 0 && careerRecords.maxThermals?.val > 0 && thermals >= careerRecords.maxThermals.val;
+
+  const climb = Number(flightMeta.maxClimbRate != null ? flightMeta.maxClimbRate : (flightMeta.maxClimb != null ? flightMeta.maxClimb : flightMeta.maxVario)) || 0;
   const isMaxClimbRate = climb > 0 && careerRecords.maxClimbRate?.val > 0 && climb >= careerRecords.maxClimbRate.val;
+
+  const rawSink = Number(flightMeta.maxSinkRate != null ? flightMeta.maxSinkRate : (flightMeta.maxSink != null ? flightMeta.maxSink : flightMeta.minVario)) || 0;
+  const sinkVal = rawSink !== 0 ? -Math.abs(rawSink) : 0;
+  const isMaxSinkRate = sinkVal < 0 && careerRecords.maxSinkRate?.val < 0 && sinkVal <= careerRecords.maxSinkRate.val;
 
   return {
     isMaxAlt,
     isMaxGain,
     isMaxDuration,
     isMaxDistance,
+    isMaxThermals,
     isMaxClimbRate,
-    hasAnyRecord: isMaxAlt || isMaxGain || isMaxDuration || isMaxDistance || isMaxClimbRate
+    isMaxSinkRate,
+    isMaxVario: isMaxClimbRate,
+    isMinVario: isMaxSinkRate,
+    hasAnyRecord: isMaxAlt || isMaxGain || isMaxDuration || isMaxDistance || isMaxThermals || isMaxClimbRate || isMaxSinkRate
   };
 }
 

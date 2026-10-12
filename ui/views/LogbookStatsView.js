@@ -608,6 +608,42 @@ export function renderLogbookStatsHtml(flights = [], options = {}) {
             <span class="gm-stats-metric-label">Distanza Massima</span>
             ${personalRecords.maxDistance.site ? `<span class="gm-stats-metric-sub truncate" title="${escapeHtml(personalRecords.maxDistance.site)}">${escapeHtml(personalRecords.maxDistance.site)}</span>` : ''}
           </div>
+
+          <div
+            class="gm-stats-metric-card ${personalRecords.maxThermals.flightId ? 'gm-stats-record-clickable' : ''}"
+            ${personalRecords.maxThermals.flightId ? `data-action="open-flight-detail" data-flight-id="${escapeHtml(personalRecords.maxThermals.flightId)}" role="button" tabindex="0" aria-label="Termiche Max: ${personalRecords.maxThermals.val}, Volo #${personalRecords.maxThermals.flightNumber}. Tocca per aprire il dettaglio."` : ''}
+          >
+            <div class="flex items-center justify-between gap-1">
+              <span class="gm-stats-metric-val">${personalRecords.maxThermals.val > 0 ? `${escapeHtml(personalRecords.maxThermals.val)}` : '--'}</span>
+              ${personalRecords.maxThermals.flightNumber != null ? `<span class="gm-flight-number-badge" aria-label="Volo ${personalRecords.maxThermals.flightNumber}">#${escapeHtml(personalRecords.maxThermals.flightNumber)}</span>` : ''}
+            </div>
+            <span class="gm-stats-metric-label">Termiche Max</span>
+            ${personalRecords.maxThermals.site ? `<span class="gm-stats-metric-sub truncate" title="${escapeHtml(personalRecords.maxThermals.site)}">${escapeHtml(personalRecords.maxThermals.site)}</span>` : ''}
+          </div>
+
+          <div
+            class="gm-stats-metric-card ${personalRecords.maxClimbRate.flightId ? 'gm-stats-record-clickable' : ''}"
+            ${personalRecords.maxClimbRate.flightId ? `data-action="open-flight-detail" data-flight-id="${escapeHtml(personalRecords.maxClimbRate.flightId)}" role="button" tabindex="0" aria-label="Max Vario: +${personalRecords.maxClimbRate.val} m/s, Volo #${personalRecords.maxClimbRate.flightNumber}. Tocca per aprire il dettaglio."` : ''}
+          >
+            <div class="flex items-center justify-between gap-1">
+              <span class="gm-stats-metric-val">${personalRecords.maxClimbRate.val > 0 ? `+${escapeHtml(personalRecords.maxClimbRate.val)} m/s` : '--'}</span>
+              ${personalRecords.maxClimbRate.flightNumber != null ? `<span class="gm-flight-number-badge" aria-label="Volo ${personalRecords.maxClimbRate.flightNumber}">#${escapeHtml(personalRecords.maxClimbRate.flightNumber)}</span>` : ''}
+            </div>
+            <span class="gm-stats-metric-label">Max Vario</span>
+            ${personalRecords.maxClimbRate.site ? `<span class="gm-stats-metric-sub truncate" title="${escapeHtml(personalRecords.maxClimbRate.site)}">${escapeHtml(personalRecords.maxClimbRate.site)}</span>` : ''}
+          </div>
+
+          <div
+            class="gm-stats-metric-card ${personalRecords.maxSinkRate.flightId ? 'gm-stats-record-clickable' : ''}"
+            ${personalRecords.maxSinkRate.flightId ? `data-action="open-flight-detail" data-flight-id="${escapeHtml(personalRecords.maxSinkRate.flightId)}" role="button" tabindex="0" aria-label="Min Vario: ${personalRecords.maxSinkRate.val} m/s, Volo #${personalRecords.maxSinkRate.flightNumber}. Tocca per aprire il dettaglio."` : ''}
+          >
+            <div class="flex items-center justify-between gap-1">
+              <span class="gm-stats-metric-val">${personalRecords.maxSinkRate.val < 0 ? `${escapeHtml(personalRecords.maxSinkRate.val)} m/s` : '--'}</span>
+              ${personalRecords.maxSinkRate.flightNumber != null ? `<span class="gm-flight-number-badge" aria-label="Volo ${personalRecords.maxSinkRate.flightNumber}">#${escapeHtml(personalRecords.maxSinkRate.flightNumber)}</span>` : ''}
+            </div>
+            <span class="gm-stats-metric-label">Min Vario</span>
+            ${personalRecords.maxSinkRate.site ? `<span class="gm-stats-metric-sub truncate" title="${escapeHtml(personalRecords.maxSinkRate.site)}">${escapeHtml(personalRecords.maxSinkRate.site)}</span>` : ''}
+          </div>
         </div>
       </section>
 

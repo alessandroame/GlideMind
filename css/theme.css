@@ -4436,10 +4436,10 @@ input.gm-input:focus {
 }
 
 .gm-trend-side-panel {
-  width: 95px;
-  min-width: 95px;
-  max-width: 95px;
-  padding: 10px 8px 8px 10px;
+  width: 98px;
+  min-width: 98px;
+  max-width: 98px;
+  padding: 10px 6px 8px 8px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -4450,13 +4450,17 @@ input.gm-input:focus {
 }
 
 .gm-trend-side-label {
-  font-size: 0.68rem;
+  font-size: 0.62rem;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
   color: var(--gm-accent);
   margin-bottom: 2px;
   line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 .gm-trend-side-val-group {
@@ -5515,27 +5519,24 @@ input.gm-input:focus {
   top: 8px;
   left: 8px;
   z-index: 10;
-  height: 28px;
-  padding: 0 10px;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  background-color: transparent;
-  background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, rgba(15, 23, 42, 0.62) 100%);
-  -webkit-backdrop-filter: blur(12px) saturate(180%);
-  backdrop-filter: blur(12px) saturate(180%);
+  justify-content: center;
+  background: radial-gradient(circle at center, rgba(15, 23, 42, 0.65) 0%, rgba(15, 23, 42, 0.35) 40%, rgba(15, 23, 42, 0.08) 70%, transparent 95%);
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
   color: #f8fafc;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  border-radius: var(--gm-radius-full, 9999px);
-  font-family: var(--gm-font-sans, system-ui, sans-serif);
-  font-size: 0.74rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  line-height: 26px;
-  cursor: pointer;
-  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.35), 0 2px 8px rgba(0, 0, 0, 0.35);
+  border: none !important;
+  border-radius: 50%;
+  box-shadow: none !important;
   outline: none;
-  transition: border-color 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
 
 .gm-mini-map-layer-toggle::before {
@@ -5551,10 +5552,15 @@ input.gm-input:focus {
 }
 
 .gm-mini-map-layer-toggle:hover {
-  background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.28) 0%, rgba(15, 23, 42, 0.75) 100%);
-  border-color: rgba(56, 189, 248, 0.6);
+  transform: scale(1.08);
+  background: radial-gradient(circle at center, rgba(15, 23, 42, 0.80) 0%, rgba(15, 23, 42, 0.45) 40%, rgba(15, 23, 42, 0.12) 70%, transparent 95%);
   color: var(--gm-accent, #38bdf8);
-  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.6), 0 3px 10px rgba(0, 0, 0, 0.45);
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.gm-mini-map-layer-toggle:active {
+  transform: scale(0.92);
 }
 
 .gm-mini-map-layer-toggle:focus-visible {
@@ -5567,21 +5573,24 @@ input.gm-input:focus {
   top: 8px;
   right: 8px;
   z-index: 10;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
   padding: 0;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, rgba(15, 23, 42, 0.62) 100%);
-  -webkit-backdrop-filter: blur(12px) saturate(180%);
-  backdrop-filter: blur(12px) saturate(180%);
-  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.35), 0 2px 8px rgba(0, 0, 0, 0.35);
+  border: none !important;
+  background: radial-gradient(circle at center, rgba(15, 23, 42, 0.65) 0%, rgba(15, 23, 42, 0.35) 40%, rgba(15, 23, 42, 0.08) 70%, transparent 95%);
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
   color: #f8fafc;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  outline: none;
+  transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
 
 /* Invisible touch floor expanding to >= 48px for outdoor ergonomics */
@@ -5598,15 +5607,15 @@ input.gm-input:focus {
 }
 
 .gm-mini-map-expand-btn:hover {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.28) 0%, rgba(15, 23, 42, 0.75) 100%);
-  border-color: rgba(56, 189, 248, 0.6);
+  transform: scale(1.08);
+  background: radial-gradient(circle at center, rgba(15, 23, 42, 0.80) 0%, rgba(15, 23, 42, 0.45) 40%, rgba(15, 23, 42, 0.12) 70%, transparent 95%);
   color: var(--gm-accent, #38bdf8);
-  transform: scale(1.05);
-  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.6), 0 3px 10px rgba(0, 0, 0, 0.45);
+  border: none !important;
+  box-shadow: none !important;
 }
 
 .gm-mini-map-expand-btn:active {
-  transform: scale(0.95);
+  transform: scale(0.92);
 }
 
 .gm-mini-map-expand-btn:focus-visible {
@@ -5616,8 +5625,7 @@ input.gm-input:focus {
 
 /* Glass effect adaptive styling: light topographic & road basemaps (OpenTopo, CyclOSM) */
 .gm-mini-map-box[data-map-layer="topo"] .gm-mini-map-layer-select,
-.gm-mini-map-box[data-map-layer="streets"] .gm-mini-map-layer-select,
-.gm-mini-map-box[data-map-layer="topo"] .gm-mini-map-layer-toggle {
+.gm-mini-map-box[data-map-layer="streets"] .gm-mini-map-layer-select {
   background-image: 
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' viewBox='0 0 24 24' fill='none' stroke='%230f172a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"),
     linear-gradient(135deg, rgba(255, 255, 255, 0.76) 0%, rgba(240, 244, 248, 0.44) 100%);
@@ -5626,13 +5634,20 @@ input.gm-input:focus {
   box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.95), 0 2px 8px rgba(15, 23, 42, 0.12);
 }
 
-.gm-mini-map-box[data-map-layer="topo"] .gm-mini-map-layer-toggle {
-  background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.76) 0%, rgba(240, 244, 248, 0.44) 100%);
+.gm-mini-map-box[data-map-layer="topo"] .gm-mini-map-layer-toggle,
+.gm-mini-map-box[data-map-layer="topo"] .gm-mini-map-expand-btn,
+.gm-mini-map-box[data-map-layer="streets"] .gm-mini-map-layer-toggle,
+.gm-mini-map-box[data-map-layer="streets"] .gm-mini-map-expand-btn {
+  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.40) 40%, rgba(255, 255, 255, 0.10) 70%, transparent 95%) !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  color: #0f172a !important;
 }
 
 .gm-mini-map-box[data-map-layer="topo"] .gm-mini-map-layer-select:hover,
-.gm-mini-map-box[data-map-layer="streets"] .gm-mini-map-layer-select:hover,
-.gm-mini-map-box[data-map-layer="topo"] .gm-mini-map-layer-toggle:hover {
+.gm-mini-map-box[data-map-layer="streets"] .gm-mini-map-layer-select:hover {
   background-image: 
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' viewBox='0 0 24 24' fill='none' stroke='%230284c7' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"),
     linear-gradient(135deg, rgba(255, 255, 255, 0.90) 0%, rgba(240, 244, 248, 0.60) 100%);
@@ -5641,8 +5656,16 @@ input.gm-input:focus {
   box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 1), 0 3px 10px rgba(15, 23, 42, 0.18);
 }
 
-.gm-mini-map-box[data-map-layer="topo"] .gm-mini-map-layer-toggle:hover {
-  background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.90) 0%, rgba(240, 244, 248, 0.60) 100%);
+.gm-mini-map-box[data-map-layer="topo"] .gm-mini-map-layer-toggle:hover,
+.gm-mini-map-box[data-map-layer="topo"] .gm-mini-map-expand-btn:hover,
+.gm-mini-map-box[data-map-layer="streets"] .gm-mini-map-layer-toggle:hover,
+.gm-mini-map-box[data-map-layer="streets"] .gm-mini-map-expand-btn:hover {
+  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.90) 0%, rgba(255, 255, 255, 0.50) 40%, rgba(255, 255, 255, 0.15) 70%, transparent 95%) !important;
+  color: #0284c7 !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 .gm-mini-map-box[data-map-layer="topo"] .gm-mini-map-layer-select option,
@@ -5651,26 +5674,9 @@ input.gm-input:focus {
   color: #0f172a;
 }
 
-.gm-mini-map-box[data-map-layer="topo"] .gm-mini-map-expand-btn,
-.gm-mini-map-box[data-map-layer="streets"] .gm-mini-map-expand-btn {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.76) 0%, rgba(240, 244, 248, 0.44) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.85);
-  color: #0f172a;
-  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.95), 0 2px 8px rgba(15, 23, 42, 0.12);
-}
-
-.gm-mini-map-box[data-map-layer="topo"] .gm-mini-map-expand-btn:hover,
-.gm-mini-map-box[data-map-layer="streets"] .gm-mini-map-expand-btn:hover {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.90) 0%, rgba(240, 244, 248, 0.60) 100%);
-  border-color: rgba(2, 132, 199, 0.5);
-  color: #0284c7;
-  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 1), 0 3px 10px rgba(15, 23, 42, 0.18);
-}
-
 /* Glass effect adaptive styling: photographic satellite & dark basemaps */
 .gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-layer-select,
-.gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-layer-select,
-.gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-layer-toggle {
+.gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-layer-select {
   background-image: 
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' viewBox='0 0 24 24' fill='none' stroke='%23f8fafc' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"),
     linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, rgba(15, 23, 42, 0.62) 100%);
@@ -5679,13 +5685,20 @@ input.gm-input:focus {
   box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.35), 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 
-.gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-layer-toggle {
-  background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, rgba(15, 23, 42, 0.62) 100%);
+.gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-layer-toggle,
+.gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-expand-btn,
+.gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-layer-toggle,
+.gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-expand-btn {
+  background: radial-gradient(circle at center, rgba(15, 23, 42, 0.65) 0%, rgba(15, 23, 42, 0.35) 40%, rgba(15, 23, 42, 0.08) 70%, transparent 95%) !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  color: #f8fafc !important;
 }
 
 .gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-layer-select:hover,
-.gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-layer-select:hover,
-.gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-layer-toggle:hover {
+.gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-layer-select:hover {
   background-image: 
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' viewBox='0 0 24 24' fill='none' stroke='%2338bdf8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"),
     linear-gradient(135deg, rgba(255, 255, 255, 0.28) 0%, rgba(15, 23, 42, 0.75) 100%);
@@ -5694,24 +5707,16 @@ input.gm-input:focus {
   box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.6), 0 3px 10px rgba(0, 0, 0, 0.45);
 }
 
-.gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-layer-toggle:hover {
-  background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.28) 0%, rgba(15, 23, 42, 0.75) 100%);
-}
-
-.gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-expand-btn,
-.gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-expand-btn {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, rgba(15, 23, 42, 0.62) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  color: #f8fafc;
-  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.35), 0 2px 8px rgba(0, 0, 0, 0.35);
-}
-
+.gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-layer-toggle:hover,
 .gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-expand-btn:hover,
+.gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-layer-toggle:hover,
 .gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-expand-btn:hover {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.28) 0%, rgba(15, 23, 42, 0.75) 100%);
-  border-color: rgba(56, 189, 248, 0.6);
-  color: #38bdf8;
-  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.6), 0 3px 10px rgba(0, 0, 0, 0.45);
+  background: radial-gradient(circle at center, rgba(15, 23, 42, 0.80) 0%, rgba(15, 23, 42, 0.45) 40%, rgba(15, 23, 42, 0.12) 70%, transparent 95%) !important;
+  color: #38bdf8 !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 .gm-windsock-marker-container {
@@ -5809,15 +5814,7 @@ input.gm-input:focus {
   color: #0f172a;
 }
 
-[data-theme="light"] .gm-mini-map-expand-btn {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.76) 0%, rgba(240, 244, 248, 0.44) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.85);
-  color: #0f172a;
-  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.95), 0 2px 8px rgba(15, 23, 42, 0.12);
-}
-
-[data-theme="light"] .gm-mini-map-layer-select,
-[data-theme="light"] .gm-mini-map-layer-toggle {
+[data-theme="light"] .gm-mini-map-layer-select {
   background-image: 
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' viewBox='0 0 24 24' fill='none' stroke='%230f172a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"),
     linear-gradient(135deg, rgba(255, 255, 255, 0.76) 0%, rgba(240, 244, 248, 0.44) 100%);
@@ -5826,19 +5823,7 @@ input.gm-input:focus {
   box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.95), 0 2px 8px rgba(15, 23, 42, 0.12);
 }
 
-[data-theme="light"] .gm-mini-map-layer-toggle {
-  background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.76) 0%, rgba(240, 244, 248, 0.44) 100%);
-}
-
-[data-theme="light"] .gm-mini-map-expand-btn:hover {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.90) 0%, rgba(240, 244, 248, 0.60) 100%);
-  border-color: rgba(2, 132, 199, 0.5);
-  color: #0284c7;
-  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 1), 0 3px 10px rgba(15, 23, 42, 0.18);
-}
-
-[data-theme="light"] .gm-mini-map-layer-select:hover,
-[data-theme="light"] .gm-mini-map-layer-toggle:hover {
+[data-theme="light"] .gm-mini-map-layer-select:hover {
   background-image: 
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' viewBox='0 0 24 24' fill='none' stroke='%230284c7' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"),
     linear-gradient(135deg, rgba(255, 255, 255, 0.90) 0%, rgba(240, 244, 248, 0.60) 100%);
@@ -5847,19 +5832,34 @@ input.gm-input:focus {
   box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 1), 0 3px 10px rgba(15, 23, 42, 0.18);
 }
 
-[data-theme="light"] .gm-mini-map-layer-toggle:hover {
-  background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.90) 0%, rgba(240, 244, 248, 0.60) 100%);
-}
-
 [data-theme="light"] .gm-mini-map-layer-select option {
   background-color: #ffffff;
   color: #0f172a;
 }
 
-/* Light theme with dark or photographic map layers (satellite & dark): ensure dark frosted glass */
+[data-theme="light"] .gm-mini-map-expand-btn,
+[data-theme="light"] .gm-mini-map-layer-toggle {
+  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.40) 40%, rgba(255, 255, 255, 0.10) 70%, transparent 95%) !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .gm-mini-map-expand-btn:hover,
+[data-theme="light"] .gm-mini-map-layer-toggle:hover {
+  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.90) 0%, rgba(255, 255, 255, 0.50) 40%, rgba(255, 255, 255, 0.15) 70%, transparent 95%) !important;
+  color: #0284c7 !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Light theme with dark or photographic map layers (satellite & dark): ensure dark radial scrim */
 [data-theme="light"] .gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-layer-select,
-[data-theme="light"] .gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-layer-select,
-[data-theme="light"] .gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-layer-toggle {
+[data-theme="light"] .gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-layer-select {
   background-image: 
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' viewBox='0 0 24 24' fill='none' stroke='%23f8fafc' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"),
     linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, rgba(15, 23, 42, 0.62) 100%);
@@ -5868,13 +5868,8 @@ input.gm-input:focus {
   box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.35), 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 
-[data-theme="light"] .gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-layer-toggle {
-  background-image: linear-gradient(135deg, rgba(15, 23, 42, 0.85) 0%, rgba(30, 41, 59, 0.92) 100%);
-}
-
 [data-theme="light"] .gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-layer-select:hover,
-[data-theme="light"] .gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-layer-select:hover,
-[data-theme="light"] .gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-layer-toggle:hover {
+[data-theme="light"] .gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-layer-select:hover {
   background-image: 
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' viewBox='0 0 24 24' fill='none' stroke='%2338bdf8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"),
     linear-gradient(135deg, rgba(255, 255, 255, 0.28) 0%, rgba(15, 23, 42, 0.75) 100%);
@@ -5883,24 +5878,28 @@ input.gm-input:focus {
   box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.6), 0 3px 10px rgba(0, 0, 0, 0.45);
 }
 
-[data-theme="light"] .gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-layer-toggle:hover {
-  background-image: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(56, 189, 248, 0.25) 100%);
-}
-
+[data-theme="light"] .gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-layer-toggle,
 [data-theme="light"] .gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-expand-btn,
+[data-theme="light"] .gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-layer-toggle,
 [data-theme="light"] .gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-expand-btn {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, rgba(15, 23, 42, 0.62) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  color: #f8fafc;
-  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.35), 0 2px 8px rgba(0, 0, 0, 0.35);
+  background: radial-gradient(circle at center, rgba(15, 23, 42, 0.65) 0%, rgba(15, 23, 42, 0.35) 40%, rgba(15, 23, 42, 0.08) 70%, transparent 95%) !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  color: #f8fafc !important;
 }
 
+[data-theme="light"] .gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-layer-toggle:hover,
 [data-theme="light"] .gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-expand-btn:hover,
+[data-theme="light"] .gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-layer-toggle:hover,
 [data-theme="light"] .gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-expand-btn:hover {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.28) 0%, rgba(15, 23, 42, 0.75) 100%);
-  border-color: rgba(56, 189, 248, 0.6);
-  color: #38bdf8;
-  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.6), 0 3px 10px rgba(0, 0, 0, 0.45);
+  background: radial-gradient(circle at center, rgba(15, 23, 42, 0.80) 0%, rgba(15, 23, 42, 0.45) 40%, rgba(15, 23, 42, 0.12) 70%, transparent 95%) !important;
+  color: #38bdf8 !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 /* Desktop layout: 2-column split within spot summary card */
@@ -6140,8 +6139,6 @@ input.gm-input:focus {
 
 .gm-map-ctrl-btn,
 .gm-map-top-spot-btn,
-.gm-map-layer-toggle,
-.gm-replay-layer-toggle,
 .gm-flight-analysis-ctrl-btn {
   display: inline-flex;
   align-items: center;
@@ -6164,9 +6161,7 @@ input.gm-input:focus {
 
 [data-theme="light"] .gm-map-ctrl-btn,
 [data-theme="light"] .gm-map-top-spot-btn,
-[data-theme="light"] .gm-flight-analysis-ctrl-btn,
-[data-theme="light"] .gm-map-layer-toggle,
-[data-theme="light"] .gm-replay-layer-toggle {
+[data-theme="light"] .gm-flight-analysis-ctrl-btn {
   background: rgba(255, 255, 255, 0.92);
   color: #0f172a;
   border: 1px solid rgba(0, 0, 0, 0.14);
@@ -6175,25 +6170,125 @@ input.gm-input:focus {
 
 .gm-map-ctrl-btn:hover,
 .gm-map-top-spot-btn:hover,
-.gm-flight-analysis-ctrl-btn:hover,
-.gm-map-layer-toggle:hover,
-.gm-replay-layer-toggle:hover {
+.gm-flight-analysis-ctrl-btn:hover {
   border-color: var(--gm-accent);
   color: var(--gm-accent);
 }
 
 .gm-map-ctrl-btn:active,
 .gm-map-top-spot-btn:active,
-.gm-flight-analysis-ctrl-btn:active,
-.gm-map-layer-toggle:active,
-.gm-replay-layer-toggle:active {
+.gm-flight-analysis-ctrl-btn:active {
   transform: scale(0.96);
 }
 
 .gm-map-ctrl-btn.loading,
 .gm-map-top-spot-btn.loading,
-.gm-flight-analysis-ctrl-btn.loading,
-.gm-map-layer-toggle.loading {
+.gm-flight-analysis-ctrl-btn.loading {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* Standalone Circular Map Layer Toggles with Soft Radial Scrim */
+.gm-map-layer-toggle,
+.gm-replay-layer-toggle,
+.gm-map-ctrl-btn.gm-map-layer-toggle,
+.gm-flight-analysis-ctrl-btn.gm-map-layer-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
+  border-radius: 50% !important;
+  border: none !important;
+  outline: none;
+  background: radial-gradient(circle at center, rgba(15, 23, 42, 0.65) 0%, rgba(15, 23, 42, 0.35) 40%, rgba(15, 23, 42, 0.08) 70%, transparent 95%) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+  color: #f8fafc;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.gm-map-layer-toggle::before,
+.gm-replay-layer-toggle::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  min-width: var(--gm-touch-min, 48px);
+  min-height: var(--gm-touch-min, 48px);
+  width: 100%;
+  height: 100%;
+}
+
+.gm-map-layer-toggle[data-layer="topo"],
+.gm-replay-layer-toggle[data-layer="topo"],
+[data-theme="light"] .gm-map-layer-toggle,
+[data-theme="light"] .gm-replay-layer-toggle,
+[data-theme="light"] .gm-map-ctrl-btn.gm-map-layer-toggle,
+[data-theme="light"] .gm-flight-analysis-ctrl-btn.gm-map-layer-toggle {
+  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.40) 40%, rgba(255, 255, 255, 0.10) 70%, transparent 95%) !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  color: #0f172a !important;
+}
+
+.gm-map-layer-toggle[data-layer="satellite"],
+.gm-replay-layer-toggle[data-layer="satellite"] {
+  background: radial-gradient(circle at center, rgba(15, 23, 42, 0.65) 0%, rgba(15, 23, 42, 0.35) 40%, rgba(15, 23, 42, 0.08) 70%, transparent 95%) !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  color: #f8fafc !important;
+}
+
+.gm-map-layer-toggle:hover,
+.gm-replay-layer-toggle:hover {
+  transform: scale(1.08);
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.gm-map-layer-toggle[data-layer="topo"]:hover,
+.gm-replay-layer-toggle[data-layer="topo"]:hover,
+[data-theme="light"] .gm-map-layer-toggle:hover,
+[data-theme="light"] .gm-replay-layer-toggle:hover {
+  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.90) 0%, rgba(255, 255, 255, 0.50) 40%, rgba(255, 255, 255, 0.15) 70%, transparent 95%) !important;
+  color: #0284c7 !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.gm-map-layer-toggle[data-layer="satellite"]:hover,
+.gm-replay-layer-toggle[data-layer="satellite"]:hover {
+  background: radial-gradient(circle at center, rgba(15, 23, 42, 0.80) 0%, rgba(15, 23, 42, 0.45) 40%, rgba(15, 23, 42, 0.12) 70%, transparent 95%) !important;
+  color: #38bdf8 !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.gm-map-layer-toggle:active,
+.gm-replay-layer-toggle:active {
+  transform: scale(0.92);
+}
+
+.gm-map-layer-toggle.loading,
+.gm-replay-layer-toggle.loading {
   opacity: 0.7;
   pointer-events: none;
 }
@@ -8094,6 +8189,15 @@ input.gm-input:focus {
 [data-theme="light"] .gm-flight-phase-map-pin {
   background: rgba(255, 255, 255, 0.95);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.gm-flight-phase-exit-pin {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #38bdf8;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
 }
 
 .gm-flight-track-cursor {

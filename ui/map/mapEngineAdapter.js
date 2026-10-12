@@ -51,11 +51,11 @@ export const MAP_THEMES = Object.freeze({
  * @param {number} [size=16]
  * @returns {string}
  */
-export function renderLayerToggleIcon(layerId, size = 16) {
+export function renderLayerToggleIcon(layerId, size = 20) {
   if (layerId === 'satellite') {
-    return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="gm-layer-icon gm-icon-satellite"><path d="M13 7 9 3 5 7l4 4"></path><path d="m17 11 4 4-4 4-4-4"></path><path d="m8 12 4 4 6-6-4-4Z"></path><path d="m16 8 3-3"></path><path d="M9 21a6 6 0 0 0-6-6"></path></svg>`;
+    return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="gm-layer-icon gm-icon-satellite"><circle cx="12" cy="12" r="9.5"></circle><line x1="2.5" y1="12" x2="21.5" y2="12"></line><line x1="12" y1="2.5" x2="12" y2="21.5"></line><ellipse cx="12" cy="12" rx="4.5" ry="9.5"></ellipse><ellipse cx="12" cy="12" rx="9.5" ry="4.5"></ellipse></svg>`;
   }
-  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="gm-layer-icon gm-icon-topo"><path d="m8 3 4 8 5-5 5 15H2L8 3z"></path><path d="M4.15 18h15.7"></path></svg>`;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="gm-layer-icon gm-icon-topo"><path d="M12 2.5L2.5 20.5h19L12 2.5z"></path><path d="M6.8 12.5L9.5 14.5L12 12.2L14.5 14.5L17.2 12.5"></path></svg>`;
 }
 
 /**
@@ -352,10 +352,13 @@ export class HeadlessMockMapEngine {
   highlightFlightTrackRange(startIndex, endIndex = null, options = {}) {
     if (startIndex == null) {
       this.highlightedRange = null;
+      this.isTrimmedToPhase = false;
     } else if (typeof startIndex === 'object') {
       this.highlightedRange = startIndex;
+      this.isTrimmedToPhase = true;
     } else {
       this.highlightedRange = { startIndex, endIndex, options };
+      this.isTrimmedToPhase = true;
     }
     if (this.activeFlightTrackData) {
       this.activeFlightTrackData.highlightRange = this.highlightedRange;
@@ -363,9 +366,11 @@ export class HeadlessMockMapEngine {
     return this;
   }
 
-  setFlightTrackCursor(index) {
+  setFlightTrackCursor(index, totalCount = null, timeSeconds = null) {
     this.cursorIndex = index;
     this.cursorPointIndex = index;
+    this.cursorTotalCount = totalCount;
+    this.cursorTimeSeconds = timeSeconds;
     if (this.activeFlightTrackData) {
       this.activeFlightTrackData.cursorIndex = index;
     }
@@ -586,7 +591,7 @@ export class LeafletMapEngine {
 
     this.map = window.L.map(containerEl, mapOptions);
 
-    if (!this.isMiniMap && !this.options.isFlightAnalysis && this.options.zoomControl !== false) {
+    if (!this.isMiniMap && !this.options.isFlightAnalysis && this.options.zoomControl !== false && window.L.control?.zoom) {
       // Add zoom control in top-right to preserve bottom Thumb Zone
       window.L.control.zoom({ position: 'topright' }).addTo(this.map);
     }
@@ -1589,13 +1594,28 @@ export class LeafletMapEngine {
     return this;
   }
 
-  highlightFlightTrackRange(range) {
+  highlightFlightTrackRange(startIndex, endIndex = null, options = {}) {
     if (this.phaseHighlightGroup && typeof this.phaseHighlightGroup.clearLayers === 'function') {
       this.phaseHighlightGroup.clearLayers();
     }
-    this.highlightedRange = range;
 
-    if (!range || typeof range.startIndex !== 'number') {
+    let sIdx = null;
+    let eIdx = null;
+    let opts = {};
+
+    if (startIndex !== null && typeof startIndex === 'object') {
+      sIdx = startIndex.startIndex;
+      eIdx = startIndex.endIndex ?? sIdx;
+      opts = startIndex;
+    } else if (typeof startIndex === 'number') {
+      sIdx = startIndex;
+      eIdx = (typeof endIndex === 'number') ? endIndex : sIdx;
+      opts = options || {};
+    }
+
+    this.highlightedRange = (sIdx !== null) ? { startIndex: sIdx, endIndex: eIdx, ...opts } : null;
+
+    if (sIdx === null || isNaN(sIdx)) {
       if (this.flightTrackPolylines) {
         for (const poly of this.flightTrackPolylines) {
           poly.setStyle({ opacity: 0.85, weight: 3.5 });
@@ -1607,9 +1627,7 @@ export class LeafletMapEngine {
       return this;
     }
 
-    const sIdx = range.startIndex;
-    const eIdx = range.endIndex ?? sIdx;
-
+    // Trim visualization: Dim background track and highlight active phase
     if (this.flightTrackPolylines) {
       for (const poly of this.flightTrackPolylines) {
         const seg = poly.segmentData;
@@ -1617,7 +1635,7 @@ export class LeafletMapEngine {
         if (overlaps) {
           poly.setStyle({ opacity: 1.0, weight: 5 });
         } else {
-          poly.setStyle({ opacity: 0.22, weight: 2 });
+          poly.setStyle({ opacity: 0.15, weight: 1.5 });
         }
       }
     }
@@ -1627,9 +1645,9 @@ export class LeafletMapEngine {
       if (phasePoints.length >= 2) {
         const phaseCoords = phasePoints.map(p => [p.lat, p.lon]);
         const halo = window.L.polyline(phaseCoords, {
-          color: '#ffffff',
-          weight: 8,
-          opacity: 0.45,
+          color: '#38bdf8',
+          weight: 7,
+          opacity: 0.6,
           lineCap: 'round',
           lineJoin: 'round'
         });
@@ -1637,15 +1655,26 @@ export class LeafletMapEngine {
 
         const badgeIcon = window.L.divIcon({
           className: 'gm-map-div-icon',
-          html: `<div class="gm-flight-phase-map-pin">${escapeHtml(range.label || 'Fase')}</div>`,
+          html: `<div class="gm-flight-phase-map-pin" title="Fase: ${escapeHtml(opts.label || 'Fase')}">${escapeHtml(opts.label || 'Fase')}</div>`,
           iconAnchor: [18, 24]
         });
         const badgeMarker = window.L.marker(phaseCoords[0], { icon: badgeIcon, zIndexOffset: 950 });
         this.phaseHighlightGroup.addLayer(badgeMarker);
 
+        if (phaseCoords.length > 3) {
+          const exitIcon = window.L.divIcon({
+            className: 'gm-map-div-icon',
+            html: `<div class="gm-flight-phase-exit-pin" title="Uscita fase"></div>`,
+            iconSize: [10, 10],
+            iconAnchor: [5, 5]
+          });
+          const exitMarker = window.L.marker(phaseCoords[phaseCoords.length - 1], { icon: exitIcon, zIndexOffset: 940 });
+          this.phaseHighlightGroup.addLayer(exitMarker);
+        }
+
         const phaseBounds = window.L.latLngBounds(phaseCoords);
         if (this.map) {
-          this.map.fitBounds(phaseBounds, { padding: [30, 30], maxZoom: 17, animate: true });
+          this.map.fitBounds(phaseBounds, { padding: [35, 35], maxZoom: 17, animate: true });
         }
       }
     }
@@ -1653,13 +1682,43 @@ export class LeafletMapEngine {
     return this;
   }
 
-  setFlightTrackCursor(index) {
+  setFlightTrackCursor(index, totalCount = null, timeSeconds = null) {
     this.cursorIndex = index;
     if (typeof window === 'undefined' || !window.L || !this.map) return this;
 
-    if (typeof index === 'number' && this.validTrackPoints) {
-      let targetPt = this.validTrackPoints.find(p => p.origIdx === index);
-      if (!targetPt && this.validTrackPoints.length > 0) {
+    if (typeof index === 'number' && this.validTrackPoints && this.validTrackPoints.length > 0) {
+      let targetPt = null;
+
+      // 1. By timestamp if available
+      if (typeof timeSeconds === 'number' && !isNaN(timeSeconds)) {
+        let bestPt = null;
+        let minDiff = Infinity;
+        for (const p of this.validTrackPoints) {
+          if (typeof p.timeSeconds === 'number') {
+            const diff = Math.abs(p.timeSeconds - timeSeconds);
+            if (diff < minDiff) {
+              minDiff = diff;
+              bestPt = p;
+            }
+          }
+        }
+        if (bestPt) targetPt = bestPt;
+      }
+
+      // 2. Proportional mapping using totalCount
+      if (!targetPt && typeof totalCount === 'number' && totalCount > 1) {
+        const frac = Math.max(0, Math.min(1, index / (totalCount - 1)));
+        const targetIdx = Math.max(0, Math.min(this.validTrackPoints.length - 1, Math.round(frac * (this.validTrackPoints.length - 1))));
+        targetPt = this.validTrackPoints[targetIdx];
+      }
+
+      // 3. Direct origIdx match
+      if (!targetPt) {
+        targetPt = this.validTrackPoints.find(p => p.origIdx === index);
+      }
+
+      // 4. Clamped index fallback
+      if (!targetPt) {
         const clamped = Math.max(0, Math.min(this.validTrackPoints.length - 1, index));
         targetPt = this.validTrackPoints[clamped];
       }

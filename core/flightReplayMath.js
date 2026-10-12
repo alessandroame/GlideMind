@@ -383,3 +383,49 @@ export function projectTrackToThreeLocal(points, origin = null, { relativeAltitu
     points: projected
   };
 }
+
+/**
+ * Calculates dynamic 3D track ribbon width and height in meters based on map zoom and geographic latitude.
+ * Maintains a consistent, crisp visual screen width across all zoom levels,
+ * preventing the track from appearing gigantically thick when zoomed in (shrinks dynamically)
+ * or vanishing into subpixels when zoomed out.
+ * 
+ * @param {number} zoom Current map zoom level (e.g. 10 - 20)
+ * @param {number} [latitude=46.0] Geographic latitude for Web Mercator scale distortion
+ * @param {object} [options]
+ * @param {number} [options.targetPixels=3.5] Target visual thickness on screen in pixels
+ * @param {number} [options.minWidthMeters=1.0] Minimum physical width clamp in meters (close-up)
+ * @param {number} [options.maxWidthMeters=400.0] Maximum physical width clamp in meters (overview)
+ * @param {number} [options.heightRatio=0.65] Ratio of vertical thickness to horizontal width
+ * @returns {{ widthMeters: number, heightMeters: number, halfWidth: number, halfHeight: number, metersPerPixel: number }}
+ */
+export function calculateRibbonDimensions(zoom, latitude = 46.0, options = {}) {
+  const targetPixels = options.targetPixels ?? 3.5;
+  const minWidth = options.minWidthMeters ?? 1.0;
+  const maxWidth = options.maxWidthMeters ?? 400.0;
+  const heightRatio = options.heightRatio ?? 0.65;
+
+  const latRad = ((Number(latitude) || 46.0) * Math.PI) / 180;
+  const cosLat = Math.max(0.1, Math.cos(latRad));
+  const z = typeof zoom === 'number' && !isNaN(zoom) ? zoom : 14;
+
+  // Ground resolution in meters per pixel in Web Mercator:
+  // S = (40075016.686 * cos(lat)) / (256 * 2^zoom) = (156543.03392 * cos(lat)) / (2^zoom)
+  const metersPerPixel = (156543.03392 * cosLat) / Math.pow(2, z);
+
+  const rawWidth = metersPerPixel * targetPixels;
+  const clampedWidth = Math.max(minWidth, Math.min(maxWidth, rawWidth));
+  const roundedWidth = Math.round(clampedWidth * 100) / 100;
+
+  const halfWidth = Math.round((roundedWidth / 2) * 100) / 100;
+  const heightMeters = Math.round((roundedWidth * heightRatio) * 100) / 100;
+  const halfHeight = Math.round((heightMeters / 2) * 100) / 100;
+
+  return {
+    widthMeters: roundedWidth,
+    heightMeters,
+    halfWidth,
+    halfHeight,
+    metersPerPixel: Math.round(metersPerPixel * 1000) / 1000
+  };
+}

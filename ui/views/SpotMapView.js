@@ -547,14 +547,13 @@ export class SpotMapView {
               <button 
                 type="button" 
                 id="gm-map-layer-toggle" 
-                class="gm-map-ctrl-btn gm-map-layer-toggle" 
+                class="gm-map-layer-toggle" 
                 data-action="toggle-map-layer" 
                 data-layer="${this.activeLayer}" 
                 aria-label="Layer mappa: ${this.activeLayer === 'satellite' ? 'Satellite (tocca per OpenTopo)' : 'OpenTopo (tocca per Satellite)'}" 
                 title="Layer mappa: ${this.activeLayer === 'satellite' ? 'Satellite (tocca per OpenTopo)' : 'OpenTopo (tocca per Satellite)'}"
               >
-                ${renderLayerToggleIcon(this.activeLayer)}
-                <span class="gm-layer-toggle-label">${getMapLayerLabel(this.activeLayer)}</span>
+                ${renderLayerToggleIcon(this.activeLayer, 20)}
               </button>
             </div>
             <div class="gm-map-controls-right">
@@ -970,11 +969,7 @@ export class SpotMapView {
     const nextLabel = isSat ? 'OpenTopo' : 'Satellite';
     toggleBtn.setAttribute('data-layer', this.activeLayer);
     toggleBtn.setAttribute('aria-label', `Layer mappa: ${curLabel} (tocca per ${nextLabel})`);
-    toggleBtn.setAttribute('title', `Layer mappa: ${curLabel} (tocca per ${nextLabel})`);
-    toggleBtn.innerHTML = `
-      ${renderLayerToggleIcon(this.activeLayer)}
-      <span class="gm-layer-toggle-label">${curLabel}</span>
-    `;
+    toggleBtn.innerHTML = renderLayerToggleIcon(this.activeLayer, 20);
     const select = this.container.querySelector('#gm-map-layer-select');
     if (select) select.value = this.activeLayer;
   }

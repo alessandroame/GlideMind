@@ -8,6 +8,7 @@ import {
   interpolateTrackSample,
   calculateAvatarMinScale,
   projectTrackToThreeLocal,
+  calculateRibbonDimensions,
   STANDARD_GRAVITY
 } from '../../core/flightReplayMath.js';
 
@@ -262,6 +263,55 @@ describe('Flight Replay Math - Headless Core Kinematics & Coordinates', () => {
       const result = projectTrackToThreeLocal([]);
       assert.deepEqual(result.points, []);
       assert.ok(result.origin);
+    });
+  });
+
+  describe('calculateRibbonDimensions - Dynamic Zoom-Adaptive 3D Track Scaling', () => {
+    it('should calculate slender ribbon dimensions when zoomed in close to the paraglider (zoom 18)', () => {
+      const dims = calculateRibbonDimensions(18, 46.0);
+      assert.ok(dims.widthMeters < 3.0, `Expected close-up ribbon width < 3m, got ${dims.widthMeters}`);
+      assert.ok(dims.widthMeters >= 1.0, `Width must respect min clamp >= 1m, got ${dims.widthMeters}`);
+      assert.ok(dims.heightMeters < dims.widthMeters, 'Height should be proportional to width');
+      assert.equal(dims.halfWidth, Math.round((dims.widthMeters / 2) * 100) / 100);
+      assert.equal(dims.halfHeight, Math.round((dims.heightMeters / 2) * 100) / 100);
+    });
+
+    it('should scale up ribbon meters when zoomed out to preserve constant visual screen pixels (zoom 12)', () => {
+      const closeDims = calculateRibbonDimensions(18, 46.0);
+      const overviewDims = calculateRibbonDimensions(12, 46.0);
+
+      // In world meters, overview ribbon must be much larger than close-up to maintain ~3.5px on screen
+      assert.ok(overviewDims.widthMeters > closeDims.widthMeters * 30,
+        `Expected overview width (${overviewDims.widthMeters}m) to be > 30x closeDims (${closeDims.widthMeters}m)`);
+      assert.ok(overviewDims.widthMeters > 50 && overviewDims.widthMeters < 150,
+        `Expected overview width ~90m at zoom 12, got ${overviewDims.widthMeters}`);
+    });
+
+    it('should respect custom options for targetPixels, clamps, and heightRatio', () => {
+      const customDims = calculateRibbonDimensions(16, 46.0, {
+        targetPixels: 5.0,
+        minWidthMeters: 2.0,
+        maxWidthMeters: 200.0,
+        heightRatio: 0.5
+      });
+
+      assert.ok(customDims.widthMeters >= 2.0);
+      assert.equal(customDims.heightMeters, Math.round((customDims.widthMeters * 0.5) * 100) / 100);
+    });
+
+    it('should handle missing, NaN, or extreme zoom inputs safely without crashing', () => {
+      const defaultDims = calculateRibbonDimensions(undefined, null);
+      assert.ok(defaultDims.widthMeters > 0);
+      assert.ok(defaultDims.heightMeters > 0);
+
+      const nanDims = calculateRibbonDimensions(NaN, NaN);
+      assert.ok(nanDims.widthMeters > 0);
+
+      const extremeClose = calculateRibbonDimensions(25, 46.0);
+      assert.equal(extremeClose.widthMeters, 1.0, 'Must clamp to minWidthMeters at extreme close zoom');
+
+      const extremeFar = calculateRibbonDimensions(1, 46.0);
+      assert.equal(extremeFar.widthMeters, 400.0, 'Must clamp to maxWidthMeters at extreme wide zoom');
     });
   });
 });
