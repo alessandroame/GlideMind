@@ -199,6 +199,38 @@ describe('LogbookView Controller & Outdoor Ergonomics (UI Layer)', () => {
     assert.ok(!html.includes('Scarica IGC'), 'Must not clutter card with download button');
   });
 
+  it('should prevent redundant takeoff in subtitle and exclude EN category badge from card header', async () => {
+    const flightWithTakeoffInTitle = {
+      id: 'fl_ciavanis_94',
+      date: '2026-10-11',
+      takeoffTime: '16:42',
+      durationMinutes: 11,
+      site: 'Decollo Ciavanis',
+      siteName: 'Decollo Ciavanis -> PeterPan Santa Elisabetta',
+      takeoffLocationName: 'Decollo Ciavanis',
+      landingLocationName: 'PeterPan Santa Elisabetta',
+      glider: 'Axis Pluto 4',
+      gliderClass: 'EN-B',
+      maxAltMsl: 1775,
+      maxGainMeters: 0
+    };
+
+    storeInstance.setState({ flights: [flightWithTakeoffInTitle] });
+    await controller.mount(container);
+
+    const cardHtml = controller.renderFlightCard(flightWithTakeoffInTitle, 94);
+
+    // Card header must NOT contain the EN-B pill badge (avoids horizontal overcrowding)
+    assert.ok(!cardHtml.includes('gm-glider-pill-badge'), 'Flight card must not contain redundant glider pill badge');
+    assert.ok(!cardHtml.includes('EN-B'), 'Flight card header must not display EN-B pill badge');
+
+    // Subtitle must NOT repeat "Decollo Ciavanis"
+    assert.ok(!cardHtml.includes('• Decollo Ciavanis •'), 'Subtitle must not repeat takeoff when already in title');
+    assert.ok(cardHtml.includes('2026-10-11'));
+    assert.ok(cardHtml.includes('Ore 16:42'));
+    assert.ok(cardHtml.includes('Axis Pluto 4'));
+  });
+
   it('should filter flights by category chips and search query', async () => {
     storeInstance.setState({ flights: [mockFlight1, mockFlight2] });
     await controller.mount(container);
