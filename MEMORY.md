@@ -1952,3 +1952,82 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
   4. **Fitts's Law Outdoor**: Target touch esteso a pavimento $\ge 48\times 48\text{px}$ tramite pseudo-elemento invisibile `::before`.
 
 
+
+
+---
+
+## 146. Visualizzazione Precipitazioni: Standard Parameteo su Probabilità (0-100%) con Curva Continua ed Eliminazione del Micro-Nastro Heatmap (Prevenzione Canvas Vuoto e Micro-Testo Illeggibile)
+- **Problema**:
+  1. Con accumulo a 0.0 mm/h per tutta la giornata (scenario tipico delle giornate volabili o con convezione pomeridiana), scalare l'asse Y su 0-3 mm/h generava un "canvas deserto" (80% dell'area vuota, barre ad altezza zero) e costringeva a stipare le probabilità in una striscia heatmap inferiore di appena 13px con font a 6.8px, completamente illeggibile su smartphone e sotto luce solare diretta.
+  2. Il marcatore dell'ora attiva dello scrubber a 0.0 mm/h collideva direttamente sulla baseline con le linee di soglia orizzontali e il testo percentuale.
+  3. Rottura dell'omogeneità visiva rispetto a tutti gli altri 6 grafici Parameteo (Vento, CAPE, Base Cumulo, ecc.) che usano curve continue spline Bézier a tutta altezza.
+- **Causa Radice**:
+  Scambio erroneo tra grandezza continua di rischio (la probabilità di precipitazione %, che varia continuamente e definisce la finestra di sicurezza del volo) e grandezza quantitativa episodica (l'accumulo mm/h, che è nullo nella quasi totalità delle ore volabili).
+- **Pattern Vincolante**:
+  1. **Asse Primario su Probabilità di Precipitazione (0 - 100%)**:
+     - L'asse Y misura 0% - 100% con curva continua cubica Bézier ciano cielo (`var(--gm-accent-sky)`) e riempimento d'area sfumato (`rgba(14, 165, 233, 0.18)`), conforme allo standard Parameteo di `ui_chart_design_spec.md`.
+     - Soglie aeronautiche di sicurezza a linee tratteggiate: 30% (cautela sviluppo convezione/rovesci) e 60% (critico / rovesci probabili NO FLY).
+  2. **Accumulo Condizionale su Barre SVG (`hasPrecip`)**:
+     - Se e solo se almeno un'ora della giornata presenta accumulo $> 0.0\text{ mm/h}$, vengono tracciate le barre verticali di accumulo quantitativo (`type: 'bar'`, scala autonoma `minY: 0`, `maxY: maxPrecip * 1.5`, opacità 0.55) collocate al di sotto della curva.
+     - Se l'accumulo è 0.0 mm/h ovunque, non vengono generate barre fittizie, mantenendo il canvas pulito.
+  3. **Eliminazione Radicale della Heatmap Ribbon**:
+     - Nessun nastro micro-testuale con font a 6.8px sotto la baseline. L'altezza del grafico è recuperata interamente.
+     - Lo scrubber orario posiziona il cursore direttamente sulla quota della curva di probabilità, azzerando le collisioni sulla linea di terra.
+  4. **Display a Sinistra (Single Source of Truth)**:
+     - Valore primario: percentuale di probabilità dell'ora attiva (es. `11` con unità `% prob.`).
+     - Sub-badge: accumulo orario e stato semaforico esplicito (es. `0.0 mm/h · Asciutto`, `Pioviggine (0.3 mm/h)` o `NO FLY: Pioggia (1.2 mm/h)`).
+
+---
+
+## 147. Riconoscimento Intelligente delle Termiche: Clustering Spaziale, Tolleranza Inversioni di Virata ("Entro ed Esco") ed Estensione Salita
+- **Problema**:
+  1. Durante il termicamento in volo libero, i piloti invertono frequentemente il senso di rotazione (da orario CW ad antiorario CCW o viceversa) per ricentrare il nucleo di massima ascendenza o adattarsi all'orografia del costone. L'algoritmo precedente (`detectThermals`) scartava categoricamente il merge di blocchi contigui con direzione opposta (`cand.turnDir === curBlock.turnDir`), spezzando un'unica salita termica continua in frammenti artificiali distinti (es. T1 da +101m e T2 da +31m con gap di 0s e discesa di 0m nel volo reale #93).
+  2. Nelle fasi alte della termica o in prossimità del costone, i piloti spesso effettuano virate alternate / a S (soaring/figure-8) con rotazione netta vicina a 0° pur mantenendo ratei di salita sostenuti (+1.5..+4 m/s). L'accumulatore classico di cerchi a senso unico si azzerava continuamente, scartando del tutto la quota guadagnata in tali manovre (es. perdita di 92m di salita tra 1913m e 2005m).
+  3. L'uscita temporanea dal nucleo per ricerca (fino a 30-45s con perdita di pochi metri entro 150-250m di raggio) provocava la terminazione definitiva della termica a causa di soglie temporali ed altimetriche troppo restrittive (`gapSec <= 12`, `altDrop <= 8`) e prive di verifica di prossimità spaziale.
+  4. Le tracce già presenti in IndexedDB conservavano la vecchia telemetria serializzata con `engineVersion` precedente, impedendo all'utente di beneficiare dei miglioramenti algoritmici senza dover reimportare manualmente il file IGC.
+- **Causa Radice**:
+  - Assunzione ingenua che una termica debba mantenere rigorosamente lo stesso senso di virata dall'ingresso all'uscita.
+  - Mancanza di analisi delle manovre attive in portanza (`soaring_turn`) con rotazione combinata multi-direzionale.
+  - Mancanza di verifica del centroide geografico del nucleo (`distMeters`) nella logica di clustering.
+- **Pattern Vincolante**:
+  1. **Rilevamento Manovre Attive in Portanza (`type: 'soaring_turn'`)**:
+     - Monitorare finestre con velocità angolare attiva ($|\omega| \ge 2.5^\circ/\text{s}$), variometro positivo ($v_z \ge -0.2\text{ m/s}$), angolo complessivo accumulato $\ge 220^\circ$ e guadagno $\ge 8\text{m}$ con rateo $\ge 0.15\text{ m/s}$.
+  2. **Forward Climb Extension**:
+     - Estendere i candidati in avanti lungo la traccia fino al raggiungimento del picco effettivo di quota prima della transizione a planata o discendenza persistente.
+  3. **Clustering Spaziale Invariante rispetto al Senso di Virata ("Entro ed Esco")**:
+     - Rimuovere il vincolo di direzione identica nel merge.
+     - Calcolare il centro geografico del nucleo (`computeSliceCenter`) e fondere i frammenti appartenenti alla medesima colonna termica:
+       - Gap immediato: $\Delta t \le 15\text{s}$, $\Delta h \le 15\text{m}$, distanza $\le 300\text{m}$.
+       - Ricerca standard: $\Delta t \le 45\text{s}$, $\Delta h \le 22\text{m}$, distanza $\le 250\text{m}$.
+       - Uscita/rientro ampio: $\Delta t \le 60\text{s}$, $\Delta h \le 25\text{m}$, distanza $\le 140\text{m}$.
+     - Se la termica unificata presenta sia virate CW che CCW, assegnare la direzione dominante se una supera l'altra di almeno $2\times$, oppure `'CW/CCW'` (visualizzato come `"Misto"` nella UI) se equilibrata.
+  4. **Auto-Upgrade Telemetria (Engine Versioning)**:
+     - Incrementare `CURRENT_TELEMETRY_ENGINE_VERSION` (es. `9`). All'apertura del dettaglio volo (`getFlightDetail` in `logbookDb.js`), se `telemetry.engineVersion < CURRENT_TELEMETRY_ENGINE_VERSION`, ri-analizzare la telemetria al volo sui punti originali o decimati e aggiornare il record in background nell'adapter.
+
+
+
+---
+
+## 147. Ergonomia Marker Decollo su Mappa: Settore di Esposizione Pulito Senza Freccia né Badge Numerico dei Gradi
+- **Problema**: Nel marker cartografico del decollo (`generateTakeoffSectorSvg`), la presenza simultanea del cuneo ad arco a 70°, della linea con freccia azimutale e del badge rettangolare scuro con il valore in gradi (es. `170°`) provocava un sovraccarico visivo inutile (clutter), estendendosi oltre l'impronta del settore e sovrapponendosi all'ortofoto satellitare, ai nomi geografici e alla linea di planata verso l'atterraggio.
+- **Causa Radice**: Ridondanza informativa: il cono a 70° comunica già in modo immediato, intuitivo e geometrico l'orientamento e l'apertura del pendio di decollo. La freccia e il badge numerico costituivano inchiostro non-dati duplicativo.
+- **Pattern Vincolante**:
+  1. `generateTakeoffSectorSvg` deve omettere per impostazione predefinita (`showArrow = options.showArrow === true`, `showBadge = options.showBadge === true`) sia l'asta/freccia direzionale (`prefix-line`, `prefix-arrow`) sia il badge numerico con i gradi (`prefix-badge`).
+  2. Il marker cartografico standard visualizza unicamente il cuneo di lancio a 70° colorato secondo la direzione del vento (verde in asse, ambra al traverso, rosso sottovento), il perno centrale di decollo (`circle.hub` con `▲`) e la quota altimetrica in metri (`${altitude}m`), preservando la massima chiarezza outdoor della mappa sia nella vista contestuale che a schermo intero.
+
+---
+
+## 148. Gerarchia Visiva Card Flight Log: Anti-Troncamento Rotte, Rimozione Badge EN Ridondanti e Prevenzione Duplicazione Decollo
+- **Problema**:
+  1. Su viewport mobile ristretti (360px–390px), la rotta di volo (`siteName`: `Decollo -> Atterraggio`) veniva sistematicamente troncata a 13–15 caratteri con puntini di sospensione (`Decollo Ciavanis -> PeterPan ...`), oscurando completamente l'atterraggio.
+  2. Il pill badge della classe velica (`EN-B` o `EN-A`) occupava ~54px nell'header della card pur essendo cognitivamente superfluo (il modello specifico della vela è già mostrato nel sub-header, i filtri di categoria sono presenti nella toolbar orizzontale e i dettagli tecnici risiedono nel full-sheet).
+  3. Il toponimo di decollo veniva duplicato nella seconda riga (`2026-10-11 • Ore 16:42 • Decollo Ciavanis • Axis Pluto 4`), sprecando 100px orizzontali e forzando il troncamento artificiale del nome della vela (`truncate max-w-[140px]`).
+- **Causa Radice**:
+  - Sovraffollamento flexbox orizzontale a riga singola con `white-space: nowrap; text-overflow: ellipsis;`.
+  - Assenza di deduzione semantica sulla ridondanza toponomastica (`siteArea` generato per qualsiasi `site !== title`, anche quando `site` è parte integrante del titolo rotta).
+- **Pattern Vincolante**:
+  1. **Header Card Pulito (Occam's Razor)**: Rimuovere `gm-glider-pill-badge` dal feed delle card, liberando 54px orizzontali ed eliminando il rumore cromatico su decine di card consecutive.
+  2. **Anti-Troncamento a Due Righe Controllate (`line-clamp: 2`)**: Configurare `.gm-flight-site-title` con `display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.35; word-break: break-word;` e `.gm-flight-card-header` a `align-items: flex-start`. La rotta ha a disposizione fino a due righe (~480px) senza subire tagli con ellipsis.
+  3. **Prevenzione Duplicazione Decollo (`isTakeoffRedundant`)**: Verificare sistematicamente se `flight.site` coincide o è contenuto in `title`/`siteName`. In caso positivo, omettere `siteArea` dalla seconda riga, lasciando la sequenza ariosa `Data • Ore HH:MM • Modello Vela`.
+  4. **Rimozione del Vincolo Lunghezza Vela**: Rimuovere `max-w-[140px]` dallo span della vela, consentendo ai nomi composti di estendersi naturalmente nello spazio liberato.
+

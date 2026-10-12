@@ -656,12 +656,49 @@ function createMockThree() {
   describe('4. Dynamic Traveled Track Rendering (Playback Instant Contracts)', () => {
     let engine;
     let mockThree;
+    let mockMap;
 
     beforeEach(() => {
       mockThree = createMockThree();
       engine = new MapLibreThreeEngine();
+      engine.isHeadless = false;
       engine.THREE = mockThree;
       engine.threeScene = new mockThree.Scene();
+
+      mockMap = {
+        transform: { elevation: 1060 },
+        _pitch: 60,
+        getPitch() { return this._pitch; },
+        getZoom() { return 14; },
+        getCenter() { return { lng: 9.302, lat: 45.833 }; },
+        jumpTo() {},
+        getCanvas() { return { clientWidth: 800, clientHeight: 600 }; },
+        getLayer() { return null; },
+        removeLayer() {},
+        addLayer(layer) {
+          if (layer && typeof layer.onAdd === 'function') {
+            layer.onAdd(this, {});
+          }
+        },
+        fitBounds() {},
+        triggerRepaint() {},
+        on() {},
+        off() {},
+        once() {}
+      };
+      engine.map = mockMap;
+      engine.maplibregl = {
+        MercatorCoordinate: {
+          fromLngLat(lngLat, alt) {
+            return {
+              x: 0.5,
+              y: 0.5,
+              z: (alt || 0) * 1e-7,
+              meterInMercatorCoordinateUnits: () => 1e-7
+            };
+          }
+        }
+      };
     });
 
     it('should start with 0 track drawRange when progress is 0 (at takeoff)', async () => {
@@ -686,9 +723,9 @@ function createMockThree() {
       const progress = targetIdx / (n - 1);
       engine.seek(progress);
 
-      const expectedIndices = (targetIdx + 1) * 24;
+      const expectedIndices = targetIdx * 24;
       assert.equal(engine.trackRibbonMesh.geometry.drawRange.count, expectedIndices);
-      assert.equal(engine.centerLineMesh.geometry.drawRange.count, targetIdx + 2);
+      assert.equal(engine.centerLineMesh.geometry.drawRange.count, targetIdx + 1);
       assert.ok(engine.curtainMesh.geometry.drawRange.count > 0);
     });
 

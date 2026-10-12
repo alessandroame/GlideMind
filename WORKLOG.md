@@ -1517,3 +1517,57 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Test suite globale al 100% verde: 711 test (124 suite), 710 passanti, 0 falliti, 1 skipped.
   - Registrata la Lezione Appresa #145 in [MEMORY.md](file:///MEMORY.md).
 
+---
+
+## 2026-10-12 - UI / Meteo: Armonizzazione Grafico Precipitazioni su Curva Spline Parameteo (0-100%) ed Eliminazione Micro-Nastro Heatmap
+- **Tipo**: Refactoring / UI / Ergonomia Mobile / Parameteo Standard
+- **Dettagli**: [.agents/worklog.d/2026-10-12_parameteo_precipitation_spline_curve_standard.md](file:///.agents/worklog.d/2026-10-12_parameteo_precipitation_spline_curve_standard.md)
+- **Sintesi**:
+  - Risolto il difetto del "canvas deserto" e del nastro micro-testuale nella card `multi-chart-precipitation` in modalità "Solo Grafici": sostituito il grafico cartesiano vuoto (0-3 mm/h con barre a zero) e il nastro orario a 6.8px con la curva continua Monotone Bézier cubica di probabilità (0-100%) con campitura sfumata ciano cielo (`var(--gm-accent-sky)` / `rgba(14, 165, 233, 0.18)`), perfettamente omogenea con gli altri 6 grafici Parameteo (Vento, Base Cumulo, CAPE, Turbolenza, Copertura, Brezza Valle).
+  - Tracciate le soglie aeronautiche di sicurezza a 30% (cautela sviluppo convezione) e 60% (critico / rovesci probabili NO FLY).
+  - Supportate le barre verticali condizionali per l'accumulo in mm/h renderizzate solo se almeno un'ora della giornata presenta accumulo $> 0.0\text{ mm/h}$, lasciando il canvas pulito e privo di barre invisibili nei giorni asciutti.
+  - Sincronizzato il display a sinistra: mostra come primario il valore percentuale dell'ora attiva (es. `11` con unità `% prob.`) e nel sub-badge l'accumulo orario quantitativo e lo stato semaforico esplicito (es. `0.0 mm/h · Asciutto`, `Pioviggine (0.3 mm/h)` o `NO FLY: Pioggia (1.2 mm/h)`).
+  - Test suite globale al 100% verde: 711 test (124 suite), 710 passanti, 0 falliti, 1 skipped.
+  - Registrata la Lezione Appresa #146 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-12 - Core / Telemetria: Riconoscimento Intelligente delle Termiche con Clustering Spaziale e Tolleranza Inversioni di Virata ("Entro ed Esco")
+- **Tipo**: Feature / Core / Telemetria di Volo / Algoritmi di Riconoscimento / UI Dettaglio Volo
+- **Dettagli**: [.agents/worklog.d/2026-10-12_intelligent_thermal_clustering_and_reversal_merging.md](file:///.agents/worklog.d/2026-10-12_intelligent_thermal_clustering_and_reversal_merging.md)
+- **Sintesi**:
+  - Risolta la frammentazione artificiale delle salite termiche in `core/flightManeuvers.js`: rimosso il vincolo rigido che imponeva lo stesso senso di rotazione (`cand.turnDir === curBlock.turnDir`), consentendo la fusione unificata di termiche in cui il pilota inverte la virata (CW <-> CCW) per ricentrare il nucleo (es. volo reale #93, dove T1 e T2 erano artificialmente separate con 0s di stacco a 1882m).
+  - Introdotto lo Step 2B per il rilevamento delle manovre attive in portanza (`type: 'soaring_turn'`), catturando le virate alternate / a S contro il pendio o nel lift (con rotazione angolare totale $\ge 220^\circ$, $v_z \ge -0.2\text{ m/s}$ e guadagno $\ge 8\text{m}$), recuperando per intero la salita finale da 1913m a 2005m (+92m) precedentemente persa.
+  - Implementata la Forward Climb Extension nello Step 3 per estendere i candidati in avanti fino al raggiungimento del culmine effettivo di salita prima della transizione a planata.
+  - Sostituita la logica di merge a soglie fisse con il clustering spaziale di colonna termica basato sul centroide geografico (`computeSliceCenter`) e distanza orizzontale $\le 140\dots 300\text{m}$ con tolleranza di uscita e rientro ("entro ed esco") fino a 45-60s e perdita di quota $\le 22\dots 25\text{m}$.
+  - Supportata la direzione di virata `'CW/CCW'` (visualizzata nella UI come `"Misto"`) per le termiche con frequenti cambi di direzione.
+  - Elevata la versione dell'engine di telemetria a `CURRENT_TELEMETRY_ENGINE_VERSION = 9` in `core/flightTelemetry.js` e introdotta la ri-analisi automatica e salvataggio trasparente in background in `core/logbookDb.js` (`getFlightDetail`) per i voli già salvati nel DB locale.
+  - Validazione sul volo reale #93: l'intera salita da 1765m a 2005m (+240m di guadagno netto, 3m 39s, 13.2 giri) è ora riconosciuta come un'unica termica continua coerente con la selezione visiva dell'utente.
+  - Aggiunti test unitari specifici in `tests/core/flightManeuvers.test.mjs`. Test suite globale al 100% verde: 713 test (124 suite), 712 passanti, 0 falliti, 1 skipped.
+  - Registrata la Lezione Appresa #147 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-12 - UI / Cartografia: Rimozione Freccia Azimutale e Badge Gradi nel Settore di Esposizione Decollo
+- **Tipo**: Refactoring / UI / Cartografia 2D / Ergonomia Outdoor
+- **Dettagli**: [.agents/worklog.d/2026-10-12_clean_takeoff_sector_svg_without_arrow_or_heading_badge.md](file:///.agents/worklog.d/2026-10-12_clean_takeoff_sector_svg_without_arrow_or_heading_badge.md)
+- **Sintesi**:
+  - Rimossa per impostazione predefinita la freccia direzionale di pendio e il badge scuro dei gradi (es. `170°`) dalla funzione `generateTakeoffSectorSvg` in [`ui/map/mapEngineAdapter.js`](file:///ui/map/mapEngineAdapter.js).
+  - Il marker cartografico di decollo mantiene in primo piano il cuneo di esposizione a 70° (`path.wedge`) con colorazione semaforica reattiva al vento (in asse, traverso, sottovento), l'hub circolare centrale con triangolo `▲` e la quota altimetrica (`${altitude}m`), azzerando il sovraccarico visivo sulla mappa e le sovrapposizioni con l'orografia e la linea geodesica di planata.
+  - Aggiornati i test in [`tests/ui/mapTakeoffSector.test.mjs`](file:///tests/ui/mapTakeoffSector.test.mjs) per verificare l'assenza di freccia e badge di default e la disponibilità opzionale via configurazione.
+  - Test suite globale al 100% verde: 714 test (124 suite), 713 passanti, 0 falliti, 1 skipped.
+  - Registrata la Lezione Appresa #147 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-12 - UI / Logbook: Bonifica Gerarchia Visiva Card, Anti-Troncamento Rotte e Rimozione Ridondanze
+- **Tipo**: Refactoring / UI / Logbook / Ergonomia Mobile / Laws of UX
+- **Dettagli**: [.agents/worklog.d/2026-10-12_logbook_card_anti_truncation_and_clean_hierarchy.md](file:///.agents/worklog.d/2026-10-12_logbook_card_anti_truncation_and_clean_hierarchy.md)
+- **Sintesi**:
+  - Risolto il troncamento sistematico del titolo rotta decollo-atterraggio nelle card del Flight Log: rimosso il badge di categoria velica `gm-glider-pill-badge` (`EN-B` o `EN-A`) dall'header, liberando ~54px orizzontali ed eliminando il rumore visivo su decine di card consecutive.
+  - Applicato `display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.35; word-break: break-word;` con `align-items: flex-start` su `.gm-flight-card-header` e `.gm-flight-site-title`, consentendo alle rotte lunghe (es. `Decollo Ciavanis -> PeterPan Santa Elisabetta`) di estendersi su due righe senza essere tagliate con puntini di sospensione.
+  - Risolta la duplicazione toponomastica nella seconda riga con la funzione helper `isTakeoffRedundant`, evitando di ripetere il decollo quando già contenuto nel titolo.
+  - Rimosso il limite forzato `max-w-[140px]` dal nome della vela nel sub-header, permettendo la visualizzazione completa dei modelli composti.
+  - Aggiunti test di validazione in `tests/ui/logbookView.test.mjs`. Test suite logbook al 100% verde (65/65 test passanti).
+  - Registrata la Lezione Appresa #148 in [MEMORY.md](file:///MEMORY.md).
+
