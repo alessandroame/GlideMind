@@ -1938,3 +1938,17 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
   3. **Scala Dinamica Multi-Zoom**: A zoom 12 scala a $2.08\text{ m}$ (4px), a zoom 10 a $8.32\text{ m}$ (4px), con clamp $0.35\text{ m} \le W \le 25.0\text{ m}$.
   4. **Proporzione Volumetrica Prismatica (`heightRatio = 0.6`)**: Sezione a diamante $52\text{ cm} \times 31\text{ cm}$ con vertici colorati secondo la scala variometrica FAI.
 
+---
+
+## 145. Mini-Mappe Contestuali (Previsioni e Dettaglio Volo): Coerenza dei Controlli Flottanti e Stacking Leaflet
+- **Problema**: Nella mini-mappa 2D del volo (`FlightDetailSheet.js`), il controllo di cambio layer era stato inserito nella riga di intestazione esterna (`flex items-center gap-1.5`) accanto al titolo di sezione, collidendo con la spaziatura e disallineandosi con la classe `.gm-mini-map-layer-toggle` (che ha `position: absolute`), mentre il pulsante di espansione a tutto schermo era del tutto assente rispetto alla mini-mappa delle previsioni (`ForecastView.js`).
+- **Causa Radice**: Mancata applicazione del pattern `.gm-mini-map-box` per la card cartografica del volo, lasciando i controlli separati dal canvas anziché fluttuanti sovrapposti agli angoli del contenitore cartografico.
+- **Pattern Vincolante**:
+  1. **Parità Architetturale del Container**: Qualsiasi mini-mappa nell'applicazione deve adottare la classe `.gm-mini-map-box` e l'attributo reattivo `data-map-layer="${activeLayer}"`.
+  2. **Controlli Flottanti Standardizzati**:
+     - In alto a sinistra (`top: 8px; left: 8px`): `.gm-mini-map-layer-toggle` con icona dinamica del layer opposto e sfumatura radiale morbida nera.
+     - In alto a destra (`top: 8px; right: 8px`): `.gm-mini-map-expand-btn` con icona a frecce diagonali opposte e apertura diretta della vista espansa (fullscreen overlay in previsioni, Replay 3D volumetrico nel logbook volo).
+  3. **Stacking Context Sicuro su Leaflet (`z-index: 500`)**: Entrambi i pulsanti devono avere `z-index: 500` per galleggiare stabilmente sopra i tile Leaflet (pane 200) e le polilinee del tracciato (pane 400).
+  4. **Fitts's Law Outdoor**: Target touch esteso a pavimento $\ge 48\times 48\text{px}$ tramite pseudo-elemento invisibile `::before`.
+
+

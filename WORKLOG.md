@@ -1490,7 +1490,7 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Disaccoppiato lo scrubber dal pan con macchina a stati gestuale a 350ms: la pressione breve con movimento orizzontale opera esclusivamente come scrubber (aggiornamento cursore, HUD e mappa senza alterare la finestra del grafico), mentre il pan dello zoom richiede una pressione prolungata $\ge 350\text{ms}$. Il tocco breve rapido (<350ms, <6px) preserva la selezione/deselezione della fase.
   - Risolta la dominanza di blu sulla traccia trimmata della mini-mappa 2D in `LeafletMapEngine.highlightFlightTrackRange`: rimosso l'alone azzurro `#38bdf8` che copriva la traccia, portati in primo piano i segmenti attivi (`poly.bringToFront()`) con spessore 5.5px e opacità piena 1.0; introdotta la media mobile a 3 punti del variometro in `renderFlightTrack` e `safePoints` per eliminare il rumore GNSS e riflettere fedelmente i colori caldi (arancio/giallo) delle termiche.
   - Suite di test globale al 100% verde: 709 test (124 suite), 708 passanti, 0 falliti, 1 skipped.
-  - Registrata la Lezione Appresa #141 in [MEMORY.md](file:///MEMORY.md).
+  - Registrata la Lezione Appresa #143 in [MEMORY.md](file:///MEMORY.md).
 
 ---
 
@@ -1504,4 +1504,16 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Aggiornati i test in `tests/core/flightReplayMath.test.mjs` per validare le dimensioni a 4px esatti e l'adattamento dinamico.
   - Test suite globale al 100% verde: 711 test (124 suite), 710 passanti, 0 falliti, 1 skipped.
   - Registrata la Lezione Appresa #144 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-12 - UI / Cartografia: Uniformazione Controlli Flottanti della Mini-Mappa del Volo (Parità con Previsioni)
+- **Tipo**: Feature / UI / Ergonomia Mobile / Cartografia 2D
+- **Dettagli**: [.agents/worklog.d/2026-10-12_flight_detail_minimap_controls_parity_with_forecast_view.md](file:///.agents/worklog.d/2026-10-12_flight_detail_minimap_controls_parity_with_forecast_view.md)
+- **Sintesi**:
+  - Allineata la mini-mappa 2D del tracciato di volo ([`FlightDetailSheet.js`](file:///ui/views/FlightDetailSheet.js)) al pattern comune `.gm-mini-map-box` della vista Previsioni: rimossi i controlli dall'intestazione testuale della sezione e inseriti fluttuanti direttamente sopra il canvas cartografico.
+  - Integrati i due controlli canonici agli angoli superiori: in alto a sinistra il toggle dinamico del layer (`#flight-detail-map-layer-toggle`, classe `.gm-mini-map-layer-toggle`) con finitura a sfumatura radiale morbida e icone Opzione 2 (globo orbitale per satellite / mappa piegata per topo); in alto a destra il pulsante di espansione a schermo intero (`#flight-detail-map-expand-btn`, classe `.gm-mini-map-expand-btn`) con frecce diagonali opposte che apre direttamente il Replay 3D volumetrico (`#replay?flightId=...`).
+  - Elevato `z-index: 500` per entrambe le classi in [`css/theme.css`](file:///css/theme.css) per garantire galleggiamento stabile al di sopra di tutti i layer e le polilinee Leaflet.
+  - Test suite globale al 100% verde: 711 test (124 suite), 710 passanti, 0 falliti, 1 skipped.
+  - Registrata la Lezione Appresa #145 in [MEMORY.md](file:///MEMORY.md).
 
