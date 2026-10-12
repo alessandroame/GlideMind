@@ -95,6 +95,10 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     this.curtainMesh = null;
     this._ribbonNormals = null;
     this._currentRibbonZoom = null;
+    this._lastModifiedIndex = null;
+    this._lastCurrentPoint = null;
+    this._totalCurtainVertices = 0;
+    this._curtainStep = 10;
 
     // Trajectory & Geodesic Projection State
     this.rawPoints = [];
@@ -465,9 +469,10 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
         self.avatarGroup = createParagliderMesh(THREE);
         self.threeScene.add(self.avatarGroup);
 
-        // Initial avatar position with dynamic scale
+        // Initial avatar position with dynamic scale and traveled track alignment
         if (self.projectedTrack && self.projectedTrack.points.length > 0) {
-          self._updateCurrentFrame(self.projectedTrack.points[0]);
+          const currentPt = self._interpolatePointAtTime(self.currentTimeSec);
+          self._updateCurrentFrame(currentPt);
         }
 
         // WebGL Renderer
@@ -543,7 +548,7 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
         // Check for zoom changes to dynamically adapt ribbon width and height
         const currentZoom = (self.map && typeof self.map.getZoom === 'function') ? self.map.getZoom() : null;
         if (currentZoom !== null && self.trackRibbonMesh && self._currentRibbonZoom !== null) {
-          if (Math.abs(currentZoom - self._currentRibbonZoom) > 0.08) {
+          if (Math.abs(currentZoom - self._currentRibbonZoom) > 0.02) {
             self._updateRibbonDimensions(currentZoom);
           }
         }
@@ -556,6 +561,18 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
         }
       }
     };
+
+    if (this.map && typeof this.map.on === 'function' && !this._onMapZoom) {
+      this._onMapZoom = () => {
+        if (this.trackRibbonMesh && typeof this.map.getZoom === 'function') {
+          const z = this.map.getZoom();
+          if (Math.abs(z - (this._currentRibbonZoom ?? 0)) > 0.02) {
+            this._updateRibbonDimensions(z);
+          }
+        }
+      };
+      this.map.on('zoom', this._onMapZoom);
+    }
 
     try {
       this.map.addLayer(this.glCustomLayer);
@@ -666,6 +683,11 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     geom.setIndex(indices);
 
+    if (typeof geom.setDrawRange === 'function') {
+      const initialIndices = (this.progress > 0) ? Math.floor(this.progress * (n - 1)) * 24 : 0;
+      geom.setDrawRange(0, initialIndices);
+    }
+
     const mat = new THREE.MeshBasicMaterial({
       vertexColors: true,
       side: THREE.DoubleSide,
@@ -684,6 +706,12 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     const lineGeom = new THREE.BufferGeometry();
     lineGeom.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3));
     lineGeom.setAttribute('color', new THREE.Float32BufferAttribute(lineColors, 3));
+
+    if (typeof lineGeom.setDrawRange === 'function') {
+      const initialLineCount = (this.progress > 0) ? Math.floor(this.progress * (n - 1)) + 1 : 0;
+      lineGeom.setDrawRange(0, initialLineCount);
+    }
+
     const lineMat = new THREE.LineBasicMaterial({
       vertexColors: true,
       transparent: true,
@@ -785,6 +813,10 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     }
 
     posAttr.needsUpdate = true;
+
+    if (this._lastCurrentPoint) {
+      this._updateTraveledTrack(this._lastCurrentPoint);
+    }
   }
 
   /**
@@ -800,6 +832,7 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
 
     // Place vertical pylon lines every ~10-15 points
     const step = Math.max(4, Math.floor(n / 40));
+    this._curtainStep = step;
     const linePositions = [];
     const lineColors = [];
 
@@ -826,9 +859,18 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
       lineColors.push(varioCol.r, varioCol.g, varioCol.b);
     }
 
+    this._totalCurtainVertices = linePositions.length / 3;
+
     const geom = new THREE.BufferGeometry();
     geom.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3));
     geom.setAttribute('color', new THREE.Float32BufferAttribute(lineColors, 3));
+
+    if (typeof geom.setDrawRange === 'function') {
+      const initialCurtainCount = (this.progress > 0)
+        ? Math.min(this._totalCurtainVertices, (Math.floor((this.progress * (n - 1)) / step) + 1) * 2)
+        : 0;
+      geom.setDrawRange(0, initialCurtainCount);
+    }
 
     const mat = new THREE.LineBasicMaterial({
       vertexColors: true,
@@ -842,6 +884,265 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
 
     this.curtainMesh = new THREE.LineSegments(geom, mat);
     this.threeScene.add(this.curtainMesh);
+  }
+
+  /**
+   * Restores a ribbon point and centerline vertex to its precomputed coordinates and FAI colors.
+   * 
+   * @param {number} i Point index in projectedTrack.points
+   */
+  _restoreRibbonPoint(i) {
+    if (i == null || !this.trackRibbonMesh || !this.projectedTrack || !this._ribbonNormals) return;
+    const pts = this.projectedTrack.points;
+    if (i < 0 || i >= pts.length) return;
+
+    const pt = pts[i];
+    const geom = this.trackRibbonMesh.geometry;
+    const posAttr = (geom && typeof geom.getAttribute === 'function')
+      ? geom.getAttribute('position')
+      : geom?.attributes?.position;
+    const colAttr = (geom && typeof geom.getAttribute === 'function')
+      ? geom.getAttribute('color')
+      : geom?.attributes?.color;
+
+    const currentZoom = (this.map && typeof this.map.getZoom === 'function')
+      ? this.map.getZoom()
+      : (this._currentRibbonZoom || 14);
+    const dims = calculateRibbonDimensions(currentZoom, this.origin?.lat);
+    const hw = dims.halfWidth;
+    const hh = dims.halfHeight;
+
+    const nx = this._ribbonNormals[i * 2];
+    const nz = this._ribbonNormals[i * 2 + 1];
+
+    const varioCol = sampleVarioRgb(pt.vario);
+    const r = varioCol.r;
+    const g = varioCol.g;
+    const b = varioCol.b;
+
+    if (posAttr && posAttr.array) {
+      const baseIdx = i * 12;
+      posAttr.array[baseIdx]     = pt.x;
+      posAttr.array[baseIdx + 1] = pt.y + hh;
+      posAttr.array[baseIdx + 2] = pt.z;
+
+      posAttr.array[baseIdx + 3] = pt.x + nx * hw;
+      posAttr.array[baseIdx + 4] = pt.y;
+      posAttr.array[baseIdx + 5] = pt.z + nz * hw;
+
+      posAttr.array[baseIdx + 6] = pt.x;
+      posAttr.array[baseIdx + 7] = pt.y - hh;
+      posAttr.array[baseIdx + 8] = pt.z;
+
+      posAttr.array[baseIdx + 9]  = pt.x - nx * hw;
+      posAttr.array[baseIdx + 10] = pt.y;
+      posAttr.array[baseIdx + 11] = pt.z - nz * hw;
+      posAttr.needsUpdate = true;
+    }
+
+    if (colAttr && colAttr.array) {
+      for (let c = 0; c < 4; c++) {
+        colAttr.array[i * 12 + c * 3]     = r;
+        colAttr.array[i * 12 + c * 3 + 1] = g;
+        colAttr.array[i * 12 + c * 3 + 2] = b;
+      }
+      colAttr.needsUpdate = true;
+    }
+
+    if (this.centerLineMesh) {
+      const lineGeom = this.centerLineMesh.geometry;
+      const linePos = (lineGeom && typeof lineGeom.getAttribute === 'function')
+        ? lineGeom.getAttribute('position')
+        : lineGeom?.attributes?.position;
+      const lineCol = (lineGeom && typeof lineGeom.getAttribute === 'function')
+        ? lineGeom.getAttribute('color')
+        : lineGeom?.attributes?.color;
+      if (linePos && linePos.array) {
+        linePos.array[i * 3]     = pt.x;
+        linePos.array[i * 3 + 1] = pt.y;
+        linePos.array[i * 3 + 2] = pt.z;
+        linePos.needsUpdate = true;
+      }
+      if (lineCol && lineCol.array) {
+        lineCol.array[i * 3]     = r;
+        lineCol.array[i * 3 + 1] = g;
+        lineCol.array[i * 3 + 2] = b;
+        lineCol.needsUpdate = true;
+      }
+    }
+  }
+
+  /**
+   * Dynamically renders only the flight track traveled up to the current playback instant.
+   * Updates geometry draw ranges and attaches the active end segment directly to the avatar position.
+   * 
+   * @param {object} currentPoint Interpolated track point at current playback time
+   */
+  _updateTraveledTrack(currentPoint) {
+    if (!this.trackRibbonMesh || !this.projectedTrack || !this.projectedTrack.points.length) return;
+    const pts = this.projectedTrack.points;
+    const n = pts.length;
+    if (n < 2) return;
+
+    this._lastCurrentPoint = currentPoint;
+
+    const startSec = pts[0].timeSeconds || 0;
+    const endSec = pts[n - 1].timeSeconds || (n - 1);
+
+    // Case 1: At takeoff / progress <= 0
+    if (this.currentTimeSec <= startSec || this.progress <= 0) {
+      if (this._lastModifiedIndex !== null) {
+        this._restoreRibbonPoint(this._lastModifiedIndex);
+        this._lastModifiedIndex = null;
+      }
+      if (typeof this.trackRibbonMesh.geometry.setDrawRange === 'function') {
+        this.trackRibbonMesh.geometry.setDrawRange(0, 0);
+      }
+      if (this.centerLineMesh && typeof this.centerLineMesh.geometry.setDrawRange === 'function') {
+        this.centerLineMesh.geometry.setDrawRange(0, 0);
+      }
+      if (this.curtainMesh && typeof this.curtainMesh.geometry.setDrawRange === 'function') {
+        this.curtainMesh.geometry.setDrawRange(0, 0);
+      }
+      return;
+    }
+
+    // Case 2: Flight finished / progress >= 1.0
+    if (this.currentTimeSec >= endSec || this.progress >= 1.0) {
+      if (this._lastModifiedIndex !== null) {
+        this._restoreRibbonPoint(this._lastModifiedIndex);
+        this._lastModifiedIndex = null;
+      }
+      const totalIndices = (n - 1) * 24;
+      if (typeof this.trackRibbonMesh.geometry.setDrawRange === 'function') {
+        this.trackRibbonMesh.geometry.setDrawRange(0, totalIndices);
+      }
+      if (this.centerLineMesh && typeof this.centerLineMesh.geometry.setDrawRange === 'function') {
+        this.centerLineMesh.geometry.setDrawRange(0, n);
+      }
+      if (this.curtainMesh && typeof this.curtainMesh.geometry.setDrawRange === 'function') {
+        this.curtainMesh.geometry.setDrawRange(0, this._totalCurtainVertices || 0);
+      }
+      return;
+    }
+
+    // Case 3: In-flight intermediate segment (binary search for current segment)
+    let low = 0;
+    let high = n - 1;
+    while (low <= high) {
+      const mid = Math.floor((low + high) / 2);
+      const midTime = pts[mid].timeSeconds ?? mid;
+      if (midTime < this.currentTimeSec) {
+        low = mid + 1;
+      } else {
+        high = mid - 1;
+      }
+    }
+    const idx = Math.max(0, Math.min(n - 2, high));
+    const nextIdx = idx + 1;
+
+    // If active segment moved to a different point, restore previously modified point
+    if (this._lastModifiedIndex !== null && this._lastModifiedIndex !== nextIdx) {
+      this._restoreRibbonPoint(this._lastModifiedIndex);
+    }
+
+    // Update nextIdx vertices to match currentPoint (connecting track seamlessly to avatar)
+    const geom = this.trackRibbonMesh.geometry;
+    const posAttr = (geom && typeof geom.getAttribute === 'function')
+      ? geom.getAttribute('position')
+      : geom?.attributes?.position;
+    const colAttr = (geom && typeof geom.getAttribute === 'function')
+      ? geom.getAttribute('color')
+      : geom?.attributes?.color;
+
+    const currentZoom = (this.map && typeof this.map.getZoom === 'function')
+      ? this.map.getZoom()
+      : (this._currentRibbonZoom || 14);
+    const dims = calculateRibbonDimensions(currentZoom, this.origin?.lat);
+    const hw = dims.halfWidth;
+    const hh = dims.halfHeight;
+
+    const cp = currentPoint || pts[nextIdx];
+    const headingRad = (((cp && cp.heading) || 0) * Math.PI) / 180;
+    const nx = Math.cos(headingRad);
+    const nz = Math.sin(headingRad);
+
+    const varioCol = sampleVarioRgb(cp.vario);
+    const r = varioCol.r;
+    const g = varioCol.g;
+    const b = varioCol.b;
+
+    if (posAttr && posAttr.array) {
+      const baseIdx = nextIdx * 12;
+      posAttr.array[baseIdx]     = cp.x;
+      posAttr.array[baseIdx + 1] = cp.y + hh;
+      posAttr.array[baseIdx + 2] = cp.z;
+
+      posAttr.array[baseIdx + 3] = cp.x + nx * hw;
+      posAttr.array[baseIdx + 4] = cp.y;
+      posAttr.array[baseIdx + 5] = cp.z + nz * hw;
+
+      posAttr.array[baseIdx + 6] = cp.x;
+      posAttr.array[baseIdx + 7] = cp.y - hh;
+      posAttr.array[baseIdx + 8] = cp.z;
+
+      posAttr.array[baseIdx + 9]  = cp.x - nx * hw;
+      posAttr.array[baseIdx + 10] = cp.y;
+      posAttr.array[baseIdx + 11] = cp.z - nz * hw;
+      posAttr.needsUpdate = true;
+    }
+
+    if (colAttr && colAttr.array) {
+      for (let c = 0; c < 4; c++) {
+        colAttr.array[nextIdx * 12 + c * 3]     = r;
+        colAttr.array[nextIdx * 12 + c * 3 + 1] = g;
+        colAttr.array[nextIdx * 12 + c * 3 + 2] = b;
+      }
+      colAttr.needsUpdate = true;
+    }
+
+    if (this.centerLineMesh) {
+      const lineGeom = this.centerLineMesh.geometry;
+      const linePos = (lineGeom && typeof lineGeom.getAttribute === 'function')
+        ? lineGeom.getAttribute('position')
+        : lineGeom?.attributes?.position;
+      const lineCol = (lineGeom && typeof lineGeom.getAttribute === 'function')
+        ? lineGeom.getAttribute('color')
+        : lineGeom?.attributes?.color;
+      if (linePos && linePos.array) {
+        linePos.array[nextIdx * 3]     = cp.x;
+        linePos.array[nextIdx * 3 + 1] = cp.y;
+        linePos.array[nextIdx * 3 + 2] = cp.z;
+        linePos.needsUpdate = true;
+      }
+      if (lineCol && lineCol.array) {
+        lineCol.array[nextIdx * 3]     = r;
+        lineCol.array[nextIdx * 3 + 1] = g;
+        lineCol.array[nextIdx * 3 + 2] = b;
+        lineCol.needsUpdate = true;
+      }
+    }
+
+    // Set draw range for ribbon: segments 0 through idx (idx + 1 segments * 24 indices)
+    const drawIndices = (idx + 1) * 24;
+    if (typeof this.trackRibbonMesh.geometry.setDrawRange === 'function') {
+      this.trackRibbonMesh.geometry.setDrawRange(0, drawIndices);
+    }
+
+    // Set draw range for centerline: vertices 0 through nextIdx (nextIdx + 1 vertices)
+    if (this.centerLineMesh && typeof this.centerLineMesh.geometry.setDrawRange === 'function') {
+      this.centerLineMesh.geometry.setDrawRange(0, nextIdx + 1);
+    }
+
+    // Set draw range for drop curtain: pylons up to idx
+    if (this.curtainMesh && typeof this.curtainMesh.geometry.setDrawRange === 'function') {
+      const step = this._curtainStep || Math.max(4, Math.floor(n / 40));
+      const pylonCount = Math.floor(idx / step) + 1;
+      const curtainDrawCount = Math.min(this._totalCurtainVertices || 0, pylonCount * 2);
+      this.curtainMesh.geometry.setDrawRange(0, curtainDrawCount);
+    }
+
+    this._lastModifiedIndex = nextIdx;
   }
 
 
@@ -1004,6 +1305,8 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
       this._updateCameraForFrame(pt);
     }
 
+    this._updateTraveledTrack(pt);
+
     this._emitTimeUpdate(pt);
   }
 
@@ -1125,8 +1428,14 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     this._lastValidCenterElevation = 0;
     this._ribbonNormals = null;
     this._currentRibbonZoom = null;
+    this._lastModifiedIndex = null;
+    this._lastCurrentPoint = null;
 
     if (this.map) {
+      if (typeof this.map.off === 'function' && this._onMapZoom) {
+        this.map.off('zoom', this._onMapZoom);
+        this._onMapZoom = null;
+      }
       const mapCanvas = this.map.getCanvas();
       if (mapCanvas) {
         mapCanvas.removeEventListener('webglcontextlost', this._onContextLost);

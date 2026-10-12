@@ -108,6 +108,19 @@ export class HeadlessReplayEngine extends IReplay3dEngine {
   }
 
   /**
+   * Returns array of track points traveled up to the current playback instant.
+   * @returns {Array<object>}
+   */
+  getTraveledPoints() {
+    if (!this.trackPoints || this.trackPoints.length === 0) return [];
+    if (this.progress <= 0) return [];
+    if (this.progress >= 1.0) return [...this.trackPoints];
+    const n = this.trackPoints.length;
+    const maxIdx = Math.floor(this.progress * (n - 1));
+    return this.trackPoints.slice(0, maxIdx + 1);
+  }
+
+  /**
    * Sets playback speed multiplier.
    * @param {number} speedMultiplier (1, 2, 5, 10, 20)
    */

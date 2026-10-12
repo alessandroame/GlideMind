@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import { FlightReplayView } from '../../ui/views/FlightReplayView.js';
 import { MapLibreThreeEngine } from '../../ui/3d/MapLibreThreeEngine.js';
+import { HeadlessReplayEngine } from '../../ui/3d/HeadlessReplayEngine.js';
 import { DEFAULT_COMPRENSORI, parseCoordinates } from '../../core/comprensorio.js';
 import { DEFAULT_SEED_FLIGHTS } from '../../core/logbook.js';
 import { createStore } from '../../core/store.js';
@@ -133,133 +134,139 @@ describe('3D Flight Replay - Headless Takeoff & Landing Track Visibility Contrac
     });
   });
 
+function createMockThree() {
+  return {
+    Scene: class {
+      constructor() {
+        this.children = [];
+      }
+      add(obj) { this.children.push(obj); }
+      traverse(fn) {
+        const visit = (o) => {
+          fn(o);
+          if (o.children) o.children.forEach(visit);
+        };
+        this.children.forEach(visit);
+      }
+    },
+    Camera: class {
+      constructor() {
+        this.projectionMatrix = { multiply: () => this.projectionMatrix };
+        this.matrixWorldInverse = { identity: () => {} };
+      }
+    },
+    WebGLRenderer: class {
+      constructor() { this.autoClear = true; }
+      resetState() {}
+      render() {}
+      dispose() {}
+    },
+    AmbientLight: class { constructor() {} },
+    DirectionalLight: class { constructor() { this.position = { set: () => {} }; } },
+    BufferGeometry: class {
+      constructor() {
+        this.attributes = {};
+        this.indices = [];
+        this.drawRange = { start: 0, count: Infinity };
+      }
+      setAttribute(name, attr) { this.attributes[name] = attr; }
+      getAttribute(name) { return this.attributes[name]; }
+      setIndex(idx) { this.indices = idx; }
+      setDrawRange(start, count) { this.drawRange = { start, count }; }
+      dispose() {}
+    },
+    Float32BufferAttribute: class {
+      constructor(array, itemSize) {
+        this.array = array;
+        this.itemSize = itemSize;
+        this.count = array.length / itemSize;
+        this.needsUpdate = false;
+      }
+    },
+    MeshBasicMaterial: class {
+      constructor(opts) { Object.assign(this, opts); }
+      dispose() {}
+    },
+    MeshStandardMaterial: class {
+      constructor(opts) { Object.assign(this, opts); }
+      dispose() {}
+    },
+    LineBasicMaterial: class {
+      constructor(opts) { Object.assign(this, opts); }
+      dispose() {}
+    },
+    Mesh: class {
+      constructor(geom, mat) {
+        this.geometry = geom;
+        this.material = mat;
+        this.position = { x: 0, y: 0, z: 0, set(x, y, z) { this.x = x; this.y = y; this.z = z; } };
+        this.rotation = { set() {} };
+        this.scale = { setScalar() {} };
+        this.children = [];
+      }
+    },
+    Line: class {
+      constructor(geom, mat) {
+        this.geometry = geom;
+        this.material = mat;
+      }
+    },
+    LineSegments: class {
+      constructor(geom, mat) {
+        this.geometry = geom;
+        this.material = mat;
+      }
+    },
+    Group: class {
+      constructor() {
+        this.children = [];
+        this.position = { x: 0, y: 0, z: 0, set(x, y, z) { this.x = x; this.y = y; this.z = z; } };
+        this.rotation = { set() {} };
+        this.scale = { setScalar() {} };
+      }
+      add(child) { this.children.push(child); }
+    },
+    Vector3: class {
+      constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z; }
+      set(x, y, z) { this.x = x; this.y = y; this.z = z; return this; }
+      applyMatrix4() { return this; }
+    },
+    RingGeometry: class {
+      constructor(inner, outer, segs) {
+        this.innerRadius = inner;
+        this.outerRadius = outer;
+        this.segments = segs;
+      }
+      rotateX() {}
+      dispose() {}
+    },
+    CylinderGeometry: class {
+      constructor() {}
+      rotateX() {}
+      dispose() {}
+    },
+    SphereGeometry: class {
+      constructor() {}
+      dispose() {}
+    },
+    Matrix4: class {
+      constructor() { this.elements = new Float32Array(16); this.lastSetArgs = null; }
+      fromArray(arr) { return this; }
+      set(...args) { this.lastSetArgs = args; return this; }
+      multiply(m) { return this; }
+      copy(m) { return this; }
+    },
+    DoubleSide: 2
+  };
+}
+
   describe('3. MapLibreThreeEngine - 3D Volumetric Track & Ground Marker Contracts', () => {
     let engine;
     let mockThree;
 
     beforeEach(() => {
       engine = new MapLibreThreeEngine();
-
-      // Lightweight Three.js mock capturing geometry attributes and mesh structures
-      mockThree = {
-        Scene: class {
-          constructor() {
-            this.children = [];
-          }
-          add(obj) { this.children.push(obj); }
-          traverse(fn) {
-            const visit = (o) => {
-              fn(o);
-              if (o.children) o.children.forEach(visit);
-            };
-            this.children.forEach(visit);
-          }
-        },
-        Camera: class {
-          constructor() {
-            this.projectionMatrix = { multiply: () => this.projectionMatrix };
-            this.matrixWorldInverse = { identity: () => {} };
-          }
-        },
-        WebGLRenderer: class {
-          constructor() { this.autoClear = true; }
-          resetState() {}
-          render() {}
-          dispose() {}
-        },
-        AmbientLight: class { constructor() {} },
-        DirectionalLight: class { constructor() { this.position = { set: () => {} }; } },
-        BufferGeometry: class {
-          constructor() {
-            this.attributes = {};
-            this.indices = [];
-          }
-          setAttribute(name, attr) { this.attributes[name] = attr; }
-          setIndex(idx) { this.indices = idx; }
-          dispose() {}
-        },
-        Float32BufferAttribute: class {
-          constructor(array, itemSize) {
-            this.array = array;
-            this.itemSize = itemSize;
-            this.count = array.length / itemSize;
-          }
-        },
-        MeshBasicMaterial: class {
-          constructor(opts) { Object.assign(this, opts); }
-          dispose() {}
-        },
-        MeshStandardMaterial: class {
-          constructor(opts) { Object.assign(this, opts); }
-          dispose() {}
-        },
-        LineBasicMaterial: class {
-          constructor(opts) { Object.assign(this, opts); }
-          dispose() {}
-        },
-        Mesh: class {
-          constructor(geom, mat) {
-            this.geometry = geom;
-            this.material = mat;
-            this.position = { x: 0, y: 0, z: 0, set(x, y, z) { this.x = x; this.y = y; this.z = z; } };
-            this.rotation = { set() {} };
-            this.scale = { setScalar() {} };
-            this.children = [];
-          }
-        },
-        Line: class {
-          constructor(geom, mat) {
-            this.geometry = geom;
-            this.material = mat;
-          }
-        },
-        LineSegments: class {
-          constructor(geom, mat) {
-            this.geometry = geom;
-            this.material = mat;
-          }
-        },
-        Group: class {
-          constructor() {
-            this.children = [];
-            this.position = { x: 0, y: 0, z: 0, set(x, y, z) { this.x = x; this.y = y; this.z = z; } };
-            this.rotation = { set() {} };
-            this.scale = { setScalar() {} };
-          }
-          add(child) { this.children.push(child); }
-        },
-        Vector3: class {
-          constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z; }
-          set(x, y, z) { this.x = x; this.y = y; this.z = z; return this; }
-          applyMatrix4() { return this; }
-        },
-        RingGeometry: class {
-          constructor(inner, outer, segs) {
-            this.innerRadius = inner;
-            this.outerRadius = outer;
-            this.segments = segs;
-          }
-          rotateX() {}
-          dispose() {}
-        },
-        CylinderGeometry: class {
-          constructor() {}
-          rotateX() {}
-          dispose() {}
-        },
-        SphereGeometry: class {
-          constructor() {}
-          dispose() {}
-        },
-        Matrix4: class {
-          constructor() { this.elements = new Float32Array(16); this.lastSetArgs = null; }
-          fromArray(arr) { return this; }
-          set(...args) { this.lastSetArgs = args; return this; }
-          multiply(m) { return this; }
-          copy(m) { return this; }
-        },
-        DoubleSide: 2
-      };
+      mockThree = createMockThree();
     });
 
     it('should project flight points with P0 origin grounded at (0, 0, 0) topocentric space', async () => {
@@ -643,6 +650,105 @@ describe('3D Flight Replay - Headless Takeoff & Landing Track Visibility Contrac
       // Curtain
       assert.equal(engine.curtainMesh.material.depthTest, true);
       assert.equal(engine.curtainMesh.material.polygonOffset, true);
+    });
+  });
+
+  describe('4. Dynamic Traveled Track Rendering (Playback Instant Contracts)', () => {
+    let engine;
+    let mockThree;
+
+    beforeEach(() => {
+      mockThree = createMockThree();
+      engine = new MapLibreThreeEngine();
+      engine.THREE = mockThree;
+      engine.threeScene = new mockThree.Scene();
+    });
+
+    it('should start with 0 track drawRange when progress is 0 (at takeoff)', async () => {
+      const cornizzoloFlight = DEFAULT_SEED_FLIGHTS[0];
+      const pts = view._generateFallbackTrackPoints(cornizzoloFlight);
+      await engine.loadTrack(pts);
+
+      engine.seek(0);
+
+      assert.equal(engine.trackRibbonMesh.geometry.drawRange.count, 0, 'Ribbon must have 0 drawn indices at takeoff');
+      assert.equal(engine.centerLineMesh.geometry.drawRange.count, 0, 'Centerline must have 0 drawn vertices at takeoff');
+      assert.equal(engine.curtainMesh.geometry.drawRange.count, 0, 'Curtain must have 0 drawn vertices at takeoff');
+    });
+
+    it('should dynamically render traveled track up to currentPoint during playback', async () => {
+      const cornizzoloFlight = DEFAULT_SEED_FLIGHTS[0];
+      const pts = view._generateFallbackTrackPoints(cornizzoloFlight);
+      await engine.loadTrack(pts);
+
+      const n = engine.projectedTrack.points.length;
+      const targetIdx = 10;
+      const progress = targetIdx / (n - 1);
+      engine.seek(progress);
+
+      const expectedIndices = (targetIdx + 1) * 24;
+      assert.equal(engine.trackRibbonMesh.geometry.drawRange.count, expectedIndices);
+      assert.equal(engine.centerLineMesh.geometry.drawRange.count, targetIdx + 2);
+      assert.ok(engine.curtainMesh.geometry.drawRange.count > 0);
+    });
+
+    it('should seamlessly extend ribbon and centerline when seeking across the timeline', async () => {
+      const cornizzoloFlight = DEFAULT_SEED_FLIGHTS[0];
+      const pts = view._generateFallbackTrackPoints(cornizzoloFlight);
+      await engine.loadTrack(pts);
+
+      engine.seek(0.25);
+      const count25 = engine.trackRibbonMesh.geometry.drawRange.count;
+
+      engine.seek(0.75);
+      const count75 = engine.trackRibbonMesh.geometry.drawRange.count;
+
+      assert.ok(count75 > count25, `Expected count at 75% (${count75}) to exceed count at 25% (${count25})`);
+    });
+
+    it('should restore previously modified vertices when seeking backward', async () => {
+      const cornizzoloFlight = DEFAULT_SEED_FLIGHTS[0];
+      const pts = view._generateFallbackTrackPoints(cornizzoloFlight);
+      await engine.loadTrack(pts);
+
+      engine.seek(0.5);
+      const midPoint = engine.projectedTrack.points[20];
+      const originalX = midPoint.x;
+
+      engine.seek(0.2);
+      const posAttr = engine.trackRibbonMesh.geometry.getAttribute('position');
+      assert.equal(posAttr.array[20 * 12], originalX);
+    });
+
+    it('should render full track when progress reaches 1.0 (touchdown at landing)', async () => {
+      const cornizzoloFlight = DEFAULT_SEED_FLIGHTS[0];
+      const pts = view._generateFallbackTrackPoints(cornizzoloFlight);
+      await engine.loadTrack(pts);
+
+      engine.seek(1.0);
+
+      const n = engine.projectedTrack.points.length;
+      const totalIndices = (n - 1) * 24;
+      assert.equal(engine.trackRibbonMesh.geometry.drawRange.count, totalIndices);
+      assert.equal(engine.centerLineMesh.geometry.drawRange.count, n);
+      assert.equal(engine.curtainMesh.geometry.drawRange.count, engine._totalCurtainVertices);
+    });
+
+    it('HeadlessReplayEngine should return traveledPoints array reflecting playback progress', async () => {
+      const headless = new HeadlessReplayEngine();
+      const cornizzoloFlight = DEFAULT_SEED_FLIGHTS[0];
+      const pts = view._generateFallbackTrackPoints(cornizzoloFlight);
+      await headless.loadTrack(pts);
+
+      headless.seek(0);
+      assert.equal(headless.getTraveledPoints().length, 0);
+
+      headless.seek(0.5);
+      const midPoints = headless.getTraveledPoints();
+      assert.ok(midPoints.length > 0 && midPoints.length < pts.length);
+
+      headless.seek(1.0);
+      assert.equal(headless.getTraveledPoints().length, pts.length);
     });
   });
 });

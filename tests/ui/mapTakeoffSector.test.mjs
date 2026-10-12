@@ -8,19 +8,27 @@ import { generateTakeoffSectorSvg, LeafletMapEngine, HeadlessMockMapEngine } fro
 
 describe('GlideMind Cartography - Takeoff Slope Exposure Sector & Launch Window', () => {
 
-  it('should generate valid SVG with 70° launch sector arc and aspect arrow', () => {
+  it('should generate valid clean SVG with 70° launch sector arc without arrow line or heading badge by default', () => {
     const svg = generateTakeoffSectorSvg(170, 180, 1060, { prefix: 'test-to-' });
 
     assert.ok(svg.includes('<svg'), 'Must produce <svg root element');
     assert.ok(svg.includes('class="gm-takeoff-sector-svg"'), 'Must have correct CSS class');
     assert.ok(svg.includes('id="test-to-wedge"'), 'Must render sector arc wedge');
-    assert.ok(svg.includes('id="test-to-line"'), 'Must render slope axis line');
-    assert.ok(svg.includes('id="test-to-arrow"'), 'Must render directional arrowhead');
-    assert.ok(svg.includes('id="test-to-badge"'), 'Must render heading angle badge');
-    assert.ok(svg.includes('170°'), 'Must display 170° heading text');
+    assert.ok(!svg.includes('id="test-to-line"'), 'Must not render slope axis line by default');
+    assert.ok(!svg.includes('id="test-to-arrow"'), 'Must not render directional arrowhead by default');
+    assert.ok(!svg.includes('id="test-to-badge"'), 'Must not render heading angle badge by default');
     assert.ok(svg.includes('1060m'), 'Must display 1060m altitude text');
     assert.ok(svg.includes('role="img"'), 'Must be accessible with role="img"');
     assert.ok(svg.includes('aria-label='), 'Must include accessibility label');
+  });
+
+  it('should optionally render slope axis line and heading badge when explicitly requested in options', () => {
+    const svg = generateTakeoffSectorSvg(170, 180, 1060, { prefix: 'test-to-', showArrow: true, showBadge: true });
+
+    assert.ok(svg.includes('id="test-to-line"'), 'Must render slope axis line when showArrow is true');
+    assert.ok(svg.includes('id="test-to-arrow"'), 'Must render directional arrowhead when showArrow is true');
+    assert.ok(svg.includes('id="test-to-badge"'), 'Must render heading angle badge when showBadge is true');
+    assert.ok(svg.includes('170°'), 'Must display 170° heading text when showBadge is true');
   });
 
   it('should color-code sector green (#22c55e) when wind is aligned in front (diff <= 35°)', () => {

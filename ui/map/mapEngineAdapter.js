@@ -447,10 +447,27 @@ export function generateTakeoffSectorSvg(heading = null, windDirection = null, a
   const xEnd = Math.round((center + radius * Math.cos(radEnd)) * 10) / 10;
   const yEnd = Math.round((center + radius * Math.sin(radEnd)) * 10) / 10;
 
-  // Arrow tip along slope heading
-  const arrowLen = radius + 9;
-  const xArrow = Math.round((center + arrowLen * Math.cos(radCenter)) * 10) / 10;
-  const yArrow = Math.round((center + arrowLen * Math.sin(radCenter)) * 10) / 10;
+  const showArrow = options.showArrow === true;
+  const showBadge = options.showBadge === true;
+
+  // Arrow tip along slope heading (only computed if requested)
+  let arrowLen = 0, xArrow = 0, yArrow = 0, xHead1 = 0, yHead1 = 0, xHead2 = 0, yHead2 = 0, xLabel = 0, yLabel = 0;
+  if (showArrow || showBadge) {
+    arrowLen = radius + 9;
+    xArrow = Math.round((center + arrowLen * Math.cos(radCenter)) * 10) / 10;
+    yArrow = Math.round((center + arrowLen * Math.sin(radCenter)) * 10) / 10;
+
+    const headLen = 7;
+    const headAngle = 0.45;
+    xHead1 = Math.round((xArrow - headLen * Math.cos(radCenter - headAngle)) * 10) / 10;
+    yHead1 = Math.round((yArrow - headLen * Math.sin(radCenter - headAngle)) * 10) / 10;
+    xHead2 = Math.round((xArrow - headLen * Math.cos(radCenter + headAngle)) * 10) / 10;
+    yHead2 = Math.round((yArrow - headLen * Math.sin(radCenter + headAngle)) * 10) / 10;
+
+    const labelDist = arrowLen + 9;
+    xLabel = Math.round((center + labelDist * Math.cos(radCenter)) * 10) / 10;
+    yLabel = Math.round((center + labelDist * Math.sin(radCenter)) * 10) / 10;
+  }
 
   // Determine alignment color based on wind direction vs slope heading
   let statusColor = '#22c55e'; // Green: aligned (front wind)
@@ -477,36 +494,24 @@ export function generateTakeoffSectorSvg(heading = null, windDirection = null, a
   // Sector arc path (70° opening, clockwise)
   const sectorPath = `M ${center} ${center} L ${xStart} ${yStart} A ${radius} ${radius} 0 0 1 ${xEnd} ${yEnd} Z`;
 
-  // Arrowhead points
-  const headLen = 7;
-  const headAngle = 0.45;
-  const xHead1 = Math.round((xArrow - headLen * Math.cos(radCenter - headAngle)) * 10) / 10;
-  const yHead1 = Math.round((yArrow - headLen * Math.sin(radCenter - headAngle)) * 10) / 10;
-  const xHead2 = Math.round((xArrow - headLen * Math.cos(radCenter + headAngle)) * 10) / 10;
-  const yHead2 = Math.round((yArrow - headLen * Math.sin(radCenter + headAngle)) * 10) / 10;
-
-  // Heading angle badge location (offset beyond arrow tip)
-  const labelDist = arrowLen + 9;
-  const xLabel = Math.round((center + labelDist * Math.cos(radCenter)) * 10) / 10;
-  const yLabel = Math.round((center + labelDist * Math.sin(radCenter)) * 10) / 10;
-
   return `
     <svg class="gm-takeoff-sector-svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="overflow: visible; pointer-events: none;" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Esposizione decollo ${H} gradi (${statusLabel})">
       <!-- Launch Window Sector (+/-35 deg) -->
       <path id="${prefix}wedge" d="${sectorPath}" fill="${fillColor}" stroke="${statusColor}" stroke-width="1.5" stroke-dasharray="3 2" />
-      
+      ${showArrow ? `
       <!-- Central Slope Aspect Line -->
       <line id="${prefix}line" x1="${center}" y1="${center}" x2="${xArrow}" y2="${yArrow}" stroke="${statusColor}" stroke-width="2.2" stroke-linecap="round" />
       
       <!-- Directional Arrowhead -->
       <polygon id="${prefix}arrow" points="${xArrow},${yArrow} ${xHead1},${yHead1} ${xHead2},${yHead2}" fill="${statusColor}" />
-      
+      ` : ''}
+      ${showBadge ? `
       <!-- Heading Angle Pill Badge -->
       <g id="${prefix}badge" transform="translate(${xLabel}, ${yLabel})">
         <rect x="-16" y="-8" width="32" height="15" rx="4" fill="rgba(18, 22, 31, 0.90)" stroke="${statusColor}" stroke-width="1" />
         <text x="0" y="2.5" font-family="monospace" font-size="9" font-weight="700" fill="#ffffff" text-anchor="middle">${Math.round(H)}°</text>
       </g>
-
+      ` : ''}
       <!-- Center Hub Pivot Ring -->
       <circle id="${prefix}hub" cx="${center}" cy="${center}" r="11" fill="var(--gm-bg-card, #12161f)" stroke="${statusColor}" stroke-width="2" />
       <text x="${center}" y="${center + 3.5}" font-size="10" font-weight="800" fill="${statusColor}" text-anchor="middle">▲</text>

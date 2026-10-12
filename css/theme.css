@@ -7077,7 +7077,7 @@ input.gm-input:focus {
 .gm-flight-card-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   width: 100%;
   min-width: 0;
@@ -7085,7 +7085,7 @@ input.gm-input:focus {
 
 .gm-flight-title-group {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   min-width: 0;
   flex: 1 1 0%;
@@ -7106,6 +7106,7 @@ input.gm-input:focus {
   color: var(--gm-accent-sky, #38bdf8);
   border: 1px solid rgba(56, 189, 248, 0.28);
   flex-shrink: 0;
+  margin-top: 1px;
 }
 
 [data-theme="light"] .gm-flight-number-badge {
@@ -7117,12 +7118,15 @@ input.gm-input:focus {
 .gm-flight-site-title {
   font-weight: 700;
   font-size: 0.92rem;
+  line-height: 1.35;
   color: var(--gm-text-primary);
   margin: 0;
   min-width: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  word-break: break-word;
 }
 
 .gm-flight-badge-group {
@@ -7148,6 +7152,8 @@ input.gm-input:focus {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  margin-top: -6px;
+  margin-right: -4px;
 }
 
 .gm-flight-delete-btn:hover {

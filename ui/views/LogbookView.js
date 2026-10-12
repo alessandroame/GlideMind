@@ -33,6 +33,35 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+/**
+ * Determines whether the site or locality is already represented in the title/route,
+ * preventing redundant strings like "Decollo Ciavanis • Decollo Ciavanis".
+ * @param {string|null|undefined} site
+ * @param {string} title
+ * @param {string|null|undefined} [takeoffName]
+ * @returns {boolean}
+ */
+function isTakeoffRedundant(site, title, takeoffName) {
+  if (!site) return true;
+  if (site === title) return true;
+  const normSite = String(site).toLowerCase().trim();
+  const normTitle = String(title).toLowerCase().trim();
+  if (normTitle.includes(normSite)) return true;
+  if (takeoffName && normSite === String(takeoffName).toLowerCase().trim()) {
+    const titleTakeoff = normTitle.split('->')[0].trim();
+    if (titleTakeoff.includes(normSite) || normSite.includes(titleTakeoff)) {
+      return true;
+    }
+  }
+  if (normTitle.includes('->')) {
+    const titleTakeoff = normTitle.split('->')[0].trim();
+    if (titleTakeoff.includes(normSite) || normSite.includes(titleTakeoff)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export class LogbookViewController {
   /**
    * @param {Object} [options={}]
@@ -507,11 +536,10 @@ export class LogbookViewController {
     const takeoffTime = flight.takeoffTime ? `Ore ${flight.takeoffTime}` : '';
     const duration = flight.durationMinutes ? `${flight.durationMinutes} min` : '--';
     const glider = flight.glider || 'Parapendio';
-    const gliderClass = flight.gliderClass || 'Custom';
-    const classBadgeStyle = (gliderClass || '').toLowerCase().trim().replace(/[^a-z0-9-]/g, '');
     const maxAlt = flight.maxAltMsl ? `${flight.maxAltMsl} m` : '--';
     const maxGain = flight.maxGainMeters ? `+${flight.maxGainMeters} m` : '--';
-    const siteArea = flight.site && flight.site !== title ? flight.site : '';
+    const isRedundant = isTakeoffRedundant(flight.site, title, flight.takeoffLocationName);
+    const siteArea = !isRedundant ? flight.site : '';
 
     return `
       <article
@@ -532,9 +560,6 @@ export class LogbookViewController {
           </div>
 
           <div class="gm-flight-badge-group">
-            <span class="gm-glider-pill-badge ${classBadgeStyle}">
-              ${escapeHtml(gliderClass)}
-            </span>
             <button
               type="button"
               class="gm-flight-delete-btn"
@@ -548,12 +573,12 @@ export class LogbookViewController {
           </div>
         </div>
 
-        <!-- Date & Glider info row (No duplicate duration) -->
+        <!-- Date & Glider info row (No redundant takeoff repetition) -->
         <div class="gm-flight-card-sub">
           <span>${escapeHtml(dateFormatted)}</span>
           ${takeoffTime ? `<span>•</span><span>${escapeHtml(takeoffTime)}</span>` : ''}
           ${siteArea ? `<span>•</span><span class="font-medium text-[var(--gm-text-secondary)]">${escapeHtml(siteArea)}</span>` : ''}
-          <span class="truncate max-w-[140px] text-[var(--gm-text-secondary)] font-medium">• ${escapeHtml(glider)}</span>
+          <span class="text-[var(--gm-text-secondary)] font-medium">• ${escapeHtml(glider)}</span>
         </div>
 
         <!-- Glanceable 3-Metric Row (Grid-based: Never wraps) -->
