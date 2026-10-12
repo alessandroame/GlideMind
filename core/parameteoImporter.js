@@ -12,6 +12,7 @@
 
 import { deduceGliderClass, generateSparklinePoints, computeFlightFingerprint } from './logbookDb.js';
 import { lttbDecimate, analyzeFlightTelemetry } from './flightTelemetry.js';
+import { parseIgc } from './igcParser.js';
 import { store } from './store.js';
 
 /**
@@ -28,6 +29,42 @@ import { store } from './store.js';
  *   error?: string
  * }}
  */
+/**
+ * Extracts raw IGC text or track points from a ParaMeteo flight object.
+ * @param {Object} f
+ * @returns {{ flightId: string, trackPoints: Array<Object>|null, rawIgc: string|null, telemetry: Object|null }|null}
+ */
+function extractEmbeddedTrack(f) {
+  if (!f || typeof f !== 'object') return null;
+  const rawIgc = (typeof f._rawIgcText === 'string' && f._rawIgcText.trim().length > 30)
+    ? f._rawIgcText.trim()
+    : ((typeof f.rawIgc === 'string' && f.rawIgc.trim().length > 30)
+        ? f.rawIgc.trim()
+        : ((typeof f.rawIgcText === 'string' && f.rawIgcText.trim().length > 30)
+            ? f.rawIgcText.trim()
+            : ((typeof f.igc === 'string' && f.igc.trim().length > 30)
+                ? f.igc.trim()
+                : null)));
+
+  const pts = (Array.isArray(f.trackPoints) && f.trackPoints.length > 0)
+    ? f.trackPoints
+    : (Array.isArray(f.track) && f.track.length > 0
+        ? f.track
+        : (Array.isArray(f.points) && f.points.length > 0
+            ? f.points
+            : (Array.isArray(f.decimatedPoints) && f.decimatedPoints.length > 0 ? f.decimatedPoints : null)));
+
+  if (pts || rawIgc) {
+    return {
+      flightId: f.id,
+      trackPoints: pts || null,
+      rawIgc: rawIgc || null,
+      telemetry: f.telemetry || null
+    };
+  }
+  return null;
+}
+
 export function parseParaMeteoBackup(jsonContent) {
   if (!jsonContent) {
     return { isValid: false, version: 0, flights: [], tracksMap: new Map(), summary: { flightsCount: 0, tracksCount: 0, exportedAt: '' }, error: 'Empty backup content' };
@@ -71,15 +108,9 @@ export function parseParaMeteoBackup(jsonContent) {
     // Reconcile any embedded tracks in flight objects
     for (const f of validFlights) {
       if (f.id && !tracksMap.has(f.id)) {
-        const pts = (Array.isArray(f.trackPoints) && f.trackPoints.length > 0)
-          ? f.trackPoints
-          : (Array.isArray(f.track) && f.track.length > 0 ? f.track : null);
-        if (pts) {
-          tracksMap.set(f.id, {
-            flightId: f.id,
-            trackPoints: pts,
-            telemetry: f.telemetry || null
-          });
+        const embedded = extractEmbeddedTrack(f);
+        if (embedded) {
+          tracksMap.set(f.id, embedded);
         }
       }
     }
@@ -113,15 +144,9 @@ export function parseParaMeteoBackup(jsonContent) {
 
     for (const f of validFlights) {
       if (f.id && !tracksMap.has(f.id)) {
-        const pts = (Array.isArray(f.trackPoints) && f.trackPoints.length > 0)
-          ? f.trackPoints
-          : (Array.isArray(f.track) && f.track.length > 0 ? f.track : null);
-        if (pts) {
-          tracksMap.set(f.id, {
-            flightId: f.id,
-            trackPoints: pts,
-            telemetry: f.telemetry || null
-          });
+        const embedded = extractEmbeddedTrack(f);
+        if (embedded) {
+          tracksMap.set(f.id, embedded);
         }
       }
     }
@@ -145,16 +170,10 @@ export function parseParaMeteoBackup(jsonContent) {
     const tracksMap = new Map();
 
     for (const f of validFlights) {
-      if (f.id) {
-        const pts = (Array.isArray(f.trackPoints) && f.trackPoints.length > 0)
-          ? f.trackPoints
-          : (Array.isArray(f.track) && f.track.length > 0 ? f.track : null);
-        if (pts) {
-          tracksMap.set(f.id, {
-            flightId: f.id,
-            trackPoints: pts,
-            telemetry: f.telemetry || null
-          });
+      if (f.id && !tracksMap.has(f.id)) {
+        const embedded = extractEmbeddedTrack(f);
+        if (embedded) {
+          tracksMap.set(f.id, embedded);
         }
       }
     }
@@ -196,10 +215,46 @@ export function convertParaMeteoFlight(flight, trackData = null, options = {}) {
     throw new Error('[convertParaMeteoFlight] Invalid flight record provided');
   }
 
+  // Extract raw IGC text from various known ParaMeteo export properties
+  const rawIgc = (typeof flight._rawIgcText === 'string' && flight._rawIgcText.trim().length > 30)
+    ? flight._rawIgcText.trim()
+    : ((typeof flight.rawIgc === 'string' && flight.rawIgc.trim().length > 30)
+        ? flight.rawIgc.trim()
+        : ((typeof flight.rawIgcText === 'string' && flight.rawIgcText.trim().length > 30)
+            ? flight.rawIgcText.trim()
+            : ((typeof flight.igc === 'string' && flight.igc.trim().length > 30)
+                ? flight.igc.trim()
+                : (typeof trackData?.rawIgc === 'string' && trackData.rawIgc.trim().length > 30
+                    ? trackData.rawIgc.trim()
+                    : null))));
+
   // Extract or synthesize track points
-  const rawPoints = trackData?.trackPoints
+  let rawPoints = trackData?.trackPoints
     || (Array.isArray(flight.trackPoints) && flight.trackPoints.length > 0 ? flight.trackPoints : null)
-    || (Array.isArray(flight.track) && flight.track.length > 0 ? flight.track : null);
+    || (Array.isArray(flight.track) && flight.track.length > 0 ? flight.track : null)
+    || (Array.isArray(flight.points) && flight.points.length > 0 ? flight.points : null)
+    || (Array.isArray(flight.decimatedPoints) && flight.decimatedPoints.length > 0 ? flight.decimatedPoints : null);
+
+  let telemetry = trackData?.telemetry || flight.telemetry || null;
+
+  // If track points are absent but raw IGC text is available, parse IGC on-the-fly
+  if ((!rawPoints || rawPoints.length < 2) && rawIgc) {
+    try {
+      const catalog = options.spotsCatalog || (typeof store?.getState === 'function' ? store.getState()?.spotsCatalog : null) || [];
+      const parsedIgc = parseIgc(rawIgc, catalog);
+      if (parsedIgc && Array.isArray(parsedIgc.trackPoints) && parsedIgc.trackPoints.length >= 2) {
+        rawPoints = parsedIgc.trackPoints;
+        if (!telemetry || Object.keys(telemetry).length === 0) {
+          telemetry = parsedIgc.telemetry;
+        }
+      }
+    } catch (parseErr) {
+      // Graceful fallback for malformed or incomplete IGC strings
+      if (typeof console !== 'undefined' && console.warn) {
+        console.warn(`[convertParaMeteoFlight] IGC parse fallback for flight ${flight.id || 'unknown'}:`, parseErr.message);
+      }
+    }
+  }
 
   const hasPoints = Array.isArray(rawPoints) && rawPoints.length >= 2;
   const points = hasPoints ? rawPoints : null;
@@ -247,7 +302,6 @@ export function convertParaMeteoFlight(flight, trackData = null, options = {}) {
   // Telemetry and decimation
   let decimatedPoints = [];
   let sparklineSvgPoints = '0,16 100,16';
-  let telemetry = trackData?.telemetry || flight.telemetry || null;
 
   if (points) {
     sparklineSvgPoints = generateSparklinePoints(points, 60, 100, 32);
@@ -268,27 +322,55 @@ export function convertParaMeteoFlight(flight, trackData = null, options = {}) {
 
   // Normalise flight statistics
   const stats = flight.stats || {};
-  const takeoffAltMsl = stats.takeoffAltitude != null
+  let takeoffAltMsl = stats.takeoffAltitude != null
     ? stats.takeoffAltitude
     : (flight.takeoffAltMsl != null ? flight.takeoffAltMsl : (points ? (points[0].alt || 0) : 0));
-  const landingAltMsl = stats.landingAltitude != null
+  if (takeoffAltMsl === 0 && points && points[0]?.alt) {
+    takeoffAltMsl = points[0].alt;
+  }
+
+  let landingAltMsl = stats.landingAltitude != null
     ? stats.landingAltitude
     : (flight.landingAltMsl != null ? flight.landingAltMsl : (points ? (points[points.length - 1].alt || 0) : 0));
-  const maxAltMsl = stats.maxAltitude != null
+  if (landingAltMsl === 0 && points && points[points.length - 1]?.alt) {
+    landingAltMsl = points[points.length - 1].alt;
+  }
+
+  let maxAltMsl = stats.maxAltitude != null
     ? stats.maxAltitude
     : (flight.maxAltMsl != null ? flight.maxAltMsl : (flight.maxAltitude != null ? flight.maxAltitude : 0));
-  const minAltMsl = stats.minAltitude != null
+  if (maxAltMsl === 0 && points) {
+    maxAltMsl = Math.max(...points.map(p => p.alt || 0));
+  }
+
+  let minAltMsl = stats.minAltitude != null
     ? stats.minAltitude
     : (flight.minAltMsl != null ? flight.minAltMsl : (flight.minAltitude != null ? flight.minAltitude : 0));
-  const maxGainMeters = stats.maxGainMeters != null
+  if (minAltMsl === 0 && points) {
+    minAltMsl = Math.min(...points.map(p => p.alt || 0));
+  }
+
+  let maxGainMeters = stats.maxGainMeters != null
     ? stats.maxGainMeters
     : (flight.maxGainMeters != null ? flight.maxGainMeters : (flight.maxGain != null ? flight.maxGain : 0));
-  const maxClimbRate = stats.maxClimb != null
+  if (maxGainMeters === 0 && maxAltMsl > takeoffAltMsl) {
+    maxGainMeters = maxAltMsl - takeoffAltMsl;
+  }
+
+  let maxClimbRate = stats.maxClimb != null
     ? stats.maxClimb
     : (flight.maxClimbRate != null ? flight.maxClimbRate : (flight.maxClimb != null ? flight.maxClimb : 0));
-  const maxSinkRate = stats.maxSink != null
+  if (maxClimbRate === 0 && telemetry?.maxClimbRate) {
+    maxClimbRate = telemetry.maxClimbRate;
+  }
+
+  let maxSinkRate = stats.maxSink != null
     ? stats.maxSink
     : (flight.maxSinkRate != null ? flight.maxSinkRate : (flight.maxSink != null ? flight.maxSink : 0));
+  if (maxSinkRate === 0 && telemetry?.maxSinkRate) {
+    maxSinkRate = telemetry.maxSinkRate;
+  }
+
   const accumulatedClimbMeters = stats.accumulatedClimbMeters != null
     ? stats.accumulatedClimbMeters
     : (telemetry.accumulatedClimbMeters != null ? telemetry.accumulatedClimbMeters : (flight.accumulatedClimbMeters || 0));
@@ -352,9 +434,11 @@ export function convertParaMeteoFlight(flight, trackData = null, options = {}) {
     accumulatedClimbMeters,
     distanceKm: Math.round(distanceKm * 10) / 10,
     sparklineSvgPoints,
-    hasRawIgc: !!(flight.rawIgc && typeof flight.rawIgc === 'string' && flight.rawIgc.length > 50),
+    hasRawIgc: !!(rawIgc && rawIgc.length > 30),
     hasDecimatedTrack: decimatedPoints.length > 0,
-    rawFileSizeBytes: (typeof flight.rawIgc === 'string') ? flight.rawIgc.length : (points ? points.length * 40 : 0),
+    rawFileSizeBytes: rawIgc ? rawIgc.length : (points ? points.length * 40 : 0),
+    isTrimmed: !!flight.isTrimmed,
+    trimIndices: flight.trimIndices || null,
     originalFileName: flight.originalFileName || `parameteo_${flightId}.json`,
     notes,
     updatedAt
@@ -363,8 +447,9 @@ export function convertParaMeteoFlight(flight, trackData = null, options = {}) {
   // Construct raw record
   const rawRecord = {
     id: flightId,
-    rawIgc: flight.rawIgc || null,
+    rawIgc: rawIgc || null,
     originalFileName: metaRecord.originalFileName,
+    originalPoints: points || null,
     decimatedPoints,
     telemetry,
     sampleIntervalSeconds: (points && points.length > 1)

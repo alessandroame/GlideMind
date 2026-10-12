@@ -326,8 +326,35 @@ test('Flight Maneuvers - Rapid Descent & Acrobatic Detection', async (t) => {
         const points = generateTrackSegment(headings, speeds, varios);
         const maneuvers = detectFlightManeuvers(points);
         assert.ok(maneuvers.length > 0, 'Should detect maneuvers');
-        const hasAcro = maneuvers.some(m => m.type === MANEUVER_KEYS.INVERSIONI || m.type === MANEUVER_KEYS.WINGOVER);
-        assert.ok(hasAcro, 'Should detect inversioni di rollio or wingover');
+        const inv = maneuvers.find(m => m.type === MANEUVER_KEYS.INVERSIONI);
+        assert.ok(inv, 'Should detect inversioni di rollio');
+        assert.strictEqual(inv.pendolateCount, 4, 'Should count exactly 4 pendolate');
+        assert.strictEqual(inv.chainCount, 4, 'Should record chainCount 4');
+        assert.ok(inv.details.includes('4 pendolate'), 'Details string must mention 4 pendolate');
+    });
+
+    await t.test('should count 5 alternating pendolate in progressive roll inversions', () => {
+        const headings = [];
+        const speeds = [];
+        const varios = [];
+
+        // 5 alternating roll oscillations (CW, CCW, CW, CCW, CW)
+        for (let cycle = 0; cycle < 5; cycle++) {
+            const isCW = cycle % 2 === 0;
+            for (let s = 0; s < 4; s++) {
+                const h = isCW ? (330 + (s + 1) * 18) % 360 : (30 - (s + 1) * 18 + 360) % 360;
+                headings.push(h);
+                speeds.push(34 + s * 2);
+                varios.push(-0.8 - s * 0.3);
+            }
+        }
+
+        const points = generateTrackSegment(headings, speeds, varios);
+        const maneuvers = detectFlightManeuvers(points);
+        const inv = maneuvers.find(m => m.type === MANEUVER_KEYS.INVERSIONI);
+        assert.ok(inv, 'Must detect standard roll inversions');
+        assert.strictEqual(inv.pendolateCount, 5, 'Must count exactly 5 pendolate');
+        assert.ok(inv.details.includes('5 pendolate'), 'Must format 5 pendolate in details');
     });
 
     await t.test('should suppress false maneuvers on final landing approach', () => {

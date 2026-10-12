@@ -32,12 +32,13 @@ export const VARIO_BANDS = Object.freeze([
  * Standard paragliding flight phase color definitions (Tailwind & Hex).
  */
 export const FLIGHT_PHASE_COLORS = Object.freeze({
-    takeoff: '#64748b', // Slate 500 (Decollo)
-    thermal: '#f59e0b', // Amber 500 (Termica)
-    soaring: '#10b981', // Emerald 500 (Dinamica)
-    glide:   '#0ea5e9', // Sky Blue 500 (Planata)
-    descent: '#a855f7', // Purple 500 (Discesa)
-    landing: '#475569'  // Slate 600 (Atterraggio)
+    takeoff:  '#64748b', // Slate 500 (Decollo)
+    thermal:  '#f59e0b', // Amber 500 (Termica)
+    soaring:  '#10b981', // Emerald 500 (Dinamica)
+    glide:    '#0ea5e9', // Sky Blue 500 (Planata)
+    descent:  '#a855f7', // Purple 500 (Discesa)
+    maneuver: '#8b5cf6', // Violet 500 (Esercizi / Manovre)
+    landing:  '#475569'  // Slate 600 (Atterraggio)
 });
 
 /**
@@ -272,9 +273,10 @@ export function calculateAccumulatedGain(points, thermals = [], smoothedAlts = n
  * @param {Array<Object>} points Track points
  * @param {Array<Object>} [thermals=[]] Detected thermals
  * @param {Array<number>} [smoothedAlts=null] Smoothed altitudes
+ * @param {Array<Object>} [maneuvers=[]] Detected flight maneuvers
  * @returns {Object} Phase breakdown durations, percentages, and chronological timeline segments
  */
-export function segmentFlightPhases(points, thermals = [], smoothedAlts = null) {
+export function segmentFlightPhases(points, thermals = [], smoothedAlts = null, maneuvers = []) {
     if (!points || !Array.isArray(points) || points.length < 2) {
         return {
             takeoff: { durationSeconds: 0, percentage: 0 },
@@ -282,6 +284,7 @@ export function segmentFlightPhases(points, thermals = [], smoothedAlts = null) 
             soaring: { durationSeconds: 0, percentage: 0 },
             glide: { durationSeconds: 0, percentage: 0 },
             descent: { durationSeconds: 0, percentage: 0 },
+            maneuver: { durationSeconds: 0, percentage: 0 },
             landing: { durationSeconds: 0, percentage: 0 },
             timeline: []
         };
@@ -309,6 +312,19 @@ export function segmentFlightPhases(points, thermals = [], smoothedAlts = null) 
                     const t = points[i].timeSeconds !== undefined ? points[i].timeSeconds : i;
                     if (t >= thStart && t <= thEnd) {
                         pointPhases[i] = 'thermal';
+                    }
+                }
+            }
+        }
+    }
+
+    // Mark detected maneuvers
+    if (maneuvers && Array.isArray(maneuvers)) {
+        for (const m of maneuvers) {
+            if (typeof m.startIndex === 'number' && typeof m.endIndex === 'number') {
+                for (let i = Math.max(0, m.startIndex); i <= Math.min(n - 1, m.endIndex); i++) {
+                    if (!pointPhases[i]) {
+                        pointPhases[i] = 'maneuver';
                     }
                 }
             }
@@ -359,6 +375,7 @@ export function segmentFlightPhases(points, thermals = [], smoothedAlts = null) 
         soaring: 0,
         glide: 0,
         descent: 0,
+        maneuver: 0,
         landing: 0
     };
 
@@ -423,6 +440,7 @@ export function segmentFlightPhases(points, thermals = [], smoothedAlts = null) 
         soaring: { durationSeconds: durations.soaring, percentage: Math.round((durations.soaring / totalDurationSeconds) * 100) },
         glide: { durationSeconds: durations.glide, percentage: Math.round((durations.glide / totalDurationSeconds) * 100) },
         descent: { durationSeconds: durations.descent, percentage: Math.round((durations.descent / totalDurationSeconds) * 100) },
+        maneuver: { durationSeconds: durations.maneuver, percentage: Math.round((durations.maneuver / totalDurationSeconds) * 100) },
         landing: { durationSeconds: durations.landing, percentage: Math.round((durations.landing / totalDurationSeconds) * 100) },
         timeline
     };
@@ -565,8 +583,288 @@ export function generateVarioTimelineGradient(flight, maxStops = 120) {
 }
 
 /**
+ * Extracts and tags all chronological flight milestone events (takeoff, thermals,
+ * dynamic soaring sessions, max altitude, peak climb rate, maneuvers, and landing).
+ * 
+ * @param {Object} flight Flight object or track representation
+ * @returns {Array<Object>} Chronological list of flight milestone events
+ */
+export function extractFlightEvents(flight) {
+    if (!flight) return [];
+    const pts = flight.points || flight.trackPoints || flight.projectedPoints || flight.decimatedPoints || (flight.raw && flight.raw.decimatedPoints) || [];
+    if (pts.length < 2) return [];
+
+    const totalPts = pts.length;
+    const firstTime = pts[0].timeSeconds !== undefined ? pts[0].timeSeconds : 0;
+    const lastTime = pts[totalPts - 1].timeSeconds !== undefined ? pts[totalPts - 1].timeSeconds : (totalPts - 1);
+    const totalDurationSec = Math.max(1, lastTime - firstTime);
+
+    const events = [];
+
+    // 1. Takeoff Event
+    events.push({
+        id: 'takeoff',
+        type: 'takeoff',
+        label: 'Decollo',
+        shortLabel: 'Decollo',
+        icon: 'flight_takeoff',
+        color: FLIGHT_PHASE_COLORS.takeoff,
+        index: 0,
+        progress: 0.0,
+        timeSeconds: firstTime,
+        relTimeSeconds: 0,
+        alt: Math.round(pts[0].alt || 0),
+        detail: `${Math.round(pts[0].alt || 0)} m`
+    });
+
+    // 2. Thermals
+    const thermals = flight.telemetry?.thermals || flight.thermals || [];
+    thermals.forEach((th, idx) => {
+        let tSec = th.startTimeSeconds;
+        let pt = null;
+        let startIdx = 0;
+        if (typeof tSec === 'number' && tSec > 0) {
+            startIdx = pts.findIndex(p => (p.timeSeconds !== undefined ? p.timeSeconds : 0) >= tSec);
+            if (startIdx === -1) startIdx = pts.length - 1;
+            pt = pts[startIdx] || pts[0];
+        } else {
+            startIdx = Math.max(0, Math.min(totalPts - 1, th.startIndex || 0));
+            pt = pts[startIdx] || pts[0];
+            tSec = pt.timeSeconds !== undefined ? pt.timeSeconds : (firstTime + (startIdx / totalPts) * totalDurationSec);
+        }
+        const relSec = Math.max(0, tSec - firstTime);
+        const progress = Math.max(0.00, Math.min(1.00, relSec / totalDurationSec));
+
+        const thNumber = idx + 1;
+        const gainStr = (typeof th.altGain === 'number') ? `+${Math.round(th.altGain)}m` : '';
+        const varioStr = th.avgClimbRate ? `${th.avgClimbRate.toFixed(1)} m/s` : '';
+        const detailStr = gainStr && varioStr ? `${gainStr} (${varioStr})` : (gainStr || varioStr || `${Math.round(pt.alt || 0)}m`);
+
+        events.push({
+            id: `thermal_${thNumber}`,
+            type: 'thermal',
+            label: `Termica #${thNumber}`,
+            shortLabel: `T#${thNumber}`,
+            icon: 'air',
+            color: FLIGHT_PHASE_COLORS.thermal,
+            index: startIdx,
+            progress,
+            timeSeconds: tSec,
+            relTimeSeconds: relSec,
+            alt: Math.round(pt.alt || 0),
+            detail: detailStr,
+            altGain: th.altGain,
+            avgClimbRate: th.avgClimbRate
+        });
+    });
+
+    // 2b. Dynamic Soaring Segments (>= 20s)
+    const unifiedSegs = getUnifiedFlightPhaseSegments(flight);
+    const soaringSegs = (unifiedSegs || []).filter(s => s.phase === 'soaring' && s.durationSeconds >= 20);
+    soaringSegs.forEach((seg, sIdx) => {
+        const sSec = seg.startTimeSeconds;
+        let startIdx = pts.findIndex(p => (p.timeSeconds !== undefined ? p.timeSeconds : 0) >= sSec);
+        if (startIdx === -1) startIdx = 0;
+        const pt = pts[startIdx] || pts[0];
+        const relSec = Math.max(0, sSec - firstTime);
+        const progress = Math.max(0.00, Math.min(1.00, relSec / totalDurationSec));
+
+        events.push({
+            id: `soaring_${sIdx + 1}`,
+            type: 'soaring',
+            label: `Dinamica #${sIdx + 1}`,
+            shortLabel: `D#${sIdx + 1}`,
+            icon: 'waves',
+            color: FLIGHT_PHASE_COLORS.soaring,
+            index: startIdx,
+            progress,
+            timeSeconds: sSec,
+            relTimeSeconds: relSec,
+            alt: Math.round(pt.alt || 0),
+            detail: `${seg.durationSeconds}s • ${Math.round(pt.alt || 0)}m`
+        });
+    });
+
+    // 3. Max Altitude Event
+    let maxAlt = -Infinity;
+    let maxAltIdx = 0;
+    for (let i = 0; i < totalPts; i++) {
+        if ((pts[i].alt || 0) > maxAlt) {
+            maxAlt = pts[i].alt || 0;
+            maxAltIdx = i;
+        }
+    }
+    if (maxAltIdx > 0 && maxAltIdx < totalPts - 1) {
+        const pt = pts[maxAltIdx];
+        const tSec = pt.timeSeconds !== undefined ? pt.timeSeconds : (firstTime + (maxAltIdx / totalPts) * totalDurationSec);
+        const relSec = Math.max(0, tSec - firstTime);
+        const progress = Math.max(0.01, Math.min(0.99, relSec / totalDurationSec));
+
+        events.push({
+            id: 'max_alt',
+            type: 'max_alt',
+            label: 'Quota Max',
+            shortLabel: 'Max Q',
+            icon: 'terrain',
+            color: '#6366f1',
+            index: maxAltIdx,
+            progress,
+            timeSeconds: tSec,
+            relTimeSeconds: relSec,
+            alt: Math.round(maxAlt),
+            detail: `${Math.round(maxAlt)} m`
+        });
+    }
+
+    // 4. Max Climb Rate (Picco Salita)
+    const officialMaxVario = flight.telemetry?.maxClimbRate;
+    let maxVario = (typeof officialMaxVario === 'number' && officialMaxVario > 0) ? officialMaxVario : -Infinity;
+    let maxVarioIdx = -1;
+
+    if (maxVario > -Infinity) {
+        let bestDiff = Infinity;
+        for (let i = 1; i < totalPts - 1; i++) {
+            const v = pts[i].vario || 0;
+            const diff = Math.abs(v - maxVario);
+            if (diff < bestDiff) {
+                bestDiff = diff;
+                maxVarioIdx = i;
+            }
+        }
+    } else {
+        for (let i = 1; i < totalPts - 1; i++) {
+            const v = pts[i].vario || 0;
+            if (v > maxVario) {
+                maxVario = v;
+                maxVarioIdx = i;
+            }
+        }
+    }
+
+    if (maxVarioIdx > 0 && maxVario >= 2.0 && Math.abs(maxVarioIdx - maxAltIdx) > 5) {
+        const pt = pts[maxVarioIdx];
+        const tSec = pt.timeSeconds !== undefined ? pt.timeSeconds : (firstTime + (maxVarioIdx / totalPts) * totalDurationSec);
+        const relSec = Math.max(0, tSec - firstTime);
+        const progress = Math.max(0.01, Math.min(0.99, relSec / totalDurationSec));
+
+        events.push({
+            id: 'max_climb',
+            type: 'max_climb',
+            label: 'Picco Salita',
+            shortLabel: 'Max Vario',
+            icon: 'trending_up',
+            color: '#ef4444',
+            index: maxVarioIdx,
+            progress,
+            timeSeconds: tSec,
+            relTimeSeconds: relSec,
+            alt: Math.round(pt.alt || 0),
+            detail: `+${maxVario.toFixed(1)} m/s`
+        });
+    }
+
+    // 5. Maneuvers
+    const maneuvers = flight.telemetry?.maneuvers || flight.maneuvers || [];
+    maneuvers.forEach((man, mIdx) => {
+        let tSec = man.timeSeconds;
+        let startIdx = 0;
+        let pt = null;
+        if (typeof tSec === 'number' && tSec > 0) {
+            startIdx = pts.findIndex(p => (p.timeSeconds !== undefined ? p.timeSeconds : 0) >= tSec);
+            if (startIdx === -1) startIdx = pts.length - 1;
+            pt = pts[startIdx] || pts[0];
+        } else {
+            startIdx = Math.max(0, Math.min(totalPts - 1, man.startIndex || 0));
+            pt = pts[startIdx] || pts[0];
+            tSec = pt.timeSeconds !== undefined ? pt.timeSeconds : (firstTime + (startIdx / totalPts) * totalDurationSec);
+        }
+
+        const relSec = Math.max(0, tSec - firstTime);
+        const progress = Math.max(0.00, Math.min(1.00, relSec / totalDurationSec));
+
+        let iconBg = FLIGHT_PHASE_COLORS.maneuver;
+        let iconName = 'sync';
+        let shortLabel = '360°';
+
+        const isInv = man.type === 'inversioni' || String(man.type).toLowerCase().includes('inversion');
+        const pCount = isInv
+            ? (man.pendolateCount || man.chainCount || (man.details && man.details.match(/(\d+)\s*(?:pendolat|spendolat)/i)?.[1]))
+            : null;
+
+        if (isInv) {
+            iconBg = '#ea580c';
+            iconName = 'shuffle';
+            shortLabel = pCount ? `${pCount} Pend.` : 'Inversioni';
+        } else if (man.type === 'orecchie con pilotaggio' || man.type === 'orecchie' || String(man.type).includes('orecchie')) {
+            iconBg = '#0284c7';
+            iconName = 'vertical_align_bottom';
+            shortLabel = 'Orecchie';
+        } else if (man.type === 'spirale' || String(man.type).includes('spirale')) {
+            iconBg = '#dc2626';
+            iconName = 'cyclone';
+            shortLabel = 'Spirale';
+        } else if (man.type === 'figura_8' || String(man.type).includes('8')) {
+            iconBg = '#4f46e5';
+            iconName = 'all_inclusive';
+            shortLabel = '8';
+        } else if (man.type === 'doppio_360' || String(man.type).includes('2x')) {
+            iconBg = '#7c3aed';
+            iconName = 'rotate_right';
+            shortLabel = '2x360';
+        } else if (man.type === 'wingover') {
+            iconBg = '#a855f7';
+            iconName = 'swap_horiz';
+            shortLabel = 'Wingover';
+        }
+
+        const formattedName = (isInv && pCount)
+            ? `Inversioni (${pCount} pendolate)`
+            : String(man.type).replace(/_/g, ' ');
+        const durStr = man.durationSeconds ? `${Math.round(man.durationSeconds)}s` : '';
+        const detailStr = isInv && pCount
+            ? (durStr ? `${pCount} pendolate • ${durStr} • ${Math.round(pt.alt || 0)}m` : `${pCount} pendolate • ${Math.round(pt.alt || 0)}m`)
+            : (durStr ? `${durStr} • ${Math.round(pt.alt || 0)}m` : `${Math.round(pt.alt || 0)}m`);
+
+        events.push({
+            id: `maneuver_${mIdx + 1}`,
+            type: 'maneuver',
+            label: formattedName.charAt(0).toUpperCase() + formattedName.slice(1),
+            shortLabel,
+            icon: iconName,
+            color: iconBg,
+            index: startIdx,
+            progress,
+            timeSeconds: tSec,
+            relTimeSeconds: relSec,
+            alt: Math.round(pt.alt || 0),
+            detail: detailStr,
+            maneuverType: man.type
+        });
+    });
+
+    // 6. Landing Event
+    events.push({
+        id: 'landing',
+        type: 'landing',
+        label: 'Atterraggio',
+        shortLabel: 'Atterraggio',
+        icon: 'flight_land',
+        color: FLIGHT_PHASE_COLORS.landing,
+        index: totalPts - 1,
+        progress: 1.0,
+        timeSeconds: lastTime,
+        relTimeSeconds: totalDurationSec,
+        alt: Math.round(pts[totalPts - 1].alt || 0),
+        detail: `${Math.round(pts[totalPts - 1].alt || 0)} m`
+    });
+
+    events.sort((a, b) => a.progress - b.progress);
+    return events;
+}
+
+/**
  * Analyzes full flight telemetry: altitude smoothing, thermals, gains,
- * flight phases, peak climb/sink rates, dominant wind drift, and maneuvers.
+ * flight phases, peak climb/sink rates, dominant wind drift, maneuvers, and milestone events.
  * 
  * @param {Array<Object>} points Track points
  * @param {Object} [options={}] Optional configuration
@@ -574,6 +872,8 @@ export function generateVarioTimelineGradient(flight, maxStops = 120) {
  */
 export function analyzeFlightTelemetry(points, options = {}) {
     if (!points || !Array.isArray(points) || points.length < 5) {
+        const fallbackPhases = segmentFlightPhases(points || [], []);
+        const fallbackEvents = extractFlightEvents({ points: points || [], telemetry: { phases: fallbackPhases, thermals: [] } });
         return {
             engineVersion: CURRENT_TELEMETRY_ENGINE_VERSION,
             pointsCount: points ? points.length : 0,
@@ -584,20 +884,23 @@ export function analyzeFlightTelemetry(points, options = {}) {
             soaringGainMeters: 0,
             maxThermalGain: 0,
             bestThermal: null,
-            phases: segmentFlightPhases(points || [], []),
+            phases: fallbackPhases,
             dominantWindDrift: null,
             totalDistanceKm: 0,
             maxClimbRate: 0,
             maxSinkRate: 0,
             maneuvers: [],
-            detectedManeuverKeys: []
+            detectedManeuverKeys: [],
+            events: fallbackEvents
         };
     }
 
     const smoothedAlts = smoothAltitudes(points, 3);
     const thermals = detectThermals(points, smoothedAlts);
     const gains = calculateAccumulatedGain(points, thermals, smoothedAlts);
-    const phases = segmentFlightPhases(points, thermals, smoothedAlts);
+    const maneuvers = detectFlightManeuvers(points, smoothedAlts, thermals);
+    const detectedManeuverKeys = Array.from(new Set(maneuvers.map(m => m.type)));
+    const phases = segmentFlightPhases(points, thermals, smoothedAlts, maneuvers);
 
     let totalDistKm = 0;
     let maxClimbRate = 0;
@@ -651,10 +954,7 @@ export function analyzeFlightTelemetry(points, options = {}) {
         }
     }
 
-    const maneuvers = detectFlightManeuvers(points, smoothedAlts, thermals);
-    const detectedManeuverKeys = Array.from(new Set(maneuvers.map(m => m.type)));
-
-    return {
+    const telemetryResult = {
         engineVersion: CURRENT_TELEMETRY_ENGINE_VERSION,
         pointsCount: points.length,
         thermals,
@@ -672,4 +972,8 @@ export function analyzeFlightTelemetry(points, options = {}) {
         maneuvers,
         detectedManeuverKeys
     };
+
+    telemetryResult.events = extractFlightEvents({ points, telemetry: telemetryResult });
+
+    return telemetryResult;
 }

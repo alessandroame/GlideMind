@@ -918,10 +918,12 @@ function processOscillationChain(chain, points, stepVarios, detectedEvents, step
         return;
     }
 
-    // 3. Inversioni di rollio acrobatiche
+    // 3. Inversioni di rollio (Roll reversals / pendolate)
     const hasInversioniAcro = avgAngle >= 55 && minVz <= -1.5 && avgVz <= -1.2 && maxSpeed >= 38 && speedDelta >= 10 && maxTurnRate >= 14;
+    const hasInversioniStandard = avgAngle >= 40 && maxTurnRate >= 8 && chain.length >= 3;
 
-    if (hasInversioniAcro) {
+    if (hasInversioniAcro || hasInversioniStandard) {
+        const isAcro = hasInversioniAcro;
         detectedEvents.push({
             type: MANEUVER_KEYS.INVERSIONI,
             startIndex: sIdx,
@@ -936,7 +938,14 @@ function processOscillationChain(chain, points, stepVarios, detectedEvents, step
             minVz: Number(minVz.toFixed(1)),
             avgVz: Number(avgVz.toFixed(1)),
             chainCount: chain.length,
-            details: 'Inversioni di rollio: ' + chain.length + ' pendolate dinamiche (avg ' + Math.round(avgAngle) + '°, max ' + Math.round(maxAngle) + '°), ΔV ' + Math.round(speedDelta) + ' km/h'
+            pendolateCount: chain.length,
+            isAcro,
+            oscillations: chain.map(o => ({
+                dir: o.dir,
+                angle: Math.round(o.angle),
+                durationSeconds: Math.round(o.duration * 10) / 10
+            })),
+            details: 'Inversioni di rollio: ' + chain.length + ' pendolate ' + (isAcro ? 'dinamiche' : 'progressive') + ' (avg ' + Math.round(avgAngle) + '°, max ' + Math.round(maxAngle) + '°)' + (speedDelta > 0 ? ', ΔV ' + Math.round(speedDelta) + ' km/h' : '')
         });
     }
 }

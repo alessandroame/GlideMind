@@ -109,10 +109,10 @@ export function renderImportSheetHtml() {
           type="button"
           class="gm-btn gm-btn-primary w-full"
           id="gm-import-done-btn"
-          aria-label="Chiudi e torna al libretto di volo"
+          aria-label="Chiudi e torna al flight log"
           style="min-height: var(--gm-touch-min, 48px);"
         >
-          Vai al Libretto di Volo
+          Vai al Flight Log
         </button>
       </div>
     </div>
@@ -208,7 +208,7 @@ export async function processImportFiles(files, options = {}) {
     summaryWrap.style.display = 'flex';
     const tracksText = totalImportedTracks > 0 ? ` (${totalImportedTracks} con traccia GPS)` : '';
     if (summaryMsg) {
-      summaryMsg.textContent = `${totalImportedFlights} ${totalImportedFlights === 1 ? 'volo importato' : 'voli importati'}${tracksText}. Dati sincronizzati nel libretto.`;
+      summaryMsg.textContent = `${totalImportedFlights} ${totalImportedFlights === 1 ? 'volo importato' : 'voli importati'}${tracksText}. Dati sincronizzati nel flight log.`;
     }
   }
 

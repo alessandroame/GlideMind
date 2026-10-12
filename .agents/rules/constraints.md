@@ -25,7 +25,7 @@
 ## 3. UI & Ergonomic Constraints (Outdoor Mobile Interface)
 
 - **General Outdoor HMI**: Governed centrally by [`laws-of-ux`](file:///c:/github/antigravity-plugins/plugins/laws-of-ux) (Section 8) and skill `ux-outdoor-and-field-ergonomics` (touch target floor $\ge 44\text{px}$/$\ge 48\text{px}$, single-row `pan-x` carousels, dynamic `100dvh`, zero icon clutter).
-- **GlideMind Theme Custom Properties**: Dual theme engine (dark cockpit + `[data-theme="light"]` sunlight mode) strictly governed via CSS custom properties (`var(--gm-bg-base)`, `var(--gm-touch-min)`, `var(--gm-text-primary)` in `css/theme.css`) with WCAG 2.1 AA contrast $\ge 4.5:1$.
+- **GlideMind Design System & Tokens**: Governed by [`ui_design_system_spec.md`](.agents/rules/ui_design_system_spec.md). Dual theme engine (dark cockpit + `[data-theme="light"]` sunlight mode) strictly governed via CSS custom properties (`var(--gm-bg-base)`, `var(--gm-touch-min)`, `var(--gm-text-primary)` in `css/theme.css`) with WCAG 2.1 AA contrast $\ge 4.5:1$. Hardcoded hex/rgb colors and inline styles for static properties are strictly forbidden.
 - **Controlled Viewport & Gestures**: Dashboard views adopt vertical scrolling; full-viewport map and 3D replay manage their canvas containers (`height: 100dvh`, cooperative gestures / `touch-action: pan-y`).
 
 ---

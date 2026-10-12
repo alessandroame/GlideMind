@@ -1472,3 +1472,112 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
   2. **Bounding Dinamico Invariante**: Sia la timeline oraria (`renderTimelineGrid`, scrubber slider, step buttons), sia i grafici parametrici (`computeParamMetrics`, `renderSvgTrendChart`, `renderWindChart`, `renderSoundingChart`) e il briefing AI (`generateGuidoBriefing`) devono essere strettamente delimitati tra `sunriseHour` e `sunsetHour`.
   3. **CSS Grid Flessibile con Compatibilità Retroattiva**: La classe `.gm-timeline-grid-13` adotta `grid-template-columns: repeat(var(--gm-timeline-slots, 13), 1fr);`, permettendo un numero arbitrario di slot diurni (es. 9 in inverno, 15 in estate) senza rompere la delegazione eventi basata su classe nei test e nella UI.
 
+---
+
+## 119. Architettura di Trimming Non-Distruttivo dei Tracciati GPS (Original Points Retention & Telemetry Recalculation)
+- **Problema**: Il trimming di decollo e atterraggio nei logbook di volo può corrompere permanentemente i dati GPS grezzi registrati dal GNSS, impedendo al pilota di annullare tagli accidentali o ripristinare il tracciato nativo (violazione NN/G #3 e Safe Autonomy / Reversibility). Inoltre, tagliare i punti senza ricalcolare le statistiche cinematiche, i dislivelli, i tempi, le termiche e le fasi genera discrepanze critiche tra la traccia e i record FAI.
+- **Causa Radice**: Sovrascrittura distruttiva dell'array di punti GPS in memoria/storage e disaccoppiamento tra operazione di taglio e pipeline di ricalcolo telemetrico.
+- **Pattern Vincolante**:
+  1. **Conservazione Immutabile (`raw.originalPoints`)**: Preservare sempre l'array completo dei punti originali in `raw.originalPoints`. L'array di visualizzazione `raw.decimatedPoints` viene generato per affettamento non distruttivo (`slice(takeoffIndex, landingIndex + 1)`).
+  2. **Ricalcolo Olistico della Telemetria (`recalculateFlightAfterTrim`)**: A ogni trimming, ricalcolare durata, velocità media/max, dislivello cumulato, salita/discesa max, guadagno netto dal decollo, termiche e manovre.
+  3. **Ripristino Deterministico a Costo Zero (`restoreUntrimmedFlight`)**: Consentire in qualsiasi momento il ripristino istantaneo della traccia integrale a partire da `originalPoints`.
+
+---
+
+## 120. Ingestione Backup ParaMeteo V2/V1 con FAI IGC Incorporato (`_rawIgcText`) e Auto-Healing Tracciati
+- **Problema**: I backup completi di ParaMeteo (es. `parameteo_backup_*.json`) serializzano i voli provvisti di traccia GPS memorizzando il testo FAI IGC originale sotto proprietà private (`_rawIgcText`, `rawIgcText`, `rawIgc`, `igc`) all'interno dell'oggetto volo, lasciando talvolta non valorizzati gli array `trackPoints` o la collezione esterna `flightTracks`. Di conseguenza, l'importatore scartava silenziosamente la traccia (`decimatedPoints = []`), provocando: (1) messaggio "Tracciato altimetrico non disponibile" nella scheda volo, (2) omissione della sezione di trimming per tracciato insufficiente, (3) attivazione nel Replay 3D della traccia sintetica di fallback (volo simulato a Monte Cornizzolo) anziché del volo reale del pilota.
+- **Causa Radice**:
+  1. `parseParaMeteoBackup` e `convertParaMeteoFlight` cercavano esclusivamente array di punti (`flight.trackPoints`, `flight.track`) o l'array `flightTracks`, ignorando il testo IGC embedded in `_rawIgcText`.
+  2. La strategia di merge non teneva conto dell'arricchimento retroattivo di tracce su record preesistenti privi di punti.
+- **Pattern Vincolante**:
+  1. **Risoluzione Esaustiva della Sorgente IGC**: In `extractEmbeddedTrack` e `convertParaMeteoFlight`, ispezionare ricorsivamente `_rawIgcText`, `rawIgcText`, `rawIgc`, `igc`, `points`, `decimatedPoints` e `trackData`.
+  2. **Parsing IGC On-the-Fly**: Se i punti non sono strutturati in array ma è presente il testo IGC ($> 30$ caratteri), invocare automaticamente `parseIgc()` per estrarre fix GNSS, derivare le quote MSL, generare la sparkline SVG e calcolare le fasi telemetriche.
+  3. **Arricchimento Deterministico in Merge (`addsTrack`)**: Nel ripristino o sincronizzazione in modalità merge, verificare se il record in arrivo fornisce una traccia assente nel record locale (`addsTrack = !existingHasTrack && incomingHasTrack`). Se vero, procedere all'aggiornamento automatico senza richiedere eliminazioni manuali.
+  4. **Auto-Healing Dinamico in `getFlightDetail`**: All'apertura del dettaglio volo, se `decimatedPoints` è vuoto ma `rawIgc` è presente nello storage, eseguire la riparazione trasparente al volo, aggiornando la cache in memoria e riallineando lo storage in background.
+  5. **Feedback Esplicito su Tracce Simulate**: Nel Replay 3D, qualora non vi siano fix reali e venga impiegato il generatore topografico di fallback, applicare l'indicatore semantico esplicito `Traccia Simulata`.
+
+---
+
+## 121. Trimming Automatico Traccia, Safe Autonomy Anti-Oscillazione e Calibrazione Quote Barometriche Bi-Punto
+- **Problema**: Richiedere all'utente di azionare manualmente cursori e selettori per eliminare la sosta a terra pre-decollo e post-atterraggio introduce attrito cognitivo non necessario (violazione Tesler's Law). D'altro canto, alloggiare gli slider di trimming direttamente nella vista principale di debriefing appesantisce lo scorrimento e confonde l'analisi del volo. Inoltre, l'errore QNH o la deriva barometrica dello strumento fa divergere le quote di decollo e atterraggio dalla realtà topografica nota.
+- **Causa Radice**:
+  1. Assenza di una pipeline di auto-trimming in background all'atto dell'importazione o del primo caricamento della scheda volo.
+  2. Rischio di oscillazione o loop di re-trimming qualora il pilota ripristini volontariamente il tracciato nativo e il sistema forzi nuovamente il taglio al caricamento successivo.
+  3. Mancanza di un modello di correzione altimetrica a due punti per compensare la variazione di pressione atmosferica nel tempo durante voli prolungati.
+- **Pattern Vincolante**:
+  1. **Auto-Trimming Trasparente in Lettura (`autoTrimFlight`)**: All'accesso al dettaglio volo in `getFlightDetail`, se la traccia non è trimmata e presenta stazionamento a terra, il sistema applica automaticamente il trimming e persiste lo stato in background.
+  2. **Prevenzione Anti-Oscillazione (`meta.isExplicitlyUntrimmed`)**: Quando il pilota preme "Ripristina Originale", memorizzare `meta.isExplicitlyUntrimmed = true`. La pipeline di auto-trimming controlla preventivamente questo flag e non sovrascrive mai la decisione esplicita dell'utente.
+  3. **Disaccoppiamento della Vista "Setup Traccia" (`TrackSetupSheet.js`)**: Spostare tutti i controlli manuali di trimming e correzione quote in una vista secondaria dedicata, raggiungibile da pulsante compatto nella top bar (`#btn-open-track-setup`) e nella bottom bar (`#btn-setup-from-detail`), mantenendo la schermata di debriefing pulita e focalizzata sui dati di volo.
+  4. **Modello Altimetrico Bi-Punto (`two_point`)**: Correggere la quota a qualsiasi istante $t \in [0, T]$ interpolando linearmente la deriva tra scostamento di decollo e scostamento di atterraggio:
+     $$\Delta Z(t) = \Delta Z_{\text{takeoff}} \cdot \left(1 - \frac{t}{T}\right) + \Delta Z_{\text{landing}} \cdot \frac{t}{T}$$
+     preservando `raw.uncalibratedOriginalPoints` per garantire la piena reversibilità.
+
+---
+
+## 122. Attribuzione del Numero di Volo nel Dettaglio (Flight Number Attribution), Chunking del Debriefing e Standardizzazione Lessicale 'Flight Log'
+- **Problema**: L'assenza del numero progressivo del volo nella schermata di dettaglio (`FlightDetailSheet.js`) disorientava il pilota, privando la scheda del riferimento cronologico rispetto alla lista. Inoltre, la presenza disomogenea del termine colloquiale "Libretto" (es. nei pulsanti di ritorno e header) creava dissonanza con la terminologia aeronautica moderna ("Flight Log"). Infine, il debriefing didattico presentato come blocco continuo di testo non formattato provocava affaticamento visivo e violava i principi di chunking (Miller's Law).
+- **Causa Radice**:
+  1. Omissione del passaggio di `flightNumber` dal controller della lista (`LogbookView.js`) all'apertura del dettaglio e mancata risoluzione di fallback dallo store o dai seed.
+  2. Uso promiscuo di etichette non allineate alla convenzione aeronautica internazionale.
+  3. Formattazione del testo del debriefing affidata a un semplice `white-space: pre-line` anziché a componenti Gestalt strutturati.
+- **Pattern Vincolante**:
+  1. **Attribuzione Deterministica del Flight Number**: Risolvere `flightNumber` prioritizzando `options.flightNumber`, `bundle.meta.flightNumber`, o deducendolo dalla posizione inversa nello store (`state.flights.length - index`). Esporlo sia come pill badge `#N` nella topbar sia come blocco hero aeronautico `VOLO #N` nella card principale.
+  2. **Standardizzazione Lessicale Globale ("Flight Log")**: Impiegare rigorosamente "Flight Log" in tutta l'applicazione (pulsanti "Torna al Flight Log", navigation tab, intestazioni di vista, empty states ed export summary).
+  3. **Chunking Didattico (`gm-debrief-callout`)**: Segmentare il debriefing dell'Istruttore Guido per capoverso e racchiudere ogni consiglio tematico (efficienza termica, deriva vento/sottovento, margine classe vela, manovre) in card distinte `.gm-debrief-callout` provviste di bordo semantico ad alto contrasto.
+
+---
+
+## 123. Prevenzione del Collasso Orizzontale nella Topbar e Troncamento dei Pulsanti di Azione Mobile (Pure CSS Resilience & Responsive Text Chunking)
+- **Problema**: Su schermi compatti o finestre ristrette, la topbar di `FlightDetailSheet.js` subiva una compressione orizzontale estrema: il pulsante "Flight Log" andava a capo su due righe ("Flight" / "Log") perdendo l'icona freccia, mentre il titolo del sito di decollo veniva schiacciato in una colonna di ~30px spezzandosi verticalmente in frammenti di tre lettere ("Dec" / "C..." / "2026"). Nella bottom bar, il pulsante primario "Visualizza Replay 3D" andava a capo su due righe e il terzo pulsante "Scarica Traccia IGC (FAI)" veniva spinto oltre il margine destro dello schermo risultando tagliato.
+- **Causa Radice**:
+  1. Assenza nel foglio di stile vanilla (`css/theme.css`) delle classi utility responsive di visibilità (`hidden`, `sm:inline`, `md:inline`, `lg:inline`, `xl:inline`, `sm:hidden`, `md:hidden`), causando la visualizzazione simultanea di tutti i testi lunghi su qualsiasi viewport.
+  2. Mancanza di `white-space: nowrap; flex-shrink: 0;` su pulsanti e icone della topbar e della barra delle azioni.
+  3. L'uso di `-webkit-line-clamp: 2` su `.gm-flight-detail-title-heading` senza `white-space: nowrap`, unito a un contenitore destro rigido (`flex-shrink: 0`) contenente Setup Traccia, badge classe e nome vela ("Axis Pluto 4"), che sottraeva oltre 320px di spazio orizzontale lasciando briciole al titolo.
+- **Pattern Vincolante**:
+  1. **Utilities di Visibilità Responsive in CSS Nativo**: Implementare esplicitamente in `css/theme.css` le classi `.hidden`, `.inline`, `.block`, `.inline-flex`, `.whitespace-nowrap` e le relative varianti `@media (min-width: ...)` (`sm:`, `md:`, `lg:`, `xl:`).
+  2. **Topbar Resilience & Priorità del Titolo**:
+     - Pulsante di ritorno provvisto di `white-space: nowrap; flex-shrink: 0;` e icona SVG con `flex-shrink: 0;`.
+     - Intestazione del sito con `white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;` all'interno di contenitori `flex-1 min-w-0`.
+     - Pulsante "Setup Traccia" compatto da 38x38px (solo icona su schermi `< 1024px`, testo visibile solo con `.hidden.lg:inline`), e nome del modello vela nascosto sotto schermi XL (`.hidden.xl:inline`).
+  3. **Bottom Bar Action Chunking**:
+     - Tutti i pulsanti di azione della bottom bar devono dichiarare `white-space: nowrap;` e altezza minima Fitts $\ge 48\text{px}$.
+     - Adottare etichette responsive tramite due span semantici coesistenti nel DOM:
+       - Primario Replay: `<span class="hidden sm:inline">Visualizza Replay 3D</span><span class="sm:hidden">Replay 3D</span>`
+       - Setup: `<span class="hidden md:inline">Setup Traccia</span><span class="md:hidden">Setup</span>`
+       - Download: `<span class="hidden md:inline">Scarica Traccia IGC (FAI)</span><span class="md:hidden">Scarica IGC</span>`
+     - Questo garantisce ingombro $< 340\text{px}$ su smartphone, zero wrapping e completa compatibilità con le asserzioni dei test automatizzati.
+
+
+
+
+
+
+---
+
+## 124. Governance del Design System UI: Eliminazione degli Stili Inline, Token Semantici `--gm-*` e Gate Shift-Left Statico
+- **Problema**: Con la crescita delle viste e l'aggiunta di nuove schermate e fogli (es. `FlightDetailSheet.js`, `SpotMapView.js`), sono comparsi stili inline ad-hoc (`style="..."`) e colori esadecimali cablati (`#dc2626`, `#f59e0b`, `#10b981`, `#64748b`, `#22c55e`, `#ef4444`). L'uso di colori cablati impedisce l'adattamento al tema chiaro (Sunlight Mode `[data-theme="light"]`) rompendo i contrasti minimi WCAG AA e generando disomogeneità tipografica e visiva. Inoltre, l'assenza di un test automatico consentiva alle sessioni di introdurre stili non conformi senza segnalazioni d'errore.
+- **Causa Radice**:
+  1. Assenza di una specifica dedicata al Design System in `.agents/rules/` con catalogazione delle classi primitive (`.gm-card`, `.gm-btn-*`, `.gm-badge-*`, `.gm-section-title`).
+  2. Mancanza di un divieto esplicito di stili inline per proprietà statiche (colori, font, margini, bordi).
+  3. Mancanza di un test di governance statico (Gate 3) che ispezionasse i file `ui/views/*.js` bloccando l'inclusione di colori esadecimali cablati.
+- **Pattern Vincolante**:
+  1. **Specifica Design System (`ui_design_system_spec.md`)**: Regola vincolante che impone il ricorso esclusivo a `css/theme.css` e token `var(--gm-*)`. È tassativamente vietato l'uso di `#...` o `rgb(...)` all'interno dei file di vista JavaScript.
+  2. **Classi Semantiche per Componenti e Stati**: Utilizzare sempre le classi primitive censite (`.gm-card`, `.gm-btn-primary`, `.gm-btn-secondary`, `.gm-btn-ghost`, `.gm-stepper-btn`, `.gm-badge-*`, `.gm-section-title`, `.gm-stat-grid`, `.gm-stat-box`). Per dot e indicatori variometrici o di fase volo, utilizzare classi dedicate (`.gm-vario-color-*`, `.gm-phase-dot-*`, `.gm-ind-dot-*`).
+  3. **Stili Inline Riservati a Parametri Dinamici**: L'uso di `style="..."` è consentito unicamente per grandezze numeriche calcolate a runtime (es. `width: ${pct}%`, rotazioni angolari `transform: rotate(...)`).
+  4. **Gate di Governance Automatizzato (`shiftLeftGovernance.test.mjs`)**: La suite di test esegue una scansione regex su tutti i file `.js` in `ui/views/`, fallendo la build in caso di rilevamento di stringhe esadecimali in attributi `style`.
+
+---
+
+## 125. Architettura Topbar vs Header Card (Progressive Disclosure) e Layout Anti-Collisione nei Grafici Altimetrici
+- **Problema**: Su viewport mobili compatti, il titolo della località di decollo nella sticky topbar veniva troncato a causa della concorrenza di troppi metadati secondari nella medesima riga (sottotitolo data/durata, badge classe ala EN-B, modello vela). Inoltre, nel grafico altimetrico SVG, le etichette di quota estrema (`Max`, `Min`, `Decollo`, `Atterraggio`) collidevano con i marker delle termiche (`T1`, `T2`) e delle oscillazioni di rollio (`P`), mentre al di sotto persisteva una doppia legenda ridondante e in conflitto cromatico con una barra delle fasi fittizia.
+- **Causa Radice**:
+  1. Violazione della Progressive Disclosure: sovraccarico informativo nella topbar a scapito dell'orientamento primario dell'utente (località e numero volo).
+  2. Mancanza di segregazione tra quote globali di riferimento e marcatori temporali lungo la polilinea nel calcolo geometrico SVG.
+  3. Sovrapposizione di tassonomie informative incoerenti (fasi teoriche vs variometro empirico reale).
+- **Pattern Vincolante**:
+  1. **Topbar Ultra-Leggera con Massima Priorità al Titolo**: La sticky topbar espone esclusivamente il pulsante di ritorno "Flight Log", il badge `#N`, il titolo località decollo a massima espansione e il tasto "Setup Traccia". Metadati quali data estesa, orari decollo/atterraggio, durata, modello e classe vela risiedono stabilmente nella card principale (`gm-flight-detail-header-card`).
+  2. **Grafico SVG a Bande e Badge Anti-Collisione**:
+     - *Riga Superiore di Riferimento Quote (`y = 17px`)*: Riserva uno spazio dedicato esterno all'area di volo per `Decollo` (sinistra), `Max • Min` (centro) e `Atterraggio` (destra).
+     - *Badge Scaglionati*: Termiche e inversioni di rollio vengono ordinate per tempo e renderizzate ad altezze Y alternate con sfondi a pillola scura ad alto contrasto per azzerare qualsiasi sovrapposizione visiva.
+  3. **Legenda Unica e Coerente**: Soppressione della barra di fase fittizia e della seconda legenda; adozione di un'unica legenda variometrica arricchita dinamicamente con gli indicatori di termica, sondaggio 360° e oscillazioni di rollio.
+

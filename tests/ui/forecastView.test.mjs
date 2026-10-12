@@ -149,9 +149,10 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.ok(!html.includes('<span>Scrubber Orario</span>'), 'Must not render redundant technical label');
     assert.ok(!html.includes('id="forecast-scrubber-hour-display"'), 'Must not render redundant text header');
 
-    // If current time is within [8, 20], verify is-now and compact-now-badge
+    // If current time is within daylight window, verify is-now and compact-now-badge
     const currentHour = today.getHours();
-    if (currentHour >= 8 && currentHour <= 20) {
+    const daylight = controller.getDaylightWindow(DEFAULT_COMPRENSORI[0], null, todayIso);
+    if (currentHour >= daylight.sunriseHour && currentHour <= daylight.sunsetHour) {
       assert.ok(html.includes('is-now'), 'Must mark current hour slot with is-now class');
       assert.ok(html.includes('compact-now-badge'), 'Must render ORA badge on current hour slot');
       assert.ok(html.includes('>ORA</span>'), 'Must contain text ORA');

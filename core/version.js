@@ -3,14 +3,14 @@
  * Single Source of Truth for client runtime versioning, release tag and build stamp.
  */
 
-let detectedBuild = '5bf6d1c';
+let detectedBuild = 'b2f9135';
 if (typeof process !== 'undefined' && process.env && process.env.GLIDEMIND_BUILD) {
   detectedBuild = process.env.GLIDEMIND_BUILD;
 }
 
 export const APP_VERSION = '2.0.0';
 export const APP_BUILD = detectedBuild;
-export const APP_BUILD_DATE = '2026-10-09';
+export const APP_BUILD_DATE = '2026-10-12';
 
 /**
  * Returns formatted version string (e.g. "v2.0.0").

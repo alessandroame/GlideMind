@@ -276,6 +276,23 @@ describe('ParaMeteo Importer - Headless Core Contracts', () => {
       assert.ok(meta.id.startsWith('fl_20260501_'));
       assert.equal(raw.id, meta.id);
     });
+
+    it('should parse embedded _rawIgcText when trackPoints array is absent', () => {
+      const flightWithRawIgc = {
+        id: 'fl_igc_embedded_test',
+        date: '2026-10-12',
+        siteName: 'Decollo Ciavanis',
+        _rawIgcText: 'HFDTE121026\nB1200004522732N00721407EA0177501746\nB1201004522700N00721400EA0176001746\nB1202004522600N00721300EA0174001746\n'
+      };
+
+      const { meta, raw } = convertParaMeteoFlight(flightWithRawIgc, null);
+      assert.equal(meta.id, 'fl_igc_embedded_test');
+      assert.equal(meta.hasRawIgc, true);
+      assert.equal(meta.hasDecimatedTrack, true);
+      assert.ok(raw.decimatedPoints.length >= 2);
+      assert.ok(raw.rawIgc.length > 30);
+      assert.equal(meta.takeoffAltMsl, 1746);
+    });
   });
 
   describe('importParaMeteoData Ingestion & Store Synchronization', () => {
@@ -411,6 +428,32 @@ describe('ParaMeteo Importer - Headless Core Contracts', () => {
       assert.equal(stored.meta.siteName, 'Col Rodella');
       assert.equal(stored.meta.glider, 'Advance Epsilon 9');
     });
+    it('should automatically update existing flight in merge mode when incoming adds a track', async () => {
+      // 1. Initial flight without track
+      const initialFlight = {
+        id: 'fl_merge_track_test',
+        date: '2026-10-12',
+        siteName: 'Ciavanis',
+        updatedAt: 5000
+      };
+      await importParaMeteoData([initialFlight], mockManager, { mode: 'merge' });
+      const before = await mockManager.adapter.getFlight('fl_merge_track_test');
+      assert.equal(before.raw.decimatedPoints.length, 0);
+
+      // 2. Incoming flight with same updatedAt but with _rawIgcText
+      const incomingFlight = {
+        id: 'fl_merge_track_test',
+        date: '2026-10-12',
+        siteName: 'Ciavanis',
+        updatedAt: 5000,
+        _rawIgcText: 'HFDTE121026\nB1200004522732N00721407EA0177501746\nB1201004522700N00721400EA0176001746\n'
+      };
+      const res = await importParaMeteoData([incomingFlight], mockManager, { mode: 'merge' });
+      assert.equal(res.updatedFlightsCount, 1);
+
+      const after = await mockManager.adapter.getFlight('fl_merge_track_test');
+      assert.ok(after.raw.decimatedPoints.length >= 2);
+    });
   });
 
   describe('LogbookManager Singleton Integration', () => {
@@ -423,6 +466,23 @@ describe('ParaMeteo Importer - Headless Core Contracts', () => {
 
       const flights = await logbookManager.getAllFlights();
       assert.equal(flights.length, 2);
+    });
+
+    it('should auto-heal decimatedPoints in getFlightDetail when rawIgc is present but decimatedPoints is empty', async () => {
+      await logbookManager.clearAll();
+
+      const meta = { id: 'fl_heal_test', date: '2026-10-12', siteName: 'Spot' };
+      const raw = {
+        id: 'fl_heal_test',
+        decimatedPoints: [],
+        rawIgc: 'HFDTE121026\nB1200004522732N00721407EA0177501746\nB1201004522700N00721400EA0176001746\n'
+      };
+      await logbookManager.adapter.saveFlight(meta, raw);
+
+      const detail = await logbookManager.getFlightDetail('fl_heal_test');
+      assert.ok(detail);
+      assert.ok(detail.raw.decimatedPoints.length >= 2);
+      assert.equal(detail.meta.hasDecimatedTrack, true);
     });
   });
 });

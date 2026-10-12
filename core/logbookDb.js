@@ -771,6 +771,7 @@ class LogbookManager {
       id: flightId,
       rawIgc: rawIgcText,
       originalFileName: fileName,
+      originalPoints: flightPoints,
       decimatedPoints,
       telemetry,
       sampleIntervalSeconds: flightPoints.length > 1
@@ -844,14 +845,80 @@ class LogbookManager {
     const bundle = await this.adapter.getFlight(flightId);
     if (!bundle || !bundle.meta) return null;
 
-    let telemetry = bundle.raw?.telemetry || null;
-    if (!telemetry && bundle.raw?.decimatedPoints && bundle.raw.decimatedPoints.length >= 5) {
-      telemetry = analyzeFlightTelemetry(bundle.raw.decimatedPoints);
+    let raw = bundle.raw;
+    let decimatedPoints = raw?.decimatedPoints || [];
+    let originalPoints = raw?.originalPoints || null;
+
+    // Auto-heal on the fly if track points are missing but raw IGC text is present
+    const rawIgc = raw?.rawIgc || raw?._rawIgcText || bundle.meta?.rawIgc || null;
+    if ((!decimatedPoints || decimatedPoints.length === 0) && rawIgc && typeof rawIgc === 'string' && rawIgc.length > 50) {
+      try {
+        const rawCatalog = (store && store.getState().locationsCatalog) || DEFAULT_COMPRENSORI;
+        const spotsList = flattenSpotsCatalog(rawCatalog);
+        const parsed = parseIgc(rawIgc, spotsList);
+        if (parsed && parsed.trackPoints && parsed.trackPoints.length >= 2) {
+          originalPoints = parsed.trackPoints;
+          decimatedPoints = originalPoints.length <= 1500 ? originalPoints : lttbDecimate(originalPoints, 1500, 'alt');
+          const telemetry = parsed.telemetry || (originalPoints.length >= 5 ? analyzeFlightTelemetry(originalPoints) : {});
+
+          if (!raw) {
+            raw = { id: flightId };
+          }
+          raw.originalPoints = originalPoints;
+          raw.decimatedPoints = decimatedPoints;
+          raw.telemetry = telemetry;
+          raw.rawIgc = rawIgc;
+
+          if (!bundle.meta.hasDecimatedTrack || !bundle.meta.hasRawIgc) {
+            bundle.meta.hasDecimatedTrack = true;
+            bundle.meta.hasRawIgc = true;
+            bundle.meta.sparklineSvgPoints = generateSparklinePoints(originalPoints, 60, 100, 32);
+          }
+
+          // Persist the repaired bundle in background
+          this.adapter.saveFlight(bundle.meta, raw).catch(err => {
+            if (typeof console !== 'undefined' && console.warn) {
+              console.warn('[LogbookManager] Background auto-heal save failed:', err);
+            }
+          });
+        }
+      } catch (parseErr) {
+        if (typeof console !== 'undefined' && console.warn) {
+          console.warn('[LogbookManager] On-the-fly auto-heal parse failed:', parseErr);
+        }
+      }
+    }
+
+    // Auto-trim flight track on-the-fly if not already trimmed
+    if (bundle.meta && !bundle.meta.isTrimmed && !bundle.meta.isExplicitlyUntrimmed && raw) {
+      try {
+        const { autoTrimFlight } = await import('./flightTrimming.js');
+        const auto = autoTrimFlight({ meta: bundle.meta, raw });
+        if (auto.wasTrimmed) {
+          bundle.meta = auto.bundle.meta;
+          raw = auto.bundle.raw;
+          decimatedPoints = raw.decimatedPoints;
+          this.adapter.saveFlight(bundle.meta, raw).catch(err => {
+            if (typeof console !== 'undefined' && console.warn) {
+              console.warn('[LogbookManager] Background auto-trim save failed:', err);
+            }
+          });
+        }
+      } catch (trimErr) {
+        if (typeof console !== 'undefined' && console.warn) {
+          console.warn('[LogbookManager] Auto-trim error:', trimErr);
+        }
+      }
+    }
+
+    let telemetry = raw?.telemetry || null;
+    if (!telemetry && decimatedPoints && decimatedPoints.length >= 5) {
+      telemetry = analyzeFlightTelemetry(decimatedPoints);
     }
 
     return {
       meta: bundle.meta,
-      raw: bundle.raw,
+      raw: raw || null,
       telemetry: telemetry || {}
     };
   }
@@ -959,6 +1026,113 @@ class LogbookManager {
     }
 
     return { rawIgc, fileName, mimeType };
+  }
+
+  /**
+   * Applies non-destructive track trimming at takeoff and landing.
+   * Recalculates all flight metrics, thermals, maneuvers, and telemetry.
+   * @param {string} flightId
+   * @param {number} takeoffIndex
+   * @param {number} landingIndex
+   * @returns {Promise<{ meta: Object, raw: Object, trimmedPoints: Array<Object> }>}
+   */
+  async trimFlightTrack(flightId, takeoffIndex, landingIndex) {
+    await this.init();
+    const bundle = await this.adapter.getFlight(flightId);
+    if (!bundle || !bundle.meta) {
+      throw new Error(`[LogbookManager] Impossibile trovare il volo ${flightId} per il trimming`);
+    }
+
+    const { recalculateFlightAfterTrim } = await import('./flightTrimming.js');
+    const result = recalculateFlightAfterTrim(bundle, takeoffIndex, landingIndex);
+
+    await this.adapter.saveFlight(result.meta, result.raw);
+
+    const allMetas = await this.adapter.getAllFlightMetas();
+    if (store && typeof store.setState === 'function') {
+      store.setState({ flights: allMetas });
+    }
+
+    return result;
+  }
+
+  /**
+   * Restores original untrimmed track points and metrics.
+   * @param {string} flightId
+   * @returns {Promise<{ meta: Object, raw: Object, restoredPoints: Array<Object> }>}
+   */
+  async resetFlightTrim(flightId) {
+    await this.init();
+    const bundle = await this.adapter.getFlight(flightId);
+    if (!bundle || !bundle.meta) {
+      throw new Error(`[LogbookManager] Impossibile trovare il volo ${flightId} per il ripristino`);
+    }
+
+    const { restoreUntrimmedFlight } = await import('./flightTrimming.js');
+    const result = restoreUntrimmedFlight(bundle);
+    result.meta.isExplicitlyUntrimmed = true;
+
+    await this.adapter.saveFlight(result.meta, result.raw);
+
+    const allMetas = await this.adapter.getAllFlightMetas();
+    if (store && typeof store.setState === 'function') {
+      store.setState({ flights: allMetas });
+    }
+
+    return result;
+  }
+
+  /**
+   * Applies topographic elevation correction to flight trackpoints.
+   * @param {string} flightId
+   * @param {number} targetTakeoffAlt Target takeoff altitude in meters
+   * @param {number|null} [targetLandingAlt=null] Target landing altitude in meters
+   * @param {'two_point'|'takeoff_offset'} [mode='two_point']
+   * @returns {Promise<{ meta: Object, raw: Object }>}
+   */
+  async correctFlightElevations(flightId, targetTakeoffAlt, targetLandingAlt = null, mode = 'two_point') {
+    await this.init();
+    const bundle = await this.adapter.getFlight(flightId);
+    if (!bundle || !bundle.meta) {
+      throw new Error(`[LogbookManager] Impossibile trovare il volo ${flightId} per la calibrazione quote`);
+    }
+
+    const { applyElevationCorrection } = await import('./flightTrimming.js');
+    const result = applyElevationCorrection(bundle, targetTakeoffAlt, targetLandingAlt, mode);
+
+    await this.adapter.saveFlight(result.meta, result.raw);
+
+    const allMetas = await this.adapter.getAllFlightMetas();
+    if (store && typeof store.setState === 'function') {
+      store.setState({ flights: allMetas });
+    }
+
+    return result;
+  }
+
+  /**
+   * Restores original uncalibrated elevations.
+   * @param {string} flightId
+   * @returns {Promise<{ meta: Object, raw: Object }>}
+   */
+  async resetFlightElevations(flightId) {
+    await this.init();
+    const bundle = await this.adapter.getFlight(flightId);
+    if (!bundle || !bundle.meta) {
+      throw new Error(`[LogbookManager] Impossibile trovare il volo ${flightId} per il ripristino quote`);
+    }
+
+    const { restoreOriginalElevations } = await import('./flightTrimming.js');
+    const result = restoreOriginalElevations(bundle);
+
+    await this.adapter.saveFlight(result.meta, result.raw);
+
+    const allMetas = await this.adapter.getAllFlightMetas();
+    if (store && typeof store.setState === 'function') {
+      store.setState({ flights: allMetas });
+    }
+
+    return result;
   }
 
   /**

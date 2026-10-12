@@ -180,7 +180,7 @@ export class LogbookViewController {
     );
 
     return `
-      <section class="gm-logbook-view" role="region" aria-label="Libretto di Volo e Telemetria">
+      <section class="gm-logbook-view" role="region" aria-label="Flight Log e Telemetria">
         ${this.renderStorageWarningBanner()}
         ${this.renderUndoBanner()}
         ${this.renderImportSummaryBanner()}
@@ -188,7 +188,7 @@ export class LogbookViewController {
         <!-- Header Bar: Title, Import Trigger & Segmented Control -->
         <header class="gm-logbook-header">
           <div class="gm-logbook-header-top">
-            <h2 class="gm-logbook-title">Libretto di Volo</h2>
+            <h2 class="gm-logbook-title">Flight Log</h2>
             <button
               type="button"
               class="gm-btn gm-btn-primary gm-logbook-import-btn"
@@ -201,7 +201,7 @@ export class LogbookViewController {
           </div>
 
           <!-- Segmented Control: Voli vs Statistiche -->
-          <div class="gm-segmented-control" role="tablist" aria-label="Sezioni del Libretto">
+          <div class="gm-segmented-control" role="tablist" aria-label="Sezioni del Flight Log">
             <button
               type="button"
               class="gm-segment-btn ${this.activeTab === 'flights' ? 'active' : ''}"
@@ -222,7 +222,7 @@ export class LogbookViewController {
               aria-selected="${this.activeTab === 'stats'}"
               style="min-height: var(--gm-touch-min, 48px);"
             >
-              Statistiche &amp; Valuta
+              Statistiche
             </button>
           </div>
         </header>
@@ -361,7 +361,7 @@ export class LogbookViewController {
     return `
       <div class="gm-storage-warning-banner" role="status" aria-live="polite">
         <div>
-          <strong>Archiviazione protetta consigliata:</strong> Su questo dispositivo mobile lo storage IndexedDB potrebbe essere liberato dal sistema se inattivo. Aggiungi GlideMind alla schermata Home (PWA) o esegui backup periodici del libretto.
+          <strong>Archiviazione protetta consigliata:</strong> Su questo dispositivo mobile lo storage IndexedDB potrebbe essere liberato dal sistema se inattivo. Aggiungi GlideMind alla schermata Home (PWA) o esegui backup periodici del flight log.
         </div>
         <button
           type="button"
@@ -437,7 +437,7 @@ export class LogbookViewController {
     return `
       <div class="gm-logbook-empty" role="region" aria-label="Nessun volo registrato">
         <div class="font-bold text-base text-[var(--gm-text-primary)]">
-          Nessun volo memorizzato nel Logbook
+          Nessun volo memorizzato nel Flight Log
         </div>
         <div class="text-sm max-w-md text-center text-[var(--gm-text-secondary)]">
           Carica il tuo primo file .IGC o ripristina un backup ParaMeteo per analizzare la telemetria, il guadagno in termica e visualizzare la traccia.
@@ -901,7 +901,14 @@ export class LogbookViewController {
    */
   async handleOpenFlightDetail(flightId) {
     if (!flightId) return;
-    await openFlightDetailSheet(flightId, { store: this.store });
+    const state = this.store.getState();
+    const flights = (state.flights || []);
+    const idx = flights.findIndex((f) => f && (f.id === flightId || f.flightId === flightId));
+    let flightNum = null;
+    if (idx !== -1) {
+      flightNum = flights[idx].flightNumber != null ? flights[idx].flightNumber : (flights.length - idx);
+    }
+    await openFlightDetailSheet(flightId, { store: this.store, flightNumber: flightNum });
   }
 }
 

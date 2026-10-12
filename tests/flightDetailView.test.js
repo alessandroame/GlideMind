@@ -124,7 +124,7 @@ describe('Flight Detail Full-Screen View & Schema Integrity', () => {
     assert.ok(html.includes('class="gm-flight-detail-topbar"'), 'Must have top bar');
     assert.ok(html.includes('id="btn-flight-detail-back"'), 'Must have back button');
     assert.ok(html.includes('class="gm-flight-detail-back-btn"'), 'Must have back button class');
-    assert.ok(html.includes('aria-label="Torna al Libretto Voli"'), 'Must have accessible back button label');
+    assert.ok(html.includes('aria-label="Torna al Flight Log"') || html.includes('aria-label="Torna al Libretto Voli"'), 'Must have accessible back button label');
 
     // Sticky Bottom Bar in Thumb Zone
     assert.ok(html.includes('class="gm-flight-detail-bottom-bar"'), 'Must have sticky bottom bar');

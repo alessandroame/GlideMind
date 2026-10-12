@@ -1186,13 +1186,72 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
 
 ---
 
-## 2026-10-11 - Fase 7-bis: Piano Architetturale Condivisione Universale Contestuale & Deep Linking
-- **Tipo**: Architettura / Deep Linking / Web Share API / Roadmap
-- **Dettagli**: [.agents/worklog.d/2026-10-11_phase-7-bis-universal-contextual-sharing-plan.md](file:///.agents/worklog.d/2026-10-11_phase-7-bis-universal-contextual-sharing-plan.md)
-- **Sintesi**:
-  - Formalizzato il piano di Fase 7-bis per il pulsante Condividi universale contestuale a 1 tocco (Home, Previsioni con spot+ora+data, Mappa, Volo in sola visualizzazione/ospite).
-  - Definita la risoluzione per PWA offline-first senza backend: traccia 3D decimata LTTB a 150-200 punti, compressa via `CompressionStream('deflate')` in Base64URL (<1.5 KB) compatibile con WhatsApp e Telegram, e supporto file `.igc` originale nativo via Web Share API.
-  - Definiti i moduli headless `core/urlState.js` e `core/shareEngine.js`, e l'integrazione con `ui/router.js` per il parsing query string da hash (`#route?param=val`).
-  - Creata la specifica [docs/plans/phase-7-bis-universal-contextual-sharing.md](file:///docs/plans/phase-7-bis-universal-contextual-sharing.md) e aggiornata la matrice di stato [DESIDERATA.md](file:///DESIDERATA.md) con stato `🔴 Prioritario`.
+---
 
+## 2026-10-12 - Fase 7-ter: Analisi Tracce IGC Avanzata, Trimming Non-Distruttivo e Telemetria di Volo
+- **Tipo**: Feature / Aerologia / Trimming / 3D Avatar / Cinematica
+- **Dettagli**: [.agents/worklog.d/2026-10-12_phase7ter_track_analysis_and_trimming.md](file:///.agents/worklog.d/2026-10-12_phase7ter_track_analysis_and_trimming.md)
+- **Sintesi**:
+  - Implementata la classificazione e persistenza delle fasi di volo (decollo, termica, dinamica, planata, discesa, manovre) ed estrazione eventi salienti in `core/flightTelemetry.js`.
+  - Implementato il modulo headless non distruttivo `core/flightTrimming.js` per il trimming di decollo e atterraggio, con calcolo automatico, ricalcolo olistico delle metriche e reset a 1-tap.
+  - Ricreato l'avatar 3D del parapendio Enzo 3 competition a 54 cassoni con geometria alare accurata, fascio funicolare, pilota con cabina pod affusolata ed elmo aerodinamico in `ui/3d/models/paragliderModel.js`.
+  - Integrata in `ui/views/FlightReplayView.js` la barra telemetrica avionica completa (bussola rotante con prua, variometro FAI bicolore, velocità, altitudine MSL/AGL) e chip eventi interattivi.
+  - Aggiunto lo strumento interattivo di trimming con slider e auto-rilevamento in `ui/views/FlightDetailSheet.js`.
+  - Registrata la Lezione Appresa #119 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-12 - Bugfix: Ingestione Backup ParaMeteo V2 (_rawIgcText), Auto-Healing e Trasparenza Replay 3D
+- **Tipo**: Bugfix / Ingestione Dati / Auto-Healing / Replay 3D
+- **Dettagli**: [.agents/worklog.d/2026-10-12_parameteo_backup_raw_igc_and_auto_heal.md](file:///.agents/worklog.d/2026-10-12_parameteo_backup_raw_igc_and_auto_heal.md)
+- **Sintesi**:
+  - Risolto il problema per cui i voli importati da backup ParaMeteo mostravano una traccia inventata a Monte Cornizzolo nel Replay 3D e non mostravano profilo altimetrico o trimming nel dettaglio volo.
+  - Identificata la causa radice nel formato di backup di ParaMeteo, che memorizza il file FAI IGC completo nella proprietà `flight._rawIgcText` anziché in `trackPoints`.
+  - Aggiornato `core/parameteoImporter.js` per estrarre ed eseguire il parsing on-the-fly di `_rawIgcText`, popolando `decimatedPoints`, `originalPoints`, quote MSL e telemetria.
+  - Implementata la regola di merge `addsTrack = !existingHasTrack && incomingHasTrack`: re-importando il backup, i voli privi di traccia vengono aggiornati e arricchiti automaticamente nel database IndexedDB senza richiedere cancellazioni manuali.
+  - Implementato l'auto-healing dinamico in `LogbookManager.getFlightDetail` (`core/logbookDb.js`) che ripara i record al volo se il testo IGC è memorizzato.
+  - Aggiunto l'indicatore semantico esplicito `Traccia Simulata` nel Replay 3D (`ui/views/FlightReplayView.js`) quando viene utilizzata una traiettoria sintetica di fallback.
+  - Registrata la Lezione Appresa #120 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-12 - Feature: Trimming Automatico Traccia, Vista Dedicata "Setup Traccia" e Calibrazione Quote Barometriche
+- **Tipo**: Feature / UX Disaccoppiata / Ergonomia / Calibrazione Barometrica
+- **Dettagli**: [.agents/worklog.d/2026-10-12_track_auto_trimming_and_setup_sheet.md](file:///.agents/worklog.d/2026-10-12_track_auto_trimming_and_setup_sheet.md)
+- **Sintesi**:
+  - Implementato l'auto-trimming automatico delle tracce in background (`core/flightTrimming.js`, `core/logbookDb.js`): i punti di pre-decollo e post-atterraggio vengono identificati e trimmati automaticamente all'apertura del volo senza richiedere l'intervento dell'utente.
+  - Prevenzione delle oscillazioni (Safe Autonomy): quando il pilota ripristina intenzionalmente la traccia nativa ("Ripristina Originale"), viene impostato il flag `meta.isExplicitlyUntrimmed = true` impedendo al motore di ri-trimmare forzatamente il volo al caricamento successivo.
+  - Creata la vista full-screen dedicata `TrackSetupSheet.js` ("Setup Traccia") per rimuovere i controlli slider dalla vista principale di dettaglio volo (`FlightDetailSheet.js`), eliminando il disordine cognitivo e visivo.
+  - Implementato il motore di calibrazione delle quote barometriche: modello Bi-Punto con correzione lineare della deriva temporale barometrica (`two_point`) e modello a traslazione uniforme (`takeoff_offset`), con conservazione immutabile di `raw.uncalibratedOriginalPoints` per il ripristino istantaneo reversibile.
+  - Aggiornato `FlightDetailSheet.js`: rimossa la sezione di trimming inline; integrati i pulsanti di accesso `#btn-open-track-setup` nella testata e `#btn-setup-from-detail` nella barra inferiore; visualizzati badge di stato ad alta visibilità (`Traccia Trimmata`, `Quote Calibrate`).
+  - Suite completa di test automatizzati superata al 100% (671 test su 117 suite).
+  - Registrata la Lezione Appresa #121 in [MEMORY.md](file:///MEMORY.md).
+
+
+
+
+---
+
+## 2026-10-12 - Governance: Design System UI, Coerenza dei Token CSS e Gate Statico Shift-Left
+- **Tipo**: Governance / Design System / Qualità Shift-Left / Ergonomia UI
+- **Dettagli**: [.agents/worklog.d/2026-10-12_ui_design_system_governance_and_token_consistency.md](file:///.agents/worklog.d/2026-10-12_ui_design_system_governance_and_token_consistency.md)
+- **Sintesi**:
+  - Formalizzata la specifica di Design System `.agents/rules/ui_design_system_spec.md`, vincolando tutte le viste all'uso esclusivo dei token `--gm-*` in `css/theme.css` e censendo le classi primitive (`.gm-card`, `.gm-btn-*`, `.gm-badge-*`, `.gm-section-title`).
+  - Esteso il Gate 2 e Gate 3 in `shift_left_quality_gate.md` e implementato il test statico in `tests/ui/shiftLeftGovernance.test.mjs` che vieta stringhe esadecimali `#...` in attributi di stile inline nei file `ui/views/*.js`.
+  - Bonificate 11 occorrenze di colori cablati e blocchi di stili inline in `FlightDetailSheet.js`, `FlightReplayView.js`, `LogbookStatsView.js` e `SpotMapView.js`.
+  - Allineata la label del pulsante indietro in `FlightDetailSheet.js` e `tests/flightDetailView.test.js` risolvendo il test fallito.
+  - Suite completa di 676 test (117 suite) superata al 100% (675 pass, 0 fail, 1 skipped).
+  - Registrata la Lezione Appresa #124 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-12 - UI / Ergonomia: Bonifica Topbar, Anti-Collisione Grafico Altimetrico e Legenda Unica nel Dettaglio Volo
+- **Tipo**: UI / Ergonomia / Dettaglio Volo / SVG Layout
+- **Dettagli**: [.agents/worklog.d/2026-10-12_flight_detail_topbar_chart_and_legend_cleanup.md](file:///.agents/worklog.d/2026-10-12_flight_detail_topbar_chart_and_legend_cleanup.md)
+- **Sintesi**:
+  - Alleggerita la sticky topbar di `FlightDetailSheet.js`, dedicandola al titolo decollo a piena estensione con pulsante "Flight Log", badge "#N" e pulsante "Setup Traccia", spostando i metadati secondari nella header card.
+  - Implementata una riga di quote di riferimento esterna nel grafico SVG (`y = 17px`) e scaglionamento verticale alternato per i badge di termica e inversioni di rollio, azzerando le collisioni visive.
+  - Soppressa la barra di fase fittizia e unificata la legenda variometrica con marcatori operativi di salita, discesa, termiche, sondaggi 360° e oscillazioni di rollio.
+  - Suite completa di test verificata con successo (675/675 passati).
+  - Registrata la Lezione Appresa #125 in [MEMORY.md](file:///MEMORY.md).
 

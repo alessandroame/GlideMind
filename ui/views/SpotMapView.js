@@ -1437,16 +1437,16 @@ export class SpotMapView {
     const windDir = spotEval.weatherSnapshot?.direction?.cardinal || 'N/D';
 
     const sheetContent = `
-      <div class="gm-spot-detail-sheet" style="display: flex; flex-direction: column; gap: 14px; padding: 4px 0;">
+      <div class="gm-spot-detail-sheet">
         <!-- Header summary -->
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;">
+        <div class="gm-spot-detail-header">
           <div>
-            <h4 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--gm-text-primary);">${spot.name || spot.location}</h4>
-            <div style="font-size: 0.8rem; color: var(--gm-text-secondary); margin-top: 2px;">
-              ${spot.location || ''} ${spot.province ? `(${spot.province})` : ''}
+            <h4 class="gm-spot-detail-title">${escapeHtml(spot.name || spot.location)}</h4>
+            <div class="gm-spot-detail-subtitle">
+              ${escapeHtml(spot.location || '')} ${spot.province ? `(${escapeHtml(spot.province)})` : ''}
             </div>
           </div>
-          <span class="gm-badge" style="background-color: ${statusStyle.fill}; color: #ffffff; font-weight: 700; padding: 4px 10px; border-radius: var(--gm-radius-full); font-size: 0.78rem;">
+          <span class="gm-badge gm-badge-${escapeHtml(spotEval.status || 'unavailable')}">
             ${statusStyle.icon} ${statusStyle.badge}
           </span>
         </div>
@@ -1456,13 +1456,13 @@ export class SpotMapView {
           <div class="gm-flight-stat-row">
             <div class="gm-flight-label">
               <span class="gm-flight-icon">▲</span>
-              <span class="gm-flight-target">${takeoff?.name || 'Decollo Principale'}</span>
-              <span class="gm-flight-alt">${tAlt}</span>
+              <span class="gm-flight-target">${escapeHtml(takeoff?.name || 'Decollo Principale')}</span>
+              <span class="gm-flight-alt">${escapeHtml(tAlt)}</span>
             </div>
             <div class="gm-flight-data">
               <span class="gm-ind-pill">
-                <span class="gm-ind-dot" style="background-color: ${statusStyle.fill};"></span>
-                <span>${windSpeed} ${windDir}</span>
+                <span class="gm-ind-dot gm-ind-dot-${escapeHtml(spotEval.status || 'unavailable')}"></span>
+                <span>${escapeHtml(windSpeed)} ${escapeHtml(windDir)}</span>
               </span>
             </div>
           </div>
@@ -1470,13 +1470,13 @@ export class SpotMapView {
           <div class="gm-flight-stat-row">
             <div class="gm-flight-label">
               <span class="gm-flight-icon">⏚</span>
-              <span class="gm-flight-target">${landing?.name || 'Atterraggio Sicuro'}</span>
-              <span class="gm-flight-alt">${lAlt}</span>
+              <span class="gm-flight-target">${escapeHtml(landing?.name || 'Atterraggio Sicuro')}</span>
+              <span class="gm-flight-alt">${escapeHtml(lAlt)}</span>
             </div>
             <div class="gm-flight-data">
               <span class="gm-ind-pill">
-                <span class="gm-ind-dot" style="background-color: ${glide.isSafe ? '#22c55e' : '#ef4444'};"></span>
-                <span>Eff. ${glideRatioStr}</span>
+                <span class="gm-ind-dot ${glide.isSafe ? 'gm-ind-dot-safe' : 'gm-ind-dot-danger'}"></span>
+                <span>Eff. ${escapeHtml(glideRatioStr)}</span>
               </span>
             </div>
           </div>
@@ -1484,20 +1484,20 @@ export class SpotMapView {
 
         <!-- Physical explainability text -->
         ${spotEval.reason ? `
-          <div style="font-size: 0.82rem; color: var(--gm-text-secondary); background: var(--gm-bg-elevated); padding: 8px 12px; border-radius: var(--gm-radius-sm); border-left: 3px solid ${statusStyle.fill};">
-            ${spotEval.reason}
+          <div class="gm-spot-detail-reason gm-spot-detail-reason-${escapeHtml(spotEval.status || 'unavailable')}">
+            ${escapeHtml(spotEval.reason)}
           </div>
         ` : ''}
 
         <!-- Hazards warning if present -->
         ${takeoff?.hazards ? `
-          <div style="font-size: 0.76rem; color: #f59e0b; background: rgba(245, 158, 11, 0.08); padding: 6px 10px; border-radius: var(--gm-radius-sm); border: 1px solid rgba(245, 158, 11, 0.2);">
+          <div class="gm-hazard-callout">
             <strong>Pericoli:</strong> ${cleanUserText(takeoff.hazards)}
           </div>
         ` : ''}
 
         <!-- Primary CTA to Forecast View -->
-        <button type="button" id="gm-map-cta-forecast" class="gm-btn gm-btn-primary" style="min-height: var(--gm-touch-min, 48px); width: 100%; margin-top: 4px; font-weight: 700;">
+        <button type="button" id="gm-map-cta-forecast" class="gm-btn gm-btn-primary gm-spot-detail-cta">
           Apri Previsioni Dettagliate
         </button>
       </div>

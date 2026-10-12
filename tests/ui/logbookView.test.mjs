@@ -148,13 +148,13 @@ describe('LogbookView Controller & Outdoor Ergonomics (UI Layer)', () => {
     assert.ok(html.includes('gm-logbook-view'), 'Must render root logbook view');
     assert.ok(html.includes('gm-segmented-control'), 'Must render segmented control');
     assert.ok(html.includes('Voli (0)'), 'Must render Voli tab with 0 count');
-    assert.ok(html.includes('Statistiche &amp; Valuta'), 'Must render Statistiche & Valuta tab');
+    assert.ok(html.includes('Statistiche'), 'Must render Statistiche tab');
 
     // Header upload trigger
     assert.ok(html.includes('+ Importa'), 'Must render + Importa header button');
 
     // Empty state
-    assert.ok(html.includes('Nessun volo memorizzato nel Logbook'), 'Must render clean empty state');
+    assert.ok(html.includes('Nessun volo memorizzato nel Flight Log'), 'Must render clean empty state');
     assert.ok(html.includes('+ Importa Traccia IGC / Backup'), 'Must render primary upload button in empty state');
   });
 
@@ -288,7 +288,7 @@ describe('LogbookView Controller & Outdoor Ergonomics (UI Layer)', () => {
     assert.ok(html.includes('role="tab"'));
     assert.ok(html.includes('role="list"'));
     assert.ok(html.includes('role="listitem"'));
-    assert.ok(html.includes('aria-label="Libretto di Volo e Telemetria"'));
+    assert.ok(html.includes('aria-label="Flight Log e Telemetria"'));
 
     // Fitts's Law touch target floor
     assert.ok(html.includes('--gm-touch-min, 48px'));

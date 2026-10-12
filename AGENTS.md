@@ -19,6 +19,7 @@ Per l'implementazione e la verifica dei moduli del progetto, consultare le speci
 - **Profilo Pilota Principiante (EN-A)**: [.agents/rules/novice_pilot_spec.md](file:///c:/github/GlideMind/.agents/rules/novice_pilot_spec.md)
 - **Layout UI Mobile ed Ergonomia Visiva**: [.agents/rules/ui_layout_spec.md](file:///c:/github/GlideMind/.agents/rules/ui_layout_spec.md)
 - **Ergonomia Grafici e Serie Temporali (Parameteo Standard)**: [.agents/rules/ui_chart_design_spec.md](file:///c:/github/GlideMind/.agents/rules/ui_chart_design_spec.md)
+- **Design System UI & Coerenza Visiva**: [.agents/rules/ui_design_system_spec.md](file:///c:/github/GlideMind/.agents/rules/ui_design_system_spec.md)
 - **Guardia Mock Dati Meteo nei Test**: [.agents/rules/testing_weather_mock_guard.md](file:///c:/github/GlideMind/.agents/rules/testing_weather_mock_guard.md)
 - **Geodesia e Motore WebGL 3D**: [.agents/rules/geodesy_webgl_3d_spec.md](file:///c:/github/GlideMind/.agents/rules/geodesy_webgl_3d_spec.md)
 

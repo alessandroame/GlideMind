@@ -18,6 +18,7 @@ import { DEFAULT_SEED_FLIGHTS } from '../../core/logbook.js';
 import { HeadlessReplayEngine } from '../3d/HeadlessReplayEngine.js';
 import { MapLibreThreeEngine } from '../3d/MapLibreThreeEngine.js';
 import { ReplayTelemetryCanvas } from '../3d/ReplayTelemetryCanvas.js';
+import { extractFlightEvents } from '../../core/flightTelemetry.js';
 
 export function escapeHtml(str) {
   if (str == null) return '';
@@ -41,6 +42,7 @@ export class FlightReplayView {
     this.activeLayer = options.mapLayer || 'dark';
     this.isPlaying = false;
     this.elevationOffset = 0;
+    this.flightEvents = [];
     this._boundKeyDown = this._onKeyDown.bind(this);
     this._boundLayerChange = this._onLayerChange.bind(this);
     this._boundStoreListener = null;
@@ -108,10 +110,12 @@ export class FlightReplayView {
       const detail = await logbookManager.getFlightDetail(flightId);
       if (detail && detail.meta) {
         const rawPoints = detail.raw?.decimatedPoints || detail.raw?.points || [];
+        const isSimulated = rawPoints.length === 0;
         return {
           meta: detail.meta,
           raw: detail.raw || {},
-          points: rawPoints.length > 0 ? rawPoints : this._generateFallbackTrackPoints(detail.meta)
+          points: rawPoints.length > 0 ? rawPoints : this._generateFallbackTrackPoints(detail.meta),
+          isSimulated
         };
       }
     } catch {
@@ -131,7 +135,8 @@ export class FlightReplayView {
       return {
         meta: cachedFlight,
         raw: {},
-        points: this._generateFallbackTrackPoints(cachedFlight)
+        points: this._generateFallbackTrackPoints(cachedFlight),
+        isSimulated: true
       };
     }
 
@@ -283,7 +288,8 @@ export class FlightReplayView {
     return {
       meta,
       raw: {},
-      points: this._generateFallbackTrackPoints(meta)
+      points: this._generateFallbackTrackPoints(meta),
+      isSimulated: true
     };
   }
 
@@ -301,10 +307,16 @@ export class FlightReplayView {
     this.currentFlightId = this._resolveTargetFlightId(params);
     this.currentBundle = await this._loadFlightData(this.currentFlightId);
 
+    this.flightEvents = extractFlightEvents({
+      points: this.currentBundle.points,
+      telemetry: this.currentBundle.telemetry || this.currentBundle.raw?.telemetry
+    });
+
     const state = (store && typeof store.getState === 'function') ? store.getState() : {};
     this.activeLayer = state.ui?.mapLayer || this.activeLayer || 'dark';
 
     this.render();
+    this._renderEventsStrip();
 
     // Initialize 3D Engine
     this.engine = this._createEngine();
@@ -316,7 +328,9 @@ export class FlightReplayView {
     const telemetryContainer = containerEl.querySelector('#gm-replay-telemetry-container');
     if (telemetryContainer) {
       this.telemetryCanvas.mount(telemetryContainer, this.currentBundle.points, {
-        onSeek: (frac) => this.handleSeek(frac)
+        onSeek: (frac) => this.handleSeek(frac),
+        flight: this.currentBundle,
+        events: this.flightEvents
       });
     }
 
@@ -387,10 +401,20 @@ export class FlightReplayView {
         return;
       }
 
-      const offsetBtn = target.closest('[data-action="toggle-offset"]');
+        const offsetBtn = target.closest('[data-action="toggle-offset"]');
       if (offsetBtn) {
         e.preventDefault();
         this.handleToggleElevationOffset();
+        return;
+      }
+
+      const eventBtn = target.closest('[data-event-progress]');
+      if (eventBtn) {
+        e.preventDefault();
+        const p = parseFloat(eventBtn.getAttribute('data-event-progress'));
+        if (!isNaN(p)) {
+          this.handleSeek(p);
+        }
         return;
       }
     });
@@ -399,6 +423,30 @@ export class FlightReplayView {
     if (layerSelect) {
       layerSelect.addEventListener('change', this._boundLayerChange);
     }
+  }
+
+  /**
+   * Renders the interactive milestone events strip above the scrubber.
+   */
+  _renderEventsStrip() {
+    if (!this.containerEl) return;
+    const stripEl = this.containerEl.querySelector('#replay-3d-events-strip');
+    if (!stripEl) return;
+
+    if (!Array.isArray(this.flightEvents) || this.flightEvents.length === 0) {
+      stripEl.innerHTML = '';
+      stripEl.style.display = 'none';
+      return;
+    }
+
+    stripEl.style.display = 'flex';
+    stripEl.innerHTML = this.flightEvents.map(ev => `
+      <button type="button" class="gm-btn-replay-event" data-event-id="${ev.id}" data-event-progress="${ev.progress}" aria-label="${escapeHtml(ev.label)}: ${escapeHtml(ev.detail)}">
+        <span class="gm-event-color-dot" style="background-color: ${ev.color}; width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0;"></span>
+        <span class="gm-event-name" style="font-weight: 700; white-space: nowrap;">${escapeHtml(ev.shortLabel || ev.label)}</span>
+        <span class="gm-event-detail" style="font-size: 0.72rem; opacity: 0.8; font-family: monospace; white-space: nowrap;">${escapeHtml(ev.detail)}</span>
+      </button>
+    `).join('');
   }
 
   /**
@@ -606,16 +654,18 @@ export class FlightReplayView {
         <!-- Top Navigation & Camera Bar -->
         <header class="gm-replay-top-bar">
           <div class="gm-replay-top-left">
-            <button type="button" class="gm-btn gm-btn-ghost gm-replay-back-btn" data-action="exit-replay" aria-label="Torna al Libretto di Volo">
+            <button type="button" class="gm-btn gm-btn-ghost gm-replay-back-btn" data-action="exit-replay" aria-label="Torna al Flight Log">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <line x1="19" y1="12" x2="5" y2="12"></line>
                 <polyline points="12 19 5 12 12 5"></polyline>
               </svg>
-              <span>Libretto</span>
+              <span>Flight Log</span>
             </button>
             <div class="gm-replay-flight-meta">
               <h1 class="gm-replay-flight-title" id="replay-flight-title">${escapeHtml(siteTitle)}</h1>
-              <span class="gm-replay-flight-subtitle" id="replay-flight-subtitle">${escapeHtml(dateStr)} • ${escapeHtml(gliderStr)}</span>
+              <span class="gm-replay-flight-subtitle" id="replay-flight-subtitle">
+                ${escapeHtml(dateStr)} • ${escapeHtml(gliderStr)}${this.currentBundle?.isSimulated ? ' • <span class="gm-simulated-badge">Traccia Simulata</span>' : ''}
+              </span>
             </div>
           </div>
           <div class="gm-replay-top-right">
@@ -642,8 +692,9 @@ export class FlightReplayView {
           </div>
         </div>
 
-        <!-- Sticky Bottom Bar: Telemetry & Controls (Thumb Zone) -->
+        <!-- Sticky Bottom Bar: Events, Telemetry & Controls (Thumb Zone) -->
         <footer class="gm-replay-bottom-bar">
+          <div id="replay-3d-events-strip" class="gm-replay-events-strip" role="region" aria-label="Eventi salienti del volo"></div>
           <div id="gm-replay-telemetry-container" class="gm-replay-telemetry-slot"></div>
           <div class="gm-replay-controls-row">
             <button type="button" class="gm-btn gm-btn-primary gm-replay-play-btn" data-action="toggle-play" aria-label="Avvia riproduzione">

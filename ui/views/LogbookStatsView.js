@@ -132,7 +132,7 @@ export function renderDonutDistributionCardHtml({ id, title, items, totalFlights
       <div class="gm-dist-row">
         <div class="gm-dist-info">
           <div class="flex items-center gap-2 min-w-0">
-            <span class="gm-donut-bullet" style="background-color: #64748b;"></span>
+            <span class="gm-donut-bullet gm-donut-bullet-muted"></span>
             <span class="gm-dist-name text-[var(--gm-text-secondary)] italic truncate">Altri</span>
           </div>
           <span class="gm-dist-count shrink-0 font-mono text-[var(--gm-text-secondary)]">
@@ -141,7 +141,7 @@ export function renderDonutDistributionCardHtml({ id, title, items, totalFlights
           </span>
         </div>
         <div class="gm-dist-bar-bg">
-          <div class="gm-dist-bar-fill" style="width: ${remPct}%; background-color: #64748b;"></div>
+          <div class="gm-dist-bar-fill gm-dist-bar-fill-muted" style="width: ${remPct}%;"></div>
         </div>
       </div>
     `);

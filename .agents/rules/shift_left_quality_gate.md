@@ -24,7 +24,7 @@ Nessuna modifica viene consegnata all'utente senza aver superato internamente i 
 ### Gate 2: Rigore di Implementazione In-Flight
 1. **Headless Core Purity (`core/`)**: Zero riferimenti a `window`, `document`, `localStorage` o selettori DOM. 100% eseguibile in Node.js puro (`engineering-workflow`, Sez. 4).
 2. **SSOT Reattivo (`core/store.js`)**: Le viste aggiornano unicamente lo store tramite azioni pub/sub.
-3. **Mappatura Rigorosa CSS**: Vietato l'uso di utility CSS non dichiarate in `css/theme.css`.
+3. **Mappatura Rigorosa CSS & Design System**: Vietato l'uso di utility CSS non dichiarate in `css/theme.css`. Vietato l'uso di stili inline (`style="..."`) per colori, tipografia, bordi e layout statici. Vietati colori esadecimali cablati (`#...`) nei file di vista (`ui/views/*.js`); impiegare sempre i token semantici `var(--gm-*)` ([`ui_design_system_spec.md`](.agents/rules/ui_design_system_spec.md)).
 4. **Strict English nel Codice**: 100% inglese per codice, commenti, log e test. Stringhe UI localizzate in italiano.
 
 ### Gate 3: Test Suite di Governance Automatizzata (`npm test`)
@@ -34,6 +34,7 @@ La suite [shiftLeftGovernance.test.mjs](file:///c:/github/GlideMind/tests/ui/shi
 - Assenza di naked numbers e arrow isolate nei widget temporali.
 - Presenza del touch floor `--gm-touch-min` e della guardia landscape in `css/theme.css`.
 - Assenza di emoji decorative vietate (`📈`, `🎙️`, `⏱️`, `ℹ️`, `🚀`, `✨`, `🔥`, `🎉`).
+- Assenza di colori esadecimali cablati (`#...`) negli attributi `style` delle viste (`ui/views/`).
 - Prevenzione troncamenti flexbox (`.gm-flight-label`, `.gm-flight-target`).
 
 ### Gate 4: Loop di Ispezione Geometrica & Visiva

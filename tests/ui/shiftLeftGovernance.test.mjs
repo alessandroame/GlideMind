@@ -170,5 +170,42 @@ describe('Shift-Left Quality Gate & Architectural Governance', () => {
       'theme.css must enforce no-repeat on multi-layer background to prevent SVG chevron repeating artifacts'
     );
   });
+
+  it('Gate 2 (UI Design System - Token Consistency): ensures view markup never hardcodes hex colors in inline style attributes', () => {
+    const viewFiles = readdirSync(viewsDir).filter(f => f.endsWith('.js'));
+    const hexInStyleRegex = /style="[^"]*#[0-9a-fA-F]{3,6}/;
+
+    for (const file of viewFiles) {
+      const src = readFileSync(join(viewsDir, file), 'utf-8');
+      const match = src.match(hexInStyleRegex);
+      assert.ok(
+        !match,
+        `View ui/views/${file} contains hardcoded hex color in style attribute: "${match?.[0]}". Must use var(--gm-*) design tokens.`
+      );
+    }
+  });
+
+  it('Gate 2 (UI Design System - Component Primitives): verifies theme.css defines canonical design primitives', () => {
+    const themeSrc = readFileSync(cssFile, 'utf-8');
+    const requiredPrimitives = [
+      '.gm-card',
+      '.gm-btn-primary',
+      '.gm-btn-secondary',
+      '.gm-badge',
+      '.gm-badge-flyable',
+      '.gm-badge-caution',
+      '.gm-badge-unflyable',
+      '.gm-badge-severe',
+      '.gm-section-title',
+      '.gm-stat-grid'
+    ];
+
+    for (const primitive of requiredPrimitives) {
+      assert.ok(
+        themeSrc.includes(primitive),
+        `theme.css must define canonical UI primitive: "${primitive}"`
+      );
+    }
+  });
 });
 

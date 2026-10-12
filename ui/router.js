@@ -176,7 +176,7 @@ export function createRouter(options = {}) {
       home: 'Home Dashboard',
       forecast: 'Meteo & Volabilità',
       map: 'Mappa Decolli & Spot',
-      logbook: 'Libretto di Volo & Telemetria',
+      logbook: 'Flight Log & Telemetria',
       settings: 'Impostazioni & Strumenti',
       replay: 'Visualizzatore 3D Traiettoria'
     };

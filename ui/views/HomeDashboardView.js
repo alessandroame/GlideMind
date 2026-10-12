@@ -1099,7 +1099,7 @@ export class HomeDashboardViewController {
             id="btn-home-add-flight"
             class="gm-btn-compact-primary"
             data-action="open-add-flight-sheet"
-            aria-label="Aggiungi nuovo log di volo nel libretto"
+            aria-label="Aggiungi nuovo log di volo nel flight log"
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true">
               <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -1191,7 +1191,7 @@ export class HomeDashboardViewController {
 
         <div class="gm-form-actions">
           <button type="button" class="gm-btn-compact-accent" id="btn-cancel-flight-log">Annulla</button>
-          <button type="submit" class="gm-btn-compact-primary" id="btn-save-flight-log">Salva nel Libretto</button>
+          <button type="submit" class="gm-btn-compact-primary" id="btn-save-flight-log">Salva nel Flight Log</button>
         </div>
       </form>
     `;
