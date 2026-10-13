@@ -726,7 +726,7 @@ export function generateExpandedSvgChart(points, width = 600, height = 220, opti
 
 /**
  * Generates an educational safety debriefing from flight telemetry.
- * Formulated with Instructor Guido's concise, safety-first persona.
+ * Formulated with concise, safety-first instructor debriefing.
  * Robust against telemetry schema differences (altGain vs netGain, originDeg vs bearingDeg).
  * @param {Object} bundle
  * @returns {string} Debriefing text
@@ -1306,11 +1306,11 @@ export function renderFlightDetailHtml(bundle, options = {}) {
           </section>
         ` : ''}
 
-        <!-- Educational Safety Debriefing (Instructor Guido) -->
+        <!-- Educational Safety Debriefing -->
         <section class="gm-debrief-box" aria-label="Debriefing Didattico di Sicurezza">
           <div class="gm-debrief-header">
             <h3 class="gm-flight-detail-section-title" style="margin: 0;">Debriefing Didattico di Sicurezza</h3>
-            <span class="gm-debrief-instructor-tag">Istruttore Guido</span>
+            <span class="gm-debrief-instructor-tag">Istruttore</span>
           </div>
           <div class="gm-debrief-text flex flex-col gap-2.5" id="gm-debrief-content">
             ${debriefCalloutsHtml}

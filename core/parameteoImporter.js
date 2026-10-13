@@ -13,6 +13,7 @@
 import { deduceGliderClass, generateSparklinePoints, computeFlightFingerprint } from './logbookDb.js';
 import { lttbDecimate, analyzeFlightTelemetry } from './flightTelemetry.js';
 import { parseIgc } from './igcParser.js';
+import { reconstructTrackFromFlightMetadata } from './flightTrackReconstruction.js';
 import { store } from './store.js';
 
 /**
@@ -216,7 +217,7 @@ export function convertParaMeteoFlight(flight, trackData = null, options = {}) {
   }
 
   // Extract raw IGC text from various known ParaMeteo export properties
-  const rawIgc = (typeof flight._rawIgcText === 'string' && flight._rawIgcText.trim().length > 30)
+  let rawIgc = (typeof flight._rawIgcText === 'string' && flight._rawIgcText.trim().length > 30)
     ? flight._rawIgcText.trim()
     : ((typeof flight.rawIgc === 'string' && flight.rawIgc.trim().length > 30)
         ? flight.rawIgc.trim()
@@ -252,6 +253,32 @@ export function convertParaMeteoFlight(flight, trackData = null, options = {}) {
       // Graceful fallback for malformed or incomplete IGC strings
       if (typeof console !== 'undefined' && console.warn) {
         console.warn(`[convertParaMeteoFlight] IGC parse fallback for flight ${flight.id || 'unknown'}:`, parseErr.message);
+      }
+    }
+  }
+
+  // If both track points and raw IGC text are absent, but the flight contains coordinates,
+  // telemetry, or hasTrack flags, reconstruct a high-fidelity track on-the-fly
+  let isReconstructed = false;
+  if ((!rawPoints || rawPoints.length < 2) && !rawIgc) {
+    const hasCoordinates = Boolean(flight.takeoffCoords || flight.landingCoords || (flight.takeoffLat != null && flight.takeoffLon != null));
+    const hasTelemetryOrTrack = Boolean(flight.hasTrack || (Number(flight.trackPointsCount) > 0) || (Number(flight.pointsCount) > 0) || (telemetry && Object.keys(telemetry).length > 0));
+
+    if (hasCoordinates || hasTelemetryOrTrack) {
+      try {
+        const reconstructed = reconstructTrackFromFlightMetadata(flight, trackData, options);
+        if (reconstructed && Array.isArray(reconstructed.points) && reconstructed.points.length >= 2) {
+          rawPoints = reconstructed.points;
+          rawIgc = reconstructed.rawIgc;
+          isReconstructed = true;
+          if (!telemetry || Object.keys(telemetry).length === 0) {
+            telemetry = flight.telemetry || null;
+          }
+        }
+      } catch (reconErr) {
+        if (typeof console !== 'undefined' && console.warn) {
+          console.warn(`[convertParaMeteoFlight] Track reconstruction fallback for flight ${flight.id || 'unknown'}:`, reconErr.message);
+        }
       }
     }
   }

@@ -947,9 +947,9 @@ describe('GlideMind Comprensorio Locality & Dual Launch/Landing Evaluator', () =
       assert.ok(res.takeoffWeather);
       assert.ok(res.landingWeather);
       assert.equal(res.takeoffWeather.windDirection, 170);
-      assert.equal(res.landingWeather.windDirection, 170);
+      assert.equal(res.landingWeather.windDirection, 195, 'Landing wind should be decoupled with orographic valley deflection (+25deg)');
       assert.equal(res.takeoffWeather.windSpeed, 14);
-      assert.equal(res.landingWeather.windSpeed, 14);
+      assert.equal(res.landingWeather.windSpeed, 11, 'Landing wind speed should be attenuated by valley friction (75%)');
     });
   });
 });

@@ -78,4 +78,20 @@ describe('UI Integrity, Progressive Disclosure & Anti-Naked Data Audit', () => {
     assert.ok(themeCss.includes('.gm-stepper-btn'), 'theme.css must declare .gm-stepper-btn styles');
     assert.ok(themeCss.includes('touch-action: pan-y;'), 'theme.css must declare touch-action: pan-y on SVG charts');
   });
+
+  it('enforces mobile safe bottom clearance and touch target floor in theme.css', () => {
+    const themeCss = readFileSync(resolve('css/theme.css'), 'utf-8');
+    assert.ok(themeCss.includes('.gm-safe-bottom-pad'), 'theme.css must declare .gm-safe-bottom-pad utility');
+    assert.ok(themeCss.includes('.gm-logbook-undo-banner .gm-btn'), 'theme.css must declare touch targets for undo banner button');
+    assert.ok(themeCss.includes('.gm-telemetry-btn::before') || themeCss.includes('.gm-telemetry-pill-btn::before'), 'theme.css must declare touch targets for telemetry pills');
+    assert.ok(themeCss.includes('.gm-telemetry-zoom-btn::before'), 'theme.css must declare touch targets for telemetry zoom buttons');
+  });
+
+  it('enforces absence of Guido in user-facing UI labels, headers and tags unless citing his book', () => {
+    const flightDetailSrc = readFileSync(resolve('ui/views/FlightDetailSheet.js'), 'utf-8');
+    assert.ok(!forecastViewSrc.includes('Briefing di Volo (Guido)'), 'ForecastView must not label briefing with Guido');
+    assert.ok(!forecastViewSrc.includes('Briefing Sicurezza Guido'), 'ForecastView must not label sr-only header with Guido');
+    assert.ok(!forecastViewSrc.includes('Guido: "'), 'ForecastView must not use Guido persona prefix in summary');
+    assert.ok(!flightDetailSrc.includes('Istruttore Guido'), 'FlightDetailSheet must not label debriefing tag with Guido');
+  });
 });

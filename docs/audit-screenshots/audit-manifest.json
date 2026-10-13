@@ -2,8 +2,8 @@
   {
     "scenario": "Home Dashboard (Dark Cockpit, Mobile)",
     "file": "01_home_dashboard_dark_mobile.png",
-    "bytes": 168652,
-    "pageHeight": 844,
+    "bytes": 191311,
+    "pageHeight": 1137,
     "issues": [
       {
         "type": "TOUCH_TARGET_SUB_44PX",
@@ -20,7 +20,7 @@
             "tag": "BUTTON",
             "id": "gm-theme-menu-trigger",
             "text": "Scuro\n                ▾",
-            "dimensions": "76x26px"
+            "dimensions": "82x32px"
           }
         ]
       },
@@ -34,8 +34,8 @@
   {
     "scenario": "Home Dashboard (Sunlight Mode, Mobile)",
     "file": "01_home_dashboard_light_mobile.png",
-    "bytes": 169522,
-    "pageHeight": 844,
+    "bytes": 194686,
+    "pageHeight": 1137,
     "issues": [
       {
         "type": "TOUCH_TARGET_SUB_44PX",
@@ -52,7 +52,7 @@
             "tag": "BUTTON",
             "id": "gm-theme-menu-trigger",
             "text": "Scuro\n                ▾",
-            "dimensions": "76x26px"
+            "dimensions": "82x32px"
           }
         ]
       },
@@ -66,8 +66,8 @@
   {
     "scenario": "Home Dashboard (Dark Cockpit, Desktop)",
     "file": "01_home_dashboard_dark_desktop.png",
-    "bytes": 179174,
-    "pageHeight": 800,
+    "bytes": 239102,
+    "pageHeight": 985,
     "issues": [
       {
         "type": "TOUCH_TARGET_SUB_44PX",
@@ -84,7 +84,7 @@
             "tag": "BUTTON",
             "id": "gm-theme-menu-trigger",
             "text": "Scuro\n                ▾",
-            "dimensions": "76x26px"
+            "dimensions": "82x32px"
           }
         ]
       },
@@ -96,15 +96,15 @@
     ]
   },
   {
-    "scenario": "Forecast Standard (Dark Cockpit, Mobile)",
-    "file": "02_forecast_standard_dark_mobile.png",
-    "bytes": 547411,
-    "pageHeight": 844,
+    "scenario": "Home Dashboard Menu Tema Espanso (Dark, Mobile)",
+    "file": "01_home_dashboard_theme_menu_open_dark_mobile.png",
+    "bytes": 195620,
+    "pageHeight": 1137,
     "issues": [
       {
         "type": "TOUCH_TARGET_SUB_44PX",
         "severity": "P1",
-        "count": 18,
+        "count": 2,
         "samples": [
           {
             "tag": "A",
@@ -114,47 +114,61 @@
           },
           {
             "tag": "BUTTON",
-            "id": "gm-sticky-bar-scrolltop-btn",
-            "text": "",
-            "dimensions": "32x32px"
-          },
-          {
-            "tag": "DIV",
-            "id": "leaflet-marker-icon gm-map-div-icon leaflet-zoom-animated leaflet-interactive",
-            "text": "⏚\n            1100m",
-            "dimensions": "54x22px"
-          },
-          {
-            "tag": "SELECT",
-            "id": "forecast-minimap-layer-select",
-            "text": "OpenTopo\n          Satellite\n ",
-            "dimensions": "86x28px"
-          },
-          {
-            "tag": "BUTTON",
-            "id": "forecast-minimap-layer-toggle",
-            "text": "OpenTopo",
-            "dimensions": "96x28px"
+            "id": "gm-theme-menu-trigger",
+            "text": "Scuro\n                ▾",
+            "dimensions": "82x32px"
           }
         ]
       },
       {
         "type": "FLEX_TEXT_CLIPPING",
         "severity": "P2",
-        "count": 3
+        "count": 2
       }
     ]
   },
   {
-    "scenario": "Forecast Standard (Sunlight Mode, Mobile)",
-    "file": "02_forecast_standard_light_mobile.png",
-    "bytes": 559817,
-    "pageHeight": 844,
+    "scenario": "Home Dashboard Calendario 14gg Sheet Espanso (Dark, Mobile)",
+    "file": "01_home_dashboard_date_sheet_open_dark_mobile.png",
+    "bytes": 184160,
+    "pageHeight": 1137,
     "issues": [
       {
         "type": "TOUCH_TARGET_SUB_44PX",
         "severity": "P1",
-        "count": 18,
+        "count": 2,
+        "samples": [
+          {
+            "tag": "A",
+            "id": "gm-skip-link",
+            "text": "Salta al contenuto principale",
+            "dimensions": "234x39px"
+          },
+          {
+            "tag": "BUTTON",
+            "id": "gm-theme-menu-trigger",
+            "text": "Scuro\n                ▾",
+            "dimensions": "82x32px"
+          }
+        ]
+      },
+      {
+        "type": "FLEX_TEXT_CLIPPING",
+        "severity": "P2",
+        "count": 2
+      }
+    ]
+  },
+  {
+    "scenario": "Forecast Standard (Dark Cockpit, Mobile)",
+    "file": "02_forecast_standard_dark_mobile.png",
+    "bytes": 929137,
+    "pageHeight": 2356,
+    "issues": [
+      {
+        "type": "TOUCH_TARGET_SUB_44PX",
+        "severity": "P1",
+        "count": 19,
         "samples": [
           {
             "tag": "A",
@@ -175,16 +189,66 @@
             "dimensions": "54x22px"
           },
           {
-            "tag": "SELECT",
-            "id": "forecast-minimap-layer-select",
-            "text": "OpenTopo\n          Satellite\n ",
-            "dimensions": "86x28px"
+            "tag": "BUTTON",
+            "id": "forecast-minimap-layer-toggle",
+            "text": "",
+            "dimensions": "32x32px"
+          },
+          {
+            "tag": "BUTTON",
+            "id": "gm-mini-map-zoom-btn gm-mini-map-zoom-in",
+            "text": "",
+            "dimensions": "32x32px"
+          }
+        ]
+      },
+      {
+        "type": "FLEX_TEXT_CLIPPING",
+        "severity": "P2",
+        "count": 4
+      }
+    ]
+  },
+  {
+    "scenario": "Forecast Standard (Sunlight Mode, Mobile)",
+    "file": "02_forecast_standard_light_mobile.png",
+    "bytes": 859193,
+    "pageHeight": 2186,
+    "issues": [
+      {
+        "type": "TOUCH_TARGET_SUB_44PX",
+        "severity": "P1",
+        "count": 19,
+        "samples": [
+          {
+            "tag": "A",
+            "id": "gm-skip-link",
+            "text": "Salta al contenuto principale",
+            "dimensions": "234x39px"
+          },
+          {
+            "tag": "BUTTON",
+            "id": "gm-sticky-bar-scrolltop-btn",
+            "text": "",
+            "dimensions": "32x32px"
+          },
+          {
+            "tag": "DIV",
+            "id": "leaflet-marker-icon gm-map-div-icon leaflet-zoom-animated leaflet-interactive",
+            "text": "⏚\n            1100m",
+            "dimensions": "54x22px"
           },
           {
             "tag": "BUTTON",
             "id": "forecast-minimap-layer-toggle",
-            "text": "OpenTopo",
-            "dimensions": "96x28px"
+            "text": "",
+            "dimensions": "32x32px"
+          },
+          {
+            "tag": "BUTTON",
+            "id": "gm-mini-map-zoom-btn gm-mini-map-zoom-in",
+            "text": "",
+            "dimensions": "32x32px"
           }
         ]
       },
@@ -198,13 +262,13 @@
   {
     "scenario": "Forecast Standard (Dark Cockpit, Desktop)",
     "file": "02_forecast_standard_dark_desktop.png",
-    "bytes": 465791,
-    "pageHeight": 800,
+    "bytes": 771826,
+    "pageHeight": 1955,
     "issues": [
       {
         "type": "TOUCH_TARGET_SUB_44PX",
         "severity": "P1",
-        "count": 18,
+        "count": 19,
         "samples": [
           {
             "tag": "A",
@@ -225,16 +289,16 @@
             "dimensions": "54x22px"
           },
           {
-            "tag": "SELECT",
-            "id": "forecast-minimap-layer-select",
-            "text": "OpenTopo\n          Satellite\n ",
-            "dimensions": "86x28px"
+            "tag": "BUTTON",
+            "id": "forecast-minimap-layer-toggle",
+            "text": "",
+            "dimensions": "32x32px"
           },
           {
             "tag": "BUTTON",
-            "id": "forecast-minimap-layer-toggle",
-            "text": "OpenTopo",
-            "dimensions": "96x28px"
+            "id": "gm-mini-map-zoom-btn gm-mini-map-zoom-in",
+            "text": "",
+            "dimensions": "32x32px"
           }
         ]
       },
@@ -246,15 +310,15 @@
     ]
   },
   {
-    "scenario": "Forecast Solo Grafici (Dark Cockpit, Mobile)",
-    "file": "03_forecast_charts_mode_dark_mobile.png",
-    "bytes": 564009,
-    "pageHeight": 844,
+    "scenario": "Forecast Scheda Vento Decollo Espansa con Grafico SVG (Dark, Mobile)",
+    "file": "02_forecast_expanded_wind_dark_mobile.png",
+    "bytes": 924041,
+    "pageHeight": 2507,
     "issues": [
       {
         "type": "TOUCH_TARGET_SUB_44PX",
         "severity": "P1",
-        "count": 18,
+        "count": 19,
         "samples": [
           {
             "tag": "A",
@@ -275,16 +339,116 @@
             "dimensions": "54x22px"
           },
           {
-            "tag": "SELECT",
-            "id": "forecast-minimap-layer-select",
-            "text": "OpenTopo\n          Satellite\n ",
-            "dimensions": "86x28px"
+            "tag": "BUTTON",
+            "id": "forecast-minimap-layer-toggle",
+            "text": "",
+            "dimensions": "32x32px"
+          },
+          {
+            "tag": "BUTTON",
+            "id": "gm-mini-map-zoom-btn gm-mini-map-zoom-in",
+            "text": "",
+            "dimensions": "32x32px"
+          }
+        ]
+      },
+      {
+        "type": "FLEX_TEXT_CLIPPING",
+        "severity": "P2",
+        "count": 3
+      }
+    ]
+  },
+  {
+    "scenario": "Forecast Scheda Base Cumulo LCL Espansa con Sondaggio Termodinamico (Dark, Mobile)",
+    "file": "02_forecast_expanded_sounding_dark_mobile.png",
+    "bytes": 923148,
+    "pageHeight": 2507,
+    "issues": [
+      {
+        "type": "TOUCH_TARGET_SUB_44PX",
+        "severity": "P1",
+        "count": 19,
+        "samples": [
+          {
+            "tag": "A",
+            "id": "gm-skip-link",
+            "text": "Salta al contenuto principale",
+            "dimensions": "234x39px"
+          },
+          {
+            "tag": "BUTTON",
+            "id": "gm-sticky-bar-scrolltop-btn",
+            "text": "",
+            "dimensions": "32x32px"
+          },
+          {
+            "tag": "DIV",
+            "id": "leaflet-marker-icon gm-map-div-icon leaflet-zoom-animated leaflet-interactive",
+            "text": "⏚\n            1100m",
+            "dimensions": "54x22px"
           },
           {
             "tag": "BUTTON",
             "id": "forecast-minimap-layer-toggle",
-            "text": "OpenTopo",
-            "dimensions": "96x28px"
+            "text": "",
+            "dimensions": "32x32px"
+          },
+          {
+            "tag": "BUTTON",
+            "id": "gm-mini-map-zoom-btn gm-mini-map-zoom-in",
+            "text": "",
+            "dimensions": "32x32px"
+          }
+        ]
+      },
+      {
+        "type": "FLEX_TEXT_CLIPPING",
+        "severity": "P2",
+        "count": 3
+      }
+    ]
+  },
+  {
+    "scenario": "Forecast Solo Grafici (Dark Cockpit, Mobile)",
+    "file": "03_forecast_charts_mode_dark_mobile.png",
+    "bytes": 871739,
+    "pageHeight": 2186,
+    "issues": [
+      {
+        "type": "TOUCH_TARGET_SUB_44PX",
+        "severity": "P1",
+        "count": 19,
+        "samples": [
+          {
+            "tag": "A",
+            "id": "gm-skip-link",
+            "text": "Salta al contenuto principale",
+            "dimensions": "234x39px"
+          },
+          {
+            "tag": "BUTTON",
+            "id": "gm-sticky-bar-scrolltop-btn",
+            "text": "",
+            "dimensions": "32x32px"
+          },
+          {
+            "tag": "DIV",
+            "id": "leaflet-marker-icon gm-map-div-icon leaflet-zoom-animated leaflet-interactive",
+            "text": "⏚\n            1100m",
+            "dimensions": "54x22px"
+          },
+          {
+            "tag": "BUTTON",
+            "id": "forecast-minimap-layer-toggle",
+            "text": "",
+            "dimensions": "32x32px"
+          },
+          {
+            "tag": "BUTTON",
+            "id": "gm-mini-map-zoom-btn gm-mini-map-zoom-in",
+            "text": "",
+            "dimensions": "32x32px"
           }
         ]
       },
@@ -298,13 +462,13 @@
   {
     "scenario": "Overlay Analisi Volo Comprensorio (Dark, Mobile)",
     "file": "04_forecast_flight_analysis_overlay_dark_mobile.png",
-    "bytes": 1027794,
+    "bytes": 1048366,
     "pageHeight": 844,
     "issues": [
       {
         "type": "TOUCH_TARGET_SUB_44PX",
         "severity": "P1",
-        "count": 31,
+        "count": 36,
         "samples": [
           {
             "tag": "A",
@@ -325,16 +489,66 @@
             "dimensions": "54x22px"
           },
           {
-            "tag": "SELECT",
-            "id": "forecast-minimap-layer-select",
-            "text": "OpenTopo\n          Satellite\n ",
-            "dimensions": "86x28px"
+            "tag": "BUTTON",
+            "id": "forecast-minimap-layer-toggle",
+            "text": "",
+            "dimensions": "32x32px"
+          },
+          {
+            "tag": "BUTTON",
+            "id": "gm-mini-map-zoom-btn gm-mini-map-zoom-in",
+            "text": "",
+            "dimensions": "32x32px"
+          }
+        ]
+      },
+      {
+        "type": "FLEX_TEXT_CLIPPING",
+        "severity": "P2",
+        "count": 3
+      }
+    ]
+  },
+  {
+    "scenario": "Overlay Analisi Volo Menu Puntamento Espanso (Dark, Mobile)",
+    "file": "04_forecast_flight_analysis_aim_menu_dark_mobile.png",
+    "bytes": 1000810,
+    "pageHeight": 844,
+    "issues": [
+      {
+        "type": "TOUCH_TARGET_SUB_44PX",
+        "severity": "P1",
+        "count": 36,
+        "samples": [
+          {
+            "tag": "A",
+            "id": "gm-skip-link",
+            "text": "Salta al contenuto principale",
+            "dimensions": "234x39px"
+          },
+          {
+            "tag": "BUTTON",
+            "id": "gm-sticky-bar-scrolltop-btn",
+            "text": "",
+            "dimensions": "32x32px"
+          },
+          {
+            "tag": "DIV",
+            "id": "leaflet-marker-icon gm-map-div-icon leaflet-zoom-animated leaflet-interactive",
+            "text": "⏚\n            1100m",
+            "dimensions": "54x22px"
           },
           {
             "tag": "BUTTON",
             "id": "forecast-minimap-layer-toggle",
-            "text": "OpenTopo",
-            "dimensions": "96x28px"
+            "text": "",
+            "dimensions": "32x32px"
+          },
+          {
+            "tag": "BUTTON",
+            "id": "gm-mini-map-zoom-btn gm-mini-map-zoom-in",
+            "text": "",
+            "dimensions": "32x32px"
           }
         ]
       },
@@ -348,13 +562,13 @@
   {
     "scenario": "Mappa Comprensori (Dark Cockpit, Mobile)",
     "file": "05_spot_map_dark_mobile.png",
-    "bytes": 1117322,
+    "bytes": 1137326,
     "pageHeight": 844,
     "issues": [
       {
         "type": "TOUCH_TARGET_SUB_44PX",
         "severity": "P1",
-        "count": 34,
+        "count": 36,
         "samples": [
           {
             "tag": "A",
@@ -393,13 +607,13 @@
   {
     "scenario": "Mappa Comprensori (Sunlight Mode, Mobile)",
     "file": "05_spot_map_light_mobile.png",
-    "bytes": 1102674,
+    "bytes": 1127746,
     "pageHeight": 844,
     "issues": [
       {
         "type": "TOUCH_TARGET_SUB_44PX",
         "severity": "P1",
-        "count": 34,
+        "count": 36,
         "samples": [
           {
             "tag": "A",
@@ -438,13 +652,13 @@
   {
     "scenario": "Mappa Comprensori (Dark Cockpit, Desktop)",
     "file": "05_spot_map_dark_desktop.png",
-    "bytes": 3140697,
+    "bytes": 3160592,
     "pageHeight": 800,
     "issues": [
       {
         "type": "TOUCH_TARGET_SUB_44PX",
         "severity": "P1",
-        "count": 22,
+        "count": 24,
         "samples": [
           {
             "tag": "A",
@@ -483,25 +697,19 @@
   {
     "scenario": "Logbook Feed Voli (Dark, Mobile)",
     "file": "06_logbook_flights_dark_mobile.png",
-    "bytes": 111916,
+    "bytes": 109996,
     "pageHeight": 844,
     "issues": [
       {
         "type": "TOUCH_TARGET_SUB_44PX",
         "severity": "P1",
-        "count": 2,
+        "count": 1,
         "samples": [
           {
             "tag": "A",
             "id": "gm-skip-link",
             "text": "Salta al contenuto principale",
             "dimensions": "234x39px"
-          },
-          {
-            "tag": "BUTTON",
-            "id": "gm-btn gm-btn-ghost text-xs",
-            "text": "OK",
-            "dimensions": "33x36px"
           }
         ]
       }
@@ -510,52 +718,61 @@
   {
     "scenario": "Logbook Feed Voli (Sunlight Mode, Mobile)",
     "file": "06_logbook_flights_light_mobile.png",
-    "bytes": 113531,
+    "bytes": 111893,
     "pageHeight": 844,
     "issues": [
       {
         "type": "TOUCH_TARGET_SUB_44PX",
         "severity": "P1",
-        "count": 2,
+        "count": 1,
         "samples": [
           {
             "tag": "A",
             "id": "gm-skip-link",
             "text": "Salta al contenuto principale",
             "dimensions": "234x39px"
-          },
-          {
-            "tag": "BUTTON",
-            "id": "gm-btn gm-btn-ghost text-xs",
-            "text": "OK",
-            "dimensions": "33x36px"
           }
         ]
       }
     ]
   },
   {
-    "scenario": "Logbook Feed Voli (Dark, Desktop)",
+    "scenario": "Logbook Feed Voli (Dark Cockpit, Desktop)",
     "file": "06_logbook_flights_dark_desktop.png",
-    "bytes": 129752,
-    "pageHeight": 800,
+    "bytes": 128748,
+    "pageHeight": 844,
     "issues": [
       {
         "type": "TOUCH_TARGET_SUB_44PX",
         "severity": "P1",
-        "count": 2,
+        "count": 1,
         "samples": [
           {
             "tag": "A",
             "id": "gm-skip-link",
             "text": "Salta al contenuto principale",
             "dimensions": "234x39px"
-          },
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario": "Logbook Modal Importazione Volo IGC/JSON Espanso (Dark, Mobile)",
+    "file": "06_logbook_import_drawer_dark_mobile.png",
+    "bytes": 109996,
+    "pageHeight": 844,
+    "issues": [
+      {
+        "type": "TOUCH_TARGET_SUB_44PX",
+        "severity": "P1",
+        "count": 1,
+        "samples": [
           {
-            "tag": "BUTTON",
-            "id": "gm-btn gm-btn-ghost text-xs",
-            "text": "OK",
-            "dimensions": "33x36px"
+            "tag": "A",
+            "id": "gm-skip-link",
+            "text": "Salta al contenuto principale",
+            "dimensions": "234x39px"
           }
         ]
       }
@@ -564,25 +781,19 @@
   {
     "scenario": "Logbook Statistiche & Currency (Dark, Mobile)",
     "file": "07_logbook_stats_currency_dark_mobile.png",
-    "bytes": 130524,
-    "pageHeight": 844,
+    "bytes": 247192,
+    "pageHeight": 2123,
     "issues": [
       {
         "type": "TOUCH_TARGET_SUB_44PX",
         "severity": "P1",
-        "count": 2,
+        "count": 1,
         "samples": [
           {
             "tag": "A",
             "id": "gm-skip-link",
             "text": "Salta al contenuto principale",
             "dimensions": "234x39px"
-          },
-          {
-            "tag": "BUTTON",
-            "id": "gm-btn gm-btn-ghost text-xs",
-            "text": "OK",
-            "dimensions": "33x36px"
           }
         ]
       }
@@ -591,13 +802,13 @@
   {
     "scenario": "Dettaglio Volo Completo con Telemetria Multi-Canale & Debriefing (Dark, Mobile)",
     "file": "08_flight_detail_sheet_dark_mobile.png",
-    "bytes": 126784,
-    "pageHeight": 844,
+    "bytes": 775601,
+    "pageHeight": 1981,
     "issues": [
       {
         "type": "TOUCH_TARGET_SUB_44PX",
         "severity": "P1",
-        "count": 9,
+        "count": 12,
         "samples": [
           {
             "tag": "A",
@@ -607,27 +818,27 @@
           },
           {
             "tag": "BUTTON",
-            "id": "gm-btn gm-btn-ghost text-xs",
-            "text": "OK",
-            "dimensions": "33x36px"
-          },
-          {
-            "tag": "BUTTON",
             "id": "btn-open-track-setup",
             "text": "Setup Traccia",
             "dimensions": "38x38px"
           },
           {
-            "tag": "BUTTON",
-            "id": "btn-toggle-alt",
-            "text": "Quota",
-            "dimensions": "64x32px"
+            "tag": "DIV",
+            "id": "leaflet-marker-icon gm-map-div-icon leaflet-zoom-animated leaflet-interactive",
+            "text": "D",
+            "dimensions": "22x22px"
+          },
+          {
+            "tag": "DIV",
+            "id": "leaflet-marker-icon gm-map-div-icon leaflet-zoom-animated leaflet-interactive",
+            "text": "A",
+            "dimensions": "22x22px"
           },
           {
             "tag": "BUTTON",
-            "id": "btn-toggle-vario",
-            "text": "Vario",
-            "dimensions": "57x32px"
+            "id": "flight-detail-map-layer-toggle",
+            "text": "",
+            "dimensions": "32x32px"
           }
         ]
       },
@@ -641,7 +852,107 @@
   {
     "scenario": "Dettaglio Volo Completo (Sunlight Mode, Mobile)",
     "file": "08_flight_detail_sheet_light_mobile.png",
-    "bytes": 124189,
+    "bytes": 744167,
+    "pageHeight": 1981,
+    "issues": [
+      {
+        "type": "TOUCH_TARGET_SUB_44PX",
+        "severity": "P1",
+        "count": 12,
+        "samples": [
+          {
+            "tag": "A",
+            "id": "gm-skip-link",
+            "text": "Salta al contenuto principale",
+            "dimensions": "234x39px"
+          },
+          {
+            "tag": "BUTTON",
+            "id": "btn-open-track-setup",
+            "text": "Setup Traccia",
+            "dimensions": "38x38px"
+          },
+          {
+            "tag": "DIV",
+            "id": "leaflet-marker-icon gm-map-div-icon leaflet-zoom-animated leaflet-interactive",
+            "text": "D",
+            "dimensions": "22x22px"
+          },
+          {
+            "tag": "DIV",
+            "id": "leaflet-marker-icon gm-map-div-icon leaflet-zoom-animated leaflet-interactive",
+            "text": "A",
+            "dimensions": "22x22px"
+          },
+          {
+            "tag": "BUTTON",
+            "id": "flight-detail-map-layer-toggle",
+            "text": "",
+            "dimensions": "32x32px"
+          }
+        ]
+      },
+      {
+        "type": "FLEX_TEXT_CLIPPING",
+        "severity": "P2",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "scenario": "Setup Traccia & Calibrazione Quote (Dark, Mobile)",
+    "file": "09_track_setup_sheet_dark_mobile.png",
+    "bytes": 167754,
+    "pageHeight": 1981,
+    "issues": [
+      {
+        "type": "TOUCH_TARGET_SUB_44PX",
+        "severity": "P1",
+        "count": 16,
+        "samples": [
+          {
+            "tag": "A",
+            "id": "gm-skip-link",
+            "text": "Salta al contenuto principale",
+            "dimensions": "234x39px"
+          },
+          {
+            "tag": "BUTTON",
+            "id": "btn-open-track-setup",
+            "text": "Setup Traccia",
+            "dimensions": "38x38px"
+          },
+          {
+            "tag": "DIV",
+            "id": "leaflet-marker-icon gm-map-div-icon leaflet-zoom-animated leaflet-interactive",
+            "text": "D",
+            "dimensions": "22x22px"
+          },
+          {
+            "tag": "DIV",
+            "id": "leaflet-marker-icon gm-map-div-icon leaflet-zoom-animated leaflet-interactive",
+            "text": "A",
+            "dimensions": "22x22px"
+          },
+          {
+            "tag": "BUTTON",
+            "id": "flight-detail-map-layer-toggle",
+            "text": "",
+            "dimensions": "32x32px"
+          }
+        ]
+      },
+      {
+        "type": "FLEX_TEXT_CLIPPING",
+        "severity": "P2",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "scenario": "Replay Traiettoria 3D (Dark, Mobile)",
+    "file": "10_flight_replay_3d_dark_mobile.png",
+    "bytes": 2220456,
     "pageHeight": 844,
     "issues": [
       {
@@ -657,103 +968,9 @@
           },
           {
             "tag": "BUTTON",
-            "id": "gm-btn gm-btn-ghost text-xs",
-            "text": "OK",
-            "dimensions": "33x36px"
-          },
-          {
-            "tag": "BUTTON",
-            "id": "btn-open-track-setup",
-            "text": "Setup Traccia",
-            "dimensions": "38x38px"
-          },
-          {
-            "tag": "BUTTON",
-            "id": "btn-toggle-alt",
-            "text": "Quota",
-            "dimensions": "64x32px"
-          },
-          {
-            "tag": "BUTTON",
-            "id": "btn-toggle-vario",
-            "text": "Vario",
-            "dimensions": "57x32px"
-          }
-        ]
-      },
-      {
-        "type": "FLEX_TEXT_CLIPPING",
-        "severity": "P2",
-        "count": 1
-      }
-    ]
-  },
-  {
-    "scenario": "Setup Traccia & Calibrazione Quote (Dark, Mobile)",
-    "file": "09_track_setup_sheet_dark_mobile.png",
-    "bytes": 161646,
-    "pageHeight": 844,
-    "issues": [
-      {
-        "type": "TOUCH_TARGET_SUB_44PX",
-        "severity": "P1",
-        "count": 13,
-        "samples": [
-          {
-            "tag": "A",
-            "id": "gm-skip-link",
-            "text": "Salta al contenuto principale",
-            "dimensions": "234x39px"
-          },
-          {
-            "tag": "BUTTON",
-            "id": "gm-btn gm-btn-ghost text-xs",
-            "text": "OK",
-            "dimensions": "33x36px"
-          },
-          {
-            "tag": "BUTTON",
-            "id": "btn-open-track-setup",
-            "text": "Setup Traccia",
-            "dimensions": "38x38px"
-          },
-          {
-            "tag": "BUTTON",
-            "id": "btn-toggle-alt",
-            "text": "Quota",
-            "dimensions": "64x32px"
-          },
-          {
-            "tag": "BUTTON",
-            "id": "btn-toggle-vario",
-            "text": "Vario",
-            "dimensions": "57x32px"
-          }
-        ]
-      },
-      {
-        "type": "FLEX_TEXT_CLIPPING",
-        "severity": "P2",
-        "count": 1
-      }
-    ]
-  },
-  {
-    "scenario": "Replay Traiettoria 3D (Dark, Mobile)",
-    "file": "10_flight_replay_3d_dark_mobile.png",
-    "bytes": 2218259,
-    "pageHeight": 844,
-    "issues": [
-      {
-        "type": "TOUCH_TARGET_SUB_44PX",
-        "severity": "P1",
-        "count": 8,
-        "samples": [
-          {
-            "tag": "A",
-            "id": "gm-skip-link",
-            "text": "Salta al contenuto principale",
-            "dimensions": "234x39px"
+            "id": "gm-replay-layer-toggle",
+            "text": "",
+            "dimensions": "36x36px"
           },
           {
             "tag": "A",
@@ -772,12 +989,6 @@
             "id": "unnamed",
             "text": "OpenTopoMap",
             "dimensions": "79x14px"
-          },
-          {
-            "tag": "BUTTON",
-            "id": "gm-btn-replay-event",
-            "text": "Decollo\n        1060 m",
-            "dimensions": "118x32px"
           }
         ]
       }
@@ -786,19 +997,25 @@
   {
     "scenario": "Replay Traiettoria 3D (Sunlight Mode, Mobile)",
     "file": "10_flight_replay_3d_light_mobile.png",
-    "bytes": 1682639,
+    "bytes": 70247,
     "pageHeight": 844,
     "issues": [
       {
         "type": "TOUCH_TARGET_SUB_44PX",
         "severity": "P1",
-        "count": 8,
+        "count": 9,
         "samples": [
           {
             "tag": "A",
             "id": "gm-skip-link",
             "text": "Salta al contenuto principale",
             "dimensions": "234x39px"
+          },
+          {
+            "tag": "BUTTON",
+            "id": "gm-replay-layer-toggle",
+            "text": "",
+            "dimensions": "36x36px"
           },
           {
             "tag": "A",
@@ -817,12 +1034,6 @@
             "id": "unnamed",
             "text": "OpenTopoMap",
             "dimensions": "79x14px"
-          },
-          {
-            "tag": "BUTTON",
-            "id": "gm-btn-replay-event",
-            "text": "Decollo\n        1060 m",
-            "dimensions": "118x32px"
           }
         ]
       }
@@ -831,19 +1042,25 @@
   {
     "scenario": "Replay Traiettoria 3D (Dark, Desktop)",
     "file": "10_flight_replay_3d_dark_desktop.png",
-    "bytes": 5400734,
+    "bytes": 5296731,
     "pageHeight": 800,
     "issues": [
       {
         "type": "TOUCH_TARGET_SUB_44PX",
         "severity": "P1",
-        "count": 8,
+        "count": 9,
         "samples": [
           {
             "tag": "A",
             "id": "gm-skip-link",
             "text": "Salta al contenuto principale",
             "dimensions": "234x39px"
+          },
+          {
+            "tag": "BUTTON",
+            "id": "gm-replay-layer-toggle",
+            "text": "",
+            "dimensions": "36x36px"
           },
           {
             "tag": "A",
@@ -862,12 +1079,6 @@
             "id": "unnamed",
             "text": "OpenTopoMap",
             "dimensions": "79x14px"
-          },
-          {
-            "tag": "BUTTON",
-            "id": "gm-btn-replay-event",
-            "text": "Decollo\n        1060 m",
-            "dimensions": "118x32px"
           }
         ]
       }
@@ -876,8 +1087,8 @@
   {
     "scenario": "Impostazioni & Vele (Dark, Mobile)",
     "file": "11_settings_view_dark_mobile.png",
-    "bytes": 155472,
-    "pageHeight": 844,
+    "bytes": 225757,
+    "pageHeight": 1509,
     "issues": [
       {
         "type": "TOUCH_TARGET_SUB_44PX",
@@ -915,8 +1126,8 @@
   {
     "scenario": "Impostazioni & Vele (Sunlight Mode, Mobile)",
     "file": "11_settings_view_light_mobile.png",
-    "bytes": 149917,
-    "pageHeight": 844,
+    "bytes": 220985,
+    "pageHeight": 1509,
     "issues": [
       {
         "type": "TOUCH_TARGET_SUB_44PX",

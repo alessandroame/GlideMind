@@ -1675,3 +1675,51 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Aggiunti test automatici dedicati in [`tests/ui/forecastView.test.mjs`](file:///tests/ui/forecastView.test.mjs) e [`tests/ui/mapTakeoffSector.test.mjs`](file:///tests/ui/mapTakeoffSector.test.mjs).
   - Test suite globale al 100% verde: 734 test (126 suite), 733 passanti, 0 falliti, 1 skipped.
   - Registrata la Lezione Appresa #155 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-13 - Audit & HMI: Audit Visivo Multi-Modale a Piena Altezza & Bonifica Ergonomica HMI
+- **Tipo**: Audit Visivo / Ergonomia Outdoor / Laws of UX / Visual Polish / Headless Core
+- **Dettagli**: [.agents/worklog.d/2026-10-13_multimodal-visual-audit-and-hmi-remediation.md](file:///.agents/worklog.d/2026-10-13_multimodal-visual-audit-and-hmi-remediation.md)
+- **Sintesi**:
+  - Esteso lo script di acquisizione visiva headless CDP ([`scripts/run-full-audit-capture.mjs`](file:///scripts/run-full-audit-capture.mjs)) per calcolare dinamicamente il `scrollHeight` dei contenitori di scroll e dei controlli aperti (menu tema, selettore 14 giorni, schede aerologiche espanse, aim menu overlay, drawer importazione), generando 29 screenshot ad alta risoluzione senza troncamenti fino a 2676px di altezza.
+  - Applicato il pavimento tattile $\ge 48\text{px}$ (Fitts's Law) tramite pseudo-elementi `::before` a impatto visivo zero su controlli compatti in [`css/theme.css`](file:///css/theme.css): pillola cambio tema header (`.gm-theme-menu-trigger`), canali telemetrici (`.gm-telemetry-btn`), controlli zoom (`.gm-telemetry-zoom-btn`), e pulsanti di chiusura banner (`.gm-storage-warning-banner .gm-btn`, `.gm-logbook-undo-banner .gm-btn`).
+  - Rimossi gli stili inline statici dai banner in [`ui/views/LogbookView.js`](file:///ui/views/LogbookView.js) (Shift-Left Gate 2).
+  - Implementata l'auto-guarigione di `sparklineSvgPoints` in [`core/logbookDb.js`](file:///core/logbookDb.js) (`saveFlight`) su inserimento di record traccia privi di stringa SVG pre-calcolata.
+  - Aggiunta in [`css/theme.css`](file:///css/theme.css) la classe di clearance inferiore mobile `.gm-safe-bottom-pad` per `HomeDashboardView`, `LogbookView` e `SettingsView` vincolata a `@media (max-width: 768px)`.
+  - Risolti i troncamenti flexbox prematuri: allargata `.gm-unified-subspot-badge` da 220px a `min(340px, 80vw)` e aggiunta media query mobile per l'HUD di ispezione telemetrica (`.gm-telemetry-hud-ticker`) eliminando il clipping orizzontale su schermi 390px.
+  - Risolta la collisione delle etichette SVG nel grafico di attività mensile ([`ui/views/LogbookStatsView.js`](file:///ui/views/LogbookStatsView.js)): pre-calcolo delle quote verticali con inversione simmetrica del posizionamento testo ($y - 6$ per il valore superiore, $y + 11$ per quello inferiore) eliminando qualsiasi sovrapposizione tra ore di volo e conteggio voli.
+  - Sostituiti categoricamente gli acronimi tecnici (`D#1`, `Max Q`, `T#1`) con terminologia chiara per piloti principianti (`Dinamica 1`, `Quota Max`, `Termica 1`) in [`core/flightTelemetry.js`](file:///core/flightTelemetry.js).
+  - Migliorato il contrasto sunlight mode in [`css/theme.css`](file:///css/theme.css): `--gm-text-muted` elevato a `#475569` (Slate-600, contrasto $\ge 6.5:1$) e opacità 0.75 per le fasce orarie trascorse della timeline.
+  - Suite di test automatizzati estesa a 750 test nativi (129 suite) al 100% verdi.
+  - Registrata la Lezione Appresa #158 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-13 - Fase 4: Architettura Previsioni a Due Livelli & Micro Aerologia Disaccoppiata (Opzione A)
+- **Tipo**: UI Architecture / Information Hierarchy / Aerology / Outdoor HMI / Testing
+- **Dettagli**: [.agents/worklog.d/2026-10-13_macro-overview-and-decoupled-subspot-aerology.md](file:///.agents/worklog.d/2026-10-13_macro-overview-and-decoupled-subspot-aerology.md)
+- **Sintesi**:
+  - Ristrutturata l'architettura informativa di [`ui/views/ForecastView.js`](file:///ui/views/ForecastView.js) su due livelli semantici ben distinti (Opzione A approvata dall'utente).
+  - In modalità Panoramica (`selectedSubSpot === 'overview'`): pulizia radicale da accordion parametrici e barra di modo; renderizzazione della Summary Card del comprensorio ($T_{\text{best}} + L_{\text{safe}}$ con quote, dislivello, efficienza e mini-mappa con maniche a vento disaccoppiate), Evoluzione Giornaliera (4 finestre di volo 1-tap), Briefing di Volo e Scrubber orario dockato. Eliminati oltre 2.500px di scroll verticale ridondante.
+  - In modalità Sub-Spot specifico (`selectedSubSpot !== 'overview'`): segregazione analitica mirata con barra di modo (`Aerologia Decollo` o `Aerologia Atterraggio`).
+  - Decollo (`isTakeoff`): 6 parametri analitici di decollo (Vento pendio, Raffiche, LCL, CAPE, EDR, Copertura/Pioggia); rimozione di metriche o grafici di atterraggio spuri.
+  - Atterraggio (`isLanding`): 5 parametri analitici di atterraggio con brezza di valle e raffiche al suolo estratte da `landingWeather` (eliminando la confusione del vento a 1000m), cono di planata & rientro, copertura nuvolosa e temperatura al suolo.
+  - Aggiornamento in-place a 60fps con guardie difensive (`paramsContainer.style`) per compatibilità completa sia in ambiente browser che nei mock di test.
+  - Suite di test automatizzati estesa a 753 test nativi (129 suite) al 100% verdi; superati tutti i 5 Gate Shift-Left.
+  - Registrata la Lezione Appresa #160 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-13 - UI & Governance: Bando della Persona Fittizia Guido dalle Scritte UI
+- **Tipo**: Refactoring Lessicale / Anti-Sycophancy / UI Governance / Shift-Left
+- **Dettagli**: [.agents/worklog.d/2026-10-13_ban-guido-persona-from-ui.md](file:///.agents/worklog.d/2026-10-13_ban-guido-persona-from-ui.md)
+- **Sintesi**:
+  - Rimosso completamente il nome fittizio "Guido" dalle intestazioni e stringhe visibili dell'interfaccia utente ([`ui/views/ForecastView.js`](file:///ui/views/ForecastView.js) e [`ui/views/FlightDetailSheet.js`](file:///ui/views/FlightDetailSheet.js)).
+  - Rinominate le intestazioni in "Briefing di Volo" e "Briefing di Sicurezza", ed eliminato il prefisso fittizio `Guido: "..."` dalla sintesi testuale del briefing meteorologico.
+  - Aggiornato il tag didattico della card debriefing in "Istruttore".
+  - Aggiunto test di conformità permanente in [`tests/ui/uiIntegrityAudit.test.mjs`](file:///tests/ui/uiIntegrityAudit.test.mjs) che vieta l'esposizione del nome "Guido" nei template e nelle stringhe UI a meno che non si citi espressamente il suo libro di testo (*Parapendio*, Guido Teppa).
+  - Suite di test globale a 753 test verdi (129 suite).
+  - Registrata la Lezione Appresa #159 in [MEMORY.md](file:///MEMORY.md).
+
+

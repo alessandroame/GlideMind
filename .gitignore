@@ -15,3 +15,4 @@ coverage/
 .gemini/
 .agents/plugins/
 .tmp_audit_profile/
+.tmp_test_profile*/

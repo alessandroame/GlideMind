@@ -2187,3 +2187,96 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
      - Angolo in basso a destra (`bottom: 8px; right: 8px;`): pulsante fullscreen / analisi volo (`.gm-mini-map-expand-btn`), garantendo una distanza verticale $> 100\text{px}$ rispetto ai controlli di zoom per azzerare qualsiasi tocco accidentale.
   4. **Metodi Cartografici Pubblici Deterministici (`zoomIn`, `zoomOut`)**:
      - Tutti i motori cartografici (`LeafletMapEngine`, `HeadlessMockMapEngine`) devono esporre `zoomIn(delta = 1)` e `zoomOut(delta = 1)`. Nella mini-mappa Leaflet, dove i gesti di scroll e pinch sono disattivati per proteggere la navigazione della pagina, i metodi programmatici garantiscono il pieno controllo dello zoom all'utente.
+---
+
+## 156. Separazione tra Verdetto di Sicurezza e Metriche Fisiche nelle Previsioni di Comprensorio (Finestre di Volo e Imposizione Decollo)
+- **Problema**:
+  - In modalità Overview del comprensorio, fondere matematicamente o selezionare il "peggior valore" tra decollo e atterraggio per le metriche fisiche (es. velocità decollo con direzione atterraggio) genera dati ibridi inesistenti nella fisica atmosferica.
+  - Al contempo, selezionare ciecamente il decollo senza rispettare la scelta esplicita dell'utente dal picker sovrascrive silenziosamente la volontà del pilota.
+  - Inoltre, nei mock di test di componenti UI complessi, `this.containerEl` potrebbe definire solo `querySelector` ma non `querySelectorAll`, generando crash inaspettati (`TypeError: querySelectorAll is not a function`).
+- **Causa Radice**:
+  - Confusione concettuale tra *Verdetto di Sicurezza* (logica aeronautica a catena debole: $\min(\text{score}(T), \text{score}(L))$) e *Rappresentazione Telemetrica* (dati fisici puntuali che devono preservare quote e orografie reali).
+  - Assenza di un meccanismo di segmentazione diurna in finestre operative (chunking) che racconti l'evoluzione della giornata al pilota senza obbligarlo allo scrub orario manuale.
+- **Pattern Vincolante**:
+  1. **Modulo Headless per Finestre di Volo (`core/flightWindows.js`)**:
+     - La segmentazione della giornata in blocchi omogenei (Mattina, Ore Centrali, Pomeriggio, Sera) deve risiedere interamente nel Core headless, senza riferimenti al DOM, testabile in Node.js puro.
+  2. **Doppia Modalità di Decollo (Automatico $T_{\text{best}}$ vs Imposto)**:
+     - In Overview predefinita, il sistema raccomanda dinamicamente il miglior decollo ($T_{\text{best}}$) accoppiato all'atterraggio sicuro ($L_{\text{safe}}$).
+     - Se l'utente impone un decollo via `forcedTakeoffId`, il sistema valuta rigidamente quel decollo. Se in alcune finestre quel decollo è critico, segna la severità e produce un avviso consultivo se un altro decollo del comprensorio è favorevole.
+  3. **Interazione 1-Tap & Guardie di Selezione DOM**:
+     - Le card delle finestre di volo devono sincronizzare con 1-tap lo scrubber orario inferiore (`data-action="select-window" data-hour="..."`).
+     - Proteggere sempre l'accesso ai metodi DOM con guardie funzionali: `if (this.containerEl && typeof this.containerEl.querySelectorAll === 'function')`.
+
+
+---
+
+## 157. Disaccoppiamento Oro-Meteorologico delle Maniche a Vento tra Decollo e Atterraggio e Segregazione Visiva delle Finestre di Volo (Esclusiva Overview)
+- **Problema**:
+  - Sulla mini-mappa cartografica e nell'overlay delle procedure di volo, le maniche a vento del decollo e dell'atterraggio mostravano talvolta identica direzione e velocità.
+  - Nei modelli numerici di previsione (risoluzione 10km), decolli e atterraggi separati da pochi chilometri appartengono alla stessa maglia orografica e ricevono vettori identici.
+  - Se il payload meteo proveniente da cache mono-punto era privo di `landingWeather`, il fallback applicava i dati del decollo all'atterraggio.
+  - Inoltre, la sezione "Evoluzione Giornaliera" (Finestre di Volo) veniva mostrata anche quando l'utente selezionava un decollo o atterraggio specifico, generando rumore visivo rispetto ai dati puntuali dello spot.
+- **Causa Radice**:
+  - Mancanza di correzione orografica della brezza di valle per differenze angolari minime ($\le 5^\circ$) e fallback conservativo uniforme in `core/comprensorio.js`.
+  - Cache meteo di `ForecastView` che considerava valido un record presente anche se privo di `landingWeather`, omettendo la fetch multi-punto.
+  - Render incondizionato del contenitore delle finestre di volo indipendentemente da `this.selectedSubSpot`.
+- **Pattern Vincolante**:
+  1. **Disaccoppiamento Oro-Meteorologico e Brezza di Valle (`core/comprensorio.js`)**:
+     - In `evaluateComprensorio`, se `landingWeatherSource` è assente o se la deviazione angolare tra decollo e atterraggio è $\le 5^\circ$ o $\ge 355^\circ$, applicare sempre la rotazione orografica della brezza di valle ($+25^\circ$) e l'attrito al suolo (velocità $75\%$, raffiche $80\%$).
+  2. **Idratazione e Validazione Cache Multi-Punto (`ForecastView.js`)**:
+     - Il metodo `ensureLandingWeather` garantisce la presenza dei dati d'atterraggio in qualsiasi payload meteo prima del rendering.
+     - `fetchWeatherDataAsync` invalida e rinfresca la cache se il record memorizzato è privo di `landingWeather`.
+  3. **Segregazione Finestre di Volo all'Overview (`ForecastView.js`)**:
+     - Visualizzare `#forecast-flight-windows-container` e richiamare `renderFlightWindows` esclusivamente se `this.selectedSubSpot === 'overview'`.
+     - Se in Overview l'utente impone un decollo (`activeTakeoffId` specifico), mantenere la vista delle finestre esponendo il badge distintivo `Imposto: <nome decollo>`.
+
+---
+
+## 158. Audit Visivo Multi-Modale & Bonifica Ergonomica HMI: Risoluzione Collisione Etichette SVG Doppio Asse, Touch Floor via Pseudo-Elementi e Full-Length CDP Viewports
+- **Problema**:
+  1. Nei grafici SVG a doppio asse Y (es. `LogbookStatsView`, ore di volo a istogramma e numero voli a polilinea sovrapposti), quando un mese presentava valori proporzionalmente simili (es. 0.8h e 1 volo), le etichette di testo venivano disegnate alle stesse identiche coordinate (X, Y), causando una sovrapposizione illeggibile.
+  2. Gli screenshot di audit CDP iniziali venivano troncati alla parte alta della schermata (844px), nascondendo lo stato dei controlli espansi (menu tema, selettore 14 giorni, grafici aerologici aperti) e degli elementi a fondo pagina.
+  3. Controlli compatti (pillole telemetriche, zoom dock, banner dismiss) presentavano altezze fisiche inferiori a 40px, non conformi al pavimento tattile outdoor (Fitts's Law $\ge 48\text{px}$).
+  4. L'HUD di ispezione telemetrica su schermi mobile 390px subiva troncamento orizzontale sull'ultimo elemento.
+  5. Acronimi aeronautici sintetici nel visualizzatore 3D (`D#1`, `Max Q`, `T#1`) generavano confusione per piloti principianti (violazione Novice Pilot Spec).
+- **Causa Radice**:
+  1. Posizionamento cieco `y - 5` sia per la polilinea che per l'istogramma senza pre-calcolo delle collisioni verticali.
+  2. Esecuzione di `Page.captureScreenshot` senza dimensionamento dinamico del viewport basato su `scrollHeight` del contenitore attivo.
+  3. Assenza di pseudo-elementi `::before` con dimensioni minime 48x48px per estendere il touch target senza alterare la silhouette compatta.
+  4. Spaziature e font-size fissi senza media query mobile `<= 480px` sull'HUD telemetrico.
+  5. Denominazioni ereditate da logiche interne di decodifica IGC non tradotte in etichette fenomenologiche esplicite.
+- **Pattern Vincolante**:
+  1. **Pre-calcolo e Inversione Deterministica delle Etichette nei Grafici SVG**:
+     - Pre-calcolare le coordinate $(x, y)$ di entrambi i canali nello stesso ciclo. Se $|y_{\text{bar}} - y_{\text{line}}| < 16\text{px}$, posizionare l'etichetta del marker più in alto sopra il proprio elemento ($y - 6$) e l'etichetta del marker più in basso sotto il proprio elemento ($y + 11$). Questo garantisce almeno 9px di separazione netta tra i testi.
+  2. **Touch Target Extension via Pseudo-Elementi**:
+     - Utilizzare `.gm-telemetry-btn::before`, `.gm-telemetry-zoom-btn::before`, `.gm-theme-menu-trigger::before` con `position: absolute; min-width: 48px; min-height: 48px; top: 50%; left: 50%; transform: translate(-50%, -50%)`. L'area tattile rispetta Fitts's Law outdoor a costo zero di ingombro visivo.
+  3. **Full-Length Viewport Emulation negli Audit Visivi CDP**:
+     - Negli script di test visivo automatizzato (`run-full-audit-capture.mjs`), calcolare `Math.max(document.body.scrollHeight, activeScrollContainer.scrollHeight)` e impostare `Emulation.setDeviceMetricsOverride({ height: fullHeight })` prima dello scatto.
+  4. **Lessico Esplicito Pilota Principiante (Zero Acronimi Jargon)**:
+     - Sostituire categoricamente sigle come `D#`, `Max Q`, `T#` con `Dinamica [N]`, `Quota Max`, `Termica [N]` sia nel Replay 3D che nei badge telemetrici.
+
+---
+
+## 159. Vincolo di Nomenclatura UI: Bando del Nome 'Guido' da Etichette, Header e Persona di Briefing
+- **Problema**: L'interfaccia utente esponeva in modo pervasivo il nome 'Guido' come persona del briefing meteorologico ('Briefing di Volo (Guido)', 'Briefing Sicurezza Guido', 'Guido: "Oggi a..."') e nei tag didattici di sicurezza ('Istruttore Guido'), generando attribuzioni fittizie non richieste e confusione rispetto alle figure storiche reali del volo libero.
+- **Causa Radice**: Invenzione acritica di una persona/mascotte nei primi prototipi di briefing meteorologico e debriefing del volo, propagatasi nei template HTML e nelle stringhe dei controller senza vincolo di sobrietà e anti-sycophancy.
+- **Pattern Vincolante**:
+  1. **Divieto Assoluto di 'Guido' nella UI Ordinaria**: Il nome 'Guido' non deve mai comparire nei testi visibili dell'interfaccia utente (briefing card, debriefing del volo, intestazioni accessibili, badge o sintesi generate).
+  2. **Eccezione Unica (Citazione Bibliografica Esplicita)**: L'unico contesto in cui è consentito menzionare Guido Teppa è la citazione bibliografica o didattica esplicita del suo manuale ufficiale (*Parapendio*, Guido Teppa, Mulatero Editore).
+  3. **Lessico Standard Sovraordinato**: Utilizzare esclusivamente denominazioni neutre e conformi agli standard aeronautici: 'Briefing di Volo', 'Briefing di Sicurezza', 'Istruttore' / 'Istruttore FIVL', 'Debriefing Didattico di Sicurezza'.
+  4. **Governance Automatizzata nei Test**: Il test suite `tests/ui/uiIntegrityAudit.test.mjs` presidia l'assenza permanente di 'Guido' dai template e dalle stringhe UI.
+
+---
+
+## 160. Architettura Previsioni a Due Livelli: Macro Panoramica di Comprensorio vs Micro Aerologia Disaccoppiata di Spot (Opzione A)
+- **Problema**: In `ForecastView`, la presenza contemporanea in vista Panoramica (Overview) di oltre 7 schede accordion parametriche, grafici multi-trend e 4 card di evoluzione giornaliera generava un forte sovraccarico cognitivo e oltre 2.500px di scroll verticale ridondante. Inoltre, selezionando un decollo o un atterraggio dal selettore, le schede mostravano dati anemometrici confusi o identici (l'atterraggio a 260m leggeva il vento a 1000m di quota del decollo, e il decollo includeva grafici di brezza e cono di planata spuri).
+- **Causa Radice**:
+  1. `ForecastView.computeParamMetrics` estraeva `hourlyData` unicamente da `weatherData.hourly` (stazione in quota del decollo), ignorando la serie temporale al suolo `landingWeather`.
+  2. `renderSpecificSpotMetrics` utilizzava `evalData.weatherSnapshot` per entrambi i punti senza leggere `evalData.landingWeather`.
+  3. L'HTML della vista renderizzava `.gm-forecast-mode-bar` e `#forecast-params-container` in modo incondizionato sia in Overview che nei singoli sub-spot.
+- **Pattern Vincolante**:
+  1. **Macro Overview Pulita (Zero Clutter)**: Quando `selectedSubSpot === 'overview'`, renderizzare esclusivamente la Summary Card ($T_{\text{best}} + L_{\text{safe}}$ con dislivello, efficienza e mini-mappa con maniche a vento disaccoppiate), l'Evoluzione Giornaliera (4 finestre di volo 1-tap), il Briefing di Volo e lo Scrubber orario inferiore. Nascondere completamente le schede parametriche e la barra di modo.
+  2. **Micro Aerologia Decollo (`isTakeoff`)**: Mostrare la scheda specifica del decollo, il toggle `Aerologia Decollo`, e le 6 schede/grafici analitici del decollo: Vento con allineamento pendio, Raffiche in quota, Base cumulo LCL, Instabilità CAPE, Turbolenza EDR, Copertura/Pioggia. Zero schede atterraggio o brezza di valle spurie.
+  3. **Micro Aerologia Atterraggio (`isLanding`)**: Mostrare la scheda specifica dell'atterraggio, il toggle `Aerologia Atterraggio`, e le 5 schede/grafici analitici dell'atterraggio: Brezza di Valle (da `landingWeather`), Raffiche al suolo, Cono di planata & Rientro, Copertura nuvolosa, Temperatura e Aria al suolo. Zero schede o grafici di decollo spuri.
+  4. **Aggiornamento In-Place Difensivo**: In `updateHourlyInPlace`, verificare `selectedSubSpot`: se `'overview'`, mantenere il contenitore parametri nascosto (`display: none`); altrimenti rigenerare schede o grafici contestuali con guardie difensive (`if (paramsContainer.style)`).
+

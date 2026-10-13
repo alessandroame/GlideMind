@@ -285,6 +285,22 @@ describe('Logbook Database & Storage Adapters - Headless Core Contracts', () => 
       const refreshed = await logbookManager.getFlightDetail('fl_mgr_detail');
       assert.equal(refreshed.meta.notes, 'Volo didattico con virate regolari.');
     });
+
+    it('should auto-heal and generate sparklineSvgPoints in saveFlight when omitted in meta', async () => {
+      const flightPoints = [
+        { lat: 45.8, lon: 9.2, alt: 1000, timeSeconds: 0 },
+        { lat: 45.81, lon: 9.21, alt: 1250, timeSeconds: 60 },
+        { lat: 45.82, lon: 9.22, alt: 950, timeSeconds: 120 }
+      ];
+      await logbookManager.saveFlight(
+        { id: 'fl_auto_spark', site: 'Auto Spark Test' },
+        { decimatedPoints: flightPoints }
+      );
+      const retrieved = await logbookManager.getFlight('fl_auto_spark');
+      assert.ok(retrieved.meta.sparklineSvgPoints, 'Must auto-generate sparklineSvgPoints');
+      assert.equal(typeof retrieved.meta.sparklineSvgPoints, 'string');
+      assert.ok(retrieved.meta.sparklineSvgPoints.split(' ').length >= 2);
+    });
   });
 
   describe('Storage Persistence Safe Check (Node.js fallback)', () => {

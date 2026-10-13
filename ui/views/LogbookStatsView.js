@@ -226,27 +226,62 @@ export function renderMonthlyActivityChartHtml(monthlyActivity) {
   const slotWidth = chartWidth / Math.max(1, months.length);
   const barWidth = 12;
 
-  // 1. Render Hours Bars
-  const barsMarkup = months.map((m, index) => {
+  // 1. Pre-calculate layout & avoid label collision for dual Y-axis metrics
+  const slots = months.map((m, index) => {
     const slotLeft = chartLeft + index * slotWidth;
-    const barX = (slotLeft + (slotWidth - barWidth) / 2).toFixed(1);
-    const textX = (slotLeft + slotWidth / 2).toFixed(1);
-
+    const textX = slotLeft + slotWidth / 2;
+    const barX = slotLeft + (slotWidth - barWidth) / 2;
     const h = m.totalHours;
+    const c = m.flightCount;
     const barHeight = ceilingHours > 0 ? (h / ceilingHours) * chartHeight : 0;
-    const barY = (baselineY - barHeight).toFixed(1);
-    const valText = h >= 10 ? String(Math.round(h)) : String(h);
+    const barY = baselineY - barHeight;
+    const pointY = ceilingFlights > 0 ? (baselineY - (c / ceilingFlights) * chartHeight) : baselineY;
+
+    let barTextY = Math.max(16, barY - 4);
+    let pointTextY = pointY - 5;
+
+    // Detect potential collision when both metrics are plotted at similar vertical positions
+    if (h > 0 && c > 0 && Math.abs(barY - pointY) < 16) {
+      if (barY <= pointY) {
+        barTextY = Math.max(16, barY - 4);
+        pointTextY = pointY + 11;
+      } else {
+        pointTextY = Math.max(14, pointY - 6);
+        barTextY = barHeight >= 14 ? (barY + 10) : Math.min(baselineY - 2, barY + 10);
+      }
+    }
+
+    return {
+      ...m,
+      index,
+      textX,
+      barX,
+      h,
+      c,
+      barHeight,
+      barY,
+      pointY,
+      barTextY,
+      pointTextY
+    };
+  });
+
+  // 2. Render Hours Bars
+  const barsMarkup = slots.map((s) => {
+    const barXStr = s.barX.toFixed(1);
+    const textXStr = s.textX.toFixed(1);
+    const valText = s.h >= 10 ? String(Math.round(s.h)) : String(s.h);
 
     let barEl = '';
-    if (h > 0) {
-      const fillOpacity = m.isCurrentMonth ? '0.9' : '0.5';
-      const strokeWidth = m.isCurrentMonth ? '1.5' : '0';
+    if (s.h > 0) {
+      const fillOpacity = s.isCurrentMonth ? '0.9' : '0.5';
+      const strokeWidth = s.isCurrentMonth ? '1.5' : '0';
       barEl = `
         <rect
-          x="${barX}"
-          y="${barY}"
+          x="${barXStr}"
+          y="${s.barY.toFixed(1)}"
           width="${barWidth}"
-          height="${barHeight.toFixed(1)}"
+          height="${s.barHeight.toFixed(1)}"
           rx="3"
           ry="3"
           fill="var(--gm-accent)"
@@ -255,19 +290,19 @@ export function renderMonthlyActivityChartHtml(monthlyActivity) {
           stroke-width="${strokeWidth}"
         />
         <text
-          x="${textX}"
-          y="${Math.max(16, barY - 4).toFixed(1)}"
+          x="${textXStr}"
+          y="${s.barTextY.toFixed(1)}"
           text-anchor="middle"
           font-size="7.5"
           font-family="monospace"
-          font-weight="${m.isCurrentMonth ? '700' : '600'}"
+          font-weight="${s.isCurrentMonth ? '700' : '600'}"
           fill="var(--gm-accent)"
         >${escapeHtml(valText)}h</text>
       `;
     } else {
       barEl = `
         <rect
-          x="${barX}"
+          x="${barXStr}"
           y="${baselineY - 2}"
           width="${barWidth}"
           height="2"
@@ -278,63 +313,54 @@ export function renderMonthlyActivityChartHtml(monthlyActivity) {
       `;
     }
 
-    const labelFill = m.isCurrentMonth ? 'var(--gm-accent)' : 'var(--gm-text-muted)';
-    const labelWeight = m.isCurrentMonth ? '700' : '500';
+    const labelFill = s.isCurrentMonth ? 'var(--gm-accent)' : 'var(--gm-text-muted)';
+    const labelWeight = s.isCurrentMonth ? '700' : '500';
     const monthLabel = `
       <text
-        x="${textX}"
+        x="${textXStr}"
         y="136"
         text-anchor="middle"
         font-size="9"
         fill="${labelFill}"
         font-weight="${labelWeight}"
-      >${escapeHtml(m.label)}</text>
-      ${m.isCurrentMonth ? `<circle cx="${textX}" cy="144" r="2" fill="var(--gm-accent)" />` : ''}
+      >${escapeHtml(s.label)}</text>
+      ${s.isCurrentMonth ? `<circle cx="${textXStr}" cy="144" r="2" fill="var(--gm-accent)" />` : ''}
     `;
 
     return barEl + monthLabel;
   }).join('');
 
-  // 2. Render Flight Count Line & Points
-  const flightPoints = months.map((m, index) => {
-    const cx = chartLeft + index * slotWidth + slotWidth / 2;
-    const cy = ceilingFlights > 0 ? (baselineY - (m.flightCount / ceilingFlights) * chartHeight) : baselineY;
-    return {
-      x: cx,
-      y: cy,
-      count: m.flightCount,
-      isCurrent: m.isCurrentMonth
-    };
-  });
+  // 3. Render Flight Count Line & Points
+  const polylinePoints = slots.map(s => `${s.textX.toFixed(1)},${s.pointY.toFixed(1)}`).join(' ');
 
-  const polylinePoints = flightPoints.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-
-  const pointsMarkup = flightPoints.map(p => {
-    if (p.count > 0) {
+  const pointsMarkup = slots.map(s => {
+    const cxStr = s.textX.toFixed(1);
+    const cyStr = s.pointY.toFixed(1);
+    if (s.c > 0) {
       return `
         <circle
-          cx="${p.x.toFixed(1)}"
-          cy="${p.y.toFixed(1)}"
+          cx="${cxStr}"
+          cy="${cyStr}"
           r="3"
           fill="#38bdf8"
           stroke="var(--gm-bg-card, #13161f)"
           stroke-width="1.5"
         />
         <text
-          x="${p.x.toFixed(1)}"
-          y="${(p.y - 5).toFixed(1)}"
+          x="${cxStr}"
+          y="${s.pointTextY.toFixed(1)}"
           text-anchor="middle"
           font-size="8"
           font-family="monospace"
           font-weight="700"
           fill="#38bdf8"
-        >${p.count}</text>
+        >${s.c}</text>
       `;
     } else {
       return `
         <circle
-          cx="${p.x.toFixed(1)}"
-          cy="${p.y.toFixed(1)}"
+          cx="${cxStr}"
+          cy="${cyStr}"
           r="1.5"
           fill="#38bdf8"
           fill-opacity="0.3"

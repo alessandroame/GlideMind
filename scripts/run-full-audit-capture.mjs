@@ -8,15 +8,37 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.resolve(__dirname, '..');
 const SCREENSHOT_DIR = path.join(ROOT_DIR, 'docs', 'audit-screenshots');
-const ARTIFACT_DIR = 'C:\\Users\\aless\\.gemini\\antigravity\\brain\\5f203de4-2f04-48d2-a170-a5bf9aff6d60';
+const ARTIFACT_DIR = process.env.ARTIFACT_DIR || 'C:\\Users\\aame\\.gemini\\antigravity\\brain\\d586499d-1c88-440a-8505-94ce70b2123c';
 const CHROME_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 
 const HTTP_PORT = 3344;
 const CDP_PORT = 9444;
 
+// Safety watchdog to prevent hanging process
+const SCRIPT_TIMEOUT_MS = 90000;
+const safetyWatchdog = setTimeout(() => {
+  console.error(`[FATAL TIMEOUT] Script ha superato il timeout di ${SCRIPT_TIMEOUT_MS / 1000}s. Uscita forzata.`);
+  process.exit(1);
+}, SCRIPT_TIMEOUT_MS);
+safetyWatchdog.unref();
+
 // Ensure output directories exist
 fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
 fs.mkdirSync(ARTIFACT_DIR, { recursive: true });
+
+function safeWriteFileSync(filePath, data, maxRetries = 10) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      fs.writeFileSync(filePath, data);
+      return;
+    } catch (err) {
+      if (i === maxRetries - 1) throw err;
+      const waitMs = 200 * (i + 1);
+      const start = Date.now();
+      while (Date.now() - start < waitMs) {}
+    }
+  }
+}
 
 // Basic MIME types
 const MIME_TYPES = {
@@ -211,17 +233,117 @@ try {
 
   // Scenarios to capture
   const scenarios = [
-    // 1. Home Dashboard
+    // 1. Home Dashboard (Standard Full Length)
     { name: '01_home_dashboard', route: '#home', theme: 'dark', vp: { width: 390, height: 844 }, desc: 'Home Dashboard (Dark Cockpit, Mobile)' },
     { name: '01_home_dashboard', route: '#home', theme: 'light', vp: { width: 390, height: 844 }, desc: 'Home Dashboard (Sunlight Mode, Mobile)' },
     { name: '01_home_dashboard', route: '#home', theme: 'dark', vp: { width: 1280, height: 800 }, desc: 'Home Dashboard (Dark Cockpit, Desktop)' },
 
-    // 2. Weather Forecast
+    // 1-bis. Home Dashboard Expandable States
+    {
+      name: '01_home_dashboard_theme_menu_open',
+      route: '#home',
+      theme: 'dark',
+      vp: { width: 390, height: 844 },
+      desc: 'Home Dashboard Menu Tema Espanso (Dark, Mobile)',
+      beforeCapture: async () => {
+        await evalJs(`
+          (() => {
+            const trigger = document.querySelector('#gm-theme-menu-trigger');
+            if (trigger) trigger.click();
+          })()
+        `);
+      },
+      afterCapture: async () => {
+        await evalJs(`
+          (() => {
+            const trigger = document.querySelector('#gm-theme-menu-trigger');
+            if (trigger && trigger.getAttribute('aria-expanded') === 'true') trigger.click();
+          })()
+        `);
+      }
+    },
+    {
+      name: '01_home_dashboard_date_sheet_open',
+      route: '#home',
+      theme: 'dark',
+      vp: { width: 390, height: 844 },
+      desc: 'Home Dashboard Calendario 14gg Sheet Espanso (Dark, Mobile)',
+      beforeCapture: async () => {
+        await evalJs(`
+          (() => {
+            const calBtn = document.querySelector('[data-action="open-date-picker-sheet"], #home-date-picker-btn, .gm-date-picker-calendar-btn');
+            if (calBtn) calBtn.click();
+          })()
+        `);
+      },
+      afterCapture: async () => {
+        await evalJs(`
+          (() => {
+            if (window.__GLIDEMIND__ && window.__GLIDEMIND__.sheetManager) {
+              window.__GLIDEMIND__.sheetManager.close();
+            } else {
+              const closeBtn = document.querySelector('.gm-sheet-close-btn');
+              if (closeBtn) closeBtn.click();
+            }
+          })()
+        `);
+      }
+    },
+
+    // 2. Weather Forecast (Standard Full Length)
     { name: '02_forecast_standard', route: '#forecast', theme: 'dark', vp: { width: 390, height: 844 }, desc: 'Forecast Standard (Dark Cockpit, Mobile)' },
     { name: '02_forecast_standard', route: '#forecast', theme: 'light', vp: { width: 390, height: 844 }, desc: 'Forecast Standard (Sunlight Mode, Mobile)' },
     { name: '02_forecast_standard', route: '#forecast', theme: 'dark', vp: { width: 1280, height: 800 }, desc: 'Forecast Standard (Dark Cockpit, Desktop)' },
-    
-    // 3. Forecast Mode: Solo Grafici
+
+    // 2-bis. Forecast Expandable States (Card Accordeon)
+    {
+      name: '02_forecast_expanded_wind',
+      route: '#forecast',
+      theme: 'dark',
+      vp: { width: 390, height: 844 },
+      desc: 'Forecast Scheda Vento Decollo Espansa con Grafico SVG (Dark, Mobile)',
+      beforeCapture: async () => {
+        await evalJs(`
+          (() => {
+            const cardHeader = document.querySelector('[data-card-id="vento-decollo"]');
+            if (cardHeader) cardHeader.click();
+          })()
+        `);
+      },
+      afterCapture: async () => {
+        await evalJs(`
+          (() => {
+            const cardHeader = document.querySelector('[data-card-id="vento-decollo"]');
+            if (cardHeader) cardHeader.click();
+          })()
+        `);
+      }
+    },
+    {
+      name: '02_forecast_expanded_sounding',
+      route: '#forecast',
+      theme: 'dark',
+      vp: { width: 390, height: 844 },
+      desc: 'Forecast Scheda Base Cumulo LCL Espansa con Sondaggio Termodinamico (Dark, Mobile)',
+      beforeCapture: async () => {
+        await evalJs(`
+          (() => {
+            const cardHeader = document.querySelector('[data-card-id="base-cumulo"]');
+            if (cardHeader) cardHeader.click();
+          })()
+        `);
+      },
+      afterCapture: async () => {
+        await evalJs(`
+          (() => {
+            const cardHeader = document.querySelector('[data-card-id="base-cumulo"]');
+            if (cardHeader) cardHeader.click();
+          })()
+        `);
+      }
+    },
+
+    // 3. Forecast Mode: Solo Grafici Multi-Trend
     { 
       name: '03_forecast_charts_mode', 
       route: '#forecast', 
@@ -230,8 +352,18 @@ try {
       desc: 'Forecast Solo Grafici (Dark Cockpit, Mobile)',
       beforeCapture: async () => {
         await evalJs(`
-          const btn = document.querySelector('#forecast-view-charts-btn') || document.querySelector('[data-action="toggle-charts-mode"]');
-          if (btn) btn.click();
+          (() => {
+            const btn = document.querySelector('#forecast-view-charts-btn') || document.querySelector('[data-action="toggle-charts-mode"]');
+            if (btn) btn.click();
+          })()
+        `);
+      },
+      afterCapture: async () => {
+        await evalJs(`
+          (() => {
+            const btn = document.querySelector('#forecast-view-cards-btn') || document.querySelector('[data-action="toggle-cards-mode"]');
+            if (btn) btn.click();
+          })()
         `);
       }
     },
@@ -243,25 +375,96 @@ try {
       theme: 'dark',
       vp: { width: 390, height: 844 },
       desc: 'Overlay Analisi Volo Comprensorio (Dark, Mobile)',
+      fullHeight: false,
       beforeCapture: async () => {
         await evalJs(`
-          const expandBtn = document.querySelector('.gm-mini-map-expand-btn') || document.querySelector('[data-action="open-full-map"]');
-          if (expandBtn) expandBtn.click();
+          (() => {
+            const expandBtn = document.querySelector('.gm-mini-map-expand-btn') || document.querySelector('[data-action="open-full-map"]');
+            if (expandBtn) expandBtn.click();
+          })()
+        `);
+      },
+      afterCapture: async () => {
+        await evalJs(`
+          (() => {
+            const closeBtn = document.querySelector('.gm-flight-analysis-close-btn') || document.querySelector('[data-action="close-flight-analysis"]');
+            if (closeBtn) closeBtn.click();
+          })()
+        `);
+      }
+    },
+    {
+      name: '04_forecast_flight_analysis_aim_menu',
+      route: '#forecast',
+      theme: 'dark',
+      vp: { width: 390, height: 844 },
+      desc: 'Overlay Analisi Volo Menu Puntamento Espanso (Dark, Mobile)',
+      fullHeight: false,
+      beforeCapture: async () => {
+        await evalJs(`
+          (() => {
+            const expandBtn = document.querySelector('.gm-mini-map-expand-btn') || document.querySelector('[data-action="open-full-map"]');
+            if (expandBtn) expandBtn.click();
+          })()
+        `);
+        await new Promise((r) => setTimeout(r, 400));
+        await evalJs(`
+          (() => {
+            const aimBtn = document.querySelector('[data-action="toggle-aim-menu"]');
+            if (aimBtn) aimBtn.click();
+          })()
+        `);
+      },
+      afterCapture: async () => {
+        await evalJs(`
+          (() => {
+            const closeBtn = document.querySelector('.gm-flight-analysis-close-btn') || document.querySelector('[data-action="close-flight-analysis"]');
+            if (closeBtn) closeBtn.click();
+          })()
         `);
       }
     },
 
-    // 5. Spot Map
-    { name: '05_spot_map', route: '#map', theme: 'dark', vp: { width: 390, height: 844 }, desc: 'Mappa Comprensori (Dark Cockpit, Mobile)' },
-    { name: '05_spot_map', route: '#map', theme: 'light', vp: { width: 390, height: 844 }, desc: 'Mappa Comprensori (Sunlight Mode, Mobile)' },
-    { name: '05_spot_map', route: '#map', theme: 'dark', vp: { width: 1280, height: 800 }, desc: 'Mappa Comprensori (Dark Cockpit, Desktop)' },
+    // 5. Spot Map (Canvas Viewport)
+    { name: '05_spot_map', route: '#map', theme: 'dark', vp: { width: 390, height: 844 }, desc: 'Mappa Comprensori (Dark Cockpit, Mobile)', fullHeight: false },
+    { name: '05_spot_map', route: '#map', theme: 'light', vp: { width: 390, height: 844 }, desc: 'Mappa Comprensori (Sunlight Mode, Mobile)', fullHeight: false },
+    { name: '05_spot_map', route: '#map', theme: 'dark', vp: { width: 1280, height: 800 }, desc: 'Mappa Comprensori (Dark Cockpit, Desktop)', fullHeight: false },
 
-    // 6. Logbook: Elenco Voli
+    // 6. Logbook: Elenco Voli (Full Height Feed)
     { name: '06_logbook_flights', route: '#logbook', theme: 'dark', vp: { width: 390, height: 844 }, desc: 'Logbook Feed Voli (Dark, Mobile)' },
     { name: '06_logbook_flights', route: '#logbook', theme: 'light', vp: { width: 390, height: 844 }, desc: 'Logbook Feed Voli (Sunlight Mode, Mobile)' },
-    { name: '06_logbook_flights', route: '#logbook', theme: 'dark', vp: { width: 1280, height: 800 }, desc: 'Logbook Feed Voli (Dark, Desktop)' },
+    { name: '06_logbook_flights', route: '#logbook', theme: 'dark', vp: { width: 1280, height: 800 }, desc: 'Logbook Feed Voli (Dark Cockpit, Desktop)' },
 
-    // 7. Logbook: Statistiche & Pilot Currency
+    // 6-bis. Logbook Import Drawer Espanso
+    {
+      name: '06_logbook_import_drawer',
+      route: '#logbook',
+      theme: 'dark',
+      vp: { width: 390, height: 844 },
+      desc: 'Logbook Modal Importazione Volo IGC/JSON Espanso (Dark, Mobile)',
+      beforeCapture: async () => {
+        await evalJs(`
+          (() => {
+            const importBtn = document.querySelector('[data-action="open-import-drawer"], #btn-import-flight, .gm-logbook-import-cta');
+            if (importBtn) importBtn.click();
+          })()
+        `);
+      },
+      afterCapture: async () => {
+        await evalJs(`
+          (() => {
+            if (window.__GLIDEMIND__ && window.__GLIDEMIND__.sheetManager) {
+              window.__GLIDEMIND__.sheetManager.close();
+            } else {
+              const closeBtn = document.querySelector('.gm-sheet-close-btn');
+              if (closeBtn) closeBtn.click();
+            }
+          })()
+        `);
+      }
+    },
+
+    // 7. Logbook: Statistiche & Pilot Currency (Full Height)
     {
       name: '07_logbook_stats_currency',
       route: '#logbook',
@@ -270,13 +473,23 @@ try {
       desc: 'Logbook Statistiche & Currency (Dark, Mobile)',
       beforeCapture: async () => {
         await evalJs(`
-          const statsTab = document.querySelector('[data-tab="stats"]') || document.querySelector('.gm-logbook-tab-btn:nth-child(2)');
-          if (statsTab) statsTab.click();
+          (() => {
+            const statsTab = document.querySelector('[data-tab="stats"]') || document.querySelector('.gm-logbook-tab-btn:nth-child(2)');
+            if (statsTab) statsTab.click();
+          })()
+        `);
+      },
+      afterCapture: async () => {
+        await evalJs(`
+          (() => {
+            const flightsTab = document.querySelector('[data-tab="flights"]') || document.querySelector('.gm-logbook-tab-btn:first-child');
+            if (flightsTab) flightsTab.click();
+          })()
         `);
       }
     },
 
-    // 8. Flight Detail Sheet: Schermata Pieno Schermo
+    // 8. Flight Detail Sheet: Full-Height Immersive Debriefing
     {
       name: '08_flight_detail_sheet',
       route: '#logbook',
@@ -287,6 +500,16 @@ try {
         await evalJs(`
           if (window.__GLIDEMIND__ && window.__GLIDEMIND__.openFlightDetailSheet) {
             window.__GLIDEMIND__.openFlightDetailSheet('fl_cornizzolo_audit_12');
+          }
+        `);
+      },
+      afterCapture: async () => {
+        await evalJs(`
+          if (window.__GLIDEMIND__ && window.__GLIDEMIND__.closeFlightDetailSheet) {
+            window.__GLIDEMIND__.closeFlightDetailSheet();
+          } else {
+            const backBtn = document.querySelector('#btn-flight-detail-back');
+            if (backBtn) backBtn.click();
           }
         `);
       }
@@ -303,6 +526,16 @@ try {
             window.__GLIDEMIND__.openFlightDetailSheet('fl_cornizzolo_audit_12');
           }
         `);
+      },
+      afterCapture: async () => {
+        await evalJs(`
+          if (window.__GLIDEMIND__ && window.__GLIDEMIND__.closeFlightDetailSheet) {
+            window.__GLIDEMIND__.closeFlightDetailSheet();
+          } else {
+            const backBtn = document.querySelector('#btn-flight-detail-back');
+            if (backBtn) backBtn.click();
+          }
+        `);
       }
     },
 
@@ -315,23 +548,38 @@ try {
       desc: 'Setup Traccia & Calibrazione Quote (Dark, Mobile)',
       beforeCapture: async () => {
         await evalJs(`
+          if (window.__GLIDEMIND__ && window.__GLIDEMIND__.openFlightDetailSheet) {
+            window.__GLIDEMIND__.openFlightDetailSheet('fl_cornizzolo_audit_12');
+          }
+        `);
+        await new Promise((r) => setTimeout(r, 400));
+        await evalJs(`
           const setupBtn = document.querySelector('#btn-open-track-setup') || document.querySelector('[data-action="open-track-setup"]');
           if (setupBtn) setupBtn.click();
+        `);
+      },
+      afterCapture: async () => {
+        await evalJs(`
+          const backBtn = document.querySelector('#btn-track-setup-back');
+          if (backBtn) backBtn.click();
+          if (window.__GLIDEMIND__ && window.__GLIDEMIND__.closeFlightDetailSheet) {
+            window.__GLIDEMIND__.closeFlightDetailSheet();
+          }
         `);
       }
     },
 
-    // 10. Flight Replay 3D
-    { name: '10_flight_replay_3d', route: '#replay', theme: 'dark', vp: { width: 390, height: 844 }, desc: 'Replay Traiettoria 3D (Dark, Mobile)' },
-    { name: '10_flight_replay_3d', route: '#replay', theme: 'light', vp: { width: 390, height: 844 }, desc: 'Replay Traiettoria 3D (Sunlight Mode, Mobile)' },
-    { name: '10_flight_replay_3d', route: '#replay', theme: 'dark', vp: { width: 1280, height: 800 }, desc: 'Replay Traiettoria 3D (Dark, Desktop)' },
+    // 10. Flight Replay 3D (Full-screen WebGL Canvas)
+    { name: '10_flight_replay_3d', route: '#replay', theme: 'dark', vp: { width: 390, height: 844 }, desc: 'Replay Traiettoria 3D (Dark, Mobile)', fullHeight: false },
+    { name: '10_flight_replay_3d', route: '#replay', theme: 'light', vp: { width: 390, height: 844 }, desc: 'Replay Traiettoria 3D (Sunlight Mode, Mobile)', fullHeight: false },
+    { name: '10_flight_replay_3d', route: '#replay', theme: 'dark', vp: { width: 1280, height: 800 }, desc: 'Replay Traiettoria 3D (Dark, Desktop)', fullHeight: false },
 
-    // 11. Settings & Preferences
+    // 11. Settings & Preferences (Full Height)
     { name: '11_settings_view', route: '#settings', theme: 'dark', vp: { width: 390, height: 844 }, desc: 'Impostazioni & Vele (Dark, Mobile)' },
     { name: '11_settings_view', route: '#settings', theme: 'light', vp: { width: 390, height: 844 }, desc: 'Impostazioni & Vele (Sunlight Mode, Mobile)' }
   ];
 
-  console.log(`[Audit] Executing ${scenarios.length} capture scenarios...`);
+  console.log(`[Audit] Executing ${scenarios.length} capture scenarios with full-length scroll support...`);
 
   for (const scen of scenarios) {
     const isMobile = scen.vp.width < 768;
@@ -340,7 +588,7 @@ try {
     const targetFile = path.join(SCREENSHOT_DIR, filename);
     const artifactFile = path.join(ARTIFACT_DIR, filename);
 
-    // Set viewport
+    // Initial reset of device metrics
     await cdpSend('Emulation.setDeviceMetricsOverride', {
       width: scen.vp.width,
       height: scen.vp.height,
@@ -375,8 +623,41 @@ try {
       }
     }
 
-    // Wait for DOM settles
+    // Wait for DOM to settle and render
     await new Promise((r) => setTimeout(r, 600));
+
+    // Dynamic full-height adjustment for scrollable views
+    let captureHeight = scen.vp.height;
+    if (scen.fullHeight !== false && scen.route !== '#replay') {
+      const measured = await evalJs(`
+        (() => {
+          const detailOverlay = document.querySelector('.gm-flight-detail-scroll-body, .gm-track-setup-scroll-body');
+          const forecastScroll = document.querySelector('#forecast-scroll-container');
+          const mainView = document.querySelector('#main-view');
+          const homeContent = document.querySelector('.gm-home-view');
+          const logbookContent = document.querySelector('.gm-logbook-view');
+          const settingsContent = document.querySelector('.gm-settings-view');
+          const sheetContent = document.querySelector('.gm-sheet-content');
+
+          const scrollEl = detailOverlay || forecastScroll || homeContent || logbookContent || settingsContent || sheetContent || mainView;
+          const scrubber = document.querySelector('.gm-timeline-scrubber, .gm-forecast-timeline-wrapper');
+          const bottomBar = document.querySelector('#bottom-nav-bar, .gm-flight-detail-bottom-bar');
+          const extraH = (scrubber ? scrubber.offsetHeight : 0) + (bottomBar ? bottomBar.offsetHeight : 0) + 60;
+          const contentH = scrollEl ? Math.max(scrollEl.scrollHeight, scrollEl.offsetHeight) : document.body.scrollHeight;
+          return Math.max(contentH + extraH, document.documentElement.scrollHeight, 844);
+        })()
+      `);
+      if (measured && measured > scen.vp.height) {
+        captureHeight = Math.min(measured, 4000); // capped at 4000px safety floor
+        await cdpSend('Emulation.setDeviceMetricsOverride', {
+          width: scen.vp.width,
+          height: captureHeight,
+          deviceScaleFactor: 2,
+          mobile: isMobile
+        });
+        await new Promise((r) => setTimeout(r, 300));
+      }
+    }
 
     // Run DOM Heuristic Audit inside page
     const domAudit = await evalJs(`
@@ -471,18 +752,28 @@ try {
     });
 
     const buf = Buffer.from(shot.data, 'base64');
-    fs.writeFileSync(targetFile, buf);
-    fs.writeFileSync(artifactFile, buf);
+    safeWriteFileSync(targetFile, buf);
+    safeWriteFileSync(artifactFile, buf);
 
-    console.log(`[Screenshot] Saved ${filename} (${Math.round(buf.length / 1024)} KB, ${domAudit.pageHeight}px height)`);
+    console.log(`[Screenshot] Saved ${filename} (${Math.round(buf.length / 1024)} KB, ${captureHeight}px height)`);
 
     auditResults.push({
       scenario: scen.desc,
       file: filename,
       bytes: buf.length,
-      pageHeight: domAudit.pageHeight,
-      issues: domAudit.issues
+      pageHeight: captureHeight,
+      issues: domAudit ? domAudit.issues : []
     });
+
+    // Run afterCapture cleanup
+    if (typeof scen.afterCapture === 'function') {
+      try {
+        await scen.afterCapture();
+        await new Promise((r) => setTimeout(r, 200));
+      } catch (err) {
+        console.warn(`[Audit] afterCapture warning for ${filename}:`, err.message);
+      }
+    }
   }
 
   // Save audit data manifest

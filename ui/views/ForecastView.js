@@ -11,7 +11,7 @@
  * 4. Dual-State Informational Panels:
  *    - Wind & Compass: Synthetic 360° SVG or Expanded 08:00-20:00 temporal wind/gusts chart with vertical active-hour marker.
  *    - Atmospheric Soundings: Synthetic 4-tile grid or Expanded altimetric LCL/Ceiling curve chart with vertical active-hour marker.
- * 5. AI Flight Briefing (Guido Persona): Telegrafico, safety-first briefing with deterministic offline heuristic engine.
+ * 5. AI Flight Briefing: Telegrafico, safety-first briefing with deterministic offline heuristic engine.
  * 
  * Compliant with Laws of UX 2026 (touch floor >= 48px, zero trapped modals, zero text ellipsis on metrics).
  * ZERO DOM DEPENDENCIES for core calculations: 100% pure Node.js headless testable.
@@ -55,6 +55,7 @@ import {
   parseDateIso,
   formatShortDate
 } from '../../core/datePresets.js';
+import { calculateFlightWindows } from '../../core/flightWindows.js';
 
 /**
  * Normalizes an angle to [0, 360) range.
@@ -215,14 +216,14 @@ function escapeHtml(str) {
 }
 
 /**
- * Generates a safety-focused deterministic AI flight briefing (Guido persona).
+ * Generates a safety-focused deterministic AI flight briefing.
  * @param {object} spot Comprensorio object
  * @param {object} weatherData Open-Meteo weather payload
  * @param {string} dateStr YYYY-MM-DD
  * @param {object} [glider=DEFAULT_GLIDER] Active glider specifications
  * @returns {{ window: string, hazards: string, pilotLevel: string, summary: string }}
  */
-export function generateGuidoBriefing(spot, weatherData, dateStr, glider = DEFAULT_GLIDER) {
+export function generateFlightBriefing(spot, weatherData, dateStr, glider = DEFAULT_GLIDER) {
   if (!spot || !weatherData || !weatherData.hourly) {
     return {
       window: 'Dati meteo non disponibili',
@@ -304,9 +305,9 @@ export function generateGuidoBriefing(spot, weatherData, dateStr, glider = DEFAU
 
   const hazardsFormatted = hazards.map(h => `• ${h}`).join('\n');
   const summary = [
-    `Guido: "Oggi a ${spot.name}, la finestra migliore è ${windowText}.`,
+    `Oggi a ${spot.name}, la finestra migliore è ${windowText}.`,
     hazardsFormatted,
-    `Indicazione pilota: ${pilotLevel}"`
+    `Indicazione pilota: ${pilotLevel}`
   ].join('\n\n');
 
   return {
@@ -316,6 +317,8 @@ export function generateGuidoBriefing(spot, weatherData, dateStr, glider = DEFAU
     summary
   };
 }
+
+export const generateGuidoBriefing = generateFlightBriefing;
 
 /**
  * ForecastViewController
@@ -567,7 +570,7 @@ export class ForecastViewController {
 
     if (!forceRefresh && this.cachedWeatherMap.has(key)) {
       const existing = this.cachedWeatherMap.get(key);
-      if (existing && !existing._isSynthetic && !existing.isStale) {
+      if (existing && !existing._isSynthetic && !existing.isStale && existing.landingWeather) {
         this.networkStatus = 'live';
         this.updateLiveStatusBadgeInDom();
         return existing;
@@ -652,8 +655,39 @@ export class ForecastViewController {
    */
   getWeatherData(spot, dateStr) {
     const key = `${spot.id}_${dateStr}`;
+    const ensureLandingWeather = (weatherPayload) => {
+      if (!weatherPayload || weatherPayload.landingWeather) return weatherPayload;
+      const activeLandingId = (this.store ? this.store.getState()?.activeLandingId : this.activeLandingId) || spot.landings?.[0]?.id;
+      const landing = (spot.landings && spot.landings.find(l => l.id === activeLandingId)) || (spot.landings && spot.landings[0]) || null;
+      if (landing && landing.coordinates) {
+        const lCoords = parseCoordinates(landing.coordinates);
+        if (lCoords) {
+          const lCached = getCachedWeatherData(lCoords, dateStr, { weatherModel: 'best_match' });
+          if (lCached && !lCached.isStale) {
+            weatherPayload.landingWeather = lCached;
+            weatherPayload.points = [weatherPayload, lCached];
+          } else {
+            const landingSynthetic = generateSyntheticWeather(
+              lCoords,
+              {
+                targetDate: dateStr,
+                days: 1,
+                elevation: landing.altitude || 300,
+                weatherModel: 'best_match',
+                isLanding: true
+              }
+            );
+            const enrichedLanding = enrichWeatherData(landingSynthetic, dateStr, Date.now(), {});
+            weatherPayload.landingWeather = enrichedLanding;
+            weatherPayload.points = [weatherPayload, enrichedLanding];
+          }
+        }
+      }
+      return weatherPayload;
+    };
+
     if (this.cachedWeatherMap.has(key)) {
-      const data = this.cachedWeatherMap.get(key);
+      const data = ensureLandingWeather(this.cachedWeatherMap.get(key));
       if (data && !data._isSynthetic && !data.isStaleOfflineFallback && !this._networkFailed) {
         this.networkStatus = 'live';
       }
@@ -663,11 +697,12 @@ export class ForecastViewController {
     // Check store global weatherData if matching spot
     const state = this.store ? this.store.getState() : {};
     if (state.weatherData && state.selectedSpot && state.selectedSpot.id === spot.id) {
-      this.cachedWeatherMap.set(key, state.weatherData);
-      if (!state.weatherData._isSynthetic && !state.weatherData.isStaleOfflineFallback && !this._networkFailed) {
+      const data = ensureLandingWeather(state.weatherData);
+      this.cachedWeatherMap.set(key, data);
+      if (!data._isSynthetic && !data.isStaleOfflineFallback && !this._networkFailed) {
         this.networkStatus = 'live';
       }
-      return state.weatherData;
+      return data;
     }
 
     // Check defaultWeatherCache
@@ -678,11 +713,12 @@ export class ForecastViewController {
     const coords = parseCoordinates(takeoff.coordinates) || { lat: 45.833, lon: 9.302 };
     const cached = getCachedWeatherData(coords, dateStr, { weatherModel: 'best_match' });
     if (cached && !cached.isStale) {
-      this.cachedWeatherMap.set(key, cached);
-      if (!cached._isSynthetic && !cached.isStaleOfflineFallback && !this._networkFailed) {
+      const data = ensureLandingWeather(cached);
+      this.cachedWeatherMap.set(key, data);
+      if (!data._isSynthetic && !data.isStaleOfflineFallback && !this._networkFailed) {
         this.networkStatus = 'live';
       }
-      return cached;
+      return data;
     }
 
     // Generate deterministic synthetic day for immediate 0ms offline rendering
@@ -1105,8 +1141,8 @@ export class ForecastViewController {
       landingId: effectiveLandingId
     });
 
-    // Generate Guido safety briefing
-    const briefing = generateGuidoBriefing(spot, weatherData, this.activeDate, glider);
+    // Generate flight safety briefing
+    const briefing = generateFlightBriefing(spot, weatherData, this.activeDate, glider);
 
     return `
       <div id="forecast-view" class="gm-forecast-view flex flex-col h-full w-full">
@@ -1118,42 +1154,53 @@ export class ForecastViewController {
           <!-- 1. Header: Comprensorio Bar + Picker Trigger -->
           ${this.renderHeader(spot)}
 
-          <!-- 2. Spot Card: Dual Unico Binomio Overview Card -->
+          <!-- 2. Spot Card: Dual Unico Binomio Overview Card (Overview) OR Specific Spot Card (Sub-Spot) -->
           <div id="forecast-spot-card-container">
-            ${this.renderSummaryCard(evaluated)}
+            ${this.selectedSubSpot === 'overview'
+              ? this.renderSummaryCard(evaluated)
+              : this.renderSpecificSpotCard(activeSubSpotObj, evaluated)}
           </div>
 
-          <!-- Mode Toggle: Schede & Dettagli vs Solo Grafici (Trend) -->
-          <div class="gm-forecast-mode-bar flex items-center justify-between mt-1 mb-1">
-            <span class="text-xs font-semibold uppercase tracking-wider text-[var(--gm-text-muted)]">Aerologia</span>
-            <div class="gm-view-toggle" role="group" aria-label="Modalità di visualizzazione aerologia">
-              <button 
-                type="button" 
-                class="gm-view-toggle-btn ${this.forecastMode !== 'charts' ? 'active' : ''}"
-                data-action="set-forecast-mode"
-                data-mode="cards"
-                aria-pressed="${this.forecastMode !== 'charts'}"
-              >
-                Schede
-              </button>
-              <button 
-                type="button" 
-                class="gm-view-toggle-btn ${this.forecastMode === 'charts' ? 'active' : ''}"
-                data-action="set-forecast-mode"
-                data-mode="charts"
-                aria-pressed="${this.forecastMode === 'charts'}"
-              >
-                Solo Grafici
-              </button>
+          <!-- 2b. Flight Windows container (ONLY in Overview) -->
+          <div id="forecast-flight-windows-container">
+            ${this.selectedSubSpot === 'overview' ? this.renderFlightWindows(spot, weatherData, glider, activeSubSpotObj) : ''}
+          </div>
+
+          <!-- Mode Toggle & Parameter Cards / Solo Grafici (ONLY in Sub-Spot) -->
+          ${this.selectedSubSpot !== 'overview' ? `
+            <div class="gm-forecast-mode-bar flex items-center justify-between mt-1 mb-1">
+              <span class="text-xs font-semibold uppercase tracking-wider text-[var(--gm-text-muted)]">Aerologia ${activeSubSpotObj?.spotType === 'landing' ? 'Atterraggio' : 'Decollo'}</span>
+              <div class="gm-view-toggle" role="group" aria-label="Modalità di visualizzazione aerologia">
+                <button 
+                  type="button" 
+                  class="gm-view-toggle-btn ${this.forecastMode !== 'charts' ? 'active' : ''}"
+                  data-action="set-forecast-mode"
+                  data-mode="cards"
+                  aria-pressed="${this.forecastMode !== 'charts'}"
+                >
+                  Schede
+                </button>
+                <button 
+                  type="button" 
+                  class="gm-view-toggle-btn ${this.forecastMode === 'charts' ? 'active' : ''}"
+                  data-action="set-forecast-mode"
+                  data-mode="charts"
+                  aria-pressed="${this.forecastMode === 'charts'}"
+                >
+                  Solo Grafici
+                </button>
+              </div>
             </div>
-          </div>
 
-          <!-- 3. Parameter Cards or Multi-Trend Charts Container -->
-          <div id="forecast-params-container">
-            ${this.forecastMode === 'charts'
-              ? this.renderMultiTrendCharts(evaluated, weatherData, spot, glider, activeSubSpotObj)
-              : this.renderParameterCards(evaluated, weatherData, spot, glider, activeSubSpotObj)}
-          </div>
+            <!-- 3. Parameter Cards or Multi-Trend Charts Container -->
+            <div id="forecast-params-container">
+              ${this.forecastMode === 'charts'
+                ? this.renderMultiTrendCharts(evaluated, weatherData, spot, glider, activeSubSpotObj)
+                : this.renderParameterCards(evaluated, weatherData, spot, glider, activeSubSpotObj)}
+            </div>
+          ` : `
+            <div id="forecast-params-container" style="display:none;" aria-hidden="true"></div>
+          `}
 
           <!-- Hidden containers for wind and sounding panel tests compatibility -->
           <div id="forecast-wind-panel-container" style="display:none;" aria-hidden="true">
@@ -1163,7 +1210,7 @@ export class ForecastViewController {
             ${this.renderSoundingPanel(evaluated, weatherData, spot, activeSubSpotObj)}
           </div>
 
-          <!-- 5. AI Flight Briefing (Guido Persona) -->
+          <!-- 5. AI Flight Briefing -->
           ${this.renderBriefingCard(briefing, spot)}
         </div>
 
@@ -1680,8 +1727,10 @@ export class ForecastViewController {
    */
   renderSpecificSpotMetrics(subSpot, evalData) {
     if (!subSpot) return this.renderSummaryMetrics(evalData);
-    const weather = evalData.weatherSnapshot || {};
     const isTakeoff = subSpot.spotType === 'takeoff';
+    const weather = isTakeoff
+      ? (evalData.takeoffWeather || evalData.weatherSnapshot || {})
+      : (evalData.landingWeather || evalData.weatherSnapshot || {});
     const icon = isTakeoff ? '↗' : '↘';
 
     const windSpeedStr = weather.windSpeed != null ? `${Math.round(weather.windSpeed)} km/h` : '-';
@@ -1755,6 +1804,107 @@ export class ForecastViewController {
   }
 
   /**
+   * Renders the Daily Flight Windows (Evoluzione Giornaliera) section in ForecastView.
+   * Groups the daylight hours into 3-4 natural operational phases with launch & landing synthesis.
+   * 
+   * @param {object} spot
+   * @param {object} weatherData
+   * @param {object} glider
+   * @param {object|null} activeSubSpotObj
+   * @returns {string}
+   */
+  renderFlightWindows(spot, weatherData, glider, activeSubSpotObj) {
+    if (this.selectedSubSpot !== 'overview') return '';
+    if (!spot || !weatherData) return '';
+    const primaryTakeoffId = spot?.takeoffs?.find(t => t.isPrimary)?.id || spot?.takeoffs?.[0]?.id || null;
+    const forcedTakeoffId = (activeSubSpotObj && activeSubSpotObj.spotType === 'takeoff')
+      ? activeSubSpotObj.id
+      : (this.activeTakeoffId && this.activeTakeoffId !== primaryTakeoffId ? this.activeTakeoffId : null);
+    const forcedLandingId = (activeSubSpotObj && activeSubSpotObj.spotType === 'landing') ? activeSubSpotObj.id : null;
+
+    const windows = calculateFlightWindows({
+      comprensorio: spot,
+      weatherData,
+      targetDate: this.activeDate,
+      glider,
+      forcedTakeoffId,
+      forcedLandingId
+    });
+
+    if (!windows || windows.length === 0) return '';
+
+    const isForced = Boolean(forcedTakeoffId);
+    const forcedTakeoffObj = spot?.takeoffs?.find(t => t.id === forcedTakeoffId) || activeSubSpotObj;
+    const forcedTakeoffName = isForced ? (forcedTakeoffObj?.name || 'Decollo Selezionato') : null;
+
+    return `
+      <section aria-labelledby="heading-flight-windows" class="gm-flight-windows-section">
+        <div class="gm-flight-windows-header">
+          <div class="flex items-center gap-2">
+            <h2 id="heading-flight-windows" class="gm-flight-windows-title">Evoluzione Giornaliera</h2>
+            ${isForced ? `
+              <span class="gm-flight-windows-badge-forced" title="Decollo imposto manualmente">
+                Imposto: ${escapeHtml(forcedTakeoffName)}
+              </span>
+            ` : ''}
+          </div>
+          <span class="text-xs text-[var(--gm-text-muted)]">Fasce Orarie</span>
+        </div>
+        <div class="gm-flight-windows-list" role="listbox" aria-label="Finestre operative della giornata">
+          ${windows.map(win => {
+            const isActive = this.selectedHour >= win.startHour && this.selectedHour <= win.endHour;
+            const badgeClass = win.status === 'flyable'
+              ? 'gm-flight-window-badge-flyable'
+              : (win.status === 'caution' ? 'gm-flight-window-badge-caution' : 'gm-flight-window-badge-unflyable');
+            const badgeLabel = win.status === 'flyable'
+              ? 'Volabile'
+              : (win.status === 'caution' ? 'Cautela' : 'Non Volabile');
+
+            return `
+              <div 
+                class="gm-flight-window-card ${isActive ? 'active' : ''}"
+                data-action="select-window"
+                data-hour="${win.startHour}"
+                data-start-hour="${win.startHour}"
+                data-end-hour="${win.endHour}"
+                role="option"
+                tabindex="0"
+                aria-selected="${isActive ? 'true' : 'false'}"
+                aria-label="${escapeHtml(win.phaseName)}, ${escapeHtml(win.timeRange)}, ${badgeLabel}. ${escapeHtml(win.title)}."
+              >
+                <div class="gm-flight-window-card-top">
+                  <div class="gm-flight-window-time-row">
+                    <span class="gm-flight-window-time">${escapeHtml(win.timeRange)}</span>
+                    <span class="gm-flight-window-phase">· ${escapeHtml(win.phaseName)}</span>
+                  </div>
+                  <span class="gm-flight-window-badge ${badgeClass}">${badgeLabel}</span>
+                </div>
+                <div class="gm-flight-window-card-title">${escapeHtml(win.title)}</div>
+                <div class="gm-flight-window-card-desc">${escapeHtml(win.description)}</div>
+                ${win.takeoff ? `
+                  <div class="gm-flight-window-card-takeoff-tag">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="m8 3 4 8 5-5 5 15H2L8 3z"></path>
+                    </svg>
+                    <span>${escapeHtml(win.takeoff.name)}${win.landing ? ` → ${escapeHtml(win.landing.name)}` : ''}</span>
+                  </div>
+                ` : ''}
+                ${(win.hazards && win.hazards.length > 0) ? `
+                  <div class="gm-flight-window-hazards-row">
+                    ${win.hazards.map(h => `
+                      <span class="gm-flight-window-hazard-chip">${escapeHtml(h)}</span>
+                    `).join('')}
+                  </div>
+                ` : ''}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </section>
+    `;
+  }
+
+  /**
    * Computes analytical metrics, 4-state flyability indicators, and pilot advice
    * for the 7 primary paragliding parameters across the 08:00 - 20:00 diurnal window.
    * 
@@ -1774,9 +1924,14 @@ export class ForecastViewController {
       ? activeSubSpotObj
       : (evaluated.landing || (spot.landings && spot.landings[0]) || { altitude: 400, heading: null });
 
+    const isLanding = activeSubSpotObj && activeSubSpotObj.spotType === 'landing';
     const hasTakeoffHeading = typeof takeoff.heading === 'number' && !isNaN(takeoff.heading);
 
-    const hourlyData = (weatherData && weatherData.hourly) || {};
+    const landingWeatherSource = weatherData?.landingWeather || weatherData?.landing || weatherData?.points?.[1];
+    const sourceHourly = (isLanding && landingWeatherSource && landingWeatherSource.hourly)
+      ? landingWeatherSource.hourly
+      : ((weatherData && weatherData.hourly) || {});
+    const hourlyData = sourceHourly;
     const times = hourlyData.time || [];
 
     const baseDate = (times[0] && !times.some(t => t.startsWith(`${this.activeDate}T`)))
@@ -1836,8 +1991,11 @@ export class ForecastViewController {
       let landingGust = gust;
       let landingDir = dir;
 
-      const landingWeatherSource = weatherData?.landingWeather || weatherData?.landing || weatherData?.points?.[1];
-      if (landingWeatherSource && landingWeatherSource.hourly) {
+      if (isLanding) {
+        landingSpeed = speed;
+        landingGust = gust;
+        landingDir = dir;
+      } else if (landingWeatherSource && landingWeatherSource.hourly) {
         const lh = landingWeatherSource.hourly;
         const rawLSpeed = lh.windspeed_10m ?? lh.wind_speed_10m;
         if (rawLSpeed && rawLSpeed[idx] != null) landingSpeed = Number(rawLSpeed[idx]);
@@ -2355,8 +2513,167 @@ export class ForecastViewController {
       }
     };
 
+    if (isLanding) {
+      // 5 Landing Parameter Cards
+      let landingWindStatus = 'flyable';
+      let landingWindStatusLabel = 'Brezza Calma';
+      if (activePoint.speed <= 16 && activePoint.gust <= 22) {
+        landingWindStatus = 'flyable';
+        landingWindStatusLabel = 'Brezza Calma';
+      } else if (activePoint.speed <= 24 && activePoint.gust <= 30) {
+        landingWindStatus = 'caution';
+        landingWindStatusLabel = 'Brezza Sostenuta';
+      } else {
+        landingWindStatus = 'unflyable';
+        landingWindStatusLabel = 'Vento Forte Valle';
+      }
+
+      const landingWindParam = {
+        id: 'brezza-valle',
+        title: 'Brezza di Valle',
+        subtitle: 'Intensità e direzione del vento al suolo in atterraggio',
+        value: `${Math.round(activePoint.speed)} km/h · ${Math.round(activePoint.dir)}° ${getCardinalDirection(activePoint.dir)}`,
+        status: landingWindStatus,
+        statusLabel: landingWindStatusLabel,
+        details: [
+          { label: 'Velocità al Suolo', value: `${Math.round(activePoint.speed)} km/h` },
+          { label: 'Raffica al Suolo', value: `${Math.round(activePoint.gust)} km/h` },
+          { label: 'Direzione Brezza', value: `${Math.round(activePoint.dir)}° (${getCardinalDirection(activePoint.dir)})` },
+          { label: 'Quota Campo', value: `${landing.altitude} m slm` }
+        ],
+        advice: landingWindStatus === 'flyable'
+          ? 'Brezza di valle regolare allineata al campo. Condizioni ottimali per impostare il circuito standard controvento.'
+          : landingWindStatus === 'caution'
+          ? 'Brezza sostenuta in fondovalle. Mantenersi sopravento rispetto al campo durante lo smaltimento quota.'
+          : 'Vento in valle forte con rischio di scarrocciamento e rotori orografici a ridosso degli ostacoli.',
+        chartOptions: {
+          id: 'param-chart-landing-wind',
+          title: 'Brezza al Suolo',
+          unit: 'km/h',
+          minY: 0,
+          maxY: Math.max(30, Math.ceil(Math.max(...hourlyPoints.map(p => p.gust || p.speed), 0) * 1.2)),
+          thresholds: [
+            { value: 16, stroke: 'var(--gm-status-caution)', label: 'Limite Brezza (16)' },
+            { value: 24, stroke: 'var(--gm-status-unflyable)', label: 'Limite Massimo (24)' }
+          ],
+          series: [
+            {
+              name: 'Raffica Valle',
+              points: hourlyPoints.map(p => ({ hour: p.hour, value: p.gust })),
+              stroke: 'rgba(234, 179, 8, 0.7)',
+              strokeWidth: 1.5,
+              strokeDasharray: '3,3'
+            },
+            {
+              name: 'Brezza Media',
+              points: hourlyPoints.map(p => ({ hour: p.hour, value: p.speed })),
+              stroke: 'var(--gm-status-flyable)',
+              strokeWidth: 2.2,
+              fillArea: 'rgba(34, 197, 94, 0.12)'
+            }
+          ]
+        }
+      };
+
+      const landingGustParam = {
+        id: 'raffiche',
+        title: 'Raffiche & Delta al Suolo',
+        subtitle: 'Turbolenza meccanica e gradiente di vento vicino a terra',
+        value: `Raffica ${Math.round(activePoint.gust)} km/h (Delta +${Math.round(activePoint.deltaWind)} km/h)`,
+        status: gustStatus,
+        statusLabel: gustStatusLabel,
+        details: [
+          { label: 'Raffica Massima', value: `${Math.round(activePoint.gust)} km/h` },
+          { label: 'Delta Raffica', value: `+${Math.round(activePoint.deltaWind)} km/h` },
+          { label: 'Fattore Raffica', value: `${(activePoint.gust / Math.max(1, activePoint.speed)).toFixed(2)}x` },
+          { label: 'Stabilità al Suolo', value: activePoint.deltaWind <= 8 ? 'Laminare' : activePoint.deltaWind <= 14 ? 'Intermittente' : 'Rotorica' }
+        ],
+        advice: gustStatus === 'flyable'
+          ? 'Flusso laminare e prevedibile vicino al terreno. Raccordo e frenata senza turbolenze.'
+          : 'Presenza di raffiche al suolo. Mantenere velocità di trim ed evitare virate a bassa quota.',
+        chartOptions: {
+          id: 'param-chart-landing-gust',
+          title: 'Raffiche al Suolo',
+          unit: 'km/h',
+          minY: 0,
+          maxY: Math.max(30, Math.ceil(Math.max(...hourlyPoints.map(p => p.gust), 0) * 1.2)),
+          thresholds: [
+            { value: 20, stroke: 'var(--gm-status-caution)', label: 'Attenzione (20)' }
+          ],
+          series: [
+            {
+              name: 'Raffica',
+              points: hourlyPoints.map(p => ({ hour: p.hour, value: p.gust })),
+              stroke: 'var(--gm-status-caution)',
+              strokeWidth: 2.2,
+              fillArea: 'rgba(234, 179, 8, 0.15)'
+            }
+          ]
+        }
+      };
+
+      const landingConeParam = {
+        id: 'cono-planata',
+        title: 'Cono di Planata & Rientro',
+        subtitle: 'Efficienza richiesta per raggiungere il campo dai decolli',
+        value: `Efficienza 1:${reqGlide} · ${isLandingSafe ? 'Nel Cono di Sicurezza' : 'Fuori Cono (Critico)'}`,
+        status: isLandingSafe ? 'flyable' : 'unflyable',
+        statusLabel: isLandingSafe ? 'Nel Cono' : 'Fuori Cono',
+        details: [
+          { label: 'Efficienza Richiesta', value: `1:${reqGlide}` },
+          { label: 'Limite Ala con Margine', value: `1:${limitGlide}` },
+          { label: 'Dislivello dal Decollo', value: `${Math.max(0, takeoff.altitude - landing.altitude)} m` },
+          { label: 'Quota Campo', value: `${landing.altitude} m slm` }
+        ],
+        advice: isLandingSafe
+          ? 'Atterraggio comodamente raggiungibile in planata dritta senza necessità di sostentamento termico.'
+          : 'Efficienza richiesta superiore ai limiti di sicurezza dell\'ala. Rischio concreto di atterraggio fuori campo.',
+        chartOptions: landingParam.chartOptions
+      };
+
+      const landingTempParam = {
+        id: 'temperatura',
+        title: 'Temperatura & Aria al Suolo',
+        subtitle: 'Condizioni termodinamiche di fondovalle e densità dell\'aria',
+        value: `${activePoint.temp.toFixed(1)} °C · Umidità ${Math.round(activePoint.humidity)}%`,
+        status: 'flyable',
+        statusLabel: 'Ottimale',
+        details: [
+          { label: 'Temperatura Fondovalle', value: `${activePoint.temp.toFixed(1)} °C` },
+          { label: 'Punto di Rugiada', value: `${activePoint.dew.toFixed(1)} °C` },
+          { label: 'Umidità Relativa', value: `${Math.round(activePoint.humidity)}%` },
+          { label: 'Dislivello Termico', value: `Salto quota ~${Math.max(0, takeoff.altitude - landing.altitude)} m` }
+        ],
+        advice: 'Aria più calda e densa in fondovalle: risposta della vela progressiva e pronta durante la flare finale.',
+        chartOptions: {
+          id: 'param-chart-landing-temp',
+          title: 'Temperatura al Suolo',
+          unit: '°C',
+          minY: Math.floor(Math.min(...hourlyPoints.map(p => p.temp)) - 2),
+          maxY: Math.ceil(Math.max(...hourlyPoints.map(p => p.temp)) + 2),
+          series: [
+            {
+              name: 'Temperatura',
+              points: hourlyPoints.map(p => ({ hour: p.hour, value: p.temp })),
+              stroke: 'var(--gm-accent-sky, #0ea5e9)',
+              strokeWidth: 2.2,
+              fillArea: 'rgba(14, 165, 233, 0.12)'
+            }
+          ]
+        }
+      };
+
+      return {
+        params: [landingWindParam, landingGustParam, landingConeParam, cloudParam, landingTempParam],
+        hourlyPoints,
+        activePoint,
+        takeoff,
+        landing
+      };
+    }
+
     return {
-      params: [windParam, gustParam, lclParam, capeParam, edrParam, cloudParam, landingParam],
+      params: [windParam, gustParam, lclParam, capeParam, edrParam, cloudParam],
       hourlyPoints,
       activePoint,
       takeoff,
@@ -2689,12 +3006,154 @@ export class ForecastViewController {
    */
   renderMultiTrendCharts(evaluated, weatherData, spot, glider, activeSubSpotObj) {
     const { hourlyPoints, takeoff } = this.computeParamMetrics(evaluated, weatherData, spot, glider, activeSubSpotObj);
+    const isLanding = activeSubSpotObj && activeSubSpotObj.spotType === 'landing';
     const activePoint = hourlyPoints.find(p => p.hour === this.selectedHour) || hourlyPoints[0] || {};
     const activeSpeed = Math.round(activePoint.speed || 0);
     const activeGust = Math.round(activePoint.gust || activeSpeed);
     const activeDir = getCardinalDirection(activePoint.dir || 180);
 
-    const chartCards = [
+    const chartCards = isLanding ? [
+      {
+        id: 'multi-chart-wind',
+        label: 'Brezza Valle',
+        val: `${activeSpeed}`,
+        unit: 'km/h',
+        subHtml: `<span class="gm-trend-sub-badge"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="inline-block" aria-hidden="true"><path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/></svg> ${activeGust} <strong class="gm-trend-cardinal">${activeDir}</strong></span>`,
+        chartHtml: this.renderSvgTrendChart({
+          id: 'multi-landing-wind',
+          title: 'Brezza al Suolo',
+          unit: 'km/h',
+          minY: 0,
+          maxY: Math.max(30, Math.ceil(Math.max(...hourlyPoints.map(p => p.gust || p.speed), 0) * 1.2)),
+          compact: true,
+          hideTooltip: true,
+          hideThresholdLabels: true,
+          thresholds: [
+            { value: 16, stroke: 'var(--gm-status-caution)', strokeDasharray: '4,3' },
+            { value: 24, stroke: 'var(--gm-status-unflyable)', strokeDasharray: '4,3' }
+          ],
+          series: [
+            {
+              name: 'Raffica Valle',
+              points: hourlyPoints.map(p => ({ hour: p.hour, value: p.gust })),
+              stroke: 'rgba(234, 179, 8, 0.7)',
+              strokeWidth: 1.5,
+              strokeDasharray: '3,3'
+            },
+            {
+              name: 'Brezza Media',
+              points: hourlyPoints.map(p => ({ hour: p.hour, value: p.speed })),
+              stroke: 'var(--gm-status-flyable)',
+              strokeWidth: 2.2,
+              fillArea: 'rgba(34, 197, 94, 0.12)'
+            }
+          ]
+        })
+      },
+      {
+        id: 'multi-chart-landing',
+        label: 'Cono di Planata',
+        val: `1:${evaluated.glideMetrics ? evaluated.glideMetrics.requiredGlideRatio : 6.0}`,
+        unit: 'E',
+        subHtml: `<span class="gm-trend-sub-badge ${evaluated.glideMetrics?.isSafe ? 'status-flyable' : 'status-unflyable'}">${evaluated.glideMetrics?.isSafe ? 'Nel Cono' : 'Fuori Cono'}</span>`,
+        chartHtml: this.renderSvgTrendChart({
+          id: 'multi-landing',
+          title: 'Brezza',
+          unit: 'km/h',
+          minY: 0,
+          maxY: 35,
+          compact: true,
+          hideTooltip: true,
+          hideThresholdLabels: true,
+          thresholds: [
+            { value: 18, stroke: 'var(--gm-status-caution)', strokeDasharray: '4,3' }
+          ],
+          series: [{
+            name: 'Brezza Valle',
+            points: hourlyPoints.map(p => ({ hour: p.hour, value: p.landingSpeed })),
+            stroke: 'var(--gm-status-flyable)',
+            strokeWidth: 2.5,
+            fillArea: 'rgba(34, 197, 94, 0.18)'
+          }]
+        })
+      },
+      {
+        id: 'multi-chart-cloudcover',
+        label: 'Copertura',
+        val: `${Math.round(activePoint.cloudCover || 0)}`,
+        unit: '%',
+        subHtml: `<span class="gm-trend-sub-badge">${activePoint.cloudCover > 70 ? 'Nuvoloso' : activePoint.cloudCover > 25 ? 'Parziale' : 'Sereno'}</span>`,
+        chartHtml: this.renderSvgTrendChart({
+          id: 'multi-cloudcover',
+          title: 'Copertura',
+          unit: '%',
+          minY: 0,
+          maxY: 100,
+          compact: true,
+          hideTooltip: true,
+          hideThresholdLabels: true,
+          thresholds: [
+            { value: 80, stroke: 'var(--gm-status-caution)', strokeDasharray: '4,3' }
+          ],
+          series: [{
+            name: 'Copertura',
+            points: hourlyPoints.map(p => ({ hour: p.hour, value: p.cloudCover })),
+            stroke: 'var(--gm-text-secondary)',
+            strokeWidth: 2.5,
+            fillArea: 'rgba(148, 163, 184, 0.18)'
+          }]
+        })
+      },
+      {
+        id: 'multi-chart-precipitation',
+        label: 'Precipitazioni',
+        val: `${Math.round(activePoint.precipProb || 0)}`,
+        unit: '% prob.',
+        subHtml: (() => {
+          const curPrecip = activePoint.precip || 0;
+          const curProb = Math.round(activePoint.precipProb || 0);
+          if (curPrecip > 0.5) return `<span class="gm-trend-sub-badge status-unflyable">NO FLY: Pioggia (${curPrecip.toFixed(1)} mm/h)</span>`;
+          if (curPrecip >= 0.1) return `<span class="gm-trend-sub-badge status-caution">Pioviggine (${curPrecip.toFixed(1)} mm/h)</span>`;
+          if (curProb >= 50) return `<span class="gm-trend-sub-badge status-alert">${curProb}% prob. rovesci (${curPrecip.toFixed(1)} mm/h)</span>`;
+          if (curProb >= 25) return `<span class="gm-trend-sub-badge status-caution">${curProb}% prob. pioggia (${curPrecip.toFixed(1)} mm/h)</span>`;
+          if (curProb > 0) return `<span class="gm-trend-sub-badge status-flyable">${curProb}% prob. (${curPrecip.toFixed(1)} mm/h)</span>`;
+          return `<span class="gm-trend-sub-badge status-flyable">Assenti (0.0 mm/h)</span>`;
+        })(),
+        chartHtml: this.renderSvgTrendChart({
+          id: 'multi-precipitation',
+          title: 'Precipitazioni',
+          unit: '%',
+          minY: 0,
+          maxY: 100,
+          compact: true,
+          hideTooltip: true,
+          hideThresholdLabels: true,
+          thresholds: [
+            { value: 30, stroke: 'var(--gm-status-caution)', strokeDasharray: '4,3', label: '30%' },
+            { value: 60, stroke: 'var(--gm-status-unflyable)', strokeDasharray: '4,3', label: '60%' }
+          ],
+          series: [
+            ...(hourlyPoints.some(p => (p.precip || 0) > 0) ? [{
+              name: 'Accumulo Pioggia',
+              type: 'bar',
+              points: hourlyPoints.map(p => ({ hour: p.hour, value: p.precip || 0 })),
+              minY: 0,
+              maxY: Math.max(3, Math.ceil(Math.max(...hourlyPoints.map(p => p.precip || 0), 0) * 1.5)),
+              fill: 'var(--gm-accent-sky, #0ea5e9)',
+              opacity: 0.55
+            }] : []),
+            {
+              name: 'Probabilità Pioggia',
+              isPrimary: true,
+              points: hourlyPoints.map(p => ({ hour: p.hour, value: p.precipProb || 0 })),
+              stroke: 'var(--gm-accent-sky, #0ea5e9)',
+              strokeWidth: 2.4,
+              fillArea: 'rgba(14, 165, 233, 0.18)'
+            }
+          ]
+        })
+      }
+    ] : [
       {
         id: 'multi-chart-wind',
         label: 'Vento',
@@ -2850,33 +3309,6 @@ export class ForecastViewController {
               fillArea: 'rgba(14, 165, 233, 0.18)'
             }
           ]
-        })
-      },
-      {
-        id: 'multi-chart-landing',
-        label: 'Brezza Valle',
-        val: `${Math.round(activePoint.landingSpeed || 0)}`,
-        unit: 'km/h',
-        subHtml: `<span class="gm-trend-sub-badge ${activePoint.landingSpeed > 18 ? 'status-caution' : 'status-flyable'}">${activePoint.landingSpeed > 18 ? 'Sostenuta' : 'Regolare'}</span>`,
-        chartHtml: this.renderSvgTrendChart({
-          id: 'multi-landing',
-          title: 'Brezza',
-          unit: 'km/h',
-          minY: 0,
-          maxY: 35,
-          compact: true,
-          hideTooltip: true,
-          hideThresholdLabels: true,
-          thresholds: [
-            { value: 18, stroke: 'var(--gm-status-caution)', strokeDasharray: '4,3' }
-          ],
-          series: [{
-            name: 'Brezza Valle',
-            points: hourlyPoints.map(p => ({ hour: p.hour, value: p.landingSpeed })),
-            stroke: 'var(--gm-status-flyable)',
-            strokeWidth: 2.5,
-            fillArea: 'rgba(34, 197, 94, 0.18)'
-          }]
         })
       }
     ];
@@ -3419,12 +3851,12 @@ export class ForecastViewController {
   }
 
   /**
-   * Renders the AI Safety Briefing card (Guido Persona).
+   * Renders the AI Safety Briefing card.
    */
   renderBriefingCard(briefing, spot) {
     return `
       <section aria-labelledby="heading-briefing" class="gm-briefing-section">
-        <h2 id="heading-briefing" class="sr-only">Briefing Sicurezza Guido</h2>
+        <h2 id="heading-briefing" class="sr-only">Briefing di Sicurezza</h2>
 
         <article id="forecast-briefing-box" class="gm-briefing-card">
           <div class="gm-briefing-header">
@@ -3435,7 +3867,7 @@ export class ForecastViewController {
                 <line x1="12" y1="19" x2="12" y2="22"></line>
               </svg>
               <div>
-                <h3 class="gm-briefing-title">Briefing di Volo (Guido)</h3>
+                <h3 class="gm-briefing-title">Briefing di Volo</h3>
                 <span class="text-xs text-[var(--gm-text-muted)]">Istruttore FIVL • Analisi di Sicurezza</span>
               </div>
             </div>
@@ -4207,9 +4639,15 @@ export class ForecastViewController {
 
     // 3. Update Parameters or Multi-Trend container in place
     if (paramsContainer) {
-      paramsContainer.innerHTML = this.forecastMode === 'charts'
-        ? this.renderMultiTrendCharts(evaluated, weatherData, spot, glider, activeSubSpotObj)
-        : this.renderParameterCards(evaluated, weatherData, spot, glider, activeSubSpotObj);
+      if (this.selectedSubSpot === 'overview') {
+        paramsContainer.innerHTML = '';
+        if (paramsContainer.style) paramsContainer.style.display = 'none';
+      } else {
+        if (paramsContainer.style) paramsContainer.style.display = '';
+        paramsContainer.innerHTML = this.forecastMode === 'charts'
+          ? this.renderMultiTrendCharts(evaluated, weatherData, spot, glider, activeSubSpotObj)
+          : this.renderParameterCards(evaluated, weatherData, spot, glider, activeSubSpotObj);
+      }
     }
 
     // 4. Update Wind Panel container (if present in DOM)
@@ -4220,6 +4658,20 @@ export class ForecastViewController {
     // 5. Update Sounding Panel container (if present in DOM)
     if (soundingContainer) {
       soundingContainer.innerHTML = this.renderSoundingPanel(evaluated, weatherData, spot, activeSubSpotObj);
+    }
+
+    // 5b. Update Active state on Flight Window cards in place
+    if (this.containerEl && typeof this.containerEl.querySelectorAll === 'function') {
+      const windowCards = this.containerEl.querySelectorAll('.gm-flight-window-card');
+      if (windowCards && windowCards.length > 0) {
+        windowCards.forEach(card => {
+          const startH = parseInt(card.getAttribute('data-start-hour'), 10);
+          const endH = parseInt(card.getAttribute('data-end-hour'), 10);
+          const isActiveWindow = !isNaN(startH) && !isNaN(endH) && hour >= startH && hour <= endH;
+          card.classList.toggle('active', isActiveWindow);
+          card.setAttribute('aria-selected', isActiveWindow ? 'true' : 'false');
+        });
+      }
     }
 
     // 6. Update scrubber header labels in place if present
@@ -4539,6 +4991,15 @@ export class ForecastViewController {
       if (this.hasDraggedPointer) {
         return;
       }
+      const hourAttr = actionEl.getAttribute('data-hour');
+      if (hourAttr != null) {
+        const hour = parseInt(hourAttr, 10);
+        const daylight = this.getDaylightWindow();
+        if (!isNaN(hour) && hour >= daylight.sunriseHour && hour <= daylight.sunsetHour) {
+          this.setHour(hour);
+        }
+      }
+    } else if (action === 'select-window') {
       const hourAttr = actionEl.getAttribute('data-hour');
       if (hourAttr != null) {
         const hour = parseInt(hourAttr, 10);

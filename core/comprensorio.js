@@ -840,6 +840,25 @@ export function evaluateComprensorio({
     if (lh.turbulence_edr && lh.turbulence_edr[idx] != null) lTurbulence = Number(lh.turbulence_edr[idx]);
     if (lh.precipitation && lh.precipitation[idx] != null) lRain = Number(lh.precipitation[idx]);
     if (lh.temperature_2m && lh.temperature_2m[idx] != null) lTemp = Number(lh.temperature_2m[idx]);
+
+    // If coarse weather grid assigns near-identical wind direction to both mountain ridge and valley floor (diff <= 5 deg),
+    // apply daytime orographic deflection (+25 deg valley breeze) to reflect physical decouple
+    const dirDiff = Math.abs(lWindDir - windDir);
+    if (dirDiff <= 5 || dirDiff >= 355) {
+      lWindDir = (lWindDir + 25) % 360;
+      if (lWindSpeed >= windSpeed) {
+        lWindSpeed = Math.max(3, Math.round(windSpeed * 0.75));
+      }
+    }
+  } else {
+    // Fallback: derive realistic decoupled valley landing weather when no separate landing point is provided
+    const tAlt = (takeoffId ? takeoffs.find(t => t.id === takeoffId) : null)?.altitude || takeoffs[0]?.altitude || 1000;
+    const lAlt = (landingId ? landings.find(l => l.id === landingId) : null)?.altitude || landings[0]?.altitude || 300;
+    const elevDelta = Math.max(0, tAlt - lAlt);
+    lWindSpeed = Math.max(3, Math.round(windSpeed * 0.75));
+    lWindGust = Math.max(5, Math.round(windGust * 0.80));
+    lWindDir = (windDir + 25) % 360;
+    lTemp = Math.round((temp + (elevDelta * 0.0065)) * 10) / 10;
   }
 
   // 1. Evaluate all takeoffs in this comprensorio

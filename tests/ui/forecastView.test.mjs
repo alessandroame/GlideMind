@@ -197,7 +197,7 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.ok(html.includes('AGL'), 'Must display above-ground-level cloud base');
   });
 
-  it('should generate Guido safety flight briefing deterministically', () => {
+  it('should generate safety flight briefing deterministically', () => {
     const spot = DEFAULT_COMPRENSORI[0];
     const controller = new ForecastViewController();
     const weatherData = controller.getWeatherData(spot, '2026-10-09');
@@ -208,11 +208,13 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.ok(briefing.window, 'Must specify flight window');
     assert.ok(briefing.hazards, 'Must specify hazards list');
     assert.ok(briefing.pilotLevel, 'Must specify pilot level advice');
-    assert.ok(briefing.summary.includes('Guido:'), 'Summary must follow Guido persona');
+    assert.ok(briefing.summary.includes(spot.name), 'Summary must include spot name');
+    assert.ok(!briefing.summary.includes('Guido'), 'Summary must NOT include Guido unless citing his book');
 
     const html = controller.renderHtml();
     assert.ok(html.includes('id="forecast-briefing-box"'), 'HTML must render briefing box');
-    assert.ok(html.includes('Briefing di Volo (Guido)'), 'HTML must display briefing header');
+    assert.ok(html.includes('Briefing di Volo'), 'HTML must display briefing header');
+    assert.ok(!html.includes('Briefing di Volo (Guido)'), 'HTML must NOT display Guido in briefing header');
   });
 
   it('should switch spot and synchronize with store when picking spot in sheet', () => {
@@ -750,24 +752,37 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.equal(controller._resolveInitialHour('2028-06-15'), 13, 'Future date must default to 13:00 soaring hour');
   });
 
-  it('should render all 7 parameter cards at-a-glance with 4-state indicator scale', () => {
+  it('should preserve clean macro overview without parameter cards clutter or mode bar in overview mode', () => {
     const mockStore = createStore({ selectedSpot: DEFAULT_COMPRENSORI[0] });
     const controller = new ForecastViewController({ store: mockStore });
     const html = controller.renderHtml();
 
+    // In Overview: mode bar and parameter cards must NOT be displayed
+    assert.ok(!html.includes('gm-forecast-mode-bar'), 'Must NOT render mode toggle bar in overview');
+    assert.ok(!html.includes('id="param-card-vento-decollo"'), 'Must NOT render parameter cards in overview');
+    assert.ok(html.includes('id="forecast-summary-card"'), 'Must render summary card in overview');
+    assert.ok(html.includes('id="forecast-flight-windows-container"'), 'Must render flight windows in overview');
+  });
+
+  it('should render takeoff parameter cards when a takeoff sub-spot is selected', () => {
+    const mockStore = createStore({ selectedSpot: DEFAULT_COMPRENSORI[0] });
+    const controller = new ForecastViewController({ store: mockStore });
+    controller.selectedSubSpot = DEFAULT_COMPRENSORI[0].takeoffs[0].id;
+    const html = controller.renderHtml();
+
     // Verify mode toggle bar
-    assert.ok(html.includes('gm-forecast-mode-bar'), 'Must render mode toggle bar');
+    assert.ok(html.includes('gm-forecast-mode-bar'), 'Must render mode toggle bar in sub-spot');
     assert.ok(html.includes('data-mode="cards"'), 'Must provide Schede mode button');
     assert.ok(html.includes('data-mode="charts"'), 'Must provide Solo Grafici button');
 
-    // Verify all 7 parameter cards
+    // Verify 6 takeoff parameter cards
     assert.ok(html.includes('id="param-card-vento-decollo"'), 'Must render Vento in Decollo card');
     assert.ok(html.includes('id="param-card-raffiche"'), 'Must render Raffiche & Delta Vento card');
     assert.ok(html.includes('id="param-card-base-cumulo"'), 'Must render Base Cumulo (LCL) card');
     assert.ok(html.includes('id="param-card-instabilita"'), 'Must render Instabilità / Temporali (CAPE) card');
     assert.ok(html.includes('id="param-card-turbolenza"'), 'Must render Turbolenza in Termica (EDR) card');
     assert.ok(html.includes('id="param-card-copertura"'), 'Must render Copertura Nuvolosa & Insolazione card');
-    assert.ok(html.includes('id="param-card-atterraggio"'), 'Must render Condizioni in Atterraggio card');
+    assert.ok(!html.includes('id="param-card-atterraggio"'), 'Must not render redundant landing card in takeoff sub-spot');
 
     // Verify 4-state indicator dots and badges
     assert.ok(html.includes('gm-param-status-dot'), 'Must render status dots');
@@ -779,9 +794,27 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.ok(!html.includes('id="param-body-vento-decollo"'), 'Vento card must start collapsed');
   });
 
+  it('should render landing parameter cards with valley breeze and zero takeoff confusion when a landing sub-spot is selected', () => {
+    const mockStore = createStore({ selectedSpot: DEFAULT_COMPRENSORI[0] });
+    const controller = new ForecastViewController({ store: mockStore });
+    controller.selectedSubSpot = DEFAULT_COMPRENSORI[0].landings[0].id;
+    const html = controller.renderHtml();
+
+    assert.ok(html.includes('gm-forecast-mode-bar'), 'Must render mode toggle bar for landing');
+    assert.ok(html.includes('Aerologia Atterraggio'), 'Must indicate landing aerology');
+    assert.ok(html.includes('id="param-card-brezza-valle"'), 'Must render Brezza di Valle card');
+    assert.ok(html.includes('id="param-card-raffiche"'), 'Must render Raffiche al Suolo card');
+    assert.ok(html.includes('id="param-card-cono-planata"'), 'Must render Cono di Planata card');
+    assert.ok(html.includes('id="param-card-copertura"'), 'Must render Copertura card');
+    assert.ok(html.includes('id="param-card-temperatura"'), 'Must render Temperatura al Suolo card');
+    assert.ok(!html.includes('id="param-card-vento-decollo"'), 'Must NOT render Vento in Decollo card for landing');
+    assert.ok(!html.includes('id="param-card-base-cumulo"'), 'Must NOT render Base Cumulo card for landing');
+  });
+
   it('should render analytical details, pilot advice and trend chart inside expanded parameter card', () => {
     const mockStore = createStore({ selectedSpot: DEFAULT_COMPRENSORI[0] });
     const controller = new ForecastViewController({ store: mockStore });
+    controller.selectedSubSpot = DEFAULT_COMPRENSORI[0].takeoffs[0].id;
     controller.expandedCardId = 'vento-decollo';
     const html = controller.renderHtml();
 
@@ -795,6 +828,7 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
   it('should toggle expandedCardId and accordion body on toggle-param-card action', () => {
     const mockStore = createStore({ selectedSpot: DEFAULT_COMPRENSORI[0] });
     const controller = new ForecastViewController({ store: mockStore });
+    controller.selectedSubSpot = DEFAULT_COMPRENSORI[0].takeoffs[0].id;
 
     assert.equal(controller.expandedCardId, null, 'Must start with all parameter accordion cards collapsed');
 
@@ -820,6 +854,7 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
   it('should update #forecast-params-container in place and preserve scroll position when toggling param card', () => {
     const mockStore = createStore({ selectedSpot: DEFAULT_COMPRENSORI[0] });
     const controller = new ForecastViewController({ store: mockStore });
+    controller.selectedSubSpot = DEFAULT_COMPRENSORI[0].takeoffs[0].id;
 
     let paramsHtml = '';
     const mockScrollContainer = {
@@ -920,6 +955,7 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
   it('should switch between Schede and Solo Grafici mode and render multi-trend charts stack', () => {
     const mockStore = createStore({ selectedSpot: DEFAULT_COMPRENSORI[0] });
     const controller = new ForecastViewController({ store: mockStore });
+    controller.selectedSubSpot = DEFAULT_COMPRENSORI[0].takeoffs[0].id;
 
     assert.equal(controller.forecastMode, 'cards');
 
@@ -938,7 +974,7 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.equal(controller.forecastMode, 'charts', 'Must switch to charts mode');
 
     const html = controller.renderHtml();
-    assert.ok(html.includes('>Aerologia</span>'), 'Must render Aerologia section heading');
+    assert.ok(html.includes('Aerologia Decollo'), 'Must render Aerologia Decollo section heading');
     assert.ok(!html.includes('Parametri di Volo'), 'Must not render legacy Parametri di Volo heading');
     assert.ok(html.includes('gm-multi-charts-container'), 'Must render multi-charts container in Solo Grafici mode');
     assert.ok(html.includes('id="multi-chart-wind"'), 'Must render wind trend card');
@@ -947,12 +983,13 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.ok(html.includes('id="multi-chart-turbulence"'), 'Must render turbulence trend card');
     assert.ok(html.includes('id="multi-chart-cloudcover"'), 'Must render cloud cover trend card');
     assert.ok(html.includes('id="multi-chart-precipitation"'), 'Must render precipitation trend card');
-    assert.ok(html.includes('id="multi-chart-landing"'), 'Must render landing trend card');
+    assert.ok(!html.includes('id="multi-chart-landing"'), 'Must not render landing trend card when takeoff selected');
   });
 
   it('should update #forecast-params-container in place when setHour is called', () => {
     const mockStore = createStore({ selectedSpot: DEFAULT_COMPRENSORI[0] });
     const controller = new ForecastViewController({ store: mockStore });
+    controller.selectedSubSpot = DEFAULT_COMPRENSORI[0].takeoffs[0].id;
 
     let paramsHtml = '';
     const mockSpotCard = { innerHTML: '' };
@@ -2187,7 +2224,7 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.equal(mockStore.getState().activeTakeoffId, 'grappa-panettone');
 
     let html = controller.renderHtml();
-    assert.ok(html.includes('id="forecast-summary-card"'));
+    assert.ok(html.includes('id="forecast-summary-card"') || html.includes('id="forecast-specific-spot-card"'));
     assert.ok(html.includes('Panettone'));
     assert.ok(html.includes('1550m'));
 
@@ -2214,7 +2251,7 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.equal(mockStore.getState().activeLandingId, 'semonzo-garden');
 
     html = controller.renderHtml();
-    assert.ok(html.includes('id="forecast-summary-card"'));
+    assert.ok(html.includes('id="forecast-summary-card"') || html.includes('id="forecast-specific-spot-card"'));
     assert.ok(html.includes('Garden Relais'));
     assert.ok(html.includes('190m'));
   });
@@ -2439,6 +2476,7 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     it('renders clean 2-column side-by-side cards with dedicated left metric panel and uncluttered SVG in Solo Grafici mode', () => {
       const mockStore = createStore({ selectedSpot: DEFAULT_COMPRENSORI[0] });
       const controller = new ForecastViewController({ store: mockStore });
+      controller.selectedSubSpot = DEFAULT_COMPRENSORI[0].takeoffs[0].id;
       controller.forecastMode = 'charts';
 
       const html = controller.renderHtml();
@@ -2722,6 +2760,107 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
       assert.ok(svg.includes('var(--gm-status-caution, #f59e0b)'), 'Must style 39% cell with caution color');
       assert.ok(svg.includes('var(--gm-status-unflyable, #ef4444)'), 'Must style 75% cell with unflyable alert color');
       assert.ok(svg.includes('stroke="var(--gm-accent)" stroke-width="1.6"'), 'Must highlight active hour cell');
+    });
+  });
+
+  describe('Daily Flight Windows (Evoluzione Giornaliera) UI Integration', () => {
+    it('should render flight windows container and cards in overview mode', () => {
+      const mockStore = createStore({
+        selectedSpot: DEFAULT_COMPRENSORI[0] // Monte Cornizzolo
+      });
+      const controller = new ForecastViewController({ store: mockStore });
+      controller.selectedHour = 12;
+
+      const html = controller.renderHtml();
+
+      assert.ok(html.includes('id="forecast-flight-windows-container"'), 'Must have #forecast-flight-windows-container');
+      assert.ok(html.includes('gm-flight-windows-section'), 'Must contain .gm-flight-windows-section');
+      assert.ok(html.includes('Evoluzione Giornaliera'), 'Must render section title Evoluzione Giornaliera');
+      assert.ok(html.includes('data-action="select-window"'), 'Must have clickable window card targets');
+      assert.ok(html.includes('gm-flight-window-card'), 'Must render flight window cards');
+
+      // The active card should correspond to selectedHour = 12
+      assert.ok(html.includes('gm-flight-window-card active'), 'Window covering 12:00 must have active class');
+    });
+
+    it('should display forced takeoff badge when a specific takeoff is selected in overview mode', () => {
+      const spot = DEFAULT_COMPRENSORI[0];
+      const specificTakeoff = spot.takeoffs[1]; // Decollo Centrale
+      const mockStore = createStore({
+        selectedSpot: spot,
+        activeTakeoffId: specificTakeoff.id
+      });
+      const controller = new ForecastViewController({ store: mockStore });
+      controller.selectedSubSpot = 'overview';
+
+      const html = controller.renderHtml();
+
+      assert.ok(html.includes('gm-flight-windows-badge-forced'), 'Must render forced takeoff badge');
+      assert.ok(html.includes('Imposto:'), 'Must show Imposto: text in badge');
+      assert.ok(html.includes(specificTakeoff.name), 'Must display forced takeoff name');
+    });
+
+    it('should NOT render flight windows when a specific sub-spot is selected', () => {
+      const spot = DEFAULT_COMPRENSORI[0];
+      const specificTakeoff = spot.takeoffs[1];
+      const mockStore = createStore({
+        selectedSpot: spot,
+        activeTakeoffId: specificTakeoff.id
+      });
+      const controller = new ForecastViewController({ store: mockStore });
+      controller.selectedSubSpot = specificTakeoff.id;
+
+      const html = controller.renderHtml();
+
+      assert.ok(!html.includes('gm-flight-windows-section'), 'Must NOT render flight windows when not in overview');
+      assert.ok(!html.includes('Evoluzione Giornaliera'), 'Must NOT render Evoluzione Giornaliera title');
+    });
+  });
+
+  describe('Mini-Map Dual Windsock Decoupled Directions', () => {
+    it('should pass distinct wind directions for takeoff and landing to miniMapEngine both at init and during hourly scrubbing', () => {
+      const spot = DEFAULT_COMPRENSORI[0];
+      const mockStore = createStore({ selectedSpot: spot });
+      const controller = new ForecastViewController({ store: mockStore });
+
+      const mockMiniMapEl = { innerHTML: '', style: {} };
+      const mockMetricsContainer = { innerHTML: '' };
+      const mockParamsContainer = { innerHTML: '' };
+      const mockContainer = {
+        innerHTML: '',
+        addEventListener() {},
+        removeEventListener() {},
+        querySelector(sel) {
+          if (sel === '#forecast-mini-map') return mockMiniMapEl;
+          if (sel === '#forecast-spot-metrics-container') return mockMetricsContainer;
+          if (sel === '#forecast-params-container') return mockParamsContainer;
+          return null;
+        },
+        querySelectorAll() { return []; }
+      };
+
+      controller.mount(mockContainer);
+
+      assert.ok(controller.miniMapEngine, 'miniMapEngine must be initialized');
+      assert.ok(controller.miniMapEngine.takeoffWeather, 'Must supply takeoffWeather');
+      assert.ok(controller.miniMapEngine.landingWeather, 'Must supply landingWeather');
+      assert.notEqual(
+        controller.miniMapEngine.takeoffWeather.windDirection,
+        controller.miniMapEngine.landingWeather.windDirection,
+        'Takeoff and landing wind directions must not be identical at init'
+      );
+
+      // Now trigger scrubbing via setHour
+      controller.setHour(14);
+
+      assert.ok(controller.miniMapEngine.lastWindsockUpdate, 'updateWindsockMarker must be called on scrubbing');
+      assert.notEqual(
+        controller.miniMapEngine.lastWindsockUpdate.takeoffWeather.windDirection,
+        controller.miniMapEngine.lastWindsockUpdate.landingWeather.windDirection,
+        'Takeoff and landing wind directions must remain decoupled during scrubbing'
+      );
+
+      controller.unmount();
     });
   });
 });

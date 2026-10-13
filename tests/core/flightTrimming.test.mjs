@@ -156,6 +156,12 @@ describe('Flight Track Trimming & Milestone Events Engine', () => {
     for (let i = 1; i < events.length; i++) {
       assert.ok(events[i].progress >= events[i - 1].progress);
     }
+
+    // Verify novice pilot friendly short labels (no cryptic acronyms D#, T#, Max Q)
+    assert.ok(
+      !events.some(e => e.shortLabel === 'Max Q' || e.shortLabel.startsWith('D#') || e.shortLabel.startsWith('T#')),
+      'Flight events must use human-readable labels instead of cryptic acronyms (Novice Pilot Spec)'
+    );
   });
 
   it('LogbookManager should integrate trimFlightTrack and resetFlightTrim', async () => {

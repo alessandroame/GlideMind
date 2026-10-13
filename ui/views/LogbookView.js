@@ -398,7 +398,6 @@ export class LogbookViewController {
           class="gm-btn gm-btn-ghost text-xs"
           data-action="dismiss-storage-warning"
           aria-label="Ignora promemoria archiviazione"
-          style="min-height: 36px; padding: 4px 8px; flex-shrink: 0;"
         >
           OK
         </button>
@@ -426,7 +425,6 @@ export class LogbookViewController {
           class="gm-btn gm-btn-primary text-xs"
           data-action="undo-delete"
           aria-label="Annulla eliminazione volo"
-          style="min-height: 36px; padding: 4px 12px;"
         >
           Annulla
         </button>
@@ -451,7 +449,6 @@ export class LogbookViewController {
           class="gm-btn gm-btn-ghost text-xs"
           data-action="dismiss-import-summary"
           aria-label="Chiudi notifica importazione"
-          style="min-height: 36px; padding: 4px 10px; flex-shrink: 0;"
         >
           OK
         </button>

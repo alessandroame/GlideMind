@@ -816,6 +816,12 @@ class LogbookManager {
    */
   async saveFlight(meta, raw) {
     await this.init();
+    if (meta && (!meta.sparklineSvgPoints || typeof meta.sparklineSvgPoints !== 'string')) {
+      const pts = raw?.decimatedPoints || raw?.flightPoints || raw?.trackPoints || raw?.originalPoints;
+      if (Array.isArray(pts) && pts.length >= 2) {
+        meta.sparklineSvgPoints = generateSparklinePoints(pts, 60, 100, 32);
+      }
+    }
     const id = await this.adapter.saveFlight(meta, raw);
     const allMetas = await this.adapter.getAllFlightMetas();
     if (store && typeof store.setState === 'function') {

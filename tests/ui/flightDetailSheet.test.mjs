@@ -272,7 +272,8 @@ describe('FlightDetailSheet - Telemetry Analysis & Educational Debriefing (UI La
 
       // Debriefing Box & Callouts
       assert.ok(html.includes('Debriefing Didattico di Sicurezza'));
-      assert.ok(html.includes('Istruttore Guido'));
+      assert.ok(html.includes('Istruttore'));
+      assert.ok(!html.includes('Istruttore Guido'), 'Must not include Guido in debriefing tag');
       assert.ok(html.includes('class="gm-debrief-callout"'), 'Debriefing must be formatted into chunked callout cards');
 
       // Personal Notes
