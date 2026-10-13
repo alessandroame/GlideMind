@@ -578,7 +578,16 @@ export class ForecastViewController {
     this.updateLiveStatusBadgeInDom();
 
     const takeoff = this.resolveActiveTakeoff(spot) || (spot.takeoffs && spot.takeoffs[0]) || { altitude: 1000, heading: null };
-    const coords = parseCoordinates(takeoff.coordinates) || { lat: 45.833, lon: 9.302 };
+    const landing = this.resolveActiveLanding(spot) || (spot.landings && spot.landings[0]) || null;
+    const tCoords = parseCoordinates(takeoff.coordinates) || { lat: 45.833, lon: 9.302 };
+    const lCoords = landing ? parseCoordinates(landing.coordinates) : null;
+
+    const coords = (lCoords && (lCoords.lat !== tCoords.lat || lCoords.lon !== tCoords.lon))
+      ? [
+          { lat: tCoords.lat, lon: tCoords.lon, elev: takeoff.altitude || 1000, role: 'takeoff' },
+          { lat: lCoords.lat, lon: lCoords.lon, elev: landing.altitude || 300, role: 'landing' }
+        ]
+      : { lat: tCoords.lat, lon: tCoords.lon, elev: takeoff.altitude || 1000 };
 
     const fetchPromise = (async () => {
       try {
@@ -694,6 +703,30 @@ export class ForecastViewController {
     const enriched = enrichWeatherData(synthetic, dateStr, Date.now(), {
       customHeading: takeoffHeading
     });
+
+    const activeLandingId = this.store ? this.store.getState()?.activeLandingId : this.activeLandingId;
+    const landing = (spot.landings && spot.landings.find(l => l.id === activeLandingId))
+      || (spot.landings && spot.landings[0])
+      || null;
+
+    if (landing && landing.coordinates) {
+      const lCoords = parseCoordinates(landing.coordinates);
+      if (lCoords) {
+        const landingSynthetic = generateSyntheticWeather(
+          lCoords,
+          {
+            targetDate: dateStr,
+            days: 1,
+            elevation: landing.altitude || 300,
+            weatherModel: 'best_match',
+            isLanding: true
+          }
+        );
+        const enrichedLanding = enrichWeatherData(landingSynthetic, dateStr, Date.now(), {});
+        enriched.landingWeather = enrichedLanding;
+        enriched.points = [enriched, enrichedLanding];
+      }
+    }
 
     this.cachedWeatherMap.set(key, enriched);
     return enriched;
@@ -1028,6 +1061,8 @@ export class ForecastViewController {
         subSpotType,
         activeSubSpot: activeSub,
         weatherSnapshot: evaluated.weatherSnapshot,
+        takeoffWeather: evaluated.takeoffWeather || evaluated.weatherSnapshot,
+        landingWeather: evaluated.landingWeather || evaluated.weatherSnapshot,
         glideMetrics: evaluated.glideMetrics,
         onSelectSubSpot: (subSpotId) => {
           const s = this.getCurrentSpot();
@@ -1575,6 +1610,31 @@ export class ForecastViewController {
         >
           ${renderLayerToggleIcon(activeLayer, 20)}
         </button>
+        <div class="gm-mini-map-zoom-controls" role="group" aria-label="Controlli zoom mappa">
+          <button 
+            type="button" 
+            class="gm-mini-map-zoom-btn gm-mini-map-zoom-in" 
+            data-action="minimap-zoom-in" 
+            aria-label="Ingrandisci mappa" 
+            title="Ingrandisci mappa"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+          </button>
+          <button 
+            type="button" 
+            class="gm-mini-map-zoom-btn gm-mini-map-zoom-out" 
+            data-action="minimap-zoom-out" 
+            aria-label="Rimpicciolisci mappa" 
+            title="Rimpicciolisci mappa"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+          </button>
+        </div>
         <button 
           type="button" 
           class="gm-mini-map-expand-btn" 
@@ -1772,7 +1832,20 @@ export class ForecastViewController {
         : null;
       const updraft = Math.max(0.5, Math.min(5.0, (temp - dew) * 0.22 + (cape > 300 ? (cape / 400) : 0)));
       const edr = Math.max(0.8, Math.min(4.5, deltaWind * 0.15 + (updraft > 2.5 ? 1.0 : 0.4)));
-      const landingSpeed = Math.max(4, Math.round(speed * 0.75));
+      let landingSpeed = Math.max(4, Math.round(speed * 0.75));
+      let landingGust = gust;
+      let landingDir = dir;
+
+      const landingWeatherSource = weatherData?.landingWeather || weatherData?.landing || weatherData?.points?.[1];
+      if (landingWeatherSource && landingWeatherSource.hourly) {
+        const lh = landingWeatherSource.hourly;
+        const rawLSpeed = lh.windspeed_10m ?? lh.wind_speed_10m;
+        if (rawLSpeed && rawLSpeed[idx] != null) landingSpeed = Number(rawLSpeed[idx]);
+        const rawLGust = lh.windgusts_10m ?? lh.wind_gusts_10m;
+        if (rawLGust && rawLGust[idx] != null) landingGust = Number(rawLGust[idx]);
+        const rawLDir = lh.winddirection_10m ?? lh.wind_direction_10m;
+        if (rawLDir && rawLDir[idx] != null) landingDir = Number(rawLDir[idx]);
+      }
 
       hourlyPoints.push({
         hour: h,
@@ -1791,7 +1864,9 @@ export class ForecastViewController {
         angleDelta,
         updraft,
         edr,
-        landingSpeed
+        landingSpeed,
+        landingGust,
+        landingDir
       });
     }
 
@@ -4119,10 +4194,14 @@ export class ForecastViewController {
         : this.renderSpecificSpotCard(activeSubSpotObj, evaluated);
     }
 
-    // 2b. Reactively update Windsock Marker and Glide Line in mini-map without touching DOM
+    // 2b. Reactively update Windsock Markers (Takeoff + Landing) and Glide Line in mini-map without touching DOM
     if (this.miniMapEngine) {
       const currentTakeoff = activeSubSpotObj?.spotType === 'takeoff' ? activeSubSpotObj : evaluated.takeoff;
-      this.miniMapEngine.updateWindsockMarker(evaluated.weatherSnapshot, this.selectedSubSpot === 'landing', currentTakeoff);
+      this.miniMapEngine.updateWindsockMarker(
+        evaluated.takeoffWeather || evaluated.weatherSnapshot,
+        evaluated.landingWeather || evaluated.weatherSnapshot,
+        currentTakeoff
+      );
       this.miniMapEngine.updateGlideLine(evaluated.glideMetrics);
     }
 
@@ -4477,6 +4556,22 @@ export class ForecastViewController {
       const daylight = this.getDaylightWindow();
       if (this.selectedHour < daylight.sunsetHour) {
         this.setHour(this.selectedHour + 1);
+      }
+    } else if (action === 'minimap-zoom-in') {
+      if (this.miniMapEngine && typeof this.miniMapEngine.zoomIn === 'function') {
+        this.miniMapEngine.zoomIn();
+      }
+    } else if (action === 'minimap-zoom-out') {
+      if (this.miniMapEngine && typeof this.miniMapEngine.zoomOut === 'function') {
+        this.miniMapEngine.zoomOut();
+      }
+    } else if (action === 'flight-analysis-zoom-in') {
+      if (this.flightAnalysisMapEngine && typeof this.flightAnalysisMapEngine.zoomIn === 'function') {
+        this.flightAnalysisMapEngine.zoomIn();
+      }
+    } else if (action === 'flight-analysis-zoom-out') {
+      if (this.flightAnalysisMapEngine && typeof this.flightAnalysisMapEngine.zoomOut === 'function') {
+        this.flightAnalysisMapEngine.zoomOut();
       }
     } else if (action === 'open-full-map') {
       const spot = this.getCurrentSpot();
@@ -4873,6 +4968,32 @@ export class ForecastViewController {
               </button>
             </div>
             <div class="gm-flight-analysis-controls-right">
+              <div class="gm-flight-analysis-zoom-group" role="group" aria-label="Controlli zoom mappa">
+                <button 
+                  type="button" 
+                  class="gm-flight-analysis-ctrl-btn gm-flight-analysis-zoom-btn" 
+                  data-action="flight-analysis-zoom-in" 
+                  aria-label="Ingrandisci mappa" 
+                  title="Ingrandisci mappa"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                </button>
+                <button 
+                  type="button" 
+                  class="gm-flight-analysis-ctrl-btn gm-flight-analysis-zoom-btn" 
+                  data-action="flight-analysis-zoom-out" 
+                  aria-label="Rimpicciolisci mappa" 
+                  title="Rimpicciolisci mappa"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                </button>
+              </div>
+
               <div class="gm-aim-menu-wrap">
                 <button 
                   type="button" 

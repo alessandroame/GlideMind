@@ -111,6 +111,76 @@ describe('GlideMind Cartography - Takeoff Slope Exposure Sector & Launch Window'
     assert.ok(sectorInnerHtml.includes('stroke="#22c55e"'), '180deg wind vs 180deg heading is 0deg diff -> Green sector');
   });
 
+  it('should support dual windsocks (takeoff and landing) and zoom controls in LeafletMapEngine and HeadlessMockMapEngine', () => {
+    // 1. HeadlessMockMapEngine zoom controls
+    const mockEngine = new HeadlessMockMapEngine(null, { zoom: 12 });
+    assert.equal(mockEngine.zoom, 12);
+    mockEngine.zoomIn();
+    assert.equal(mockEngine.zoom, 13);
+    mockEngine.zoomOut();
+    assert.equal(mockEngine.zoom, 12);
+
+    // 2. LeafletMapEngine zoom controls delegating to Leaflet map instance
+    const leafletEngine = new LeafletMapEngine();
+    let mapZoom = 10;
+    leafletEngine.map = {
+      zoomIn(delta = 1) { mapZoom += delta; },
+      zoomOut(delta = 1) { mapZoom -= delta; }
+    };
+    leafletEngine.zoomIn();
+    assert.equal(mapZoom, 11);
+    leafletEngine.zoomOut();
+    assert.equal(mapZoom, 10);
+
+    // 3. LeafletMapEngine dual windsocks updating independently
+    let takeoffWrapperTransform = '';
+    let landingWrapperTransform = '';
+    let takeoffWrapperInnerHtml = '';
+    let landingWrapperInnerHtml = '';
+
+    const mockTakeoffWrapper = {
+      style: {
+        set transform(v) { takeoffWrapperTransform = v; },
+        get transform() { return takeoffWrapperTransform; }
+      },
+      set innerHTML(v) { takeoffWrapperInnerHtml = v; },
+      get innerHTML() { return takeoffWrapperInnerHtml; }
+    };
+
+    const mockLandingWrapper = {
+      style: {
+        set transform(v) { landingWrapperTransform = v; },
+        get transform() { return landingWrapperTransform; }
+      },
+      set innerHTML(v) { landingWrapperInnerHtml = v; },
+      get innerHTML() { return landingWrapperInnerHtml; }
+    };
+
+    leafletEngine.takeoffWindsockMarker = {
+      getElement: () => ({
+        querySelector: (sel) => (sel === '#miniws-to-wrapper' || sel === '.gm-windsock-wrapper' ? mockTakeoffWrapper : null)
+      })
+    };
+
+    leafletEngine.landingWindsockMarker = {
+      getElement: () => ({
+        querySelector: (sel) => (sel === '#miniws-ld-wrapper' || sel === '.gm-windsock-wrapper' ? mockLandingWrapper : null)
+      })
+    };
+
+    // Takeoff wind: 180° (South) -> rotates to (180+180)%360 = 0°
+    // Landing wind: 90° (East) -> rotates to (90+180)%360 = 270°
+    leafletEngine.updateWindsockMarker(
+      { windSpeed: 10, windDirection: 180, windGust: 14 },
+      { windSpeed: 12, windDirection: 90, windGust: 16 }
+    );
+
+    assert.equal(takeoffWrapperTransform, 'rotate(0deg)', 'Takeoff windsock must point North (0deg) for 180deg wind');
+    assert.equal(landingWrapperTransform, 'rotate(270deg)', 'Landing windsock must point West (270deg) for 90deg wind');
+    assert.ok(takeoffWrapperInnerHtml.includes('<svg'), 'Takeoff windsock must have SVG');
+    assert.ok(landingWrapperInnerHtml.includes('<svg'), 'Landing windsock must have SVG');
+  });
+
   it('should support flight analysis procedures rendering, scrubbing updates and pause/resume in HeadlessMockMapEngine', () => {
     const mockEngine = new HeadlessMockMapEngine();
 

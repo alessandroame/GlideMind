@@ -22,6 +22,8 @@ import {
     InMemoryCache,
     generateWeatherCacheKey,
     normalizeCoordinates,
+    isCoordinateList,
+    normalizeCoordinateList,
     buildHourlyVariablesList,
     buildForecastUrl,
     buildGeocodingUrl,
@@ -30,6 +32,7 @@ import {
     enrichWeatherData,
     getCachedWeatherData,
     fetchWeatherData,
+    fetchMultiLocationWeatherData,
     fetchWeekOverview,
     searchLocations,
     fetchReverseGeocode,
@@ -171,6 +174,46 @@ describe('Open-Meteo Client - Coordinates & URL Builders', () => {
         assert.equal(url.searchParams.get('count'), '5');
         assert.equal(url.searchParams.get('language'), 'it');
         assert.equal(url.searchParams.get('format'), 'json');
+    });
+
+    it('should detect and normalize multi-location coordinates list', () => {
+        const coordsArray = [
+            { lat: 45.833, lon: 9.302, elev: 1060 },
+            { lat: 45.817, lon: 9.318, elev: 260 }
+        ];
+        assert.equal(isCoordinateList(coordsArray), true);
+        const normalized = normalizeCoordinateList(coordsArray);
+        assert.equal(normalized.length, 2);
+        assert.equal(normalized[0].lat, 45.833);
+        assert.equal(normalized[0].elev, 1060);
+        assert.equal(normalized[1].lat, 45.817);
+        assert.equal(normalized[1].elev, 260);
+
+        // Object with takeoff and landing
+        const coordsObj = {
+            takeoff: { lat: 45.833, lon: 9.302, altitude: 1060 },
+            landing: { lat: 45.817, lon: 9.318, altitude: 260 }
+        };
+        assert.equal(isCoordinateList(coordsObj), true);
+        const normObj = normalizeCoordinateList(coordsObj);
+        assert.equal(normObj.length, 2);
+        assert.equal(normObj[0].role, 'takeoff');
+        assert.equal(normObj[1].role, 'landing');
+
+        // Single coordinate is not a list
+        assert.equal(isCoordinateList({ lat: 45.8, lon: 9.3 }), false);
+        assert.equal(isCoordinateList([45.8, 9.3]), false);
+    });
+
+    it('should build multi-point forecast URL with comma-separated coordinates', () => {
+        const coords = [
+            { lat: 45.8332, lon: 9.3021, elev: 1060 },
+            { lat: 45.8172, lon: 9.3186, elev: 260 }
+        ];
+        const url = buildForecastUrl(coords, { targetDate: '2026-10-20' });
+        assert.equal(url.searchParams.get('latitude'), '45.8332,45.8172');
+        assert.equal(url.searchParams.get('longitude'), '9.3021,9.3186');
+        assert.equal(url.searchParams.get('elevation'), '1060,260');
     });
 });
 
@@ -426,6 +469,74 @@ describe('Open-Meteo Client - Fetch Simulation, Retry & Cache Fallback', () => {
                 await fetchWithTimeout('https://example.com/api', {}, 50, hangingFetch);
             },
             /Request timed out after 50ms/
+        );
+    });
+
+    it('should fetch multi-point weather in mock mode and return distinct takeoff and landing weather', async () => {
+        const coords = [
+            { lat: 45.833, lon: 9.302, elev: 1060, role: 'takeoff' },
+            { lat: 45.817, lon: 9.318, elev: 260, role: 'landing' }
+        ];
+
+        const result = await fetchWeatherData(coords, {
+            mock: true,
+            targetDate: '2026-10-10'
+        });
+
+        assert.ok(result);
+        assert.ok(result.takeoffWeather, 'Must have takeoffWeather');
+        assert.ok(result.landingWeather, 'Must have landingWeather');
+        assert.equal(result.points.length, 2);
+
+        // Takeoff vs Landing elevation
+        assert.equal(result.takeoffWeather.elevation, 1060);
+        assert.equal(result.landingWeather.elevation, 260);
+
+        // Diurnal midday wind: landing in valley has attenuated wind speed and shifted direction
+        const middayHour = 13;
+        const takeoffWind = result.takeoffWeather.hourly.windspeed_10m[middayHour];
+        const landingWind = result.landingWeather.hourly.windspeed_10m[middayHour];
+        const takeoffDir = result.takeoffWeather.hourly.winddirection_10m[middayHour];
+        const landingDir = result.landingWeather.hourly.winddirection_10m[middayHour];
+
+        assert.notEqual(takeoffWind, landingWind, 'Takeoff and landing wind speed must differ');
+        assert.notEqual(takeoffDir, landingDir, 'Takeoff and landing wind direction must differ');
+        assert.ok(landingWind < takeoffWind, 'Valley landing wind should be calmer than mountain takeoff');
+    });
+
+    it('should fetch multi-point weather over network, cache each location and return combined payload', async () => {
+        const testCache = new InMemoryCache();
+        let requestedUrl = null;
+
+        const fakeMultiFetch = async (urlStr) => {
+            requestedUrl = urlStr;
+            const toPayload = generateSyntheticWeather([45.833, 9.302, 1060], { targetDate: '2026-10-10', isLanding: false });
+            const ldPayload = generateSyntheticWeather([45.817, 9.318, 260], { targetDate: '2026-10-10', isLanding: true });
+            return {
+                ok: true,
+                status: 200,
+                json: async () => [toPayload, ldPayload]
+            };
+        };
+
+        const coords = [
+            { lat: 45.833, lon: 9.302, elev: 1060 },
+            { lat: 45.817, lon: 9.318, elev: 260 }
+        ];
+
+        const result = await fetchWeatherData(coords, {
+            targetDate: '2026-10-10',
+            cache: testCache,
+            fetchFn: fakeMultiFetch
+        });
+
+        assert.ok(requestedUrl.includes('latitude=45.8330%2C45.8170') || requestedUrl.includes('latitude=45.8330,45.8170'));
+        assert.equal(testCache.size, 2, 'Must cache both takeoff and landing raw payloads');
+        assert.ok(result.takeoffWeather);
+        assert.ok(result.landingWeather);
+        assert.notEqual(
+            result.takeoffWeather.hourly.winddirection_10m[14],
+            result.landingWeather.hourly.winddirection_10m[14]
         );
     });
 });

@@ -866,5 +866,91 @@ describe('GlideMind Comprensorio Locality & Dual Launch/Landing Evaluator', () =
       assert.ok(res.reason.includes('Esposizione N/D'));
     });
   });
+
+  describe('Multi-Point Meteorological Ingestion (Decollo vs Atterraggio)', () => {
+    it('should expose distinct takeoffWeather and landingWeather snapshots when multi-point weather is available', () => {
+      const spot = DEFAULT_COMPRENSORI[0];
+      const multiPointWeather = {
+        hourly: {
+          time: ['2026-10-10T14:00'],
+          windspeed_10m: [18],
+          winddirection_10m: [180],
+          windgusts_10m: [24],
+          precipitation: [0],
+          temperature_2m: [19],
+          cape: [200],
+          turbulence_edr: [0.12]
+        },
+        landingWeather: {
+          hourly: {
+            time: ['2026-10-10T14:00'],
+            windspeed_10m: [11],
+            winddirection_10m: [215],
+            windgusts_10m: [14],
+            precipitation: [0],
+            temperature_2m: [24],
+            cape: [150],
+            turbulence_edr: [0.08]
+          }
+        }
+      };
+
+      const res = evaluateComprensorio({
+        comprensorio: spot,
+        weatherData: multiPointWeather,
+        hourIndex: 0,
+        glider: GLIDER_CLASSES.EN_A
+      });
+
+      assert.ok(res.takeoffWeather, 'Must expose takeoffWeather snapshot');
+      assert.ok(res.landingWeather, 'Must expose landingWeather snapshot');
+
+      // Decollo
+      assert.equal(res.takeoffWeather.windSpeed, 18);
+      assert.equal(res.takeoffWeather.windDirection, 180);
+      assert.equal(res.takeoffWeather.temp, 19);
+
+      // Atterraggio
+      assert.equal(res.landingWeather.windSpeed, 11);
+      assert.equal(res.landingWeather.windDirection, 215);
+      assert.equal(res.landingWeather.temp, 24);
+
+      // Verify they are distinct
+      assert.notEqual(res.takeoffWeather.windDirection, res.landingWeather.windDirection);
+      assert.notEqual(res.takeoffWeather.windSpeed, res.landingWeather.windSpeed);
+
+      // Backward compatibility: weatherSnapshot equals takeoffWeather
+      assert.deepEqual(res.weatherSnapshot, res.takeoffWeather);
+    });
+
+    it('should fall back gracefully to single weather snapshot when landingWeather is absent', () => {
+      const spot = DEFAULT_COMPRENSORI[0];
+      const singlePointWeather = {
+        hourly: {
+          time: ['2026-10-10T14:00'],
+          windspeed_10m: [14],
+          winddirection_10m: [170],
+          windgusts_10m: [18],
+          precipitation: [0],
+          temperature_2m: [21],
+          cape: [100]
+        }
+      };
+
+      const res = evaluateComprensorio({
+        comprensorio: spot,
+        weatherData: singlePointWeather,
+        hourIndex: 0,
+        glider: GLIDER_CLASSES.EN_A
+      });
+
+      assert.ok(res.takeoffWeather);
+      assert.ok(res.landingWeather);
+      assert.equal(res.takeoffWeather.windDirection, 170);
+      assert.equal(res.landingWeather.windDirection, 170);
+      assert.equal(res.takeoffWeather.windSpeed, 14);
+      assert.equal(res.landingWeather.windSpeed, 14);
+    });
+  });
 });
 

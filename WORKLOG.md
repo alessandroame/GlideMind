@@ -1644,3 +1644,34 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Aggiornati i test in [`tests/core/flightReplayMath.test.mjs`](file:///tests/core/flightReplayMath.test.mjs) per verificare le soglie geometriche a zoom 14 e 18 e i limiti di spazio-schermo $[1.95\text{px}, 5.05\text{px}]$ su tutto l'arco di zoom da 10 a 19.
   - Test suite globale al 100% verde: 726 test (125 suite), 725 passanti, 0 falliti, 1 skipped.
   - Registrata la Lezione Appresa #153 in [MEMORY.md](file:///MEMORY.md).
+---
+
+## 2026-10-13 - Meteo & Cartografia: Ingestione Multi-Punto Open-Meteo e Disaccoppiamento Maniche a Vento Decollo/Atterraggio
+- **Tipo**: Feature / Core / UI / Meteorologia / Headless Ingestion / Cartografia / Parapendio
+- **Dettagli**: [.agents/worklog.d/2026-10-13_multi-point-open-meteo-takeoff-landing-weather.md](file:///.agents/worklog.d/2026-10-13_multi-point-open-meteo-takeoff-landing-weather.md)
+- **Sintesi**:
+  - Diagnosticata e risolta la causa dell'orientamento identico delle maniche a vento al decollo e all'atterraggio nella mini-mappa e nell'overlay delle procedure di volo: `ForecastViewController.fetchWeatherDataAsync` interrogava Open-Meteo per le sole coordinate del decollo, `evaluateComprensorio` forniva un unico `weatherSnapshot` e `ForecastView` lo duplicava su decollo e atterraggio.
+  - Implementato in [`core/openMeteoApi.js`](file:///core/openMeteoApi.js) il supporto nativo a coordinate multi-punto (`isCoordinateList`, `normalizeCoordinateList`, `buildForecastUrl` con parametri separati da virgola `latitude`, `longitude`, `elevation`).
+  - Implementato il client headless [`fetchMultiLocationWeatherData`](file:///core/openMeteoApi.js) con caching granulare per coordinate in `InMemoryCache`, arricchimento dei punti geografici e payload strutturato con `takeoffWeather` e `landingWeather` preservando retrocompatibilità.
+  - Arricchito il generatore offline [`generateSyntheticWeather`](file:///core/openMeteoApi.js) con modellazione fisica dello strato limite di valle (`isLanding: true`), simulando riduzione del $25\%$ del vento, rotazione di $+25^\circ$ per brezza di valle e salto termico adiabatico.
+  - Aggiornato [`core/comprensorio.js`](file:///core/comprensorio.js) (`evaluateComprensorio`) per esporre `takeoffWeather` e `landingWeather` orari disaccoppiati e alimentare i circuiti di atterraggio controvento con il vento reale dell'atterraggio.
+  - Aggiornato [`ui/views/ForecastView.js`](file:///ui/views/ForecastView.js) per interrogare contemporaneamente le coordinate di decollo e atterraggio, estrarre velocità/raffiche/direzione atterraggio in `computeParamMetrics` e aggiornare la manica a vento corrispondente in `miniMapEngine` e nell'overlay delle procedure.
+  - Aggiunti 6 test in [`tests/core/openMeteoApi.test.mjs`](file:///tests/core/openMeteoApi.test.mjs) e suite dedicata in [`tests/core/comprensorio.test.mjs`](file:///tests/core/comprensorio.test.mjs).
+  - Test suite globale al 100% verde: 732 test (126 suite), 731 passanti, 0 falliti, 1 skipped.
+  - Registrata la Lezione Appresa #154 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-13 - Cartografia & Ergonomia UI: Doppia Manica a Vento sulla Mini-Mappa, Controlli Zoom Dedicati e Rilocazione Tasto Fullscreen
+- **Tipo**: Feature / UI / Cartografia Leaflet / Ergonomia Outdoor / Fitts's Law
+- **Dettagli**: [.agents/worklog.d/2026-10-13_dual-windsocks-minimap-and-zoom-controls.md](file:///.agents/worklog.d/2026-10-13_dual-windsocks-minimap-and-zoom-controls.md)
+- **Sintesi**:
+  - Implementata la visualizzazione simultanea di entrambe le maniche a vento (decollo e atterraggio) sulla mini-mappa della scheda previsioni ([`ui/map/mapEngineAdapter.js`](file:///ui/map/mapEngineAdapter.js)): istanziati marker indipendenti con prefissi SVG isolati (`miniws-to-` per decollo, `miniws-ld-` per atterraggio) e aggiornamento in-place di entrambi i vettori allo scrubbing orario in `updateWindsockMarker`.
+  - Integrati i controlli dedicati di zoom in/out (`+` e `-`) nell'angolo in alto a destra sia nella mini-mappa compatta (`.gm-mini-map-zoom-controls`, pulsanti 32×32 con touch target esteso $\ge 48\text{px}$) sia nell'overlay espanso di analisi volo (`.gm-flight-analysis-zoom-group`).
+  - Implementati i metodi pubblici `zoomIn()` e `zoomOut()` su `LeafletMapEngine` e `HeadlessMockMapEngine`.
+  - Spostato il pulsante di apertura mappa a tutto schermo / analisi volo (`.gm-mini-map-expand-btn`) in basso a destra (`bottom: 8px; right: 8px;`), garantendo una separazione verticale $> 100\text{px}$ rispetto ai controlli di zoom ed eliminando il rischio di click accidentali.
+  - Aggiornato [`ui/views/ForecastView.js`](file:///ui/views/ForecastView.js) per montare i controlli, gestire gli eventi di zoom e passare `takeoffWeather` e `landingWeather` all'inizializzazione e allo scorrimento orario.
+  - Aggiornato [`css/theme.css`](file:///css/theme.css) con le regole per frosted glass, micro-capsule e supporto per tutti i basemap cartografici e tema ad alta luminosità solare.
+  - Aggiunti test automatici dedicati in [`tests/ui/forecastView.test.mjs`](file:///tests/ui/forecastView.test.mjs) e [`tests/ui/mapTakeoffSector.test.mjs`](file:///tests/ui/mapTakeoffSector.test.mjs).
+  - Test suite globale al 100% verde: 734 test (126 suite), 733 passanti, 0 falliti, 1 skipped.
+  - Registrata la Lezione Appresa #155 in [MEMORY.md](file:///MEMORY.md).

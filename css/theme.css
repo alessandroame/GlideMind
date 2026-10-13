@@ -5579,9 +5579,72 @@ input.gm-input:focus {
   outline-offset: 2px;
 }
 
-.gm-mini-map-expand-btn {
+.gm-mini-map-zoom-controls {
   position: absolute;
   top: 8px;
+  right: 8px;
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gm-mini-map-zoom-btn {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border-radius: 50% !important;
+  border: none !important;
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.70) 0%, rgba(0, 0, 0, 0.40) 40%, rgba(0, 0, 0, 0.10) 70%, transparent 95%) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+  color: #ffffff !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  outline: none;
+  transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.gm-mini-map-zoom-btn::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  min-width: var(--gm-touch-min, 48px);
+  min-height: var(--gm-touch-min, 48px);
+  width: 100%;
+  height: 100%;
+}
+
+.gm-mini-map-zoom-btn:hover {
+  transform: scale(1.08);
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.50) 40%, rgba(0, 0, 0, 0.15) 70%, transparent 95%) !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.gm-mini-map-zoom-btn:active {
+  transform: scale(0.92);
+}
+
+.gm-mini-map-zoom-btn:focus-visible {
+  outline: 2px solid var(--gm-accent, #38bdf8);
+  outline-offset: 2px;
+}
+
+.gm-mini-map-expand-btn {
+  position: absolute;
+  bottom: 8px;
   right: 8px;
   z-index: 500;
   width: 32px;
@@ -5649,8 +5712,10 @@ input.gm-input:focus {
 
 .gm-mini-map-box[data-map-layer="topo"] .gm-mini-map-layer-toggle,
 .gm-mini-map-box[data-map-layer="topo"] .gm-mini-map-expand-btn,
+.gm-mini-map-box[data-map-layer="topo"] .gm-mini-map-zoom-btn,
 .gm-mini-map-box[data-map-layer="streets"] .gm-mini-map-layer-toggle,
-.gm-mini-map-box[data-map-layer="streets"] .gm-mini-map-expand-btn {
+.gm-mini-map-box[data-map-layer="streets"] .gm-mini-map-expand-btn,
+.gm-mini-map-box[data-map-layer="streets"] .gm-mini-map-zoom-btn {
   background: radial-gradient(circle at center, rgba(0, 0, 0, 0.70) 0%, rgba(0, 0, 0, 0.40) 40%, rgba(0, 0, 0, 0.10) 70%, transparent 95%) !important;
   border: none !important;
   box-shadow: none !important;
@@ -5671,8 +5736,10 @@ input.gm-input:focus {
 
 .gm-mini-map-box[data-map-layer="topo"] .gm-mini-map-layer-toggle:hover,
 .gm-mini-map-box[data-map-layer="topo"] .gm-mini-map-expand-btn:hover,
+.gm-mini-map-box[data-map-layer="topo"] .gm-mini-map-zoom-btn:hover,
 .gm-mini-map-box[data-map-layer="streets"] .gm-mini-map-layer-toggle:hover,
-.gm-mini-map-box[data-map-layer="streets"] .gm-mini-map-expand-btn:hover {
+.gm-mini-map-box[data-map-layer="streets"] .gm-mini-map-expand-btn:hover,
+.gm-mini-map-box[data-map-layer="streets"] .gm-mini-map-zoom-btn:hover {
   background: radial-gradient(circle at center, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.50) 40%, rgba(0, 0, 0, 0.15) 70%, transparent 95%) !important;
   color: #ffffff !important;
   border: none !important;
@@ -5700,8 +5767,10 @@ input.gm-input:focus {
 
 .gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-layer-toggle,
 .gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-expand-btn,
+.gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-zoom-btn,
 .gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-layer-toggle,
-.gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-expand-btn {
+.gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-expand-btn,
+.gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-zoom-btn {
   background: radial-gradient(circle at center, rgba(0, 0, 0, 0.70) 0%, rgba(0, 0, 0, 0.40) 40%, rgba(0, 0, 0, 0.10) 70%, transparent 95%) !important;
   border: none !important;
   box-shadow: none !important;
@@ -5722,8 +5791,10 @@ input.gm-input:focus {
 
 .gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-layer-toggle:hover,
 .gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-expand-btn:hover,
+.gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-zoom-btn:hover,
 .gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-layer-toggle:hover,
-.gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-expand-btn:hover {
+.gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-expand-btn:hover,
+.gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-zoom-btn:hover {
   background: radial-gradient(circle at center, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.50) 40%, rgba(0, 0, 0, 0.15) 70%, transparent 95%) !important;
   color: #ffffff !important;
   border: none !important;
@@ -5851,6 +5922,7 @@ input.gm-input:focus {
 }
 
 [data-theme="light"] .gm-mini-map-expand-btn,
+[data-theme="light"] .gm-mini-map-zoom-btn,
 [data-theme="light"] .gm-mini-map-layer-toggle {
   background: radial-gradient(circle at center, rgba(0, 0, 0, 0.70) 0%, rgba(0, 0, 0, 0.40) 40%, rgba(0, 0, 0, 0.10) 70%, transparent 95%) !important;
   border: none !important;
@@ -5861,6 +5933,7 @@ input.gm-input:focus {
 }
 
 [data-theme="light"] .gm-mini-map-expand-btn:hover,
+[data-theme="light"] .gm-mini-map-zoom-btn:hover,
 [data-theme="light"] .gm-mini-map-layer-toggle:hover {
   background: radial-gradient(circle at center, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.50) 40%, rgba(0, 0, 0, 0.15) 70%, transparent 95%) !important;
   color: #ffffff !important;
@@ -5893,8 +5966,10 @@ input.gm-input:focus {
 
 [data-theme="light"] .gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-layer-toggle,
 [data-theme="light"] .gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-expand-btn,
+[data-theme="light"] .gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-zoom-btn,
 [data-theme="light"] .gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-layer-toggle,
-[data-theme="light"] .gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-expand-btn {
+[data-theme="light"] .gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-expand-btn,
+[data-theme="light"] .gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-zoom-btn {
   background: radial-gradient(circle at center, rgba(0, 0, 0, 0.70) 0%, rgba(0, 0, 0, 0.40) 40%, rgba(0, 0, 0, 0.10) 70%, transparent 95%) !important;
   border: none !important;
   box-shadow: none !important;
@@ -5905,8 +5980,10 @@ input.gm-input:focus {
 
 [data-theme="light"] .gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-layer-toggle:hover,
 [data-theme="light"] .gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-expand-btn:hover,
+[data-theme="light"] .gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-zoom-btn:hover,
 [data-theme="light"] .gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-layer-toggle:hover,
-[data-theme="light"] .gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-expand-btn:hover {
+[data-theme="light"] .gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-expand-btn:hover,
+[data-theme="light"] .gm-mini-map-box[data-map-layer="dark"] .gm-mini-map-zoom-btn:hover {
   background: radial-gradient(circle at center, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.50) 40%, rgba(0, 0, 0, 0.15) 70%, transparent 95%) !important;
   color: #ffffff !important;
   border: none !important;
@@ -6199,6 +6276,37 @@ input.gm-input:focus {
 .gm-flight-analysis-ctrl-btn.loading {
   opacity: 0.7;
   pointer-events: none;
+}
+
+.gm-flight-analysis-zoom-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gm-flight-analysis-zoom-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  min-height: 36px !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+}
+
+.gm-flight-analysis-zoom-btn::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  min-width: var(--gm-touch-min, 48px);
+  min-height: var(--gm-touch-min, 48px);
+  width: 100%;
+  height: 100%;
 }
 
 /* Standalone Circular Map Layer Toggles with Soft Radial Scrim */

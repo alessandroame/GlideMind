@@ -264,12 +264,26 @@ export class HeadlessMockMapEngine {
     this.container = containerEl || this.container;
     this.activeMiniMapSpotData = spotData;
     this.renderedMode = 'minimap';
+    this.hasTakeoffWindsock = Boolean(spotData?.takeoff || spotData?.comprensorio?.takeoffs?.[0]);
+    this.hasLandingWindsock = Boolean(spotData?.landing || spotData?.comprensorio?.landings?.[0]);
+    this.takeoffWeather = spotData?.takeoffWeather || spotData?.weatherSnapshot || null;
+    this.landingWeather = spotData?.landingWeather || spotData?.weatherSnapshot || null;
     this.destroyed = false;
     return this;
   }
 
-  updateWindsockMarker(weatherSnapshot, isLanding = false, takeoff = null) {
-    this.lastWindsockUpdate = { weatherSnapshot, isLanding, takeoff };
+  updateWindsockMarker(takeoffWeather, landingWeatherOrIsLanding = false, takeoff = null) {
+    const tWeather = takeoffWeather;
+    const lWeather = (typeof landingWeatherOrIsLanding === 'object' && landingWeatherOrIsLanding !== null)
+      ? landingWeatherOrIsLanding
+      : (landingWeatherOrIsLanding === true ? takeoffWeather : takeoffWeather);
+    this.lastWindsockUpdate = {
+      weatherSnapshot: tWeather,
+      takeoffWeather: tWeather,
+      landingWeather: lWeather,
+      isLanding: landingWeatherOrIsLanding === true,
+      takeoff
+    };
     if (takeoff && this.activeMiniMapSpotData) {
       this.activeMiniMapSpotData.takeoff = takeoff;
     }
@@ -290,6 +304,8 @@ export class HeadlessMockMapEngine {
     this.hasTakeoffSector = Boolean(data?.takeoff || data?.comprensorio?.takeoffs?.[0]);
     this.hasGlideLine = Boolean((data?.takeoff || data?.comprensorio?.takeoffs?.[0]) && (data?.landing || data?.comprensorio?.landings?.[0]));
     this.glideMetrics = data?.glideMetrics || null;
+    this.takeoffWeather = data?.takeoffWeather || data?.weatherSnapshot || null;
+    this.landingWeather = data?.landingWeather || data?.weatherSnapshot || null;
     this.paused = false;
     this.destroyed = false;
     return this;
@@ -306,6 +322,12 @@ export class HeadlessMockMapEngine {
     if (options.glideMetrics) {
       this.glideMetrics = options.glideMetrics;
     }
+    if (options.takeoffWeather) {
+      this.takeoffWeather = options.takeoffWeather;
+    }
+    if (options.landingWeather) {
+      this.landingWeather = options.landingWeather;
+    }
   }
 
   pause() {
@@ -319,6 +341,20 @@ export class HeadlessMockMapEngine {
   }
 
   invalidateSize() {
+    return this;
+  }
+
+  zoomIn(delta = 1) {
+    this.zoom = (this.zoom || 14) + delta;
+    this.currentZoom = this.zoom;
+    this.lastZoomAction = 'in';
+    return this;
+  }
+
+  zoomOut(delta = 1) {
+    this.zoom = Math.max(1, (this.zoom || 14) - delta);
+    this.currentZoom = this.zoom;
+    this.lastZoomAction = 'out';
     return this;
   }
 
@@ -989,6 +1025,20 @@ export class LeafletMapEngine {
     });
   }
 
+  zoomIn(delta = 1) {
+    if (this.map && typeof this.map.zoomIn === 'function') {
+      this.map.zoomIn(delta);
+    }
+    return this;
+  }
+
+  zoomOut(delta = 1) {
+    if (this.map && typeof this.map.zoomOut === 'function') {
+      this.map.zoomOut(delta);
+    }
+    return this;
+  }
+
   on(eventName, callback) {
     if (this.map) {
       this.map.on(eventName, callback);
@@ -1013,6 +1063,8 @@ export class LeafletMapEngine {
     if (!this.map || !this.overlayLayerGroup) return this;
     this.overlayLayerGroup.clearLayers();
     this.windsockMarker = null;
+    this.takeoffWindsockMarker = null;
+    this.landingWindsockMarker = null;
     this.takeoffSectorMarker = null;
     this.glidePolyline = null;
     this.landingMarker = null;
@@ -1025,15 +1077,21 @@ export class LeafletMapEngine {
     const tCoord = parseCoordinates(spotData.takeoff?.coordinates || spotData.comprensorio?.takeoffs?.[0]?.coordinates);
     const lCoord = parseCoordinates(spotData.landing?.coordinates || spotData.comprensorio?.landings?.[0]?.coordinates);
     const mode = spotData.subSpotType || 'overview';
-    const weather = spotData.weatherSnapshot || {};
+    const takeoffWeather = spotData.takeoffWeather || spotData.weatherSnapshot || {};
+    const landingWeather = spotData.landingWeather || spotData.weatherSnapshot || {};
     const glide = spotData.glideMetrics || { requiredGlideRatio: 5.0, isSafe: true };
 
-    const speed = weather.windSpeed ?? 12;
-    const gust = weather.windGust ?? (speed > 0 ? speed * 1.3 : 15);
-    const dir = weather.windDirection ?? weather.windDir ?? 180;
-    const turb = weather.turbulence ?? 0.1;
+    const tSpeed = takeoffWeather.windSpeed ?? 12;
+    const tGust = takeoffWeather.windGust ?? (tSpeed > 0 ? tSpeed * 1.3 : 15);
+    const tDir = takeoffWeather.windDirection ?? takeoffWeather.windDir ?? 180;
+    const tTurb = takeoffWeather.turbulence ?? 0.1;
     const tHeading = spotData.takeoff?.heading ?? null;
     const tAlt = spotData.takeoff?.altitude || 1000;
+
+    const lSpeed = landingWeather.windSpeed ?? 10;
+    const lGust = landingWeather.windGust ?? (lSpeed > 0 ? lSpeed * 1.3 : 12);
+    const lDir = landingWeather.windDirection ?? landingWeather.windDir ?? 180;
+    const lTurb = landingWeather.turbulence ?? 0.1;
     const lAlt = spotData.landing?.altitude || 300;
 
     const isLandingSelected = mode === 'landing' || (spotData.activeSubSpot?.spotType === 'landing');
@@ -1041,7 +1099,7 @@ export class LeafletMapEngine {
 
     // 1. Takeoff Slope Exposure Sector (Cono e Azimut di Decollo)
     if (tCoord) {
-      const sectorSvg = generateTakeoffSectorSvg(tHeading, dir, tAlt, { prefix: 'miniws-to-' });
+      const sectorSvg = generateTakeoffSectorSvg(tHeading, tDir, tAlt, { prefix: 'miniws-to-' });
       const sectorIcon = window.L.divIcon({
         className: 'gm-takeoff-sector-marker-container',
         html: sectorSvg,
@@ -1059,22 +1117,23 @@ export class LeafletMapEngine {
       }
       this.overlayLayerGroup.addLayer(this.takeoffSectorMarker);
 
-      // 2. Vector Windsock Marker (Centered at takeoff with zero offset)
-      const wsHtml = generateWindsockSvg(speed, gust, dir, turb, { prefix: 'miniws-', scale: 0.45 });
-      const wsIcon = window.L.divIcon({
+      // 2. Vector Windsock Marker at Takeoff
+      const wsTakeoffHtml = generateWindsockSvg(tSpeed, tGust, tDir, tTurb, { prefix: 'miniws-to-', scale: 0.45 });
+      const wsTakeoffIcon = window.L.divIcon({
         className: 'gm-windsock-marker-container',
-        html: wsHtml,
+        html: wsTakeoffHtml,
         iconSize: [240, 240],
         iconAnchor: [120, 120]
       });
-      this.windsockMarker = window.L.marker([tCoord.lat, tCoord.lon], {
-        icon: wsIcon,
+      this.takeoffWindsockMarker = window.L.marker([tCoord.lat, tCoord.lon], {
+        icon: wsTakeoffIcon,
         zIndexOffset: 600
       });
-      this.overlayLayerGroup.addLayer(this.windsockMarker);
+      this.windsockMarker = this.takeoffWindsockMarker;
+      this.overlayLayerGroup.addLayer(this.takeoffWindsockMarker);
     }
 
-    // 3. Landing Marker (Compact aeronautical pin, zero location name clutter)
+    // 3. Landing Marker (Compact aeronautical pin, zero location name clutter) + Landing Windsock
     if (lCoord) {
       const landingName = (spotData.landing?.name || 'Atterraggio').replace(/^Atterraggio\s*/i, '');
       const lIcon = window.L.divIcon({
@@ -1098,6 +1157,20 @@ export class LeafletMapEngine {
         });
       }
       this.overlayLayerGroup.addLayer(this.landingMarker);
+
+      // Vector Windsock Marker at Landing
+      const wsLandingHtml = generateWindsockSvg(lSpeed, lGust, lDir, lTurb, { prefix: 'miniws-ld-', scale: 0.45 });
+      const wsLandingIcon = window.L.divIcon({
+        className: 'gm-windsock-marker-container',
+        html: wsLandingHtml,
+        iconSize: [240, 240],
+        iconAnchor: [120, 120]
+      });
+      this.landingWindsockMarker = window.L.marker([lCoord.lat, lCoord.lon], {
+        icon: wsLandingIcon,
+        zIndexOffset: 650
+      });
+      this.overlayLayerGroup.addLayer(this.landingWindsockMarker);
     }
 
     // 4. Geodesic Glide Cone Line
@@ -1144,50 +1217,84 @@ export class LeafletMapEngine {
     return this;
   }
 
-  updateWindsockMarker(weatherSnapshot, isLanding = false, takeoff = null) {
-    if (!weatherSnapshot) return;
+  updateWindsockMarker(takeoffWeather, landingWeatherOrIsLanding = false, takeoff = null) {
+    if (!takeoffWeather) return;
 
     if (takeoff && this.activeMiniMapSpotData) {
       this.activeMiniMapSpotData.takeoff = takeoff;
     }
 
-    const speed = weatherSnapshot.windSpeed ?? 0;
-    const gust = weatherSnapshot.windGust ?? speed;
-    const dir = weatherSnapshot.windDirection ?? weatherSnapshot.windDir ?? 0;
-    const turb = weatherSnapshot.turbulence ?? 0;
+    const tWeather = takeoffWeather;
+    const lWeather = (typeof landingWeatherOrIsLanding === 'object' && landingWeatherOrIsLanding !== null)
+      ? landingWeatherOrIsLanding
+      : (landingWeatherOrIsLanding === true ? takeoffWeather : takeoffWeather);
 
-    // 1. In-place update of windsock rotation, SVG segments and animation keyframes
-    if (this.windsockMarker) {
-      const el = this.windsockMarker.getElement();
+    // 1. In-place update of Takeoff windsock rotation, SVG segments and animation keyframes
+    const tMarker = this.takeoffWindsockMarker || this.windsockMarker;
+    if (tMarker && tWeather) {
+      const speed = tWeather.windSpeed ?? 0;
+      const gust = tWeather.windGust ?? speed;
+      const dir = tWeather.windDirection ?? tWeather.windDir ?? 0;
+      const turb = tWeather.turbulence ?? 0;
+
+      const el = tMarker.getElement();
       if (el) {
         const k = calculateWindsockKinematics(speed, gust, dir, turb);
-
-        const wrapper = el.querySelector('#miniws-wrapper') || el.querySelector('.gm-windsock-wrapper');
+        const wrapper = el.querySelector('#miniws-to-wrapper') || el.querySelector('#miniws-wrapper') || el.querySelector('.gm-windsock-wrapper');
         if (wrapper) {
           wrapper.style.transform = `rotate(${k.rotation}deg)`;
           const pureSvg = generateWindsockSvg(speed, gust, dir, turb, {
-            prefix: 'miniws-',
+            prefix: 'miniws-to-',
             scale: 0.45,
             includeWrapper: false
           });
           wrapper.innerHTML = pureSvg;
         } else {
           el.innerHTML = generateWindsockSvg(speed, gust, dir, turb, {
-            prefix: 'miniws-',
+            prefix: 'miniws-to-',
             scale: 0.45,
             includeWrapper: true
           });
         }
       }
+
+      // In-place update of Takeoff Exposure Sector alignment and color
+      if (this.takeoffSectorMarker && this.activeMiniMapSpotData) {
+        const tHeading = this.activeMiniMapSpotData.takeoff?.heading ?? null;
+        const tAlt = this.activeMiniMapSpotData.takeoff?.altitude || 1000;
+        const sEl = this.takeoffSectorMarker.getElement();
+        if (sEl) {
+          sEl.innerHTML = generateTakeoffSectorSvg(tHeading, dir, tAlt, { prefix: 'miniws-to-' });
+        }
+      }
     }
 
-    // 2. In-place update of Takeoff Exposure Sector alignment and color
-    if (this.takeoffSectorMarker && this.activeMiniMapSpotData) {
-      const tHeading = this.activeMiniMapSpotData.takeoff?.heading ?? null;
-      const tAlt = this.activeMiniMapSpotData.takeoff?.altitude || 1000;
-      const el = this.takeoffSectorMarker.getElement();
+    // 2. In-place update of Landing windsock
+    if (this.landingWindsockMarker && lWeather) {
+      const speed = lWeather.windSpeed ?? 0;
+      const gust = lWeather.windGust ?? speed;
+      const dir = lWeather.windDirection ?? lWeather.windDir ?? 0;
+      const turb = lWeather.turbulence ?? 0;
+
+      const el = this.landingWindsockMarker.getElement();
       if (el) {
-        el.innerHTML = generateTakeoffSectorSvg(tHeading, dir, tAlt, { prefix: 'miniws-to-' });
+        const k = calculateWindsockKinematics(speed, gust, dir, turb);
+        const wrapper = el.querySelector('#miniws-ld-wrapper') || el.querySelector('.gm-windsock-wrapper');
+        if (wrapper) {
+          wrapper.style.transform = `rotate(${k.rotation}deg)`;
+          const pureSvg = generateWindsockSvg(speed, gust, dir, turb, {
+            prefix: 'miniws-ld-',
+            scale: 0.45,
+            includeWrapper: false
+          });
+          wrapper.innerHTML = pureSvg;
+        } else {
+          el.innerHTML = generateWindsockSvg(speed, gust, dir, turb, {
+            prefix: 'miniws-ld-',
+            scale: 0.45,
+            includeWrapper: true
+          });
+        }
       }
     }
   }

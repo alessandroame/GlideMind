@@ -736,6 +736,26 @@ export function evaluateComprensorio({
       glideMetrics,
       takeoffs: evaluatedTakeoffs,
       landings: evaluatedLandings,
+      takeoffWeather: {
+        windSpeed: null,
+        windGust: null,
+        windDir: null,
+        windDirection: null,
+        turbulence: null,
+        temp: null,
+        cape: null,
+        rain: null
+      },
+      landingWeather: {
+        windSpeed: null,
+        windGust: null,
+        windDir: null,
+        windDirection: null,
+        turbulence: null,
+        temp: null,
+        cape: null,
+        rain: null
+      },
       weatherSnapshot: {
         windSpeed: null,
         windGust: null,
@@ -797,6 +817,29 @@ export function evaluateComprensorio({
     if (h.turbulence_edr && h.turbulence_edr[idx] != null) turbulence = Number(h.turbulence_edr[idx]);
     if (h.precipitation && h.precipitation[idx] != null) rain = Number(h.precipitation[idx]);
     if (h.temperature_2m && h.temperature_2m[idx] != null) temp = Number(h.temperature_2m[idx]);
+  }
+
+  let lWindSpeed = windSpeed;
+  let lWindGust = windGust;
+  let lWindDir = windDir;
+  let lCape = cape;
+  let lTurbulence = turbulence;
+  let lRain = rain;
+  let lTemp = temp;
+
+  const landingWeatherSource = weatherData?.landingWeather || weatherData?.landing || weatherData?.points?.[1];
+  if (landingWeatherSource && landingWeatherSource.hourly) {
+    const lh = landingWeatherSource.hourly;
+    const rawLSpeed = lh.windspeed_10m ?? lh.wind_speed_10m;
+    if (rawLSpeed && rawLSpeed[idx] != null) lWindSpeed = Number(rawLSpeed[idx]);
+    const rawLGust = lh.windgusts_10m ?? lh.wind_gusts_10m;
+    if (rawLGust && rawLGust[idx] != null) lWindGust = Number(rawLGust[idx]);
+    const rawLDir = lh.winddirection_10m ?? lh.wind_direction_10m;
+    if (rawLDir && rawLDir[idx] != null) lWindDir = Number(rawLDir[idx]);
+    if (lh.cape && lh.cape[idx] != null) lCape = Number(lh.cape[idx]);
+    if (lh.turbulence_edr && lh.turbulence_edr[idx] != null) lTurbulence = Number(lh.turbulence_edr[idx]);
+    if (lh.precipitation && lh.precipitation[idx] != null) lRain = Number(lh.precipitation[idx]);
+    if (lh.temperature_2m && lh.temperature_2m[idx] != null) lTemp = Number(lh.temperature_2m[idx]);
   }
 
   // 1. Evaluate all takeoffs in this comprensorio
@@ -1016,7 +1059,26 @@ export function evaluateComprensorio({
     primaryTakeoff: primaryTakeoffEval ? primaryTakeoffEval.takeoff : null,
     glideMetrics,
     takeoffs: evaluatedTakeoffs,
-    landings,
+    takeoffWeather: {
+      windSpeed: Math.round(windSpeed),
+      windGust: Math.round(windGust),
+      windDir: Math.round(windDir),
+      windDirection: Math.round(windDir),
+      turbulence,
+      temp: Math.round(temp),
+      cape: Math.round(cape),
+      rain
+    },
+    landingWeather: {
+      windSpeed: Math.round(lWindSpeed),
+      windGust: Math.round(lWindGust),
+      windDir: Math.round(lWindDir),
+      windDirection: Math.round(lWindDir),
+      turbulence: lTurbulence,
+      temp: Math.round(lTemp),
+      cape: Math.round(lCape),
+      rain: lRain
+    },
     weatherSnapshot: {
       windSpeed: Math.round(windSpeed),
       windGust: Math.round(windGust),

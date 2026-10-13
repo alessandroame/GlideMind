@@ -1070,6 +1070,9 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.ok(html.includes('data-action="open-full-map"'), 'Must render 1-tap open full map action button');
     assert.ok(html.includes('aria-label="Apri mappa comprensori completa"'), 'Must include accessible label for map button');
     assert.ok(html.includes('id="forecast-spot-metrics-container"'), 'Must render decoupled spot metrics container');
+    assert.ok(html.includes('data-action="minimap-zoom-in"'), 'Must render minimap zoom-in button in top-right');
+    assert.ok(html.includes('data-action="minimap-zoom-out"'), 'Must render minimap zoom-out button in top-right');
+    assert.ok(html.includes('class="gm-mini-map-zoom-controls"'), 'Must render minimap zoom controls container');
   });
 
   it('should initialize miniMapEngine and update windsock in place on setHour without destroying map DOM', () => {
@@ -1105,8 +1108,10 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.ok(controller.miniMapEngine, 'Must initialize miniMapEngine on mount');
     assert.equal(controller.miniMapEngine.renderedMode, 'minimap', 'Must render in minimap mode');
     assert.ok(controller.miniMapEngine.activeMiniMapSpotData, 'Must store active spot data');
+    assert.equal(controller.miniMapEngine.hasTakeoffWindsock, true, 'Must initialize takeoff windsock on mini-map');
+    assert.equal(controller.miniMapEngine.hasLandingWindsock, true, 'Must initialize landing windsock on mini-map');
 
-    // Hourly scrubbing: must update windsock and glide line without re-initializing or wiping map
+    // Hourly scrubbing: must update both windsocks and glide line without re-initializing or wiping map
     const initialEngine = controller.miniMapEngine;
     controller.setHour(15);
 
@@ -1114,6 +1119,8 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.equal(controller.miniMapEngine, initialEngine, 'miniMapEngine instance must be preserved across setHour');
     assert.ok(controller.miniMapEngine.lastWindsockUpdate, 'Must update windsock marker on setHour');
     assert.ok(controller.miniMapEngine.lastWindsockUpdate.weatherSnapshot.windDirection != null, 'weatherSnapshot must have windDirection');
+    assert.ok(controller.miniMapEngine.lastWindsockUpdate.takeoffWeather, 'Must pass distinct takeoff weather update');
+    assert.ok(controller.miniMapEngine.lastWindsockUpdate.landingWeather, 'Must pass distinct landing weather update');
     assert.ok(controller.miniMapEngine.lastWindsockUpdate.takeoff, 'Must pass active or evaluated takeoff');
     assert.ok(controller.miniMapEngine.lastGlideUpdate, 'Must update glide line on setHour');
     assert.ok(metricsHtml.includes('15:00'), 'Must update metrics text with active hour');
@@ -1231,6 +1238,12 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.ok(themeCss.includes('.gm-mini-map-expand-btn::before'), 'Must provide touch expansion pseudo-element on expand button');
     assert.ok(themeCss.includes('.gm-mini-map-box[data-map-layer="topo"] .gm-mini-map-layer-select'), 'Must define adaptive light styling for topo basemap');
     assert.ok(themeCss.includes('.gm-mini-map-box[data-map-layer="satellite"] .gm-mini-map-layer-select'), 'Must define adaptive dark styling for satellite basemap');
+    assert.ok(themeCss.includes('.gm-mini-map-zoom-controls {'), 'Must define .gm-mini-map-zoom-controls');
+    assert.ok(themeCss.includes('.gm-mini-map-zoom-btn {'), 'Must define .gm-mini-map-zoom-btn');
+    assert.ok(themeCss.includes('.gm-mini-map-zoom-btn::before'), 'Must provide touch expansion pseudo-element on minimap zoom button');
+    assert.ok(themeCss.includes('.gm-flight-analysis-zoom-group {'), 'Must define .gm-flight-analysis-zoom-group');
+    assert.ok(themeCss.includes('.gm-flight-analysis-zoom-btn {'), 'Must define .gm-flight-analysis-zoom-btn');
+    assert.ok(themeCss.includes('.gm-flight-analysis-zoom-btn::before'), 'Must provide touch expansion pseudo-element on flight analysis zoom button');
   });
 
   it('should open and close flight analysis overlay, pausing and resuming miniMapEngine', () => {
@@ -1449,6 +1462,70 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.equal(mockStore.getState().ui.mapLayer, 'topo', 'Store ui.mapLayer must be updated back to topo');
 
     controller.closeFlightAnalysisOverlay();
+  });
+
+  it('should handle minimap and flight analysis zoom-in and zoom-out click actions', () => {
+    const mockStore = createStore({
+      selectedSpot: DEFAULT_COMPRENSORI[0],
+      ui: { theme: 'dark', mapLayer: 'topo' }
+    });
+    const controller = new ForecastViewController({ store: mockStore });
+
+    const mockMiniMapEl = { innerHTML: '', style: {} };
+    const mockContainer = {
+      innerHTML: '',
+      addEventListener() {},
+      removeEventListener() {},
+      querySelector(sel) {
+        if (sel === '#forecast-mini-map') return mockMiniMapEl;
+        return null;
+      }
+    };
+
+    controller.mount(mockContainer);
+
+    assert.ok(controller.miniMapEngine, 'miniMapEngine must be initialized');
+    const initialMiniZoom = controller.miniMapEngine.zoom || 13;
+
+    // 1. Click minimap-zoom-in
+    controller.handleClick({
+      target: {
+        closest: (sel) => (sel === '[data-action]' ? { getAttribute: (attr) => (attr === 'data-action' ? 'minimap-zoom-in' : null) } : null)
+      }
+    });
+    assert.equal(controller.miniMapEngine.zoom, initialMiniZoom + 1, 'miniMapEngine zoom must increase by 1 on zoom-in');
+
+    // 2. Click minimap-zoom-out
+    controller.handleClick({
+      target: {
+        closest: (sel) => (sel === '[data-action]' ? { getAttribute: (attr) => (attr === 'data-action' ? 'minimap-zoom-out' : null) } : null)
+      }
+    });
+    assert.equal(controller.miniMapEngine.zoom, initialMiniZoom, 'miniMapEngine zoom must decrease by 1 on zoom-out');
+
+    // 3. Open flight analysis overlay and test zoom controls
+    controller.openFlightAnalysisOverlay();
+    assert.ok(controller.flightAnalysisMapEngine, 'flightAnalysisMapEngine must be initialized');
+    const initialFlightZoom = controller.flightAnalysisMapEngine.zoom || 13;
+
+    // Click flight-analysis-zoom-in
+    controller.handleClick({
+      target: {
+        closest: (sel) => (sel === '[data-action]' ? { getAttribute: (attr) => (attr === 'data-action' ? 'flight-analysis-zoom-in' : null) } : null)
+      }
+    });
+    assert.equal(controller.flightAnalysisMapEngine.zoom, initialFlightZoom + 1, 'flightAnalysisMapEngine zoom must increase by 1 on zoom-in');
+
+    // Click flight-analysis-zoom-out
+    controller.handleClick({
+      target: {
+        closest: (sel) => (sel === '[data-action]' ? { getAttribute: (attr) => (attr === 'data-action' ? 'flight-analysis-zoom-out' : null) } : null)
+      }
+    });
+    assert.equal(controller.flightAnalysisMapEngine.zoom, initialFlightZoom, 'flightAnalysisMapEngine zoom must decrease by 1 on zoom-out');
+
+    controller.closeFlightAnalysisOverlay();
+    controller.unmount();
   });
 
   it('should declare responsive full-screen 100dvh overlay, touch targets, and banners in theme.css', () => {

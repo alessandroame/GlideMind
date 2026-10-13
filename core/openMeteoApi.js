@@ -341,7 +341,11 @@ export function normalizeCoordinates(coords) {
     } else if (typeof coords === 'object') {
         lat = Number(coords.latitude ?? coords.lat);
         lon = Number(coords.longitude ?? coords.lon ?? coords.lng);
-        elev = coords.elevation != null ? Number(coords.elevation) : null;
+        elev = coords.elevation != null
+            ? Number(coords.elevation)
+            : (coords.elev != null
+                ? Number(coords.elev)
+                : (coords.altitude != null ? Number(coords.altitude) : null));
     }
 
     if (isNaN(lat) || lat < -90 || lat > 90) {
@@ -352,6 +356,71 @@ export function normalizeCoordinates(coords) {
     }
 
     return { lat, lon, elev };
+}
+
+/**
+ * Detects if a coordinate structure represents multiple locations (multi-point).
+ * Supports:
+ * - Array of coordinate objects: [{ lat, lon }, { lat, lon }]
+ * - Array of coordinate tuples: [[lat1, lon1], [lat2, lon2]]
+ * - Object with takeoff and/or landing: { takeoff: coords1, landing: coords2 }
+ * - Object with points/locations array: { points: [...] }
+ * 
+ * @param {any} coords
+ * @returns {boolean}
+ */
+export function isCoordinateList(coords) {
+    if (!coords) return false;
+    if (Array.isArray(coords)) {
+        return coords.length > 0 && (typeof coords[0] === 'object' || Array.isArray(coords[0]));
+    }
+    if (typeof coords === 'object' && (coords.takeoff || coords.points || coords.locations)) {
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Normalizes a list of coordinates into an array of { lat, lon, elev, role }.
+ * 
+ * @param {any} coords
+ * @returns {Array<{ lat: number, lon: number, elev: number|null, role?: string }>}
+ */
+export function normalizeCoordinateList(coords) {
+    if (!coords) throw new Error('Coordinate list is null or undefined.');
+    let list = [];
+    if (Array.isArray(coords)) {
+        if (coords.length > 0 && typeof coords[0] === 'number') {
+            return [normalizeCoordinates(coords)];
+        }
+        list = coords.map((c, idx) => ({
+            ...normalizeCoordinates(c),
+            role: c?.role || (idx === 0 ? 'takeoff' : 'landing')
+        }));
+    } else if (typeof coords === 'object') {
+        if (coords.takeoff || coords.landing) {
+            if (coords.takeoff) list.push({ ...normalizeCoordinates(coords.takeoff), role: 'takeoff' });
+            if (coords.landing) list.push({ ...normalizeCoordinates(coords.landing), role: 'landing' });
+        } else if (Array.isArray(coords.points)) {
+            list = coords.points.map((c, idx) => ({
+                ...normalizeCoordinates(c),
+                role: c?.role || (idx === 0 ? 'takeoff' : 'landing')
+            }));
+        } else if (Array.isArray(coords.locations)) {
+            list = coords.locations.map((c, idx) => ({
+                ...normalizeCoordinates(c),
+                role: c?.role || (idx === 0 ? 'takeoff' : 'landing')
+            }));
+        } else {
+            return [normalizeCoordinates(coords)];
+        }
+    } else {
+        return [normalizeCoordinates(coords)];
+    }
+    if (list.length === 0) {
+        throw new Error('Coordinate list is empty.');
+    }
+    return list;
 }
 
 /**
@@ -411,12 +480,20 @@ export function buildHourlyVariablesList(options = {}) {
  * @returns {URL} Constructed URL object
  */
 export function buildForecastUrl(coords, options = {}) {
-    const { lat, lon } = normalizeCoordinates(coords);
+    const isList = isCoordinateList(coords);
+    const normList = isList ? normalizeCoordinateList(coords) : [normalizeCoordinates(coords)];
     const baseUrl = options.baseUrl || OPEN_METEO_FORECAST_URL;
     const url = new URL(baseUrl);
 
-    url.searchParams.append('latitude', lat.toFixed(4));
-    url.searchParams.append('longitude', lon.toFixed(4));
+    const latParam = normList.map(c => c.lat.toFixed(4)).join(',');
+    const lonParam = normList.map(c => c.lon.toFixed(4)).join(',');
+    url.searchParams.append('latitude', latParam);
+    url.searchParams.append('longitude', lonParam);
+
+    if (normList.every(c => c.elev != null && !isNaN(c.elev))) {
+        url.searchParams.append('elevation', normList.map(c => Math.round(c.elev)).join(','));
+    }
+
     url.searchParams.append('timezone', options.timezone || 'auto');
 
     // Date range resolution
@@ -554,6 +631,7 @@ export function generateSyntheticWeather(coords, options = {}) {
     const targetDate = options.targetDate || new Date().toISOString().split('T')[0];
     const days = Math.min(16, Math.max(1, Number(options.days) || 3));
     const effectiveElev = elev != null ? elev : 900;
+    const isLanding = options.isLanding === true || (options.isLanding !== false && elev != null && elev < 650);
 
     const times = [];
     const tempArr = [];
@@ -644,6 +722,14 @@ export function generateSyntheticWeather(coords, options = {}) {
             temp = 16;
             dir = 350;
             dew = 11.8;
+        }
+
+        if (isLanding) {
+            // Low altitude valley landing: moderate valley breeze, attenuated wind speed, and directional deflection
+            wind = Math.max(3, Math.round(wind * 0.75));
+            gust = Math.max(5, Math.round(gust * 0.8));
+            dir = (dir + 25) % 360;
+            temp = Math.round((temp + Math.max(0, (900 - effectiveElev) * 0.0065)) * 10) / 10;
         }
 
         // Apply realistic deterministic multi-day synoptic progression for dayIndex > 0
@@ -977,6 +1063,172 @@ export function getCachedWeatherData(coords, targetDate, options = {}) {
 }
 
 /**
+ * Fetches Open-Meteo weather data for multiple coordinates in a single HTTP request.
+ * Enriches each location and returns a combined structure where the primary location (takeoff)
+ * is the base object, and secondary locations (e.g. landing) are attached under .landingWeather and .points.
+ * 
+ * @param {Array<{ lat: number, lon: number, elev: number|null, role?: string }>} normList
+ * @param {Object} [options]
+ * @returns {Promise<Object>}
+ */
+export async function fetchMultiLocationWeatherData(normList, options = {}) {
+    const targetDate = options.targetDate || new Date().toISOString().split('T')[0];
+    const activeModel = (options.weatherModel && SUPPORTED_WEATHER_MODELS.includes(options.weatherModel))
+        ? options.weatherModel
+        : 'best_match';
+
+    const cache = options.cache || defaultWeatherCache;
+    const fetchFn = options.fetchFn || globalThis.fetch;
+    const timeoutMs = Number(options.timeoutMs) || DEFAULT_REQUEST_TIMEOUT_MS;
+    const maxRetries = Math.max(0, Number(options.maxRetries) || 2);
+
+    // 1. Synthetic Mock Weather Guard (Offline / Testing)
+    if (options.mock === true) {
+        const enrichedList = normList.map((c, idx) => {
+            const isLanding = c.role === 'landing' || idx > 0;
+            const synthetic = generateSyntheticWeather({ lat: c.lat, lon: c.lon, elevation: c.elev }, {
+                targetDate,
+                weatherModel: activeModel,
+                takeoffAzimuth: isLanding ? null : options.customHeading,
+                isLanding
+            });
+            const enriched = enrichWeatherData(synthetic, targetDate, Date.now(), {
+                ...options,
+                customHeading: isLanding ? null : options.customHeading
+            });
+            enriched.isSynthetic = true;
+            enriched.isFromCache = false;
+            return enriched;
+        });
+
+        const combined = { ...enrichedList[0] };
+        combined.points = enrichedList;
+        combined.takeoffWeather = enrichedList[0];
+        combined.landingWeather = enrichedList[1] || enrichedList[0];
+        combined.isSynthetic = true;
+        combined.isFromCache = false;
+        return combined;
+    }
+
+    // 2. Fresh Cache Check for All Points
+    if (!options.forceRefresh) {
+        const allCached = normList.map(c => getCachedWeatherData(c, targetDate, {
+            ...options,
+            cache,
+            weatherModel: activeModel
+        }));
+        const areAllFresh = allCached.every(cached => cached && !cached.isStale && cached.hasThermalData);
+        if (areAllFresh) {
+            const combined = { ...allCached[0] };
+            combined.points = allCached;
+            combined.takeoffWeather = allCached[0];
+            combined.landingWeather = allCached[1] || allCached[0];
+            combined.isFromCache = true;
+            return combined;
+        }
+    }
+
+    // 3. Build Multi-Location URL and Fetch
+    let url = buildForecastUrl(normList, {
+        targetDate,
+        weatherModel: activeModel,
+        includeSounding: options.includeSounding !== false
+    });
+
+    let response = null;
+    let attempt = 0;
+    let lastError = null;
+
+    while (attempt <= maxRetries) {
+        try {
+            response = await fetchWithTimeout(url, {}, timeoutMs, fetchFn);
+
+            // Handle HTTP 429 Rate Limit with exponential backoff
+            if (response.status === 429 && attempt < maxRetries) {
+                const backoffMs = Math.min(4000, (500 * Math.pow(2, attempt)) + Math.round(Math.random() * 200));
+                await sleep(backoffMs);
+                attempt++;
+                continue;
+            }
+
+            // Regional Model Fallback: fallback to best_match if model returns HTTP 400
+            if (!response.ok && response.status === 400 && activeModel !== 'best_match') {
+                const fallbackUrl = buildForecastUrl(normList, {
+                    targetDate,
+                    weatherModel: 'best_match',
+                    includeSounding: options.includeSounding !== false
+                });
+                response = await fetchWithTimeout(fallbackUrl, {}, timeoutMs, fetchFn);
+            }
+
+            break;
+        } catch (netErr) {
+            lastError = netErr;
+            if (attempt < maxRetries) {
+                const backoffMs = 500 * Math.pow(2, attempt);
+                await sleep(backoffMs);
+                attempt++;
+                continue;
+            }
+            break;
+        }
+    }
+
+    // 4. Stale Cache Fallback on Network / HTTP Failure
+    if (!response || !response.ok) {
+        const staleCached = normList.map(c => getCachedWeatherData(c, targetDate, {
+            ...options,
+            cache,
+            weatherModel: activeModel
+        }));
+        if (staleCached[0]) {
+            const combined = { ...staleCached[0] };
+            combined.points = staleCached.filter(Boolean);
+            combined.takeoffWeather = staleCached[0];
+            combined.landingWeather = staleCached[1] || staleCached[0];
+            combined.isStaleOfflineFallback = true;
+            return combined;
+        }
+
+        if (lastError) {
+            throw new Error(`Open-Meteo network request failed: ${lastError.message}`);
+        }
+        let reason = `HTTP ${response ? response.status : 'Unknown'}`;
+        try {
+            const errJson = await response.json();
+            if (errJson.reason) reason = errJson.reason;
+        } catch (_) {}
+        throw new Error(`Open-Meteo API error (${reason})`);
+    }
+
+    // 5. Parse and Enrich Multi-Point Payload
+    const rawData = await response.json();
+    const rawPayloads = Array.isArray(rawData) ? rawData : [rawData];
+
+    const enrichedList = rawPayloads.map((raw, idx) => {
+        raw.weather_model = activeModel;
+        const coords = normList[idx] || normList[0];
+        const cacheKey = generateWeatherCacheKey(coords.lat, coords.lon, targetDate, activeModel);
+        cache.set(cacheKey, raw);
+
+        const isLanding = coords.role === 'landing' || idx > 0;
+        const enriched = enrichWeatherData(raw, targetDate, Date.now(), {
+            ...options,
+            customHeading: isLanding ? null : options.customHeading
+        });
+        enriched.isFromCache = false;
+        return enriched;
+    });
+
+    const combined = { ...enrichedList[0] };
+    combined.points = enrichedList;
+    combined.takeoffWeather = enrichedList[0];
+    combined.landingWeather = enrichedList[1] || enrichedList[0];
+    combined.isFromCache = false;
+    return combined;
+}
+
+/**
  * Fetches Open-Meteo weather data with caching, AbortController timeout,
  * exponential backoff retry on HTTP 429, and regional model fallback.
  * 
@@ -995,6 +1247,14 @@ export function getCachedWeatherData(coords, targetDate, options = {}) {
  * @returns {Promise<Object>} Enriched weather payload
  */
 export async function fetchWeatherData(coords, options = {}) {
+    if (isCoordinateList(coords)) {
+        const normList = normalizeCoordinateList(coords);
+        if (normList.length === 1) {
+            return fetchWeatherData(normList[0], options);
+        }
+        return fetchMultiLocationWeatherData(normList, options);
+    }
+
     const { lat, lon, elev } = normalizeCoordinates(coords);
     const targetDate = options.targetDate || new Date().toISOString().split('T')[0];
     const activeModel = (options.weatherModel && SUPPORTED_WEATHER_MODELS.includes(options.weatherModel))

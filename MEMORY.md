@@ -2140,3 +2140,50 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
      - Assegnare `renderOrder = 10`, `depthTest: true`, `depthWrite: true` e `polygonOffsetFactor: -1.0, units: -2.0` alle mesh del parapendio (`canopyMesh`, `podHarnessMesh`) in `paragliderModel.js`.
      - Assegnare `renderOrder = 1` al `trackRibbonMesh`, `renderOrder = 2` al `centerLineMesh`, e `renderOrder = 0` al `curtainMesh`, con polygon offset del ribbon ridotto a `-0.25, -1.0`.
      - In questo modo l'avatar del parapendio vince categoricamente il test di profondità, rimanendo sempre nitido, in primo piano e perfettamente visibile rispetto alla scia retrostante.
+
+---
+
+## 154. Disaccoppiamento Meteorologico Decollo-Atterraggio e Ingestione Multi-Punto Open-Meteo
+- **Problema**:
+  - Le maniche a vento vettoriali al decollo e all'atterraggio (sia nella mini-mappa che nell'overlay analitico del comprensorio) indicavano sempre la stessa identica direzione e intensità del vento, e il calcolo dei circuiti di atterraggio utilizzava il vento di decollo o un'euristica fissa.
+- **Causa Radice**:
+  - `ForecastViewController.fetchWeatherDataAsync` interrogava Open-Meteo unicamente per le coordinate del decollo attivo.
+  - `evaluateComprensorio` forniva un unico oggetto aggregato `weatherSnapshot`.
+  - Di conseguenza `takeoffWeather` e `landingWeather` puntavano alla stessa istanza dati, propagando azimut e intensità identici a entrambe le maniche a vento.
+- **Pattern Vincolante**:
+  1. **Supporto Coordinate Multi-Punto in `openMeteoApi.js` (`isCoordinateList`, `normalizeCoordinateList`)**:
+     - Accettare array di coordinate `[{ lat, lon, elev, role }]` o mappe `{ takeoff, landing }`, normalizzando le proprietà di quota (`elevation`, `altitude`, `elev`).
+     - Costruire richieste Open-Meteo con parametri separati da virgola (`latitude=lat1,lat2&longitude=lon1,lon2&elevation=elev1,elev2`), sfruttando il supporto multi-punto nativo delle API (restituzione di un array JSON di risposte).
+  2. **Cache Granulare per Coordinate (`InMemoryCache`)**:
+     - Nella gestione multi-punto (`fetchMultiLocationWeatherData`), ogni punto geografico deve essere memorizzato e recuperato nella cache in memoria con la propria chiave geografica deterministica `generateWeatherCacheKey(lat, lon, targetDate, model)`.
+     - In questo modo i dati di un decollo o atterraggio restano riutilizzabili individualmente tra schermate diverse (Home, Forecast, SpotMap) senza creare chiavi composte duplicate.
+  3. **Modellazione Fisica dello Strato Limite di Valle (`generateSyntheticWeather`)**:
+     - Nei dati sintetici offline, il flag `isLanding: true` modella la fisica reale del fondo valle: riduzione del vento del $25\%$ per attrito al suolo, rotazione del vento di $+25^\circ$ per incanalamento orografico della brezza di valle, e gradiente adiabatico sulla temperatura in base al salto di quota tra decollo e atterraggio.
+  4. **Contratto Dati Disaccoppiato nel Comprensorio (`evaluateComprensorio`)**:
+     - Il modulo comprensorio estrae separatamente `takeoffWeather` e `landingWeather` dal payload multi-punto (o punti 0 e 1).
+     - Mantiene retrocompatibilità tramite `weatherSnapshot: takeoffWeather`.
+     - Le viste UI (`ForecastView.js`) e i motori cartografici aggiornano separatamente le maniche a vento e utilizzano l'autentico vento al suolo dell'atterraggio per la configurazione dei circuiti di atterraggio.
+
+---
+
+## 155. Doppia Manica a Vento sulla Mini-Mappa, Isolamento Prefissi SVG e Ergonomia Controlli di Zoom vs Tasto Fullscreen
+- **Problema**:
+  - Nella mini-mappa compatta della scheda previsioni, il pilota poteva vedere la manica a vento del decollo, ma non quella dell'atterraggio in contemporanea, perdendo il confronto immediato sulla direzione del vento nei due punti chiave del volo.
+  - La mini-mappa e l'overlay a tutto schermo mancavano di controlli diretti di zoom (`+` e `-`), costringendo su desktop o schermi touch al pinch-to-zoom (che nella mini-mappa è disabilitato per non intrappolare lo scroll verticale della pagina).
+  - Il pulsante di espansione fullscreen era collocato in alto a destra, collidendo con la posizione naturale dei controlli di zoom.
+- **Causa Radice**:
+  - `renderSpotMiniMap` istanziava unicamente la manica a vento del sub-spot primario (o solo decollo), senza posizionare contemporaneamente il marker all'atterraggio.
+  - Mancanza di identificatori SVG univoci e isolati tra le due maniche a vento vettoriali nello stesso documento SVG/DOM (rischio di collisione di ID di gradienti e rotazioni).
+  - Sovrapposizione spaziale nell'angolo in alto a destra tra l'azione di espansione e i controlli di zoom.
+- **Pattern Vincolante**:
+  1. **Doppia Manica a Vento Vettoriale Indipendente (`LeafletMapEngine.renderSpotMiniMap`)**:
+     - Istanziare e tracciare due marker distinti sulla mini-mappa: `takeoffWindsockMarker` (coordinate decollo, prefisso `miniws-to-`, scala 0.45) e `landingWindsockMarker` (coordinate atterraggio, prefisso `miniws-ld-`, scala 0.45).
+     - L'atterraggio deve includere sia il marker grafico `⏚` sia la manica a vento orientata in base al vento dell'atterraggio.
+     - L'aggiornamento orario in-place (`updateWindsockMarker`) ruota selettivamente `#miniws-to-wrapper` e `#miniws-ld-wrapper` senza re-inizializzare la mappa Leaflet.
+  2. **Isolamento dei Prefissi SVG per Marker Cartografici Multipli**:
+     - Ogni marker vettoriale SVG generato dinamicamente deve utilizzare prefissi dedicati (`prefix: 'miniws-to-'`, `prefix: 'miniws-ld-'`) per `id="...-wrapper"`, `id="...-grad"`, `id="...-tail"`, evitando collisioni tra filtri, clip-path e trasformazioni CSS.
+  3. **Disposizione Ergonomica e Separazione Fitts (Top-Right Zoom vs Bottom-Right Fullscreen)**:
+     - Angolo in alto a destra (`top: 8px; right: 8px;`): colonna verticale dei controlli di zoom (`+` e `-`) con pulsanti da 32×32px, `radial scrim` di contrasto e pseudo-elemento `::before` esteso al pavimento Fitts $\ge 48\text{px}$.
+     - Angolo in basso a destra (`bottom: 8px; right: 8px;`): pulsante fullscreen / analisi volo (`.gm-mini-map-expand-btn`), garantendo una distanza verticale $> 100\text{px}$ rispetto ai controlli di zoom per azzerare qualsiasi tocco accidentale.
+  4. **Metodi Cartografici Pubblici Deterministici (`zoomIn`, `zoomOut`)**:
+     - Tutti i motori cartografici (`LeafletMapEngine`, `HeadlessMockMapEngine`) devono esporre `zoomIn(delta = 1)` e `zoomOut(delta = 1)`. Nella mini-mappa Leaflet, dove i gesti di scroll e pinch sono disattivati per proteggere la navigazione della pagina, i metodi programmatici garantiscono il pieno controllo dello zoom all'utente.
