@@ -20,6 +20,35 @@ export const KEYBOARD_SHORTCUTS = Object.freeze({
 });
 
 /**
+ * Extracts key-value parameter pairs from a hash query string (e.g., '#logbook?focusFlightId=123').
+ * @param {string|null|undefined} hash
+ * @returns {Record<string, string>}
+ */
+export function parseHashParams(hash) {
+  if (!hash || typeof hash !== 'string' || !hash.includes('?')) {
+    return {};
+  }
+  const queryPart = hash.split('?')[1] || '';
+  if (!queryPart) {
+    return {};
+  }
+  const result = {};
+  const pairs = queryPart.split('&');
+  for (const pair of pairs) {
+    if (!pair) continue;
+    const [rawKey, rawValue] = pair.split('=');
+    if (rawKey) {
+      try {
+        result[decodeURIComponent(rawKey)] = decodeURIComponent(rawValue || '');
+      } catch {
+        result[rawKey] = rawValue || '';
+      }
+    }
+  }
+  return result;
+}
+
+/**
  * Normalizes an arbitrary hash string or path into a valid GlideMind route name.
  * @param {string|null|undefined} hash
  * @returns {typeof VALID_ROUTES[number]}
@@ -113,6 +142,9 @@ export function createRouter(options = {}) {
   function navigate(route, params = {}) {
     const validRoute = normalizeRoute(route);
     if (validRoute === currentRoute) {
+      if (currentMountedView && typeof currentMountedView.handleRouteParams === 'function') {
+        currentMountedView.handleRouteParams(params);
+      }
       return;
     }
 
@@ -145,7 +177,11 @@ export function createRouter(options = {}) {
 
       // 3. Update window hash if in browser
       if (typeof window !== 'undefined' && window.location) {
-        const targetHash = `#${validRoute}`;
+        const queryEntries = Object.entries(params || {}).filter(([_, v]) => v != null && v !== '');
+        const queryPart = queryEntries.length > 0
+          ? '?' + queryEntries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&')
+          : '';
+        const targetHash = `#${validRoute}${queryPart}`;
         if (window.location.hash !== targetHash) {
           window.location.hash = targetHash;
         }
@@ -216,10 +252,10 @@ export function createRouter(options = {}) {
 
     // Listen to hashchange
     window.addEventListener('hashchange', () => {
-      const routeFromHash = normalizeRoute(window.location.hash);
-      if (routeFromHash !== currentRoute) {
-        navigate(routeFromHash);
-      }
+      const rawHash = window.location.hash;
+      const routeFromHash = normalizeRoute(rawHash);
+      const paramsFromHash = parseHashParams(rawHash);
+      navigate(routeFromHash, paramsFromHash);
     });
 
     // Listen to store updates for activeView
@@ -266,8 +302,10 @@ export function createRouter(options = {}) {
     }
 
     // Initial navigation based on starting hash or store state
-    const initialRoute = normalizeRoute(window.location.hash || targetStore.getState().activeView);
-    navigate(initialRoute);
+    const startingHash = typeof window !== 'undefined' && window.location ? window.location.hash : '';
+    const initialRoute = normalizeRoute(startingHash || targetStore.getState().activeView);
+    const initialParams = parseHashParams(startingHash);
+    navigate(initialRoute, initialParams);
   }
 
   return {

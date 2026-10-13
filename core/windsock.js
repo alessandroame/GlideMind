@@ -24,6 +24,34 @@ export function normalizeAngle(deg) {
 }
 
 /**
+ * Calculates the continuous unwrapped angle that represents the shortest angular
+ * rotation path from currentAngle to targetAngle.
+ * 
+ * Prevents unwanted full 360° counter-rotations across the 0°/360° discontinuity
+ * (e.g. from 355° to 10° moves +15° clockwise instead of -345° counter-clockwise).
+ * 
+ * @param {number} currentAngle Current continuous rotation in degrees
+ * @param {number} targetAngle Target orientation in degrees [0, 360)
+ * @returns {number} Next continuous angle in degrees
+ */
+export function calculateShortestRotation(currentAngle, targetAngle) {
+  const isCurrentValid = currentAngle !== null && currentAngle !== '' && Number.isFinite(Number(currentAngle));
+  const isTargetValid = targetAngle !== null && targetAngle !== '' && Number.isFinite(Number(targetAngle));
+
+  if (!isCurrentValid) return isTargetValid ? Number(targetAngle) : 0;
+  if (!isTargetValid) return Number(currentAngle);
+
+  const current = Number(currentAngle);
+  const target = Number(targetAngle);
+
+  let diff = (target - current) % 360;
+  if (diff > 180) diff -= 360;
+  if (diff < -180) diff += 360;
+
+  return current + diff;
+}
+
+/**
  * Classifies wind speed into an aeronautical elevation stage for paragliding (EN-A novice envelope).
  * - Stage 0: Calm (< 5 km/h) - Limp, droop downwards
  * - Stage 1: Light (5 - 11.9 km/h) - Slight elevation (~30-50°)
@@ -275,7 +303,7 @@ export function generateWindsockSvg(speed, gust, direction, turbulence = 0, opti
 
   return [
     `<div class="gm-windsock-scaler" style="transform: scale(${scale}); transform-origin: center; width: 240px; height: 240px;">`,
-    `  <div id="${prefix}wrapper" class="gm-windsock-wrapper" style="transform: rotate(${rotation}deg); transform-origin: 120px 120px; width: 240px; height: 240px; pointer-events: none;">`,
+    `  <div id="${prefix}wrapper" class="gm-windsock-wrapper" data-current-rotation="${rotation}" style="transform: rotate(${rotation}deg); transform-origin: 120px 120px; width: 240px; height: 240px; pointer-events: none;">`,
     `    ${svgContent}`,
     '  </div>',
     '</div>'

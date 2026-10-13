@@ -12,7 +12,7 @@
  */
 
 import { store } from '../../core/store.js';
-import { DEFAULT_SEED_FLIGHTS } from '../../core/logbook.js';
+import { DEFAULT_SEED_FLIGHTS, hasAttachedTrack } from '../../core/logbook.js';
 import { logbookManager, requestStoragePersistence } from '../../core/logbookDb.js';
 import { openFlightDetailSheet } from './FlightDetailSheet.js';
 import { openImportFlightSheet, processImportFiles } from './ImportFlightSheet.js';
@@ -152,6 +152,78 @@ export class LogbookViewController {
       this.storeUnsub = this.store.subscribeSlice('flights', () => {
         this.render();
       });
+    }
+
+    // 6. Handle focusFlightId from route params
+    if (params && params.focusFlightId) {
+      this.focusFlight(params.focusFlightId);
+    }
+  }
+
+  /**
+   * Handles dynamic route parameter updates when the view is already mounted.
+   * @param {Object} [params={}]
+   */
+  handleRouteParams(params = {}) {
+    if (!params) return;
+    if (params.tab === 'stats' && this.activeTab !== 'stats') {
+      this.activeTab = 'stats';
+      this.render();
+    } else if (params.tab === 'flights' && this.activeTab !== 'flights') {
+      this.activeTab = 'flights';
+      this.render();
+    }
+    if (params.focusFlightId) {
+      this.focusFlight(params.focusFlightId);
+    }
+  }
+
+  /**
+   * Focuses, scrolls into view, and highlights a specific flight card in the list.
+   * @param {string} flightId
+   */
+  focusFlight(flightId) {
+    if (!flightId || !this.containerEl) return;
+
+    if (this.activeTab !== 'flights') {
+      this.activeTab = 'flights';
+      this.render();
+    }
+
+    let card = this.containerEl.querySelector(`[data-flight-id="${flightId}"]`);
+
+    // If filtered out, reset search and category filter to reveal card
+    if (!card && (this.searchQuery || this.activeFilter !== 'all')) {
+      this.searchQuery = '';
+      this.activeFilter = 'all';
+      this.render();
+      card = this.containerEl.querySelector(`[data-flight-id="${flightId}"]`);
+    }
+
+    if (card) {
+      setTimeout(() => {
+        if (!card.isConnected && this.containerEl) {
+          card = this.containerEl.querySelector(`[data-flight-id="${flightId}"]`);
+        }
+        if (card) {
+          card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          if (typeof card.focus === 'function') {
+            try {
+              card.focus({ preventScroll: true });
+            } catch (_) {
+              card.focus();
+            }
+          }
+          card.classList.remove('gm-flight-card-focused');
+          void card.offsetWidth;
+          card.classList.add('gm-flight-card-focused');
+          setTimeout(() => {
+            if (card && card.classList) {
+              card.classList.remove('gm-flight-card-focused');
+            }
+          }, 3000);
+        }
+      }, 50);
     }
   }
 
@@ -309,6 +381,22 @@ export class LogbookViewController {
             </button>
             <button
               type="button"
+              class="gm-filter-chip ${this.activeFilter === 'with-track' ? 'active' : ''}"
+              data-action="filter-flights"
+              data-filter="with-track"
+            >
+              Con traccia
+            </button>
+            <button
+              type="button"
+              class="gm-filter-chip ${this.activeFilter === 'no-track' ? 'active' : ''}"
+              data-action="filter-flights"
+              data-filter="no-track"
+            >
+              Senza traccia
+            </button>
+            <button
+              type="button"
               class="gm-filter-chip ${this.activeFilter === 'EN-A' ? 'active' : ''}"
               data-action="filter-flights"
               data-filter="EN-A"
@@ -350,7 +438,11 @@ export class LogbookViewController {
   filterFlights(flights) {
     let result = flights;
 
-    if (this.activeFilter === 'EN-A') {
+    if (this.activeFilter === 'with-track') {
+      result = result.filter((f) => hasAttachedTrack(f));
+    } else if (this.activeFilter === 'no-track') {
+      result = result.filter((f) => !hasAttachedTrack(f));
+    } else if (this.activeFilter === 'EN-A') {
       result = result.filter((f) => (f.gliderClass || '').toUpperCase() === 'EN-A');
     } else if (this.activeFilter === 'EN-B') {
       result = result.filter((f) => (f.gliderClass || '').toUpperCase() === 'EN-B');
@@ -537,6 +629,15 @@ export class LogbookViewController {
     const maxGain = flight.maxGainMeters ? `+${flight.maxGainMeters} m` : '--';
     const isRedundant = isTakeoffRedundant(flight.site, title, flight.takeoffLocationName);
     const siteArea = !isRedundant ? flight.site : '';
+    const hasTrack = hasAttachedTrack(flight);
+    const trackBadgeHtml = hasTrack
+      ? `<span class="gm-track-badge gm-track-badge-present" title="Traccia GPS allegata (visualizzazione 2D e Replay 3D attivi)" aria-label="Traccia GPS presente">
+          <svg class="gm-track-badge-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+          <span>Traccia</span>
+        </span>`
+      : '';
 
     return `
       <article
@@ -557,6 +658,7 @@ export class LogbookViewController {
           </div>
 
           <div class="gm-flight-badge-group">
+            ${trackBadgeHtml}
             <button
               type="button"
               class="gm-flight-delete-btn"

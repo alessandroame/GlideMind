@@ -184,5 +184,51 @@ describe('Flight Replay View & Telemetry Canvas (UI Layer)', () => {
 
       view.unmount();
     });
+
+    it('should set window location hash to #logbook with focusFlightId on handleExitReplay', async () => {
+      const view = new FlightReplayView();
+      await view.mount(mockContainer, 'demo-flight');
+
+      const originalWindow = globalThis.window;
+      globalThis.window = {
+        location: { hash: '' }
+      };
+
+      try {
+        view.handleExitReplay();
+        assert.equal(globalThis.window.location.hash, '#logbook?focusFlightId=demo-flight');
+      } finally {
+        globalThis.window = originalWindow;
+        view.unmount();
+      }
+    });
+
+    it('should render honest Traccia GPS Non Disponibile notice when flight has no track points', async () => {
+      const { logbookManager } = await import('../../core/logbookDb.js');
+      await logbookManager.adapter.saveFlight(
+        { id: 'fl_no_points_50', siteName: 'Decollo Ciavanis', date: '2026-08-01' },
+        { id: 'fl_no_points_50', decimatedPoints: [] }
+      );
+
+      const view = new FlightReplayView();
+      await view.mount(mockContainer, 'fl_no_points_50');
+
+      assert.ok(mockContainer.innerHTML.includes('Traccia GPS Non Disponibile'), 'Must display honest GPS unavailable notice');
+      assert.ok(mockContainer.innerHTML.includes('Torna al Flight Log'), 'Must render return button');
+      assert.equal(view.engine, null, 'Engine must not be initialized when points are absent');
+
+      const originalWindow = globalThis.window;
+      globalThis.window = {
+        location: { hash: '' }
+      };
+
+      try {
+        view.handleExitReplay();
+        assert.equal(globalThis.window.location.hash, '#logbook?focusFlightId=fl_no_points_50');
+      } finally {
+        globalThis.window = originalWindow;
+        view.unmount();
+      }
+    });
   });
 });

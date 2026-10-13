@@ -613,6 +613,67 @@ function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// ---------------------------------------------------------------------------
+// Rate Limit Circuit Breaker & In-Flight Request Deduplication
+// ---------------------------------------------------------------------------
+
+let rateLimitCooldownUntil = 0;
+let rateLimitReason = '';
+const inFlightRequests = new Map();
+
+/**
+ * Returns current rate limit cooldown status.
+ * @returns {{ isRateLimited: boolean, cooldownRemainingMs: number, reason: string }}
+ */
+export function getRateLimitStatus() {
+    const now = Date.now();
+    const isLimited = now < rateLimitCooldownUntil;
+    return {
+        isRateLimited: isLimited,
+        cooldownRemainingMs: isLimited ? Math.max(0, rateLimitCooldownUntil - now) : 0,
+        reason: isLimited ? rateLimitReason : ''
+    };
+}
+
+/**
+ * Resets the rate limit cooldown state (useful for tests or after cooldown expiration).
+ */
+export function resetRateLimitCooldown() {
+    rateLimitCooldownUntil = 0;
+    rateLimitReason = '';
+}
+
+/**
+ * Returns count of currently active in-flight network requests.
+ * @returns {number}
+ */
+export function getInFlightRequestsCount() {
+    return inFlightRequests.size;
+}
+
+/**
+ * Executes a network fetch with in-flight Promise pooling.
+ * Identical concurrent URL requests share the same promise.
+ * 
+ * @param {string} urlKey
+ * @param {Function} fetcherFn
+ * @returns {Promise<any>}
+ */
+async function fetchWithDeduplication(urlKey, fetcherFn) {
+    if (inFlightRequests.has(urlKey)) {
+        return inFlightRequests.get(urlKey);
+    }
+    const promise = (async () => {
+        try {
+            return await fetcherFn();
+        } finally {
+            inFlightRequests.delete(urlKey);
+        }
+    })();
+    inFlightRequests.set(urlKey, promise);
+    return promise;
+}
+
 /**
  * Generates a deterministic synthetic weather dataset for offline simulations and testing.
  * Accurately models paragliding diurnal cycles (morning calm -> midday convection -> evening restitution).
@@ -1128,53 +1189,120 @@ export async function fetchMultiLocationWeatherData(normList, options = {}) {
         }
     }
 
-    // 3. Build Multi-Location URL and Fetch
+    // 2b. Rate Limit Circuit Breaker Check
+    const activeRateLimit = getRateLimitStatus();
+    if (activeRateLimit.isRateLimited) {
+        const staleCached = normList.map(c => getCachedWeatherData(c, targetDate, {
+            ...options,
+            cache,
+            weatherModel: activeModel
+        }));
+        if (staleCached[0]) {
+            const combined = { ...staleCached[0] };
+            combined.points = staleCached.filter(Boolean);
+            combined.takeoffWeather = staleCached[0];
+            combined.landingWeather = staleCached[1] || staleCached[0];
+            combined.isStaleOfflineFallback = true;
+            combined.isRateLimited = true;
+            combined.rateLimitRemainingMs = activeRateLimit.cooldownRemainingMs;
+            return combined;
+        }
+
+        const syntheticList = normList.map((coords, idx) => {
+            const isLanding = coords.role === 'landing' || idx > 0;
+            const syn = generateSyntheticWeather(coords, {
+                targetDate,
+                weatherModel: activeModel,
+                isLanding,
+                takeoffAzimuth: isLanding ? null : options.customHeading
+            });
+            const enriched = enrichWeatherData(syn, targetDate, Date.now(), {
+                ...options,
+                customHeading: isLanding ? null : options.customHeading
+            });
+            enriched.isSynthetic = true;
+            enriched.isRateLimited = true;
+            return enriched;
+        });
+        const combined = { ...syntheticList[0] };
+        combined.points = syntheticList;
+        combined.takeoffWeather = syntheticList[0];
+        combined.landingWeather = syntheticList[1] || syntheticList[0];
+        combined.isSynthetic = true;
+        combined.isRateLimited = true;
+        combined.rateLimitRemainingMs = activeRateLimit.cooldownRemainingMs;
+        return combined;
+    }
+
+    // 3. Build Multi-Location URL and Fetch with in-flight deduplication
     let url = buildForecastUrl(normList, {
         targetDate,
         weatherModel: activeModel,
         includeSounding: options.includeSounding !== false
     });
 
-    let response = null;
-    let attempt = 0;
-    let lastError = null;
+    const { response, rawData, lastError } = await fetchWithDeduplication(url.toString(), async () => {
+        let resp = null;
+        let attempt = 0;
+        let lastErr = null;
 
-    while (attempt <= maxRetries) {
-        try {
-            response = await fetchWithTimeout(url, {}, timeoutMs, fetchFn);
+        while (attempt <= maxRetries) {
+            try {
+                resp = await fetchWithTimeout(url, {}, timeoutMs, fetchFn);
 
-            // Handle HTTP 429 Rate Limit with exponential backoff
-            if (response.status === 429 && attempt < maxRetries) {
-                const backoffMs = Math.min(4000, (500 * Math.pow(2, attempt)) + Math.round(Math.random() * 200));
-                await sleep(backoffMs);
-                attempt++;
-                continue;
+                // Handle HTTP 429 Rate Limit with exponential backoff
+                if (resp.status === 429) {
+                    if (attempt < maxRetries) {
+                        const backoffMs = Math.min(4000, (500 * Math.pow(2, attempt)) + Math.round(Math.random() * 200));
+                        await sleep(backoffMs);
+                        attempt++;
+                        continue;
+                    }
+                    // All retries exhausted and still 429: activate circuit breaker cooldown
+                    let retrySec = 60;
+                    const retryHeader = resp.headers?.get ? resp.headers.get('retry-after') : null;
+                    if (retryHeader) {
+                        const parsedSec = parseInt(retryHeader, 10);
+                        if (!isNaN(parsedSec) && parsedSec > 0) {
+                            retrySec = Math.min(300, parsedSec);
+                        }
+                    }
+                    rateLimitCooldownUntil = Date.now() + (retrySec * 1000);
+                    rateLimitReason = `HTTP 429: Open-Meteo rate limit reached. Cooldown active for ${retrySec}s.`;
+                    break;
+                }
+
+                // Regional Model Fallback: fallback to best_match if model returns HTTP 400
+                if (!resp.ok && resp.status === 400 && activeModel !== 'best_match') {
+                    const fallbackUrl = buildForecastUrl(normList, {
+                        targetDate,
+                        weatherModel: 'best_match',
+                        includeSounding: options.includeSounding !== false
+                    });
+                    resp = await fetchWithTimeout(fallbackUrl, {}, timeoutMs, fetchFn);
+                }
+
+                break;
+            } catch (netErr) {
+                lastErr = netErr;
+                if (attempt < maxRetries) {
+                    const backoffMs = 500 * Math.pow(2, attempt);
+                    await sleep(backoffMs);
+                    attempt++;
+                    continue;
+                }
+                break;
             }
-
-            // Regional Model Fallback: fallback to best_match if model returns HTTP 400
-            if (!response.ok && response.status === 400 && activeModel !== 'best_match') {
-                const fallbackUrl = buildForecastUrl(normList, {
-                    targetDate,
-                    weatherModel: 'best_match',
-                    includeSounding: options.includeSounding !== false
-                });
-                response = await fetchWithTimeout(fallbackUrl, {}, timeoutMs, fetchFn);
-            }
-
-            break;
-        } catch (netErr) {
-            lastError = netErr;
-            if (attempt < maxRetries) {
-                const backoffMs = 500 * Math.pow(2, attempt);
-                await sleep(backoffMs);
-                attempt++;
-                continue;
-            }
-            break;
         }
-    }
 
-    // 4. Stale Cache Fallback on Network / HTTP Failure
+        let parsed = null;
+        if (resp && resp.ok) {
+            parsed = await resp.json();
+        }
+        return { response: resp, rawData: parsed, lastError: lastErr };
+    });
+
+    // 4. Stale Cache / Fallback on Network / HTTP Failure
     if (!response || !response.ok) {
         const staleCached = normList.map(c => getCachedWeatherData(c, targetDate, {
             ...options,
@@ -1187,6 +1315,37 @@ export async function fetchMultiLocationWeatherData(normList, options = {}) {
             combined.takeoffWeather = staleCached[0];
             combined.landingWeather = staleCached[1] || staleCached[0];
             combined.isStaleOfflineFallback = true;
+            if (response && response.status === 429) {
+                combined.isRateLimited = true;
+                combined.rateLimitRemainingMs = Math.max(0, rateLimitCooldownUntil - Date.now());
+            }
+            return combined;
+        }
+
+        if (response && response.status === 429) {
+            const syntheticList = normList.map((coords, idx) => {
+                const isLanding = coords.role === 'landing' || idx > 0;
+                const syn = generateSyntheticWeather(coords, {
+                    targetDate,
+                    weatherModel: activeModel,
+                    isLanding,
+                    takeoffAzimuth: isLanding ? null : options.customHeading
+                });
+                const enriched = enrichWeatherData(syn, targetDate, Date.now(), {
+                    ...options,
+                    customHeading: isLanding ? null : options.customHeading
+                });
+                enriched.isSynthetic = true;
+                enriched.isRateLimited = true;
+                return enriched;
+            });
+            const combined = { ...syntheticList[0] };
+            combined.points = syntheticList;
+            combined.takeoffWeather = syntheticList[0];
+            combined.landingWeather = syntheticList[1] || syntheticList[0];
+            combined.isSynthetic = true;
+            combined.isRateLimited = true;
+            combined.rateLimitRemainingMs = Math.max(0, rateLimitCooldownUntil - Date.now());
             return combined;
         }
 
@@ -1202,14 +1361,21 @@ export async function fetchMultiLocationWeatherData(normList, options = {}) {
     }
 
     // 5. Parse and Enrich Multi-Point Payload
-    const rawData = await response.json();
     const rawPayloads = Array.isArray(rawData) ? rawData : [rawData];
 
     const enrichedList = rawPayloads.map((raw, idx) => {
         raw.weather_model = activeModel;
         const coords = normList[idx] || normList[0];
-        const cacheKey = generateWeatherCacheKey(coords.lat, coords.lon, targetDate, activeModel);
-        cache.set(cacheKey, raw);
+
+        // Multi-day caching: populate cache for all available dates in returned dataset
+        const availableDates = Array.isArray(raw?.hourly?.time)
+            ? [...new Set(raw.hourly.time.map(t => typeof t === 'string' ? t.substring(0, 10) : ''))].filter(Boolean)
+            : [targetDate];
+
+        for (const d of availableDates) {
+            const cacheKey = generateWeatherCacheKey(coords.lat, coords.lon, d, activeModel);
+            cache.set(cacheKey, raw);
+        }
 
         const isLanding = coords.role === 'landing' || idx > 0;
         const enriched = enrichWeatherData(raw, targetDate, Date.now(), {
@@ -1293,54 +1459,104 @@ export async function fetchWeatherData(coords, options = {}) {
         }
     }
 
-    // 3. Build URL and Prepare Network Request
+    // 2b. Rate Limit Circuit Breaker Check
+    const activeRateLimit = getRateLimitStatus();
+    if (activeRateLimit.isRateLimited) {
+        const staleCached = getCachedWeatherData({ lat, lon }, targetDate, {
+            ...options,
+            cache,
+            weatherModel: activeModel
+        });
+        if (staleCached) {
+            staleCached.isStaleOfflineFallback = true;
+            staleCached.isRateLimited = true;
+            staleCached.rateLimitRemainingMs = activeRateLimit.cooldownRemainingMs;
+            return staleCached;
+        }
+
+        const synthetic = generateSyntheticWeather({ lat, lon, elevation: elev }, {
+            targetDate,
+            weatherModel: activeModel,
+            takeoffAzimuth: options.customHeading
+        });
+        const enriched = enrichWeatherData(synthetic, targetDate, Date.now(), options);
+        enriched.isSynthetic = true;
+        enriched.isRateLimited = true;
+        enriched.rateLimitRemainingMs = activeRateLimit.cooldownRemainingMs;
+        enriched.isFromCache = false;
+        return enriched;
+    }
+
+    // 3. Build URL and Prepare Network Request with in-flight deduplication
     let url = buildForecastUrl({ lat, lon }, {
         targetDate,
         weatherModel: activeModel,
         includeSounding: options.includeSounding !== false
     });
 
-    let response = null;
-    let attempt = 0;
-    let lastError = null;
+    const { response, rawData, lastError } = await fetchWithDeduplication(url.toString(), async () => {
+        let resp = null;
+        let attempt = 0;
+        let lastErr = null;
 
-    while (attempt <= maxRetries) {
-        try {
-            response = await fetchWithTimeout(url, {}, timeoutMs, fetchFn);
+        while (attempt <= maxRetries) {
+            try {
+                resp = await fetchWithTimeout(url, {}, timeoutMs, fetchFn);
 
-            // Handle HTTP 429 Rate Limit with exponential backoff
-            if (response.status === 429 && attempt < maxRetries) {
-                const backoffMs = Math.min(4000, (500 * Math.pow(2, attempt)) + Math.round(Math.random() * 200));
-                await sleep(backoffMs);
-                attempt++;
-                continue;
+                // Handle HTTP 429 Rate Limit with exponential backoff
+                if (resp.status === 429) {
+                    if (attempt < maxRetries) {
+                        const backoffMs = Math.min(4000, (500 * Math.pow(2, attempt)) + Math.round(Math.random() * 200));
+                        await sleep(backoffMs);
+                        attempt++;
+                        continue;
+                    }
+                    // All retries exhausted and still 429: activate circuit breaker cooldown
+                    let retrySec = 60;
+                    const retryHeader = resp.headers?.get ? resp.headers.get('retry-after') : null;
+                    if (retryHeader) {
+                        const parsedSec = parseInt(retryHeader, 10);
+                        if (!isNaN(parsedSec) && parsedSec > 0) {
+                            retrySec = Math.min(300, parsedSec);
+                        }
+                    }
+                    rateLimitCooldownUntil = Date.now() + (retrySec * 1000);
+                    rateLimitReason = `HTTP 429: Open-Meteo rate limit reached. Cooldown active for ${retrySec}s.`;
+                    break;
+                }
+
+                // Regional Model Fallback: if a specific model returns HTTP 400 (e.g. out of domain or horizon),
+                // automatically fall back to best_match
+                if (!resp.ok && resp.status === 400 && activeModel !== 'best_match') {
+                    const fallbackUrl = buildForecastUrl({ lat, lon }, {
+                        targetDate,
+                        weatherModel: 'best_match',
+                        includeSounding: options.includeSounding !== false
+                    });
+                    resp = await fetchWithTimeout(fallbackUrl, {}, timeoutMs, fetchFn);
+                }
+
+                break;
+            } catch (netErr) {
+                lastErr = netErr;
+                if (attempt < maxRetries) {
+                    const backoffMs = 500 * Math.pow(2, attempt);
+                    await sleep(backoffMs);
+                    attempt++;
+                    continue;
+                }
+                break;
             }
-
-            // Regional Model Fallback: if a specific model returns HTTP 400 (e.g. out of domain or horizon),
-            // automatically fall back to best_match
-            if (!response.ok && response.status === 400 && activeModel !== 'best_match') {
-                const fallbackUrl = buildForecastUrl({ lat, lon }, {
-                    targetDate,
-                    weatherModel: 'best_match',
-                    includeSounding: options.includeSounding !== false
-                });
-                response = await fetchWithTimeout(fallbackUrl, {}, timeoutMs, fetchFn);
-            }
-
-            break;
-        } catch (netErr) {
-            lastError = netErr;
-            if (attempt < maxRetries) {
-                const backoffMs = 500 * Math.pow(2, attempt);
-                await sleep(backoffMs);
-                attempt++;
-                continue;
-            }
-            break;
         }
-    }
 
-    // 4. Stale Cache Fallback on Network / HTTP Failure
+        let parsed = null;
+        if (resp && resp.ok) {
+            parsed = await resp.json();
+        }
+        return { response: resp, rawData: parsed, lastError: lastErr };
+    });
+
+    // 4. Stale Cache / Fallback on Network / HTTP Failure
     if (!response || !response.ok) {
         const staleCached = getCachedWeatherData({ lat, lon }, targetDate, {
             ...options,
@@ -1349,7 +1565,25 @@ export async function fetchWeatherData(coords, options = {}) {
         });
         if (staleCached) {
             staleCached.isStaleOfflineFallback = true;
+            if (response && response.status === 429) {
+                staleCached.isRateLimited = true;
+                staleCached.rateLimitRemainingMs = Math.max(0, rateLimitCooldownUntil - Date.now());
+            }
             return staleCached;
+        }
+
+        if (response && response.status === 429) {
+            const synthetic = generateSyntheticWeather({ lat, lon, elevation: elev }, {
+                targetDate,
+                weatherModel: activeModel,
+                takeoffAzimuth: options.customHeading
+            });
+            const enriched = enrichWeatherData(synthetic, targetDate, Date.now(), options);
+            enriched.isSynthetic = true;
+            enriched.isRateLimited = true;
+            enriched.rateLimitRemainingMs = Math.max(0, rateLimitCooldownUntil - Date.now());
+            enriched.isFromCache = false;
+            return enriched;
         }
 
         if (lastError) {
@@ -1364,11 +1598,18 @@ export async function fetchWeatherData(coords, options = {}) {
     }
 
     // 5. Parse and Enrich Payload
-    const rawPayload = await response.json();
+    const rawPayload = rawData;
     rawPayload.weather_model = activeModel;
 
-    // Cache the raw payload
-    cache.set(cacheKey, rawPayload);
+    // Multi-day caching: populate cache for all available dates in returned dataset
+    const availableDates = Array.isArray(rawPayload?.hourly?.time)
+        ? [...new Set(rawPayload.hourly.time.map(t => typeof t === 'string' ? t.substring(0, 10) : ''))].filter(Boolean)
+        : [targetDate];
+
+    for (const d of availableDates) {
+        const dCacheKey = generateWeatherCacheKey(lat, lon, d, activeModel);
+        cache.set(dCacheKey, rawPayload);
+    }
 
     // Enrich and return
     const enriched = enrichWeatherData(rawPayload, targetDate, Date.now(), options);

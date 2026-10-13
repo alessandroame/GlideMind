@@ -1186,6 +1186,71 @@ describe('FlightDetailSheet - Telemetry Analysis & Educational Debriefing (UI La
       engine.destroy();
       globalThis.window = originalWindow;
     });
+
+    it('should render Traccia Non Registrata badge and disable Replay 3D / Setup buttons when track is missing', () => {
+      const bundle = {
+        meta: {
+          id: 'fl_no_track_test',
+          date: '2026-08-01',
+          takeoffTime: '12:56',
+          landingTime: '13:32',
+          durationMinutes: 36,
+          site: 'Decollo Ciavanis',
+          siteName: 'Decollo Ciavanis -> PeterPan school / Baratonga',
+          glider: 'Axis Pluto 4',
+          gliderClass: 'EN-B',
+          takeoffAltMsl: 1777,
+          landingAltMsl: 912,
+          maxAltMsl: 2037
+        },
+        raw: {
+          id: 'fl_no_track_test',
+          decimatedPoints: []
+        },
+        telemetry: {}
+      };
+
+      const html = renderFlightDetailHtml(bundle);
+      assert.ok(html.includes('Traccia Non Registrata'), 'HTML should display Traccia Non Registrata label');
+      assert.ok(html.includes('id="btn-replay-from-detail"'), 'Replay button must exist in DOM');
+      assert.ok(html.includes('id="btn-replay-from-detail"') && html.includes('disabled aria-disabled="true"'), 'Replay 3D must be disabled');
+      assert.ok(html.includes('Replay 3D non disponibile: traccia GPS assente'), 'Replay tooltip must explain GPS track is absent');
+      assert.ok(html.includes('Tracciato altimetrico non disponibile'), 'Altimetric section must state track not available');
+      assert.ok(html.includes('Nessuna traccia GPS registrata per questo volo'), 'Altimetric section must explain absence honestly');
+    });
+
+    it('should handle attachInteractiveFlightChart safely when points are empty', () => {
+      const overlayEl = createMockElement('flight-detail-overlay');
+      const chartContainer = createMockElement('gm-interactive-chart-container');
+      const mapCanvas = createMockElement('flight-detail-map-canvas');
+      const layerBtn = createMockElement('flight-detail-map-layer-toggle');
+      const expandBtn = createMockElement('flight-detail-map-expand-btn');
+
+      overlayEl.appendChild(chartContainer);
+      overlayEl.appendChild(mapCanvas);
+      overlayEl.appendChild(layerBtn);
+      overlayEl.appendChild(expandBtn);
+
+      const bundle = {
+        meta: {
+          id: 'fl_empty_pts_test',
+          takeoffLat: 45.3789,
+          takeoffLon: 7.3568,
+          landingLat: 45.3650,
+          landingLon: 7.3311
+        },
+        raw: {
+          id: 'fl_empty_pts_test',
+          decimatedPoints: []
+        },
+        telemetry: {}
+      };
+
+      // Should not throw any exception even when points are completely empty
+      assert.doesNotThrow(() => {
+        attachInteractiveFlightChart(overlayEl, bundle);
+      });
+    });
   });
 });
 

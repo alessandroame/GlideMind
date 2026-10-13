@@ -662,3 +662,35 @@ export function checkFlightRecordFlags(flightMeta, careerRecords) {
   };
 }
 
+/**
+ * Evaluates whether a flight record has an authentic attached GPS/IGC track.
+ * Strictly respects anti-sycophancy integrity: synthetic/reconstructed tracks evaluate to false.
+ * 
+ * @param {Object} flight - Flight record (meta, bundle, or raw)
+ * @returns {boolean} True if authentic GPS points or raw IGC are present
+ */
+export function hasAttachedTrack(flight) {
+  if (!flight || typeof flight !== 'object') return false;
+  if (flight.isReconstructed === true) return false;
+
+  // Direct boolean flags on meta / flight
+  if (flight.hasDecimatedTrack === true) return true;
+  if (flight.hasRawIgc === true) return true;
+
+  // Point arrays checks
+  if (Array.isArray(flight.decimatedPoints) && flight.decimatedPoints.length >= 2) return true;
+  if (Array.isArray(flight.points) && flight.points.length >= 2) return true;
+  if (Array.isArray(flight.rawPoints) && flight.rawPoints.length >= 2) return true;
+  if (Array.isArray(flight.trackPoints) && flight.trackPoints.length >= 2) return true;
+  if (Array.isArray(flight.originalPoints) && flight.originalPoints.length >= 2) return true;
+
+  // Raw IGC text
+  if (typeof flight.rawIgc === 'string' && flight.rawIgc.trim().length > 30) return true;
+
+  // If a bundle was passed ({ meta, raw })
+  if (flight.meta && typeof flight.meta === 'object' && hasAttachedTrack(flight.meta)) return true;
+  if (flight.raw && typeof flight.raw === 'object' && hasAttachedTrack(flight.raw)) return true;
+
+  return false;
+}
+

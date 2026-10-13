@@ -1,4 +1,4 @@
-import { describe, it } from 'node:test';
+import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -6,9 +6,12 @@ import { createStore } from '../../core/store.js';
 import { ForecastViewController } from '../../ui/views/ForecastView.js';
 import { HomeDashboardViewController } from '../../ui/views/HomeDashboardView.js';
 import { DEFAULT_COMPRENSORI } from '../../core/comprensorio.js';
-import { fetchBatchComprensoriWeather, InMemoryCache } from '../../core/openMeteoApi.js';
+import { fetchBatchComprensoriWeather, InMemoryCache, resetRateLimitCooldown } from '../../core/openMeteoApi.js';
 
 describe('GlideMind Phase 4-bis: Live Weather Data Ingestion & Cache Sync', () => {
+  beforeEach(() => {
+    resetRateLimitCooldown();
+  });
   it('should guarantee 0ms optimistic initial rendering in ForecastView without network blocks', () => {
     const mockStore = createStore({ selectedSpot: DEFAULT_COMPRENSORI[0] });
     const controller = new ForecastViewController({ store: mockStore });
@@ -48,6 +51,11 @@ describe('GlideMind Phase 4-bis: Live Weather Data Ingestion & Cache Sync', () =
     const liveHtml = controller.renderLiveWeatherBadge();
     assert.ok(liveHtml.includes('gm-live-badge live'));
     assert.ok(liveHtml.includes('Live'));
+
+    controller.networkStatus = 'rate_limit';
+    const rateLimitHtml = controller.renderLiveWeatherBadge();
+    assert.ok(rateLimitHtml.includes('gm-live-badge rate-limit'));
+    assert.ok(rateLimitHtml.includes('Quota API (429)'));
 
     controller.networkStatus = 'offline';
     const offlineHtml = controller.renderLiveWeatherBadge();
@@ -251,7 +259,74 @@ describe('GlideMind Phase 4-bis: Live Weather Data Ingestion & Cache Sync', () =
     assert.ok(cssContent.includes('.gm-live-badge'), 'theme.css must declare .gm-live-badge');
     assert.ok(cssContent.includes('.gm-live-badge.live'), 'theme.css must declare .gm-live-badge.live');
     assert.ok(cssContent.includes('.gm-live-badge.loading'), 'theme.css must declare .gm-live-badge.loading');
+    assert.ok(cssContent.includes('.gm-live-badge.rate-limit'), 'theme.css must declare .gm-live-badge.rate-limit');
     assert.ok(cssContent.includes('.gm-live-badge.offline'), 'theme.css must declare .gm-live-badge.offline');
     assert.ok(cssContent.includes('gm-live-pulse'), 'theme.css must define pulse keyframes');
+  });
+
+  it('should transition to rate_limit badge and display Quota API (429) when Open-Meteo returns 429', async () => {
+    const spot = DEFAULT_COMPRENSORI[0];
+    const mockStore = createStore({ selectedSpot: spot });
+
+    const rateLimitFetch = async () => ({
+      ok: false,
+      status: 429,
+      headers: { get: () => '60' }
+    });
+
+    const controller = new ForecastViewController({
+      store: mockStore,
+      fetchFn: rateLimitFetch
+    });
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const result = await controller.fetchWeatherDataAsync(spot, todayStr, true);
+
+    assert.ok(result, 'Must return fallback rather than throwing');
+    assert.equal(controller.networkStatus, 'rate_limit', 'Network status must transition to rate_limit');
+
+    const badgeHtml = controller.renderLiveWeatherBadge();
+    assert.ok(badgeHtml.includes('rate-limit'), 'Badge HTML must contain rate-limit class');
+    assert.ok(badgeHtml.includes('Quota API (429)'), 'Badge HTML must display Quota API (429)');
+  });
+
+  it('should deduplicate concurrent fetchWeatherDataAsync calls for the same spot and date', async () => {
+    const spot = DEFAULT_COMPRENSORI[0];
+    const mockStore = createStore({ selectedSpot: spot });
+    let fetchCalls = 0;
+
+    const delayedFetch = async () => {
+      fetchCalls++;
+      await new Promise(r => setTimeout(r, 40));
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          latitude: 45.833,
+          longitude: 9.302,
+          hourly: {
+            time: [new Date().toISOString().substring(0, 19)],
+            temperature_2m: [20],
+            windspeed_10m: [12]
+          }
+        })
+      };
+    };
+
+    const controller = new ForecastViewController({
+      store: mockStore,
+      fetchFn: delayedFetch
+    });
+
+    const testDate = '2026-11-20';
+    // Trigger 3 concurrent calls
+    const [r1, r2, r3] = await Promise.all([
+      controller.fetchWeatherDataAsync(spot, testDate, false),
+      controller.fetchWeatherDataAsync(spot, testDate, false),
+      controller.fetchWeatherDataAsync(spot, testDate, false)
+    ]);
+
+    assert.equal(fetchCalls, 1, 'Only 1 network fetch must be executed despite 3 concurrent calls');
+    assert.ok(r1 && r2 && r3);
   });
 });

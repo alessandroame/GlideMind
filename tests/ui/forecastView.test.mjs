@@ -13,7 +13,7 @@ import {
   buildSmoothAreaPath,
   generateGuidoBriefing
 } from '../../ui/views/ForecastView.js';
-import { DEFAULT_COMPRENSORI } from '../../core/comprensorio.js';
+import { DEFAULT_COMPRENSORI, parseCoordinates } from '../../core/comprensorio.js';
 import { GLIDER_CLASSES } from '../../core/flyability.js';
 
 describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
@@ -2859,6 +2859,185 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
         controller.miniMapEngine.lastWindsockUpdate.landingWeather.windDirection,
         'Takeoff and landing wind directions must remain decoupled during scrubbing'
       );
+
+      controller.unmount();
+    });
+  });
+
+  describe('Mini-Map Sub-Spot Zoom & Center Contracts', () => {
+    it('should zoom and center on takeoff when a takeoff is selected', () => {
+      const spot = DEFAULT_COMPRENSORI[0];
+      const takeoff = spot.takeoffs[0];
+      const mockStore = createStore({ selectedSpot: spot });
+      const controller = new ForecastViewController({ store: mockStore });
+      controller.selectedSubSpot = takeoff.id;
+
+      const mockMiniMapEl = { innerHTML: '', style: {} };
+      const mockContainer = {
+        innerHTML: '',
+        addEventListener() {},
+        removeEventListener() {},
+        querySelector(sel) {
+          if (sel === '#forecast-mini-map') return mockMiniMapEl;
+          return null;
+        },
+        querySelectorAll() { return []; }
+      };
+
+      controller.mount(mockContainer);
+
+      assert.ok(controller.miniMapEngine, 'miniMapEngine must be mounted');
+      assert.equal(controller.miniMapEngine.focusedSpot, 'takeoff', 'Must focus on takeoff');
+      assert.equal(controller.miniMapEngine.isSubSpotFocused, true, 'isSubSpotFocused must be true');
+      assert.ok(controller.miniMapEngine.zoom >= 15, 'Zoom must be >= 15 when focusing on spot');
+      const expectedCoords = parseCoordinates(takeoff.coordinates);
+      assert.deepEqual(controller.miniMapEngine.center, [expectedCoords.lat, expectedCoords.lon], 'Center must match takeoff coordinates');
+
+      controller.unmount();
+    });
+
+    it('should zoom and center on landing when a landing is selected', () => {
+      const spot = DEFAULT_COMPRENSORI[0];
+      const landing = spot.landings[0];
+      const mockStore = createStore({ selectedSpot: spot });
+      const controller = new ForecastViewController({ store: mockStore });
+      controller.selectedSubSpot = landing.id;
+
+      const mockMiniMapEl = { innerHTML: '', style: {} };
+      const mockContainer = {
+        innerHTML: '',
+        addEventListener() {},
+        removeEventListener() {},
+        querySelector(sel) {
+          if (sel === '#forecast-mini-map') return mockMiniMapEl;
+          return null;
+        },
+        querySelectorAll() { return []; }
+      };
+
+      controller.mount(mockContainer);
+
+      assert.ok(controller.miniMapEngine, 'miniMapEngine must be mounted');
+      assert.equal(controller.miniMapEngine.focusedSpot, 'landing', 'Must focus on landing');
+      assert.equal(controller.miniMapEngine.isSubSpotFocused, true, 'isSubSpotFocused must be true');
+      assert.ok(controller.miniMapEngine.zoom >= 15, 'Zoom must be >= 15 when focusing on spot');
+      const expectedCoords = parseCoordinates(landing.coordinates);
+      assert.deepEqual(controller.miniMapEngine.center, [expectedCoords.lat, expectedCoords.lon], 'Center must match landing coordinates');
+
+      controller.unmount();
+    });
+
+    it('should maintain overview mode when selectedSubSpot is overview', () => {
+      const spot = DEFAULT_COMPRENSORI[0];
+      const mockStore = createStore({ selectedSpot: spot });
+      const controller = new ForecastViewController({ store: mockStore });
+      controller.selectedSubSpot = 'overview';
+
+      const mockMiniMapEl = { innerHTML: '', style: {} };
+      const mockContainer = {
+        innerHTML: '',
+        addEventListener() {},
+        removeEventListener() {},
+        querySelector(sel) {
+          if (sel === '#forecast-mini-map') return mockMiniMapEl;
+          return null;
+        },
+        querySelectorAll() { return []; }
+      };
+
+      controller.mount(mockContainer);
+
+      assert.ok(controller.miniMapEngine, 'miniMapEngine must be mounted');
+      assert.equal(controller.miniMapEngine.focusedSpot, 'overview', 'Must be in overview');
+      assert.equal(controller.miniMapEngine.isSubSpotFocused, false, 'isSubSpotFocused must be false');
+      assert.ok(controller.miniMapEngine.zoom < 15, 'Zoom must be < 15 for general overview');
+
+      controller.unmount();
+    });
+
+    it('should compute glide midpoint and elevation delta badge on mini-map', () => {
+      const spot = DEFAULT_COMPRENSORI[0];
+      const takeoff = spot.takeoffs[0];
+      const landing = spot.landings[0];
+      const mockStore = createStore({ selectedSpot: spot });
+      const controller = new ForecastViewController({ store: mockStore });
+
+      const mockMiniMapEl = { innerHTML: '', style: {} };
+      const mockContainer = {
+        innerHTML: '',
+        addEventListener() {},
+        removeEventListener() {},
+        querySelector(sel) {
+          if (sel === '#forecast-mini-map') return mockMiniMapEl;
+          return null;
+        },
+        querySelectorAll() { return []; }
+      };
+
+      controller.mount(mockContainer);
+
+      assert.ok(controller.miniMapEngine, 'miniMapEngine must be mounted');
+      assert.equal(controller.miniMapEngine.hasGlideDeltaBadge, true, 'hasGlideDeltaBadge must be true when both takeoff and landing exist');
+
+      const tCoord = parseCoordinates(takeoff.coordinates);
+      const lCoord = parseCoordinates(landing.coordinates);
+      const expectedMidpoint = {
+        lat: (tCoord.lat + lCoord.lat) / 2,
+        lon: (tCoord.lon + lCoord.lon) / 2
+      };
+      const expectedDelta = Math.abs(takeoff.altitude - landing.altitude);
+
+      assert.deepEqual(controller.miniMapEngine.glideMidpoint, expectedMidpoint, 'glideMidpoint must be the exact midpoint between takeoff and landing');
+      assert.equal(controller.miniMapEngine.elevationDelta, expectedDelta, 'elevationDelta must match the altitude difference');
+
+      // Verify theme.css contains the badge styling
+      const cssContent = readFileSync('css/theme.css', 'utf-8');
+      assert.ok(cssContent.includes('.gm-glide-delta-badge'), 'theme.css must declare .gm-glide-delta-badge');
+      assert.ok(cssContent.includes('.gm-glide-delta-badge-container'), 'theme.css must declare .gm-glide-delta-badge-container');
+
+      controller.unmount();
+    });
+
+    it('should rotate windsocks along shortest geometric path across 0°/360° boundary when scrubbing', () => {
+      const spot = DEFAULT_COMPRENSORI[0];
+      const mockStore = createStore({ selectedSpot: spot });
+      const controller = new ForecastViewController({ store: mockStore });
+
+      const mockMiniMapEl = { innerHTML: '', style: {} };
+      const mockContainer = {
+        innerHTML: '',
+        addEventListener() {},
+        removeEventListener() {},
+        querySelector(sel) {
+          if (sel === '#forecast-mini-map') return mockMiniMapEl;
+          return null;
+        },
+        querySelectorAll() { return []; }
+      };
+
+      controller.mount(mockContainer);
+
+      const engine = controller.miniMapEngine;
+      assert.ok(engine, 'miniMapEngine must be mounted');
+
+      // Seed initial angle at 355° (wind from 175° -> points downwind to 355°)
+      engine.takeoffWindsockAngle = 355;
+
+      // Hour scrubber moves wind from 175° to 190° (windsock orientation 190 + 180 = 370° = 10°)
+      // Shortest rotation from 355° to 10° is +15° clockwise -> 370° (NOT -345° counter-clockwise)
+      engine.updateWindsockMarker(
+        { windSpeed: 10, windDirection: 190 },
+        { windSpeed: 10, windDirection: 190 }
+      );
+      assert.equal(engine.takeoffWindsockAngle, 370, 'Continuous angle must take the shortest path (+15° -> 370°)');
+
+      // Scrubber moves wind back to 175°
+      // Shortest rotation from 370° to 355° is -15° -> 355°
+      engine.updateWindsockMarker(
+        { windSpeed: 10, windDirection: 175 },
+        { windSpeed: 10, windDirection: 175 }
+      );
+      assert.equal(engine.takeoffWindsockAngle, 355, 'Continuous angle must take the shortest path (-15° -> 355°)');
 
       controller.unmount();
     });

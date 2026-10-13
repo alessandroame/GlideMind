@@ -7,6 +7,7 @@ import {
   checkFlightRecordFlags,
   createFlightLogEntry,
   deduceFlightActivitiesFromTrack,
+  hasAttachedTrack,
   DEFAULT_SEED_FLIGHTS,
   FLIGHT_TYPES,
   PILOT_CURRENCY_STATUS,
@@ -426,4 +427,63 @@ describe('GlideMind Flight Logbook & Pilot Currency Analytics (Headless Core)', 
       assert.equal(safe.isMaxAlt, false);
     });
   });
+
+  describe('hasAttachedTrack - Authentic GPS Track Presence Verification', () => {
+    it('should return true when flight meta has hasDecimatedTrack: true or hasRawIgc: true', () => {
+      assert.equal(hasAttachedTrack({ hasDecimatedTrack: true }), true);
+      assert.equal(hasAttachedTrack({ hasRawIgc: true }), true);
+    });
+
+    it('should return true when flight has decimatedPoints or points array with >= 2 items', () => {
+      assert.equal(hasAttachedTrack({ decimatedPoints: [{ lat: 45, lon: 9 }, { lat: 45.1, lon: 9.1 }] }), true);
+      assert.equal(hasAttachedTrack({ points: [{ lat: 45, lon: 9 }, { lat: 45.1, lon: 9.1 }] }), true);
+      assert.equal(hasAttachedTrack({ rawPoints: [{ lat: 45, lon: 9 }, { lat: 45.1, lon: 9.1 }] }), true);
+    });
+
+    it('should return true when flight has rawIgc text', () => {
+      assert.equal(hasAttachedTrack({ rawIgc: 'B1200004550000N00918000EA0100001050\nB1200014550010N00918010EA0100201052' }), true);
+    });
+
+    it('should return true for flight bundle with track in raw or meta', () => {
+      const bundle = {
+        meta: { id: 'fl-test', site: 'Cornizzolo', hasDecimatedTrack: true },
+        raw: { decimatedPoints: [{ lat: 45, lon: 9 }, { lat: 45.1, lon: 9.1 }] }
+      };
+      assert.equal(hasAttachedTrack(bundle), true);
+    });
+
+    it('should return false when flight is marked isReconstructed: true', () => {
+      assert.equal(hasAttachedTrack({ isReconstructed: true, hasDecimatedTrack: true, decimatedPoints: [{}, {}] }), false);
+    });
+
+    it('should return false for flight without GPS recording (e.g. Excel flight #50)', () => {
+      const flight50 = {
+        id: 'fl_excel_1787747985586_10',
+        site: 'Ciavanis -> PeterPan',
+        takeoffAltMsl: 1777,
+        landingAltMsl: 912,
+        maxAltMsl: 2037,
+        durationMinutes: 36,
+        hasDecimatedTrack: false,
+        hasRawIgc: false,
+        decimatedPoints: [],
+        rawIgc: null
+      };
+      assert.equal(hasAttachedTrack(flight50), false);
+    });
+
+    it('should return false for default seed demo flights without GPS tracks', () => {
+      assert.equal(hasAttachedTrack(DEFAULT_SEED_FLIGHTS[0]), false);
+      assert.equal(hasAttachedTrack(DEFAULT_SEED_FLIGHTS[1]), false);
+    });
+
+    it('should handle null, undefined, empty object safely without throwing', () => {
+      assert.equal(hasAttachedTrack(null), false);
+      assert.equal(hasAttachedTrack(undefined), false);
+      assert.equal(hasAttachedTrack({}), false);
+      assert.equal(hasAttachedTrack({ points: [] }), false);
+      assert.equal(hasAttachedTrack({ points: [{ lat: 45, lon: 9 }] }), false);
+    });
+  });
 });
+

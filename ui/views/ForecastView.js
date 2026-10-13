@@ -519,6 +519,14 @@ export class ForecastViewController {
         </span>
       `;
     }
+    if (this.networkStatus === 'rate_limit') {
+      return `
+        <span id="${badgeId}" class="gm-live-badge rate-limit" title="Quota Open-Meteo temporaneamente esaurita (HTTP 429). In pausa cooldown.">
+          <span class="gm-live-badge-dot" aria-hidden="true"></span>
+          <span>Quota API (429)</span>
+        </span>
+      `;
+    }
     if (this.networkStatus === 'live') {
       return `
         <span id="${badgeId}" class="gm-live-badge live" title="Previsioni reali Open-Meteo attive">
@@ -577,6 +585,12 @@ export class ForecastViewController {
       }
     }
 
+    // In-flight request deduplication for the same spot and date
+    if (!forceRefresh && this.activeFetchPromise && this.activeFetchKey === key) {
+      return this.activeFetchPromise;
+    }
+    this.activeFetchKey = key;
+
     this.networkStatus = 'loading';
     this.updateLiveStatusBadgeInDom();
 
@@ -606,13 +620,19 @@ export class ForecastViewController {
         );
 
         if (enriched) {
-          if (enriched.isStaleOfflineFallback) {
+          if (enriched.isRateLimited) {
+            this.networkStatus = 'rate_limit';
+            this._networkFailed = false;
+            this._rateLimited = true;
+          } else if (enriched.isStaleOfflineFallback) {
             this.networkStatus = 'offline';
             this._networkFailed = true;
+            this._rateLimited = false;
           } else {
             enriched._isSynthetic = false;
             this.networkStatus = 'live';
             this._networkFailed = false;
+            this._rateLimited = false;
           }
           this.cachedWeatherMap.set(key, enriched);
 
@@ -634,9 +654,13 @@ export class ForecastViewController {
       } catch (err) {
         this.networkStatus = 'offline';
         this._networkFailed = true;
+        this._rateLimited = false;
         this.updateLiveStatusBadgeInDom();
       } finally {
-        this.activeFetchPromise = null;
+        if (this.activeFetchKey === key) {
+          this.activeFetchPromise = null;
+          this.activeFetchKey = null;
+        }
       }
       return null;
     })();
@@ -1111,7 +1135,7 @@ export class ForecastViewController {
               if (this.store) this.store.setState({ activeLandingId: subSpotId });
             }
           }
-          this.selectedSubSpot = 'overview';
+          this.selectedSubSpot = subSpotId || 'overview';
           this.render();
         }
       });
@@ -5094,6 +5118,7 @@ export class ForecastViewController {
     } else if (action === 'select-date') {
       const dateAttr = actionEl.getAttribute('data-date');
       if (dateAttr) {
+        if (dateAttr === this.activeDate) return;
         this.activeDate = dateAttr;
         this.selectedHour = this._resolveInitialHour(this.activeDate);
         if (this.store) {
@@ -5107,6 +5132,10 @@ export class ForecastViewController {
     } else if (action === 'apply-custom-date') {
       const input = document.getElementById('custom-date-native-input');
       if (input && input.value) {
+        if (input.value === this.activeDate) {
+          closeSheet();
+          return;
+        }
         this.activeDate = input.value;
         this.selectedHour = this._resolveInitialHour(this.activeDate);
         if (this.store) {
@@ -5119,6 +5148,10 @@ export class ForecastViewController {
     } else if (action === 'pick-calendar-date') {
       const dateAttr = actionEl.getAttribute('data-date');
       if (dateAttr) {
+        if (dateAttr === this.activeDate) {
+          closeSheet();
+          return;
+        }
         this.activeDate = dateAttr;
         this.selectedHour = this._resolveInitialHour(this.activeDate);
         if (this.store) {

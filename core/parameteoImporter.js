@@ -13,7 +13,6 @@
 import { deduceGliderClass, generateSparklinePoints, computeFlightFingerprint } from './logbookDb.js';
 import { lttbDecimate, analyzeFlightTelemetry } from './flightTelemetry.js';
 import { parseIgc } from './igcParser.js';
-import { reconstructTrackFromFlightMetadata } from './flightTrackReconstruction.js';
 import { store } from './store.js';
 
 /**
@@ -257,31 +256,10 @@ export function convertParaMeteoFlight(flight, trackData = null, options = {}) {
     }
   }
 
-  // If both track points and raw IGC text are absent, but the flight contains coordinates,
-  // telemetry, or hasTrack flags, reconstruct a high-fidelity track on-the-fly
-  let isReconstructed = false;
-  if ((!rawPoints || rawPoints.length < 2) && !rawIgc) {
-    const hasCoordinates = Boolean(flight.takeoffCoords || flight.landingCoords || (flight.takeoffLat != null && flight.takeoffLon != null));
-    const hasTelemetryOrTrack = Boolean(flight.hasTrack || (Number(flight.trackPointsCount) > 0) || (Number(flight.pointsCount) > 0) || (telemetry && Object.keys(telemetry).length > 0));
-
-    if (hasCoordinates || hasTelemetryOrTrack) {
-      try {
-        const reconstructed = reconstructTrackFromFlightMetadata(flight, trackData, options);
-        if (reconstructed && Array.isArray(reconstructed.points) && reconstructed.points.length >= 2) {
-          rawPoints = reconstructed.points;
-          rawIgc = reconstructed.rawIgc;
-          isReconstructed = true;
-          if (!telemetry || Object.keys(telemetry).length === 0) {
-            telemetry = flight.telemetry || null;
-          }
-        }
-      } catch (reconErr) {
-        if (typeof console !== 'undefined' && console.warn) {
-          console.warn(`[convertParaMeteoFlight] Track reconstruction fallback for flight ${flight.id || 'unknown'}:`, reconErr.message);
-        }
-      }
-    }
-  }
+  // Strict anti-sycophancy and data integrity policy:
+  // Never synthesize or invent GPS track points. If neither real raw GPS points nor real IGC exist,
+  // keep rawPoints empty. Real takeoff/landing coordinates in metadata are preserved for 2D map markers.
+  const isReconstructed = false;
 
   const hasPoints = Array.isArray(rawPoints) && rawPoints.length >= 2;
   const points = hasPoints ? rawPoints : null;
@@ -443,6 +421,12 @@ export function convertParaMeteoFlight(flight, trackData = null, options = {}) {
     siteName,
     takeoffLocationName: takeoffLocation,
     landingLocationName: landingLocation,
+    takeoffLat: flight.takeoffCoords?.lat ?? flight.takeoffLat ?? (points ? points[0]?.lat : null),
+    takeoffLon: flight.takeoffCoords?.lon ?? flight.takeoffCoords?.lng ?? flight.takeoffLon ?? (points ? points[0]?.lon : null),
+    landingLat: flight.landingCoords?.lat ?? flight.landingLat ?? (points ? points[points.length - 1]?.lat : null),
+    landingLon: flight.landingCoords?.lon ?? flight.landingCoords?.lng ?? flight.landingLon ?? (points ? points[points.length - 1]?.lon : null),
+    isReconstructed: false,
+    reconstructionVersion: null,
     pilot,
     glider: gliderName,
     gliderClass,
@@ -482,6 +466,7 @@ export function convertParaMeteoFlight(flight, trackData = null, options = {}) {
     sampleIntervalSeconds: (points && points.length > 1)
       ? Math.round(Math.max(1, ((points[points.length - 1].timeSeconds || 0) - (points[0].timeSeconds || 0)) / points.length))
       : 1,
+    isReconstructed: false,
     updatedAt
   };
 

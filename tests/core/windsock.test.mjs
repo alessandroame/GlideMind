@@ -6,6 +6,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   normalizeAngle,
+  calculateShortestRotation,
   getWindsockElevationStage,
   calculateWindsockKinematics,
   generateWindsockKeyframeCss,
@@ -28,6 +29,45 @@ describe('GlideMind Headless Core - Windsock Kinematics & Vector Engine', () => 
       assert.equal(normalizeAngle(null), 0);
       assert.equal(normalizeAngle(undefined), 0);
       assert.equal(normalizeAngle(NaN), 0);
+    });
+  });
+
+  describe('calculateShortestRotation()', () => {
+    it('should calculate shortest arc path without full 360° counter-rotations', () => {
+      // 355° to 10° should move +15° clockwise (370°), NOT -345° counter-clockwise
+      assert.equal(calculateShortestRotation(355, 10), 370);
+
+      // 10° to 355° should move -15° counter-clockwise (-5°), NOT +345° clockwise
+      assert.equal(calculateShortestRotation(10, 355), -5);
+
+      // 10° to 20° moves +10°
+      assert.equal(calculateShortestRotation(10, 20), 20);
+
+      // 20° to 10° moves -10°
+      assert.equal(calculateShortestRotation(20, 10), 10);
+    });
+
+    it('should handle multi-turn unwrapped angles correctly', () => {
+      // Current accumulated angle is 725° (which is 5° mod 360). Target is 355°.
+      // Minimal move from 5° to 355° is -10°. Result: 725 - 10 = 715°.
+      assert.equal(calculateShortestRotation(725, 355), 715);
+
+      // Current angle is -355° (5° mod 360). Target is 15°.
+      // Minimal move from 5° to 15° is +10°. Result: -355 + 10 = -345°.
+      assert.equal(calculateShortestRotation(-355, 15), -345);
+    });
+
+    it('should handle identical angles and 180° opposite angles safely', () => {
+      assert.equal(calculateShortestRotation(90, 90), 90);
+      assert.equal(calculateShortestRotation(0, 180), 180);
+      assert.equal(calculateShortestRotation(180, 0), 0);
+    });
+
+    it('should fallback gracefully on non-finite input values', () => {
+      assert.equal(calculateShortestRotation(null, 45), 45);
+      assert.equal(calculateShortestRotation(undefined, 90), 90);
+      assert.equal(calculateShortestRotation(120, null), 120);
+      assert.equal(calculateShortestRotation(NaN, NaN), 0);
     });
   });
 
@@ -138,6 +178,7 @@ describe('GlideMind Headless Core - Windsock Kinematics & Vector Engine', () => 
       assert.ok(svg.includes('viewBox="0 0 240 240"'), 'Must have 240x240 viewBox');
       assert.ok(svg.includes('id="test-ws-style"'), 'Must include scoped style tag');
       assert.ok(svg.includes('id="test-ws-wrapper"'), 'Must include wrapper with rotation');
+      assert.ok(svg.includes('data-current-rotation="270"'), 'Must include data-current-rotation attribute');
       assert.ok(svg.includes('transform: rotate(270deg)'), '90° wind must rotate wrapper to 270°');
       assert.ok(svg.includes('id="test-ws-group-1"'), 'Must have group 1');
       assert.ok(svg.includes('id="test-ws-group-12"'), 'Must have group 12');

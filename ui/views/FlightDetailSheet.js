@@ -834,6 +834,8 @@ export function renderFlightDetailHtml(bundle, options = {}) {
   const classBadgeStyle = (gliderClass || '').toLowerCase().trim().replace(/[^a-z0-9-]/g, '');
 
   const points = raw.decimatedPoints || [];
+  const hasValidTrack = Array.isArray(points) && points.length >= 2;
+  const hasIgcDownload = Boolean(hasValidTrack || (raw && raw.rawIgc && raw.rawIgc.length > 30) || meta.hasRawIgc);
   const thermals = Array.isArray(tel.thermals) ? tel.thermals : [];
   const allManeuvers = Array.isArray(tel.maneuvers) ? tel.maneuvers : [];
   const thermalProbes = allManeuvers.filter((m) => m.type === '360°' || m.type === 'SINGLE_360' || m.type === 'sondaggio_termica');
@@ -866,6 +868,10 @@ export function renderFlightDetailHtml(bundle, options = {}) {
   const hasWind = windDrift && windDrift.speedKmh > 0 && windOrigin !== null;
 
   // Kinetic metrics
+  const takeoffAltVal = meta.takeoffAltMsl || meta.takeoffAlt || meta.takeoffCoords?.elev;
+  const takeoffAlt = takeoffAltVal ? `${takeoffAltVal} m` : '--';
+  const landingAltVal = meta.landingAltMsl || meta.landingAlt || meta.landingCoords?.elev;
+  const landingAlt = landingAltVal ? `${landingAltVal} m` : '--';
   const maxAlt = meta.maxAltMsl ? `${meta.maxAltMsl} m` : '--';
   const maxGain = meta.maxGainMeters ? `+${meta.maxGainMeters} m` : '--';
   const climbRate = meta.maxClimbRate ? `+${meta.maxClimbRate} m/s` : '--';
@@ -913,9 +919,8 @@ export function renderFlightDetailHtml(bundle, options = {}) {
           <button
             type="button"
             id="btn-open-track-setup"
-            class="gm-btn gm-btn-secondary gm-topbar-setup-btn"
-            aria-label="Setup Traccia"
-            title="Setup Traccia (Trimming e Calibrazione Quote)"
+            class="gm-btn gm-btn-secondary gm-topbar-setup-btn ${!hasValidTrack ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}"
+            ${!hasValidTrack ? 'disabled aria-disabled="true" title="Setup traccia non disponibile: traccia GPS assente"' : 'aria-label="Setup Traccia" title="Setup Traccia (Trimming e Calibrazione Quote)"'}
           >
             <svg width="15" height="15" class="flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <circle cx="12" cy="12" r="3"></circle>
@@ -949,6 +954,8 @@ export function renderFlightDetailHtml(bundle, options = {}) {
                   ${recordFlags.isMaxDuration ? '<span class="gm-record-badge" title="Record Personale: Volo Più Lungo">Record</span>' : ''}
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
+                  ${hasValidTrack ? '<span class="gm-status-pill gm-status-pill-emerald" title="Traccia GPS registrata disponibile">Traccia GPS</span>' : '<span class="gm-status-pill gm-status-pill-slate" title="Volo registrato senza file IGC o coordinate GPS">Traccia Non Registrata</span>'}
+                  ${meta.isReconstructed ? '<span class="gm-status-pill gm-status-pill-sky" title="Telemetria ricostruita da statistiche di volo">Telemetria Ricostruita</span>' : ''}
                   ${meta.isTrimmed ? '<span class="gm-status-pill gm-status-pill-amber">Traccia Trimmata</span>' : ''}
                   ${meta.elevationCorrection ? '<span class="gm-status-pill gm-status-pill-emerald">Quote Calibrate</span>' : ''}
                   ${recordFlags.hasAnyRecord ? '<span class="gm-status-pill gm-status-pill-record">Record Personale</span>' : ''}
@@ -1028,6 +1035,7 @@ export function renderFlightDetailHtml(bundle, options = {}) {
             <h3 class="gm-flight-detail-section-title">Profilo Altimetrico</h3>
           </div>
 
+          ${hasValidTrack ? `
           <!-- Telemetry Toolbar: Channel Toggles & Zoom Controls (Single-Row Segmented Dock) -->
           <div class="gm-telemetry-toolbar mb-2" role="toolbar" aria-label="Controlli Telemetria">
             <div class="gm-telemetry-segmented-dock gm-telemetry-toggles" role="group" aria-label="Canali Telemetrici">
@@ -1120,6 +1128,12 @@ export function renderFlightDetailHtml(bundle, options = {}) {
               ` : ''}
             </div>
           </div>
+          ` : `
+          <div class="gm-flight-no-track-box flex flex-col items-center justify-center p-6 text-center border border-[var(--gm-border-default)] rounded-xl bg-[var(--gm-bg-surface)] text-[var(--gm-text-secondary)]">
+            <span class="text-sm font-semibold text-[var(--gm-text-primary)] mb-1">Tracciato altimetrico non disponibile</span>
+            <span class="text-xs text-[var(--gm-text-muted)] max-w-md">Nessuna traccia GPS registrata per questo volo. I dati di quota (Decollo: ${escapeHtml(takeoffAlt)}, Quota Max: ${escapeHtml(maxAlt)}, Atterraggio: ${escapeHtml(landingAlt)}) derivano dalle statistiche certificate salvate.</span>
+          </div>
+          `}
         </section>
 
         <!-- Kinetic Telemetry 2x4 Responsive Card Grid (Thermals Prominent) -->
@@ -1361,8 +1375,9 @@ export function renderFlightDetailHtml(bundle, options = {}) {
           <button
             type="button"
             id="btn-replay-from-detail"
-            class="gm-btn gm-btn-primary gm-bottom-replay-btn"
+            class="gm-btn gm-btn-primary gm-bottom-replay-btn ${!hasValidTrack ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}"
             style="min-height: var(--gm-touch-min, 48px);"
+            ${!hasValidTrack ? 'disabled aria-disabled="true" title="Replay 3D non disponibile: traccia GPS assente"' : 'title="Visualizza Replay 3D"'}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <polygon points="5 3 19 12 5 21 5 3"></polygon>
@@ -1373,10 +1388,9 @@ export function renderFlightDetailHtml(bundle, options = {}) {
           <button
             type="button"
             id="btn-setup-from-detail"
-            class="gm-btn gm-btn-secondary gm-bottom-action-btn"
+            class="gm-btn gm-btn-secondary gm-bottom-action-btn ${!hasValidTrack ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}"
             style="min-height: var(--gm-touch-min, 48px);"
-            title="Setup Traccia"
-            aria-label="Setup Traccia"
+            ${!hasValidTrack ? 'disabled aria-disabled="true" title="Setup traccia non disponibile: traccia GPS assente"' : 'title="Setup Traccia" aria-label="Setup Traccia"'}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <line x1="4" y1="21" x2="4" y2="14"></line>
@@ -1395,10 +1409,9 @@ export function renderFlightDetailHtml(bundle, options = {}) {
           <button
             type="button"
             id="btn-download-from-detail"
-            class="gm-btn gm-btn-secondary gm-bottom-action-btn"
+            class="gm-btn gm-btn-secondary gm-bottom-action-btn ${!hasIgcDownload ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}"
             style="min-height: var(--gm-touch-min, 48px);"
-            title="Scarica Traccia IGC (FAI)"
-            aria-label="Scarica Traccia IGC (FAI)"
+            ${!hasIgcDownload ? 'disabled aria-disabled="true" title="Traccia IGC non disponibile"' : 'title="Scarica Traccia IGC (FAI)" aria-label="Scarica Traccia IGC (FAI)"'}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -1418,6 +1431,8 @@ export function renderFlightDetailHtml(bundle, options = {}) {
  * Closes and removes the active full-screen flight detail view.
  */
 export function closeFlightDetailView() {
+  const closedFlightId = activeDetailOverlay?.getAttribute('data-flight-id') || null;
+
   if (flightDetailMapEngine) {
     try {
       flightDetailMapEngine.destroy();
@@ -1446,10 +1461,33 @@ export function closeFlightDetailView() {
     document.body.style.overflow = '';
   }
 
-  // Restore keyboard focus to caller element
-  if (previousActiveEl && typeof previousActiveEl.focus === 'function') {
+  // Restore keyboard focus to caller element if still connected
+  if (previousActiveEl && typeof previousActiveEl.focus === 'function' && previousActiveEl.isConnected) {
     previousActiveEl.focus();
     previousActiveEl = null;
+  }
+
+  // Also highlight and scroll the closed flight card into view if in logbook view
+  if (closedFlightId && typeof document !== 'undefined') {
+    const card = document.querySelector(`.gm-flight-card[data-flight-id="${closedFlightId}"]`);
+    if (card) {
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (typeof card.focus === 'function') {
+        try {
+          card.focus({ preventScroll: true });
+        } catch (_) {
+          card.focus();
+        }
+      }
+      card.classList.remove('gm-flight-card-focused');
+      void card.offsetWidth;
+      card.classList.add('gm-flight-card-focused');
+      setTimeout(() => {
+        if (card && card.classList) {
+          card.classList.remove('gm-flight-card-focused');
+        }
+      }, 3000);
+    }
   }
 }
 
@@ -1474,7 +1512,7 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
     ? raw.decimatedPoints
     : (raw.points || []);
 
-  if (!Array.isArray(points) || points.length < 2) return;
+  const hasPoints = Array.isArray(points) && points.length >= 2;
 
   const tel = bundle?.telemetry || {};
   const thermals = Array.isArray(tel.thermals) ? tel.thermals : [];
@@ -1515,8 +1553,8 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
   let activeLayer = currentAppState.ui?.mapLayer || 'topo';
 
   // Ensure points have fallback coordinates and smoothed variometer to match chart 1:1
-  const rawVarios = points.map((p, idx) => getPointVario(p, idx, points));
-  const safePoints = points.map((p, idx) => {
+  const rawVarios = hasPoints ? points.map((p, idx) => getPointVario(p, idx, points)) : [];
+  const safePoints = hasPoints ? points.map((p, idx) => {
     const lat = (typeof p.lat === 'number' && !isNaN(p.lat)) ? p.lat : (45.8 + idx * 0.0008);
     const lon = (typeof p.lon === 'number' && !isNaN(p.lon)) ? p.lon : (9.29 + idx * 0.0006);
     const prevV = rawVarios[Math.max(0, idx - 1)];
@@ -1528,7 +1566,7 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
       lon,
       vario
     };
-  });
+  }) : [];
 
   if (flightDetailMapEngine) {
     try { flightDetailMapEngine.destroy(); } catch (_) {}
@@ -1544,13 +1582,17 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
 
     if (flightDetailMapEngine) {
       const meta = bundle?.meta || {};
-      const takeoff = (meta.takeoffLat != null && meta.takeoffLon != null)
-        ? { lat: meta.takeoffLat, lon: meta.takeoffLon, name: meta.takeoffName || 'Decollo' }
-        : { lat: safePoints[0].lat, lon: safePoints[0].lon, name: 'Decollo' };
+      const takeoffLat = meta.takeoffLat ?? meta.takeoffCoords?.lat ?? (hasPoints ? safePoints[0]?.lat : null);
+      const takeoffLon = meta.takeoffLon ?? meta.takeoffCoords?.lon ?? meta.takeoffCoords?.lng ?? (hasPoints ? safePoints[0]?.lon : null);
+      const takeoff = (takeoffLat != null && takeoffLon != null)
+        ? { lat: takeoffLat, lon: takeoffLon, name: meta.takeoffLocationName || meta.takeoffName || 'Decollo' }
+        : (hasPoints && safePoints[0] ? { lat: safePoints[0].lat, lon: safePoints[0].lon, name: 'Decollo' } : null);
 
-      const landing = (meta.landingLat != null && meta.landingLon != null)
-        ? { lat: meta.landingLat, lon: meta.landingLon, name: meta.landingName || 'Atterraggio' }
-        : { lat: safePoints[safePoints.length - 1].lat, lon: safePoints[safePoints.length - 1].lon, name: 'Atterraggio' };
+      const landingLat = meta.landingLat ?? meta.landingCoords?.lat ?? (hasPoints ? safePoints[safePoints.length - 1]?.lat : null);
+      const landingLon = meta.landingLon ?? meta.landingCoords?.lon ?? meta.landingCoords?.lng ?? (hasPoints ? safePoints[safePoints.length - 1]?.lon : null);
+      const landing = (landingLat != null && landingLon != null)
+        ? { lat: landingLat, lon: landingLon, name: meta.landingLocationName || meta.landingName || 'Atterraggio' }
+        : (hasPoints && safePoints[safePoints.length - 1] ? { lat: safePoints[safePoints.length - 1].lat, lon: safePoints[safePoints.length - 1].lon, name: 'Atterraggio' } : null);
 
       flightDetailMapEngine.renderFlightTrack(mapCanvasEl, {
         points: safePoints,
@@ -1561,6 +1603,48 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
       });
     }
   }
+
+  if (layerToggleBtn && !layerToggleBtn._gmListenerAttached) {
+    layerToggleBtn._gmListenerAttached = true;
+    layerToggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const currentLayer = layerToggleBtn.getAttribute('data-layer') || activeLayer;
+      const nextLayer = getNextMapLayer(currentLayer);
+      activeLayer = nextLayer;
+      layerToggleBtn.setAttribute('data-layer', nextLayer);
+      layerToggleBtn.setAttribute('aria-label', `Layer mappa: ${nextLayer === 'satellite' ? 'Satellite (tocca per OpenTopo)' : 'OpenTopo (tocca per Satellite)'}`);
+      layerToggleBtn.setAttribute('title', `Passa a ${nextLayer === 'satellite' ? 'OpenTopo' : 'Satellite'}`);
+      layerToggleBtn.innerHTML = renderLayerToggleIcon(nextLayer, 20);
+
+      if (flightDetailMapEngine && typeof flightDetailMapEngine.setLayer === 'function') {
+        flightDetailMapEngine.setLayer(nextLayer);
+      }
+
+      const mapContainer = overlayEl.querySelector('#flight-detail-map-container');
+      if (mapContainer) {
+        mapContainer.setAttribute('data-map-layer', nextLayer);
+      }
+
+      if (targetStore && typeof targetStore.setState === 'function') {
+        const prevUi = targetStore.getState().ui || {};
+        targetStore.setState({ ui: { ...prevUi, mapLayer: nextLayer } });
+      }
+    });
+  }
+
+  if (expandMapBtn && !expandMapBtn._gmListenerAttached) {
+    expandMapBtn._gmListenerAttached = true;
+    expandMapBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const flightId = bundle?.meta?.id;
+      if (flightId) {
+        closeFlightDetailView();
+        window.location.hash = `#replay?flightId=${encodeURIComponent(flightId)}`;
+      }
+    });
+  }
+
+  if (!hasPoints) return;
 
   const state = {
     zoom: 1.0,
@@ -1780,44 +1864,6 @@ export function attachInteractiveFlightChart(overlayEl, bundle) {
     resetPhaseBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       clearPhaseSelection();
-    });
-  }
-
-  if (layerToggleBtn) {
-    layerToggleBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const currentLayer = layerToggleBtn.getAttribute('data-layer') || activeLayer;
-      const nextLayer = getNextMapLayer(currentLayer);
-      activeLayer = nextLayer;
-      layerToggleBtn.setAttribute('data-layer', nextLayer);
-      layerToggleBtn.setAttribute('aria-label', `Layer mappa: ${nextLayer === 'satellite' ? 'Satellite (tocca per OpenTopo)' : 'OpenTopo (tocca per Satellite)'}`);
-      layerToggleBtn.setAttribute('title', `Passa a ${nextLayer === 'satellite' ? 'OpenTopo' : 'Satellite'}`);
-      layerToggleBtn.innerHTML = renderLayerToggleIcon(nextLayer, 20);
-
-      if (flightDetailMapEngine && typeof flightDetailMapEngine.setLayer === 'function') {
-        flightDetailMapEngine.setLayer(nextLayer);
-      }
-
-      const mapContainer = overlayEl.querySelector('#flight-detail-map-container');
-      if (mapContainer) {
-        mapContainer.setAttribute('data-map-layer', nextLayer);
-      }
-
-      if (targetStore && typeof targetStore.setState === 'function') {
-        const prevUi = targetStore.getState().ui || {};
-        targetStore.setState({ ui: { ...prevUi, mapLayer: nextLayer } });
-      }
-    });
-  }
-
-  if (expandMapBtn) {
-    expandMapBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const flightId = bundle?.meta?.id;
-      if (flightId) {
-        closeFlightDetailView();
-        window.location.hash = `#replay?flightId=${encodeURIComponent(flightId)}`;
-      }
     });
   }
 
@@ -2320,20 +2366,11 @@ export async function openFlightDetailView(flightId, options = {}) {
       const maxAlt = cachedFlight.maxAltMsl || (cachedFlight.maxGainMeters ? takeoffAlt + cachedFlight.maxGainMeters : (takeoffAlt + 450));
       const durationSec = (cachedFlight.durationMinutes || 30) * 60;
 
-      // Synthesize realistic track points if absent for smooth altimetric chart and replay
-      let decimatedPoints = cachedFlight.decimatedPoints || cachedFlight.points || [];
-      if (!Array.isArray(decimatedPoints) || decimatedPoints.length < 2) {
-        const count = 30;
-        decimatedPoints = new Array(count);
-        for (let i = 0; i < count; i++) {
-          const frac = i / (count - 1);
-          decimatedPoints[i] = {
-            timeSeconds: Math.round(frac * durationSec),
-            alt: Math.round(takeoffAlt + (maxAlt - takeoffAlt) * Math.sin(frac * Math.PI)),
-            vario: Math.round(Math.cos(frac * Math.PI) * 2.5 * 10) / 10
-          };
-        }
-      }
+      // Strict Anti-Sycophancy & Real Points Only:
+      // Never fabricate or synthesize fake track points when GPS coordinates were not recorded.
+      const decimatedPoints = Array.isArray(cachedFlight.decimatedPoints)
+        ? cachedFlight.decimatedPoints
+        : (Array.isArray(cachedFlight.points) ? cachedFlight.points : []);
 
       bundle = {
         meta: cachedFlight,
@@ -2411,6 +2448,7 @@ export async function openFlightDetailView(flightId, options = {}) {
 
   document.body.appendChild(overlayEl);
   document.body.style.overflow = 'hidden';
+  overlayEl.setAttribute('data-flight-id', String(bundle.meta.id || bundle.meta.flightId || flightId));
   activeDetailOverlay = overlayEl;
 
   // 0. Attach interactive telemetry chart controls (zoom, pan, vario, speed, HUD)

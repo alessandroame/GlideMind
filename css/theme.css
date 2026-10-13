@@ -751,6 +751,16 @@ button, input, select, textarea {
   animation: gm-live-pulse 1.2s infinite ease-in-out;
 }
 
+.gm-live-badge.rate-limit {
+  color: var(--gm-status-caution);
+  border-color: rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.gm-live-badge.rate-limit .gm-live-badge-dot {
+  background-color: var(--gm-status-caution);
+}
+
 .gm-live-badge.offline {
   color: var(--gm-text-muted);
   border-color: var(--gm-border);
@@ -5897,6 +5907,33 @@ input.gm-input:focus {
   transform: scale(1.08);
 }
 
+/* Glide Line Midpoint Elevation Drop Badge */
+.gm-glide-delta-badge-container {
+  background: transparent !important;
+  border: none !important;
+}
+
+.gm-glide-delta-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 18px;
+  padding: 0 6px;
+  background-color: var(--gm-bg-card, #12161f);
+  color: var(--gm-text-primary, #f8fafc);
+  border: 1px solid var(--gm-border-strong, #334155);
+  border-radius: 9999px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.75);
+  font-family: var(--gm-font-mono, monospace);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+}
+
 /* Light theme overrides for Mini Map */
 [data-theme="light"] .gm-mini-map-box {
   border-color: rgba(15, 23, 42, 0.12);
@@ -5910,6 +5947,13 @@ input.gm-input:focus {
 
 [data-theme="light"] .gm-mini-pin .gm-mini-pin-alt {
   color: #0f172a;
+}
+
+[data-theme="light"] .gm-glide-delta-badge {
+  background-color: #ffffff;
+  color: #0f172a;
+  border-color: rgba(15, 23, 42, 0.25);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
 }
 
 [data-theme="light"] .gm-mini-map-layer-select {
@@ -7185,6 +7229,26 @@ input.gm-input:focus {
   transform: scale(0.995);
 }
 
+.gm-flight-card.gm-flight-card-focused {
+  border-color: var(--gm-accent, #38bdf8) !important;
+  box-shadow: 0 0 0 2px var(--gm-accent, #38bdf8), 0 4px 16px rgba(56, 189, 248, 0.25);
+  animation: gm-card-focus-pulse 2.5s ease-out forwards;
+}
+
+@keyframes gm-card-focus-pulse {
+  0% {
+    box-shadow: 0 0 0 4px var(--gm-accent, #38bdf8), 0 0 24px rgba(56, 189, 248, 0.45);
+    transform: scale(1.01);
+  }
+  30% {
+    box-shadow: 0 0 0 3px var(--gm-accent, #38bdf8), 0 0 16px rgba(56, 189, 248, 0.35);
+  }
+  100% {
+    box-shadow: 0 0 0 1px var(--gm-border, rgba(255, 255, 255, 0.1)), 0 2px 8px rgba(0, 0, 0, 0.2);
+    transform: scale(1);
+  }
+}
+
 .gm-flight-sparkline-wrap,
 .gm-flight-metrics-row,
 .gm-flight-card-sub,
@@ -7249,6 +7313,51 @@ input.gm-input:focus {
   -webkit-box-orient: vertical;
   overflow: hidden;
   word-break: break-word;
+}
+
+/* Flight Track Presence Indicator Badges */
+.gm-track-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--gm-font-mono, monospace);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: var(--gm-radius-sm);
+  white-space: nowrap;
+  flex-shrink: 0;
+  user-select: none;
+  transition: all var(--gm-transition-fast);
+}
+
+.gm-track-badge-icon {
+  flex-shrink: 0;
+}
+
+.gm-track-badge-present {
+  background: rgba(16, 185, 129, 0.14);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.32);
+}
+
+.gm-track-badge-missing {
+  background: rgba(148, 163, 184, 0.10);
+  color: var(--gm-text-muted, #94a3b8);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+[data-theme="light"] .gm-track-badge-present {
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+[data-theme="light"] .gm-track-badge-missing {
+  background: rgba(100, 116, 139, 0.08);
+  color: #64748b;
+  border-color: rgba(100, 116, 139, 0.25);
 }
 
 .gm-flight-badge-group {
@@ -8846,10 +8955,34 @@ input.gm-input:focus {
   border: 1px solid rgba(245, 158, 11, 0.4);
 }
 
+.gm-status-pill-sky {
+  background: rgba(14, 165, 233, 0.18);
+  color: #38bdf8;
+  border: 1px solid rgba(14, 165, 233, 0.35);
+}
+
 [data-theme="light"] .gm-status-pill-record {
   background: rgba(217, 119, 6, 0.15);
   color: #b45309;
   border-color: rgba(217, 119, 6, 0.4);
+}
+
+[data-theme="light"] .gm-status-pill-sky {
+  background: rgba(14, 165, 233, 0.15);
+  color: #0284c7;
+  border-color: rgba(14, 165, 233, 0.4);
+}
+
+.gm-status-pill-slate {
+  background: rgba(148, 163, 184, 0.12);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+}
+
+[data-theme="light"] .gm-status-pill-slate {
+  background: rgba(100, 116, 139, 0.10);
+  color: #475569;
+  border-color: rgba(100, 116, 139, 0.28);
 }
 
 .gm-debrief-callout {

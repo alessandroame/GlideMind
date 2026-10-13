@@ -6,6 +6,7 @@ import {
   DEFAULT_ROUTE,
   KEYBOARD_SHORTCUTS,
   normalizeRoute,
+  parseHashParams,
   isInputTarget,
   createRouter
 } from '../../ui/router.js';
@@ -105,5 +106,38 @@ describe('GlideMind Router - Route Management & Contracts', () => {
     const router = createRouter();
     assert.equal(typeof router.navigateTo, 'function', 'router.navigateTo must be a function');
     assert.equal(router.navigateTo, router.navigate, 'router.navigateTo must alias router.navigate');
+  });
+
+  it('should parse hash parameters correctly via parseHashParams', () => {
+    assert.deepEqual(parseHashParams('#logbook?focusFlightId=fl_50'), { focusFlightId: 'fl_50' });
+    assert.deepEqual(parseHashParams('#logbook?focusFlightId=fl_50&tab=stats'), { focusFlightId: 'fl_50', tab: 'stats' });
+    assert.deepEqual(parseHashParams('#logbook'), {});
+    assert.deepEqual(parseHashParams(''), {});
+    assert.deepEqual(parseHashParams(null), {});
+  });
+
+  it('should forward route parameters to handleRouteParams when navigating to the current active route', () => {
+    const store = createStore();
+    const router = createRouter({ storeInstance: store });
+
+    let mountedParams = null;
+    let handledParams = null;
+
+    router.registerView('logbook', {
+      mount: (_container, params) => {
+        mountedParams = params;
+      },
+      handleRouteParams: (params) => {
+        handledParams = params;
+      }
+    });
+
+    router.navigate('logbook', { focusFlightId: 'fl_10' });
+    assert.equal(router.getCurrentRoute(), 'logbook');
+    assert.deepEqual(mountedParams, { focusFlightId: 'fl_10' });
+
+    // Navigate to same route with updated params
+    router.navigate('logbook', { focusFlightId: 'fl_50' });
+    assert.deepEqual(handledParams, { focusFlightId: 'fl_50' });
   });
 });

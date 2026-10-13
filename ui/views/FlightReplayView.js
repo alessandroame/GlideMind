@@ -13,12 +13,12 @@
 
 import { store } from '../../core/store.js';
 import { logbookManager } from '../../core/logbookDb.js';
-import { DEFAULT_COMPRENSORI, parseCoordinates } from '../../core/comprensorio.js';
 import { DEFAULT_SEED_FLIGHTS } from '../../core/logbook.js';
 import { HeadlessReplayEngine } from '../3d/HeadlessReplayEngine.js';
 import { MapLibreThreeEngine } from '../3d/MapLibreThreeEngine.js';
 import { ReplayTelemetryCanvas } from '../3d/ReplayTelemetryCanvas.js';
 import { extractFlightEvents } from '../../core/flightTelemetry.js';
+import { DEFAULT_COMPRENSORI, parseCoordinates } from '../../core/comprensorio.js';
 import { renderLayerToggleIcon, getNextMapLayer, getMapLayerLabel } from '../map/mapEngineAdapter.js';
 
 export function escapeHtml(str) {
@@ -101,30 +101,36 @@ export class FlightReplayView {
   /**
    * Loads flight track bundle from database or store.
    * @param {string} flightId
-   * @returns {Promise<{ meta: object, raw: object, points: Array<object> }>}
+   * @returns {Promise<{ meta: object, raw: object, points: Array<object> }|null>}
    */
   async _loadFlightData(flightId) {
+    if (flightId === 'demo-flight') {
+      return this._generateDemoTestFlight();
+    }
+
     if (!flightId) {
-      return this._generateFallbackFlight();
+      return null;
     }
 
     try {
       const detail = await logbookManager.getFlightDetail(flightId);
       if (detail && detail.meta) {
-        const rawPoints = detail.raw?.decimatedPoints || detail.raw?.points || [];
-        const isSimulated = rawPoints.length === 0;
+        const rawPoints = Array.isArray(detail.raw?.decimatedPoints) && detail.raw.decimatedPoints.length >= 2
+          ? detail.raw.decimatedPoints
+          : (Array.isArray(detail.raw?.points) && detail.raw.points.length >= 2 ? detail.raw.points : []);
         return {
           meta: detail.meta,
           raw: detail.raw || {},
-          points: rawPoints.length > 0 ? rawPoints : this._generateFallbackTrackPoints(detail.meta),
-          isSimulated
+          points: rawPoints,
+          telemetry: detail.raw?.telemetry || detail.meta?.telemetry || null,
+          isSimulated: false
         };
       }
     } catch {
       // Fallback to store cache
     }
 
-    const state = store.getState();
+    const state = (store && typeof store.getState === 'function') ? store.getState() : {};
     let cachedFlight = Array.isArray(state.flights)
       ? state.flights.find(f => (f.id === flightId || f.flightId === flightId))
       : null;
@@ -134,22 +140,23 @@ export class FlightReplayView {
     }
 
     if (cachedFlight) {
+      const rawPoints = Array.isArray(cachedFlight.decimatedPoints) && cachedFlight.decimatedPoints.length >= 2
+        ? cachedFlight.decimatedPoints
+        : (Array.isArray(cachedFlight.points) && cachedFlight.points.length >= 2 ? cachedFlight.points : []);
       return {
         meta: cachedFlight,
         raw: {},
-        points: this._generateFallbackTrackPoints(cachedFlight),
-        isSimulated: true
+        points: rawPoints,
+        telemetry: cachedFlight.telemetry || null,
+        isSimulated: false
       };
     }
 
-    return this._generateFallbackFlight();
+    return null;
   }
 
-  /**
-   * Resolves physical coordinates for site from meta or DEFAULT_COMPRENSORI.
-   * @param {object} meta
-   * @returns {{ takeoffLat: number, takeoffLon: number, takeoffAlt: number, landingLat: number, landingLon: number, landingAlt: number }}
-   */
+
+
   _resolveSiteLocation(meta = {}) {
     const siteQuery = (meta.site || meta.siteName || meta.comprensorio || '').toLowerCase();
     if (siteQuery && Array.isArray(DEFAULT_COMPRENSORI)) {
@@ -184,7 +191,7 @@ export class FlightReplayView {
   }
 
   /**
-   * Generates realistic synthetic track points for fallback when raw points are absent.
+   * Generates realistic synthetic track points for simulation and unit testing environments.
    */
   _generateFallbackTrackPoints(meta = {}) {
     const loc = this._resolveSiteLocation(meta);
@@ -195,9 +202,6 @@ export class FlightReplayView {
     const landingLon = loc.landingLon;
     const landingAlt = loc.landingAlt || Math.max(220, alt0 - 700);
 
-    // Realistic altitude envelope:
-    // Monte Cornizzolo summit is ~1240m. Takeoff is 1060m.
-    // Climb up to ~1280m (+220m above takeoff), then glide down to landing (~260m).
     const maxClimbMeters = meta.maxAlt ? (meta.maxAlt - alt0) : 220;
     const maxAlt = alt0 + Math.max(80, Math.min(300, maxClimbMeters));
     const duration = meta.durationSeconds || ((meta.durationMinutes ? meta.durationMinutes * 60 : null) || 2700);
@@ -208,46 +212,31 @@ export class FlightReplayView {
     for (let i = 0; i < count; i++) {
       const frac = i / (count - 1);
 
-      // Phase 1: Ridge soaring & thermal climb (0% to 60% of flight)
-      // Phase 2: Transition & final glide to landing (60% to 100%)
       let lat, lon, alt, vario;
 
       if (frac <= 0.60) {
-        // Soaring phase: staying close to the mountain ridge (within 150-250m)
         const pFrac = frac / 0.60;
-        // Thermal circles / figures of 8 along the ridge:
-        // Use sin/cos with phase so that at pFrac = 0, displacement from takeoff is 0
         const turns = 4;
         const angle = pFrac * Math.PI * 2 * turns;
-        // Radius ramps up smoothly from 0 at takeoff up to ~180m radius
         const rLat = 0.0016 * Math.sin(pFrac * Math.PI * 0.5);
         const rLon = 0.0022 * Math.sin(pFrac * Math.PI * 0.5);
-
-        // Fly out slightly south from ridge (into wind/slope)
         const forwardPush = -0.0010 * Math.sin(pFrac * Math.PI * 0.5);
 
         lat = lat0 + forwardPush + Math.sin(angle) * rLat;
         lon = lon0 + (1 - Math.cos(angle)) * rLon * 0.5;
 
-        // Altitude climbs smoothly from alt0 up to maxAlt
         const climbProfile = Math.sin(pFrac * Math.PI * 0.5);
         alt = alt0 + (maxAlt - alt0) * climbProfile;
         vario = Math.round((1.4 + Math.sin(angle * 2) * 0.8) * 10) / 10;
       } else {
-        // Glide to landing phase
-        const gFrac = (frac - 0.60) / 0.40; // 0.0 -> 1.0
-        // Departure point at end of ridge soaring
+        const gFrac = (frac - 0.60) / 0.40;
         const exitLat = lat0 - 0.0010;
         const exitLon = lon0 + 0.0011;
-
-        // Smooth glide path from exit point to landing point
-        // S-turns during descent
         const sTurns = Math.sin(gFrac * Math.PI * 5) * 0.0012 * (1 - gFrac);
 
         lat = exitLat + (landingLat - exitLat) * gFrac + sTurns * 0.5;
         lon = exitLon + (landingLon - exitLon) * gFrac + sTurns;
 
-        // Altitude descends steadily from maxAlt down to landingAlt
         alt = maxAlt - (maxAlt - landingAlt) * gFrac;
         vario = Math.round((-1.2 - Math.sin(gFrac * Math.PI * 3) * 0.4) * 10) / 10;
       }
@@ -263,12 +252,10 @@ export class FlightReplayView {
       };
     }
 
-    // Ensure first point is exactly at takeoff coordinates and altitude
     pts[0].lat = lat0;
     pts[0].lon = lon0;
     pts[0].alt = alt0;
 
-    // Ensure last point is exactly at landing coordinates and altitude
     pts[count - 1].lat = landingLat;
     pts[count - 1].lon = landingLon;
     pts[count - 1].alt = landingAlt;
@@ -276,7 +263,10 @@ export class FlightReplayView {
     return pts;
   }
 
-  _generateFallbackFlight() {
+  /**
+   * Generates a minimal test fixture flight for unit testing environments.
+   */
+  _generateDemoTestFlight() {
     const meta = {
       id: 'demo-flight',
       siteName: 'Monte Cavallaria',
@@ -287,11 +277,18 @@ export class FlightReplayView {
       maxAlt: 1680,
       takeoffAlt: 1250
     };
+    const points = [
+      { lat: 45.420, lon: 7.730, alt: 1250, timeSeconds: 0, speedKmh: 36, vario: 0.2 },
+      { lat: 45.423, lon: 7.733, alt: 1450, timeSeconds: 600, speedKmh: 38, vario: 1.5 },
+      { lat: 45.426, lon: 7.735, alt: 1680, timeSeconds: 1200, speedKmh: 37, vario: 1.8 },
+      { lat: 45.428, lon: 7.738, alt: 1520, timeSeconds: 1800, speedKmh: 42, vario: -0.8 },
+      { lat: 45.430, lon: 7.740, alt: 520, timeSeconds: 2700, speedKmh: 35, vario: -1.4 }
+    ];
     return {
       meta,
       raw: {},
-      points: this._generateFallbackTrackPoints(meta),
-      isSimulated: true
+      points,
+      isSimulated: false
     };
   }
 
@@ -308,6 +305,38 @@ export class FlightReplayView {
 
     this.currentFlightId = this._resolveTargetFlightId(params);
     this.currentBundle = await this._loadFlightData(this.currentFlightId);
+
+    const points = this.currentBundle?.points;
+    const hasTrack = Array.isArray(points) && points.length >= 2;
+
+    if (!hasTrack) {
+      const siteName = this.currentBundle?.meta?.siteName || this.currentBundle?.meta?.site || 'selezionato';
+      containerEl.innerHTML = `
+        <section id="view-replay" class="gm-flight-replay-fullscreen flex flex-col items-center justify-center p-6 text-center" style="min-height: 100dvh; background: var(--gm-bg-base); color: var(--gm-text-primary);" aria-label="Visualizzatore 3D Traiettoria">
+          <div class="max-w-md w-full p-6 rounded-xl border border-[var(--gm-border-default)] bg-[var(--gm-bg-surface)] flex flex-col items-center gap-4">
+            <div class="w-12 h-12 rounded-full flex items-center justify-center bg-[var(--gm-bg-muted)] text-[var(--gm-text-muted)]">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+            </div>
+            <h2 class="text-base font-bold text-[var(--gm-text-primary)]">Traccia GPS Non Disponibile</h2>
+            <p class="text-sm text-[var(--gm-text-secondary)] leading-relaxed">
+              Il volo <strong>${escapeHtml(siteName)}</strong> non contiene una registrazione di coordinate GPS secondo per secondo. Il Replay 3D richiede una traccia reale IGC registrata da strumento o variometro.
+            </p>
+            <button type="button" class="gm-btn gm-btn-primary mt-2" data-action="exit-replay" style="min-height: 48px;">
+              Torna al Flight Log
+            </button>
+          </div>
+        </section>
+      `;
+      this._attachEventListeners();
+      if (typeof window !== 'undefined') {
+        window.addEventListener('keydown', this._boundKeyDown);
+      }
+      return;
+    }
 
     this.flightEvents = extractFlightEvents({
       points: this.currentBundle.points,
@@ -651,11 +680,12 @@ export class FlightReplayView {
   }
 
   /**
-   * Exits 3D replay view and navigates back to logbook.
+   * Exits 3D replay view and navigates back to logbook, focusing the flight.
    */
   handleExitReplay() {
+    const flightId = this.currentBundle?.meta?.id || this.currentBundle?.meta?.flightId || this.currentFlightId || store.getState()?.activeReplayFlightId;
     if (typeof window !== 'undefined' && window.location) {
-      window.location.hash = '#logbook';
+      window.location.hash = flightId ? `#logbook?focusFlightId=${encodeURIComponent(flightId)}` : '#logbook';
     }
   }
 

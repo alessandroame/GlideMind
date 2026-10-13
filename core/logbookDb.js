@@ -895,6 +895,35 @@ class LogbookManager {
       }
     }
 
+    // Strict Anti-Sycophancy & Real Data Guarantee:
+    // If this flight previously had synthetic/reconstructed points saved, purge them now
+    // to cleanse the user's local database of any invented coordinates or fake altimetry.
+    if (raw?.isReconstructed || bundle.meta?.isReconstructed) {
+      originalPoints = null;
+      decimatedPoints = [];
+      if (raw) {
+        raw.originalPoints = null;
+        raw.decimatedPoints = [];
+        raw.rawIgc = null;
+        raw.isReconstructed = false;
+        raw.reconstructionVersion = null;
+      }
+      if (bundle.meta) {
+        bundle.meta.hasDecimatedTrack = false;
+        bundle.meta.hasRawIgc = false;
+        bundle.meta.isReconstructed = false;
+        bundle.meta.reconstructionVersion = null;
+        bundle.meta.sparklineSvgPoints = '';
+      }
+      if (raw && bundle.meta) {
+        this.adapter.saveFlight(bundle.meta, raw).catch(err => {
+          if (typeof console !== 'undefined' && console.warn) {
+            console.warn('[LogbookManager] Background purge of synthetic track points failed:', err);
+          }
+        });
+      }
+    }
+
     // Auto-trim flight track on-the-fly if not already trimmed
     if (bundle.meta && !bundle.meta.isTrimmed && !bundle.meta.isExplicitlyUntrimmed && raw) {
       try {

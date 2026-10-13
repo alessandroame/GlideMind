@@ -36,6 +36,9 @@ import {
     fetchWeekOverview,
     searchLocations,
     fetchReverseGeocode,
+    getRateLimitStatus,
+    resetRateLimitCooldown,
+    getInFlightRequestsCount,
     DEFAULT_CACHE_TTL_MS,
     STANDARD_PRESSURE_LEVELS_HPA,
     OPEN_METEO_FORECAST_URL
@@ -301,6 +304,10 @@ describe('Open-Meteo Client - Payload Enrichment', () => {
 });
 
 describe('Open-Meteo Client - Fetch Simulation, Retry & Cache Fallback', () => {
+    beforeEach(() => {
+        resetRateLimitCooldown();
+    });
+
     it('should return synthetic data immediately when mock option is true', async () => {
         const result = await fetchWeatherData({ lat: 45.8, lon: 9.3 }, {
             mock: true,
@@ -312,7 +319,7 @@ describe('Open-Meteo Client - Fetch Simulation, Retry & Cache Fallback', () => {
         assert.ok(result.enrichedMetrics.thermalLift.length > 0);
     });
 
-    it('should fetch from mock fetchFn, populate cache, and hit cache on second call', async () => {
+    it('should fetch from mock fetchFn, populate cache across all returned forecast dates, and hit cache on subsequent days', async () => {
         const testCache = new InMemoryCache();
         let networkCalls = 0;
 
@@ -335,17 +342,28 @@ describe('Open-Meteo Client - Fetch Simulation, Retry & Cache Fallback', () => {
 
         assert.equal(networkCalls, 1);
         assert.equal(res1.isFromCache, false);
-        assert.equal(testCache.size, 1);
+        assert.equal(testCache.size, 3, 'Must populate cache for all 3 days in returned forecast');
 
-        // Second call: cache hit, zero network calls
+        // Second call on same date: cache hit, zero network calls
         const res2 = await fetchWeatherData({ lat: 45.8, lon: 9.3 }, {
             targetDate: '2026-10-10',
             cache: testCache,
             fetchFn: fakeFetch
         });
 
-        assert.equal(networkCalls, 1, 'Second fetch should be served from memory cache');
+        assert.equal(networkCalls, 1, 'Second fetch for same date should be served from memory cache');
         assert.equal(res2.isFromCache, true);
+
+        // Third call on different day within forecast (day 2): cache hit, zero network calls!
+        const resDay2 = await fetchWeatherData({ lat: 45.8, lon: 9.3 }, {
+            targetDate: '2026-10-11',
+            cache: testCache,
+            fetchFn: fakeFetch
+        });
+
+        assert.equal(networkCalls, 1, 'Fetch for day 2 within forecast horizon must be served from cache without network query');
+        assert.equal(resDay2.isFromCache, true);
+        assert.equal(resDay2.targetDate, '2026-10-11');
     });
 
     it('should retry on HTTP 429 rate limit with exponential backoff and succeed', async () => {
@@ -531,13 +549,124 @@ describe('Open-Meteo Client - Fetch Simulation, Retry & Cache Fallback', () => {
         });
 
         assert.ok(requestedUrl.includes('latitude=45.8330%2C45.8170') || requestedUrl.includes('latitude=45.8330,45.8170'));
-        assert.equal(testCache.size, 2, 'Must cache both takeoff and landing raw payloads');
+        assert.equal(testCache.size, 6, 'Must cache both takeoff and landing across all returned dates (3 days * 2 locations = 6)');
         assert.ok(result.takeoffWeather);
         assert.ok(result.landingWeather);
         assert.notEqual(
             result.takeoffWeather.hourly.winddirection_10m[14],
             result.landingWeather.hourly.winddirection_10m[14]
         );
+
+        // Day 2 multi-point check: zero network calls
+        let day2NetworkCalls = 0;
+        const failFetch = async () => {
+            day2NetworkCalls++;
+            throw new Error('Should not call network on day 2 cache hit');
+        };
+        const day2Result = await fetchWeatherData(coords, {
+            targetDate: '2026-10-11',
+            cache: testCache,
+            fetchFn: failFetch
+        });
+        assert.equal(day2NetworkCalls, 0, 'Multi-point day 2 must be served directly from memory cache');
+        assert.equal(day2Result.isFromCache, true);
+    });
+
+    it('should deduplicate concurrent in-flight requests for the exact same URL and execute single network fetch', async () => {
+        let networkCalls = 0;
+        const delayedFetch = async () => {
+            networkCalls++;
+            await new Promise(r => setTimeout(r, 40));
+            const synthetic = generateSyntheticWeather([45.8, 9.3, 1000], { targetDate: '2026-10-10' });
+            return {
+                ok: true,
+                status: 200,
+                json: async () => synthetic
+            };
+        };
+
+        const testCache = new InMemoryCache();
+        // Fire 4 parallel requests concurrently with forceRefresh: true (so cache check is bypassed)
+        const [r1, r2, r3, r4] = await Promise.all([
+            fetchWeatherData({ lat: 45.8, lon: 9.3 }, { targetDate: '2026-10-10', cache: testCache, fetchFn: delayedFetch, forceRefresh: true }),
+            fetchWeatherData({ lat: 45.8, lon: 9.3 }, { targetDate: '2026-10-10', cache: testCache, fetchFn: delayedFetch, forceRefresh: true }),
+            fetchWeatherData({ lat: 45.8, lon: 9.3 }, { targetDate: '2026-10-10', cache: testCache, fetchFn: delayedFetch, forceRefresh: true }),
+            fetchWeatherData({ lat: 45.8, lon: 9.3 }, { targetDate: '2026-10-10', cache: testCache, fetchFn: delayedFetch, forceRefresh: true })
+        ]);
+
+        assert.equal(networkCalls, 1, 'Only 1 network fetch must be executed despite 4 concurrent callers');
+        assert.ok(r1 && r2 && r3 && r4);
+        assert.equal(getInFlightRequestsCount(), 0, 'In-flight map must be empty after promises resolve');
+    });
+
+    it('should activate circuit breaker cooldown on persistent HTTP 429 and return fallback without throwing', async () => {
+        let attempts = 0;
+        const rateLimitedFetch = async () => {
+            attempts++;
+            return {
+                ok: false,
+                status: 429,
+                headers: {
+                    get: (name) => name.toLowerCase() === 'retry-after' ? '30' : null
+                }
+            };
+        };
+
+        const testCache = new InMemoryCache();
+        const res = await fetchWeatherData({ lat: 45.8, lon: 9.3 }, {
+            targetDate: '2026-10-10',
+            cache: testCache,
+            fetchFn: rateLimitedFetch,
+            maxRetries: 1
+        });
+
+        assert.ok(res, 'Must return fallback weather rather than throwing unhandled exception');
+        assert.equal(res.isRateLimited, true, 'Result must be flagged as rate limited');
+        assert.equal(res.isSynthetic, true, 'Result must be synthetic when no stale cache exists');
+
+        const status = getRateLimitStatus();
+        assert.equal(status.isRateLimited, true, 'Circuit breaker must be active');
+        assert.ok(status.cooldownRemainingMs > 0, 'Must have remaining cooldown');
+    });
+
+    it('should skip network fetch and immediately return fallback when circuit breaker cooldown is active', async () => {
+        const rateLimitedFetch = async () => ({
+            ok: false,
+            status: 429,
+            headers: { get: () => '60' }
+        });
+        const testCache = new InMemoryCache();
+
+        // 1. Initial call receives 429 and activates circuit breaker
+        await fetchWeatherData({ lat: 45.8, lon: 9.3 }, {
+            targetDate: '2026-10-10',
+            cache: testCache,
+            fetchFn: rateLimitedFetch,
+            maxRetries: 0
+        });
+
+        assert.equal(getRateLimitStatus().isRateLimited, true, 'Circuit breaker must be active after 429');
+
+        // 2. Subsequent call during cooldown: must NOT call spyFetch at all
+        let networkCalls = 0;
+        const spyFetch = async () => {
+            networkCalls++;
+            return { ok: true, status: 200, json: async () => ({}) };
+        };
+
+        const res = await fetchWeatherData({ lat: 45.8, lon: 9.3 }, {
+            targetDate: '2026-10-10',
+            cache: testCache,
+            fetchFn: spyFetch
+        });
+
+        assert.equal(networkCalls, 0, 'Must not touch network while circuit breaker is active');
+        assert.equal(res.isRateLimited, true);
+        assert.equal(res.isSynthetic, true);
+
+        // Reset cooldown and verify network is allowed again
+        resetRateLimitCooldown();
+        assert.equal(getRateLimitStatus().isRateLimited, false);
     });
 });
 

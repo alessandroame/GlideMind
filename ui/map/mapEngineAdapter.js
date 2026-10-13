@@ -15,6 +15,7 @@ import { parseCoordinates } from '../../core/comprensorio.js';
 import {
   normalizeAngle,
   calculateWindsockKinematics,
+  calculateShortestRotation,
   generateWindsockSvg,
   generateWindsockKeyframeCss
 } from '../../core/windsock.js';
@@ -133,6 +134,13 @@ export class HeadlessMockMapEngine {
     this.hasGlideLine = false;
     this.glideMetrics = null;
     this.lastFlightUpdateOptions = null;
+    this.hasGlideDeltaBadge = false;
+    this.glideMidpoint = null;
+    this.elevationDelta = null;
+    this.takeoffWindsockAngle = null;
+    this.landingWindsockAngle = null;
+    this.flightTakeoffWindsockAngle = null;
+    this.flightLandingWindsockAngle = null;
   }
 
   init(containerEl, options = {}) {
@@ -226,6 +234,13 @@ export class HeadlessMockMapEngine {
     this.renderedOverlays = [];
     this.activePopupSpotId = null;
     this.renderedMode = 'none';
+    this.hasGlideDeltaBadge = false;
+    this.glideMidpoint = null;
+    this.elevationDelta = null;
+    this.takeoffWindsockAngle = null;
+    this.landingWindsockAngle = null;
+    this.flightTakeoffWindsockAngle = null;
+    this.flightLandingWindsockAngle = null;
   }
 
   flyTo(coords, zoom = 9, options = {}) {
@@ -268,6 +283,58 @@ export class HeadlessMockMapEngine {
     this.hasLandingWindsock = Boolean(spotData?.landing || spotData?.comprensorio?.landings?.[0]);
     this.takeoffWeather = spotData?.takeoffWeather || spotData?.weatherSnapshot || null;
     this.landingWeather = spotData?.landingWeather || spotData?.weatherSnapshot || null;
+
+    const tDir = Number(this.takeoffWeather?.windDirection ?? this.takeoffWeather?.windDir ?? 0);
+    const lDir = Number(this.landingWeather?.windDirection ?? this.landingWeather?.windDir ?? 0);
+    this.takeoffWindsockAngle = (tDir + 180) % 360;
+    this.landingWindsockAngle = (lDir + 180) % 360;
+
+    const mode = spotData?.subSpotType || 'overview';
+    const isLandingSelected = mode === 'landing' || (spotData?.activeSubSpot?.spotType === 'landing');
+    const isTakeoffSelected = mode === 'takeoff' || (spotData?.activeSubSpot?.spotType === 'takeoff');
+    const tCoord = parseCoordinates(isTakeoffSelected && spotData?.activeSubSpot?.coordinates
+      ? spotData.activeSubSpot.coordinates
+      : (spotData?.takeoff?.coordinates || spotData?.comprensorio?.takeoffs?.[0]?.coordinates));
+    const lCoord = parseCoordinates(isLandingSelected && spotData?.activeSubSpot?.coordinates
+      ? spotData.activeSubSpot.coordinates
+      : (spotData?.landing?.coordinates || spotData?.comprensorio?.landings?.[0]?.coordinates));
+
+    if (isTakeoffSelected && tCoord) {
+      this.center = [tCoord.lat, tCoord.lon];
+      this.zoom = 15.5;
+      this.focusedSpot = 'takeoff';
+      this.focusedCoordinates = tCoord;
+      this.isSubSpotFocused = true;
+    } else if (isLandingSelected && lCoord) {
+      this.center = [lCoord.lat, lCoord.lon];
+      this.zoom = 15.5;
+      this.focusedSpot = 'landing';
+      this.focusedCoordinates = lCoord;
+      this.isSubSpotFocused = true;
+    } else {
+      this.center = tCoord ? [tCoord.lat, tCoord.lon] : (lCoord ? [lCoord.lat, lCoord.lon] : null);
+      this.zoom = 13.5;
+      this.focusedSpot = 'overview';
+      this.focusedCoordinates = null;
+      this.isSubSpotFocused = false;
+    }
+
+    if (tCoord && lCoord) {
+      const midLat = (tCoord.lat + lCoord.lat) / 2;
+      const midLon = (tCoord.lon + lCoord.lon) / 2;
+      const tAlt = Number(spotData?.takeoff?.altitude ?? spotData?.comprensorio?.takeoffs?.[0]?.altitude ?? 1000);
+      const lAlt = Number(spotData?.landing?.altitude ?? spotData?.comprensorio?.landings?.[0]?.altitude ?? 300);
+      const deltaH = Math.abs(tAlt - lAlt);
+
+      this.hasGlideDeltaBadge = true;
+      this.glideMidpoint = { lat: midLat, lon: midLon };
+      this.elevationDelta = deltaH;
+    } else {
+      this.hasGlideDeltaBadge = false;
+      this.glideMidpoint = null;
+      this.elevationDelta = null;
+    }
+
     this.destroyed = false;
     return this;
   }
@@ -277,12 +344,26 @@ export class HeadlessMockMapEngine {
     const lWeather = (typeof landingWeatherOrIsLanding === 'object' && landingWeatherOrIsLanding !== null)
       ? landingWeatherOrIsLanding
       : (landingWeatherOrIsLanding === true ? takeoffWeather : takeoffWeather);
+
+    if (tWeather) {
+      const tDir = tWeather.windDirection ?? tWeather.windDir ?? 0;
+      const targetAngle = (tDir + 180) % 360;
+      this.takeoffWindsockAngle = calculateShortestRotation(this.takeoffWindsockAngle ?? targetAngle, targetAngle);
+    }
+    if (lWeather) {
+      const lDir = lWeather.windDirection ?? lWeather.windDir ?? 0;
+      const targetAngle = (lDir + 180) % 360;
+      this.landingWindsockAngle = calculateShortestRotation(this.landingWindsockAngle ?? targetAngle, targetAngle);
+    }
+
     this.lastWindsockUpdate = {
       weatherSnapshot: tWeather,
       takeoffWeather: tWeather,
       landingWeather: lWeather,
       isLanding: landingWeatherOrIsLanding === true,
-      takeoff
+      takeoff,
+      takeoffWindsockAngle: this.takeoffWindsockAngle,
+      landingWindsockAngle: this.landingWindsockAngle
     };
     if (takeoff && this.activeMiniMapSpotData) {
       this.activeMiniMapSpotData.takeoff = takeoff;
@@ -306,6 +387,12 @@ export class HeadlessMockMapEngine {
     this.glideMetrics = data?.glideMetrics || null;
     this.takeoffWeather = data?.takeoffWeather || data?.weatherSnapshot || null;
     this.landingWeather = data?.landingWeather || data?.weatherSnapshot || null;
+
+    const tDir = Number(this.takeoffWeather?.windDirection ?? this.takeoffWeather?.windDir ?? 180);
+    const lDir = Number(this.landingWeather?.windDirection ?? this.landingWeather?.windDir ?? 180);
+    this.flightTakeoffWindsockAngle = (tDir + 180) % 360;
+    this.flightLandingWindsockAngle = (lDir + 180) % 360;
+
     this.paused = false;
     this.destroyed = false;
     return this;
@@ -324,9 +411,15 @@ export class HeadlessMockMapEngine {
     }
     if (options.takeoffWeather) {
       this.takeoffWeather = options.takeoffWeather;
+      const tDir = options.takeoffWeather.windDirection ?? options.takeoffWeather.windDir ?? 0;
+      const targetAngle = (tDir + 180) % 360;
+      this.flightTakeoffWindsockAngle = calculateShortestRotation(this.flightTakeoffWindsockAngle ?? targetAngle, targetAngle);
     }
     if (options.landingWeather) {
       this.landingWeather = options.landingWeather;
+      const lDir = options.landingWeather.windDirection ?? options.landingWeather.windDir ?? 0;
+      const targetAngle = (lDir + 180) % 360;
+      this.flightLandingWindsockAngle = calculateShortestRotation(this.flightLandingWindsockAngle ?? targetAngle, targetAngle);
     }
   }
 
@@ -581,6 +674,7 @@ export class LeafletMapEngine {
     this.windsockMarker = null;
     this.takeoffSectorMarker = null;
     this.glidePolyline = null;
+    this.glideDeltaMarker = null;
     this.landingMarker = null;
     this.takeoffMarker = null;
     this.flightTakeoffPin = null;
@@ -602,6 +696,10 @@ export class LeafletMapEngine {
     this.renderedMode = 'circular';
     this.lastComprensorioBounds = null;
     this.userLocationMarker = null;
+    this.takeoffWindsockAngle = null;
+    this.landingWindsockAngle = null;
+    this.flightTakeoffWindsockAngle = null;
+    this.flightLandingWindsockAngle = null;
     this.init(containerEl, options);
   }
 
@@ -1015,6 +1113,8 @@ export class LeafletMapEngine {
     }
     this.lastRenderedSignature = null;
     this.renderedMode = 'none';
+    this.takeoffWindsockAngle = null;
+    this.landingWindsockAngle = null;
   }
 
   flyTo(coords, zoom = 9, options = {}) {
@@ -1067,6 +1167,7 @@ export class LeafletMapEngine {
     this.landingWindsockMarker = null;
     this.takeoffSectorMarker = null;
     this.glidePolyline = null;
+    this.glideDeltaMarker = null;
     this.landingMarker = null;
     this.takeoffMarker = null;
     this.activeMiniMapSpotData = spotData;
@@ -1074,9 +1175,16 @@ export class LeafletMapEngine {
 
     if (!spotData) return this;
 
-    const tCoord = parseCoordinates(spotData.takeoff?.coordinates || spotData.comprensorio?.takeoffs?.[0]?.coordinates);
-    const lCoord = parseCoordinates(spotData.landing?.coordinates || spotData.comprensorio?.landings?.[0]?.coordinates);
     const mode = spotData.subSpotType || 'overview';
+    const isLandingSelected = mode === 'landing' || (spotData.activeSubSpot?.spotType === 'landing');
+    const isTakeoffSelected = mode === 'takeoff' || (spotData.activeSubSpot?.spotType === 'takeoff');
+
+    const tCoord = parseCoordinates(isTakeoffSelected && spotData.activeSubSpot?.coordinates
+      ? spotData.activeSubSpot.coordinates
+      : (spotData.takeoff?.coordinates || spotData.comprensorio?.takeoffs?.[0]?.coordinates));
+    const lCoord = parseCoordinates(isLandingSelected && spotData.activeSubSpot?.coordinates
+      ? spotData.activeSubSpot.coordinates
+      : (spotData.landing?.coordinates || spotData.comprensorio?.landings?.[0]?.coordinates));
     const takeoffWeather = spotData.takeoffWeather || spotData.weatherSnapshot || {};
     const landingWeather = spotData.landingWeather || spotData.weatherSnapshot || {};
     const glide = spotData.glideMetrics || { requiredGlideRatio: 5.0, isSafe: true };
@@ -1094,8 +1202,8 @@ export class LeafletMapEngine {
     const lTurb = landingWeather.turbulence ?? 0.1;
     const lAlt = spotData.landing?.altitude || 300;
 
-    const isLandingSelected = mode === 'landing' || (spotData.activeSubSpot?.spotType === 'landing');
-    const isTakeoffSelected = mode === 'takeoff' || (spotData.activeSubSpot?.spotType === 'takeoff');
+    this.takeoffWindsockAngle = (tDir + 180) % 360;
+    this.landingWindsockAngle = (lDir + 180) % 360;
 
     // 1. Takeoff Slope Exposure Sector (Cono e Azimut di Decollo)
     if (tCoord) {
@@ -1173,7 +1281,7 @@ export class LeafletMapEngine {
       this.overlayLayerGroup.addLayer(this.landingWindsockMarker);
     }
 
-    // 4. Geodesic Glide Cone Line
+    // 4. Geodesic Glide Cone Line & Midpoint Elevation Drop Badge
     if (tCoord && lCoord) {
       const glideColor = glide.isSafe ? '#16a34a' : (glide.severity === 1 ? '#ca8a04' : '#dc2626');
       this.glidePolyline = window.L.polyline(
@@ -1186,10 +1294,48 @@ export class LeafletMapEngine {
         }
       );
       this.overlayLayerGroup.addLayer(this.glidePolyline);
+
+      // Place aeronautical elevation drop badge at midpoint of the glide line
+      const midLat = (tCoord.lat + lCoord.lat) / 2;
+      const midLon = (tCoord.lon + lCoord.lon) / 2;
+      const deltaH = Math.abs(Number(tAlt || 0) - Number(lAlt || 0));
+
+      const deltaIcon = window.L.divIcon({
+        className: 'gm-glide-delta-badge-container',
+        html: `<div class="gm-glide-delta-badge" title="Dislivello: ${deltaH}m">Δ ${deltaH}m</div>`,
+        iconSize: [54, 18],
+        iconAnchor: [27, 9]
+      });
+      this.glideDeltaMarker = window.L.marker([midLat, midLon], {
+        icon: deltaIcon,
+        zIndexOffset: 350,
+        interactive: false
+      });
+      this.overlayLayerGroup.addLayer(this.glideDeltaMarker);
     }
 
-    // 5. Fit bounds with safe padding and invalidate size
-    if (tCoord && lCoord) {
+    // 5. Fit bounds with safe padding (overview) OR zoom directly on selected sub-spot
+    if (isTakeoffSelected && tCoord) {
+      this.map.setView([tCoord.lat, tCoord.lon], 15.5);
+      if (typeof window !== 'undefined') {
+        setTimeout(() => {
+          if (this.map) {
+            this.map.invalidateSize();
+            this.map.setView([tCoord.lat, tCoord.lon], 15.5);
+          }
+        }, 50);
+      }
+    } else if (isLandingSelected && lCoord) {
+      this.map.setView([lCoord.lat, lCoord.lon], 15.5);
+      if (typeof window !== 'undefined') {
+        setTimeout(() => {
+          if (this.map) {
+            this.map.invalidateSize();
+            this.map.setView([lCoord.lat, lCoord.lon], 15.5);
+          }
+        }, 50);
+      }
+    } else if (tCoord && lCoord) {
       const bounds = window.L.latLngBounds([[tCoord.lat, tCoord.lon], [lCoord.lat, lCoord.lon]]);
       this.map.fitBounds(bounds, { padding: [35, 35], maxZoom: 15 });
 
@@ -1242,7 +1388,13 @@ export class LeafletMapEngine {
         const k = calculateWindsockKinematics(speed, gust, dir, turb);
         const wrapper = el.querySelector('#miniws-to-wrapper') || el.querySelector('#miniws-wrapper') || el.querySelector('.gm-windsock-wrapper');
         if (wrapper) {
-          wrapper.style.transform = `rotate(${k.rotation}deg)`;
+          const currentAngle = this.takeoffWindsockAngle != null
+            ? this.takeoffWindsockAngle
+            : (wrapper.dataset?.currentRotation != null ? parseFloat(wrapper.dataset.currentRotation) : k.rotation);
+          const nextAngle = calculateShortestRotation(currentAngle, k.rotation);
+          this.takeoffWindsockAngle = nextAngle;
+          if (wrapper.dataset) wrapper.dataset.currentRotation = String(nextAngle);
+          wrapper.style.transform = `rotate(${nextAngle}deg)`;
           const pureSvg = generateWindsockSvg(speed, gust, dir, turb, {
             prefix: 'miniws-to-',
             scale: 0.45,
@@ -1255,6 +1407,7 @@ export class LeafletMapEngine {
             scale: 0.45,
             includeWrapper: true
           });
+          this.takeoffWindsockAngle = k.rotation;
         }
       }
 
@@ -1281,7 +1434,13 @@ export class LeafletMapEngine {
         const k = calculateWindsockKinematics(speed, gust, dir, turb);
         const wrapper = el.querySelector('#miniws-ld-wrapper') || el.querySelector('.gm-windsock-wrapper');
         if (wrapper) {
-          wrapper.style.transform = `rotate(${k.rotation}deg)`;
+          const currentAngle = this.landingWindsockAngle != null
+            ? this.landingWindsockAngle
+            : (wrapper.dataset?.currentRotation != null ? parseFloat(wrapper.dataset.currentRotation) : k.rotation);
+          const nextAngle = calculateShortestRotation(currentAngle, k.rotation);
+          this.landingWindsockAngle = nextAngle;
+          if (wrapper.dataset) wrapper.dataset.currentRotation = String(nextAngle);
+          wrapper.style.transform = `rotate(${nextAngle}deg)`;
           const pureSvg = generateWindsockSvg(speed, gust, dir, turb, {
             prefix: 'miniws-ld-',
             scale: 0.45,
@@ -1294,6 +1453,7 @@ export class LeafletMapEngine {
             scale: 0.45,
             includeWrapper: true
           });
+          this.landingWindsockAngle = k.rotation;
         }
       }
     }
@@ -1363,6 +1523,9 @@ export class LeafletMapEngine {
     const lDir = landingWeather.windDirection ?? landingWeather.windDir ?? 180;
     const lTurb = landingWeather.turbulence ?? 0.1;
     const lAlt = data.landing?.altitude || 300;
+
+    this.flightTakeoffWindsockAngle = (tDir + 180) % 360;
+    this.flightLandingWindsockAngle = (lDir + 180) % 360;
 
     // 1. Takeoff Slope Exposure Sector (Cono e Azimut di Decollo) + Windsock
     if (tCoord) {
@@ -1488,9 +1651,27 @@ export class LeafletMapEngine {
       if (el) {
         const speed = options.takeoffWeather.windSpeed ?? 0;
         const gust = options.takeoffWeather.windGust ?? speed;
-        const dir = options.takeoffWeather.windDirection ?? 0;
+        const dir = options.takeoffWeather.windDirection ?? options.takeoffWeather.windDir ?? 0;
         const turb = options.takeoffWeather.turbulence ?? 0;
-        el.innerHTML = generateWindsockSvg(speed, gust, dir, turb, { prefix: 'fl-to-ws-', scale: 0.5 });
+        const k = calculateWindsockKinematics(speed, gust, dir, turb);
+        const wrapper = el.querySelector('#fl-to-ws-wrapper') || el.querySelector('.gm-windsock-wrapper');
+        if (wrapper) {
+          const currentAngle = this.flightTakeoffWindsockAngle != null
+            ? this.flightTakeoffWindsockAngle
+            : (wrapper.dataset?.currentRotation != null ? parseFloat(wrapper.dataset.currentRotation) : k.rotation);
+          const nextAngle = calculateShortestRotation(currentAngle, k.rotation);
+          this.flightTakeoffWindsockAngle = nextAngle;
+          if (wrapper.dataset) wrapper.dataset.currentRotation = String(nextAngle);
+          wrapper.style.transform = `rotate(${nextAngle}deg)`;
+          wrapper.innerHTML = generateWindsockSvg(speed, gust, dir, turb, {
+            prefix: 'fl-to-ws-',
+            scale: 0.5,
+            includeWrapper: false
+          });
+        } else {
+          el.innerHTML = generateWindsockSvg(speed, gust, dir, turb, { prefix: 'fl-to-ws-', scale: 0.5 });
+          this.flightTakeoffWindsockAngle = k.rotation;
+        }
       }
     }
 
@@ -1510,9 +1691,27 @@ export class LeafletMapEngine {
       if (el) {
         const speed = options.landingWeather.windSpeed ?? 0;
         const gust = options.landingWeather.windGust ?? speed;
-        const dir = options.landingWeather.windDirection ?? 0;
+        const dir = options.landingWeather.windDirection ?? options.landingWeather.windDir ?? 0;
         const turb = options.landingWeather.turbulence ?? 0;
-        el.innerHTML = generateWindsockSvg(speed, gust, dir, turb, { prefix: 'fl-ld-ws-', scale: 0.5 });
+        const k = calculateWindsockKinematics(speed, gust, dir, turb);
+        const wrapper = el.querySelector('#fl-ld-ws-wrapper') || el.querySelector('.gm-windsock-wrapper');
+        if (wrapper) {
+          const currentAngle = this.flightLandingWindsockAngle != null
+            ? this.flightLandingWindsockAngle
+            : (wrapper.dataset?.currentRotation != null ? parseFloat(wrapper.dataset.currentRotation) : k.rotation);
+          const nextAngle = calculateShortestRotation(currentAngle, k.rotation);
+          this.flightLandingWindsockAngle = nextAngle;
+          if (wrapper.dataset) wrapper.dataset.currentRotation = String(nextAngle);
+          wrapper.style.transform = `rotate(${nextAngle}deg)`;
+          wrapper.innerHTML = generateWindsockSvg(speed, gust, dir, turb, {
+            prefix: 'fl-ld-ws-',
+            scale: 0.5,
+            includeWrapper: false
+          });
+        } else {
+          el.innerHTML = generateWindsockSvg(speed, gust, dir, turb, { prefix: 'fl-ld-ws-', scale: 0.5 });
+          this.flightLandingWindsockAngle = k.rotation;
+        }
       }
     }
 
@@ -1630,94 +1829,109 @@ export class LeafletMapEngine {
     }
 
     this.validTrackPoints = validPoints;
-    if (validPoints.length === 0) return this;
-
-    // Smooth vario across points to eliminate GNSS altitude noise and match chart 1:1
-    const pointVarios = validPoints.map((p, i) => {
-      if (typeof p.vario === 'number' && !isNaN(p.vario)) return p.vario;
-      if (i > 0) {
-        const prev = validPoints[i - 1];
-        const dt = Math.max(0.5, (p.timeSeconds ?? i) - (prev.timeSeconds ?? (i - 1)));
-        return ((p.alt || 0) - (prev.alt || 0)) / dt;
-      }
-      return 0;
-    });
-
-    const smoothedVarios = pointVarios.map((v, i) => {
-      if (typeof validPoints[i].vario === 'number' && !isNaN(validPoints[i].vario)) {
-        return validPoints[i].vario;
-      }
-      const prev = pointVarios[Math.max(0, i - 1)];
-      const next = pointVarios[Math.min(pointVarios.length - 1, i + 1)];
-      return (prev + v * 2 + next) / 4;
-    });
-
-    // Segment points by continuous variometer color bands
-    const segments = [];
-    let curSeg = null;
-    for (let i = 0; i < validPoints.length; i++) {
-      const p = validPoints[i];
-      const vario = smoothedVarios[i];
-      const band = sampleVarioRgb(vario);
-      const color = band.css;
-      const pt = [p.lat, p.lon];
-
-      if (!curSeg) {
-        curSeg = { color, points: [pt], startIdx: p.origIdx, endIdx: p.origIdx };
-      } else if (curSeg.color === color) {
-        curSeg.points.push(pt);
-        curSeg.endIdx = p.origIdx;
-      } else {
-        curSeg.points.push(pt);
-        curSeg.endIdx = p.origIdx;
-        segments.push(curSeg);
-        curSeg = { color, points: [pt], startIdx: p.origIdx, endIdx: p.origIdx };
-      }
-    }
-    if (curSeg && curSeg.points.length >= 2) {
-      segments.push(curSeg);
-    }
-
     this.flightTrackPolylines = [];
-    for (const segment of segments) {
-      const poly = window.L.polyline(segment.points, {
-        color: segment.color,
-        weight: 3.5,
-        opacity: 0.85,
-        lineCap: 'round',
-        lineJoin: 'round'
+
+    if (validPoints.length >= 2) {
+      // Smooth vario across points to eliminate GNSS altitude noise and match chart 1:1
+      const pointVarios = validPoints.map((p, i) => {
+        if (typeof p.vario === 'number' && !isNaN(p.vario)) return p.vario;
+        if (i > 0) {
+          const prev = validPoints[i - 1];
+          const dt = Math.max(0.5, (p.timeSeconds ?? i) - (prev.timeSeconds ?? (i - 1)));
+          return ((p.alt || 0) - (prev.alt || 0)) / dt;
+        }
+        return 0;
       });
-      poly.segmentData = segment;
-      this.overlayLayerGroup.addLayer(poly);
-      this.flightTrackPolylines.push(poly);
+
+      const smoothedVarios = pointVarios.map((v, i) => {
+        if (typeof validPoints[i].vario === 'number' && !isNaN(validPoints[i].vario)) {
+          return validPoints[i].vario;
+        }
+        const prev = pointVarios[Math.max(0, i - 1)];
+        const next = pointVarios[Math.min(pointVarios.length - 1, i + 1)];
+        return (prev + v * 2 + next) / 4;
+      });
+
+      // Segment points by continuous variometer color bands
+      const segments = [];
+      let curSeg = null;
+      for (let i = 0; i < validPoints.length; i++) {
+        const p = validPoints[i];
+        const vario = smoothedVarios[i];
+        const band = sampleVarioRgb(vario);
+        const color = band.css;
+        const pt = [p.lat, p.lon];
+
+        if (!curSeg) {
+          curSeg = { color, points: [pt], startIdx: p.origIdx, endIdx: p.origIdx };
+        } else if (curSeg.color === color) {
+          curSeg.points.push(pt);
+          curSeg.endIdx = p.origIdx;
+        } else {
+          curSeg.points.push(pt);
+          curSeg.endIdx = p.origIdx;
+          segments.push(curSeg);
+          curSeg = { color, points: [pt], startIdx: p.origIdx, endIdx: p.origIdx };
+        }
+      }
+      if (curSeg && curSeg.points.length >= 2) {
+        segments.push(curSeg);
+      }
+
+      for (const segment of segments) {
+        const poly = window.L.polyline(segment.points, {
+          color: segment.color,
+          weight: 3.5,
+          opacity: 0.85,
+          lineCap: 'round',
+          lineJoin: 'round'
+        });
+        poly.segmentData = segment;
+        this.overlayLayerGroup.addLayer(poly);
+        this.flightTrackPolylines.push(poly);
+      }
     }
 
     // Takeoff marker "D"
-    const tCoord = [validPoints[0].lat, validPoints[0].lon];
-    const tIcon = window.L.divIcon({
-      className: 'gm-map-div-icon',
-      html: `<div class="gm-flight-map-pin gm-flight-map-takeoff-pin" title="Decollo">D</div>`,
-      iconSize: [22, 22],
-      iconAnchor: [11, 11]
-    });
-    this.trackTakeoffMarker = window.L.marker(tCoord, { icon: tIcon, zIndexOffset: 700 });
-    this.overlayLayerGroup.addLayer(this.trackTakeoffMarker);
+    const tLat = trackData?.takeoff?.lat != null ? trackData.takeoff.lat : (validPoints[0]?.lat ?? null);
+    const tLon = trackData?.takeoff?.lon != null ? trackData.takeoff.lon : (validPoints[0]?.lon ?? null);
+    if (tLat !== null && tLon !== null && !isNaN(tLat) && !isNaN(tLon)) {
+      const tCoord = [tLat, tLon];
+      const tIcon = window.L.divIcon({
+        className: 'gm-map-div-icon',
+        html: `<div class="gm-flight-map-pin gm-flight-map-takeoff-pin" title="${trackData?.takeoff?.name || 'Decollo'}">D</div>`,
+        iconSize: [22, 22],
+        iconAnchor: [11, 11]
+      });
+      this.trackTakeoffMarker = window.L.marker(tCoord, { icon: tIcon, zIndexOffset: 700 });
+      this.overlayLayerGroup.addLayer(this.trackTakeoffMarker);
+    }
 
     // Landing marker "A"
-    const lCoord = [validPoints[validPoints.length - 1].lat, validPoints[validPoints.length - 1].lon];
-    const lIcon = window.L.divIcon({
-      className: 'gm-map-div-icon',
-      html: `<div class="gm-flight-map-pin gm-flight-map-landing-pin" title="Atterraggio">A</div>`,
-      iconSize: [22, 22],
-      iconAnchor: [11, 11]
-    });
-    this.trackLandingMarker = window.L.marker(lCoord, { icon: lIcon, zIndexOffset: 700 });
-    this.overlayLayerGroup.addLayer(this.trackLandingMarker);
+    const lLat = trackData?.landing?.lat != null ? trackData.landing.lat : (validPoints[validPoints.length - 1]?.lat ?? null);
+    const lLon = trackData?.landing?.lon != null ? trackData.landing.lon : (validPoints[validPoints.length - 1]?.lon ?? null);
+    if (lLat !== null && lLon !== null && !isNaN(lLat) && !isNaN(lLon)) {
+      const lCoord = [lLat, lLon];
+      const lIcon = window.L.divIcon({
+        className: 'gm-map-div-icon',
+        html: `<div class="gm-flight-map-pin gm-flight-map-landing-pin" title="${trackData?.landing?.name || 'Atterraggio'}">A</div>`,
+        iconSize: [22, 22],
+        iconAnchor: [11, 11]
+      });
+      this.trackLandingMarker = window.L.marker(lCoord, { icon: lIcon, zIndexOffset: 700 });
+      this.overlayLayerGroup.addLayer(this.trackLandingMarker);
+    }
 
-    // Fit bounds to flight track
-    const allCoords = validPoints.map(p => [p.lat, p.lon]);
-    this.trackBounds = window.L.latLngBounds(allCoords);
-    this.map.fitBounds(this.trackBounds, { padding: [25, 25], maxZoom: 16 });
+    // Fit bounds to flight track or takeoff/landing pins
+    const boundsCoords = validPoints.map(p => [p.lat, p.lon]);
+    if (boundsCoords.length === 0) {
+      if (tLat !== null && tLon !== null && !isNaN(tLat) && !isNaN(tLon)) boundsCoords.push([tLat, tLon]);
+      if (lLat !== null && lLon !== null && !isNaN(lLat) && !isNaN(lLon)) boundsCoords.push([lLat, lLon]);
+    }
+    if (boundsCoords.length > 0) {
+      this.trackBounds = window.L.latLngBounds(boundsCoords);
+      this.map.fitBounds(this.trackBounds, { padding: [25, 25], maxZoom: 16 });
+    }
 
     // Apply initial range or cursor if provided
     if (trackData.highlightRange) {
@@ -1896,6 +2110,7 @@ export class LeafletMapEngine {
     this.windsockMarker = null;
     this.takeoffSectorMarker = null;
     this.glidePolyline = null;
+    this.glideDeltaMarker = null;
     this.landingMarker = null;
     this.takeoffMarker = null;
     this.flightTakeoffSector = null;
@@ -1907,6 +2122,10 @@ export class LeafletMapEngine {
     this.overlayLayerGroup = null;
     this.phaseHighlightGroup = null;
     this.tileLayer = null;
+    this.takeoffWindsockAngle = null;
+    this.landingWindsockAngle = null;
+    this.flightTakeoffWindsockAngle = null;
+    this.flightLandingWindsockAngle = null;
   }
 }
 

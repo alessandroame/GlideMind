@@ -2280,3 +2280,151 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
   3. **Micro Aerologia Atterraggio (`isLanding`)**: Mostrare la scheda specifica dell'atterraggio, il toggle `Aerologia Atterraggio`, e le 5 schede/grafici analitici dell'atterraggio: Brezza di Valle (da `landingWeather`), Raffiche al suolo, Cono di planata & Rientro, Copertura nuvolosa, Temperatura e Aria al suolo. Zero schede o grafici di decollo spuri.
   4. **Aggiornamento In-Place Difensivo**: In `updateHourlyInPlace`, verificare `selectedSubSpot`: se `'overview'`, mantenere il contenitore parametri nascosto (`display: none`); altrimenti rigenerare schede o grafici contestuali con guardie difensive (`if (paramsContainer.style)`).
 
+---
+
+## 161. Puntamento Dinamico e Zoom Automatico della Mini-Mappa sullo Spot Selezionato
+- **Problema**: Quando il pilota selezionava un decollo o un atterraggio specifico in `ForecastView`, la mini-mappa manteneva incondizionatamente un `fitBounds` macroscopico sull'intero comprensorio con zoom modesto ($\le 14$), rendendo difficile valutare i dettagli del pendio di decollo o dell'atterraggio. Inoltre, il tocco sui marker della mini-mappa reimpostava forzatamente la modalità 'overview'.
+- **Causa Radice**: `renderSpotMiniMap` in `mapEngineAdapter.js` non distingueva la presenza di `isTakeoffSelected` o `isLandingSelected` nel calcolo finale dell'inquadratura, invocando sempre `fitBounds` sul binomio complessivo se entrambi i punti erano definiti.
+- **Pattern Vincolante**:
+  1. **Zoom Mirato su Sub-Spot Selezionato (`setView(..., 15.5)`)**: Se `isTakeoffSelected` o `isLandingSelected` è attivo, `LeafletMapEngine.prototype.renderSpotMiniMap` centra e zooma a `15.5` sulle coordinate dello spot selezionato (`tCoord` o `lCoord`), garantendo una vista ravvicinata nitida del cono di lancio, della manica a vento e dell'orografia.
+  2. **Panoramica in Overview (`fitBounds`)**: Solo quando `selectedSubSpot === 'overview'` (nessun sub-spot selezionato), la mini-mappa esegue `fitBounds` con padding di sicurezza per includere entrambi i punti.
+  3. **Headless Engine Symmetry**: `HeadlessMockMapEngine` riflette la medesima logica calcolando `center`, `zoom` (15.5 vs 13.5), `focusedSpot` e flag `isSubSpotFocused`.
+  4. **Reattività al Tocco sui Marker (`onSelectSubSpot`)**: Toccando il marker di decollo o atterraggio sulla mini-mappa, `ForecastView` imposta `this.selectedSubSpot = subSpotId`, commutando l'aerologia e zoomando istantaneamente sul punto selezionato.
+
+---
+
+## 162. Ricostruzione Deterministica della Traccia e Auto-Heal Telemetrico nei Voli da Backup (Caso Volo #50)
+- **Problema**: I voli storici importati da backup ParaMeteo (es. Volo #50 `fl_excel_1787747985586_10`) presentavano tutte le statistiche di sintesi (quota max 2037m, guadagno +260m, vario +2.4 m/s, 3 termiche, durata 36 min), ma la sezione "MAPPA 2D TRACCIA" restava un rettangolo nero vuoto e il "PROFILO ALTIMETRICO" mostrava *"Tracciato altimetrico non disponibile"*, impedendo l'accesso al Replay 3D e al download IGC.
+- **Causa Radice**:
+  1. Le routine di esportazione del software legacy omettevano gli array di punti GPS grezzi dalla collezione `database.flightTracks`, memorizzando solo metadati di volo, coordinate estreme, termiche e timeline delle fasi.
+  2. `parameteoImporter.js` impostava `decimatedPoints = []` e `rawIgc = null` in assenza di punti grezzi, non sfruttando i dati telemetrici ricchi già presenti.
+  3. In `FlightDetailSheet.js`, la riga `if (!Array.isArray(points) || points.length < 2) return;` abortiva prematuramente `attachInteractiveFlightChart`, impedendo l'inizializzazione del motore Leaflet (`createMapEngine`) e lasciando il canvas disconnesso.
+  4. In `logbookDb.js`, la routine di auto-heal in `getFlightDetail` scattava solo se `rawIgc` era già presente come testo stringa.
+- **Pattern Vincolante**:
+  1. **Motore Headless di Ricostruzione Traccia (`core/flightTrackReconstruction.js`)**: Modulo puro Node.js privo di DOM che sintetizza traiettorie 3D realistiche e deterministiche interpolando decollo, atterraggio, quote min/max, punti di massimo variometro, spirali di salita per ciascuna termica (raggio, centri geodetici, numero di giri) e segmenti della timeline, generando sia punti campionati sia file IGC validi (standard FAI B-records).
+  2. **Auto-Heal a Due Livelli (Import & Query Time)**:
+     - All'importazione (`parameteoImporter.js`), ricostruire la traccia se i punti mancano ma la telemetria è presente, popolando `takeoffLat/Lon`, `landingLat/Lon` e flag `isReconstructed: true`.
+     - Alla lettura nel database (`logbookDb.js#getFlightDetail`), se un volo esistente in IndexedDB manca di `decimatedPoints`, invocare la ricostruzione al volo e salvarlo in background senza costringere l'utente a re-importare il backup.
+  3. **Inizializzazione Difensiva della Mappa (`FlightDetailSheet.js`)**: Non abortire mai la creazione del motore di mappa: anche se i punti sono vuoti o ridotti, la mappa 2D deve essere montata e centrare i marker di decollo e atterraggio.
+  4. **Badge di Trasparenza Semantica (`.gm-status-pill-sky`)**: Mostrare visivamente il badge `Telemetria Ricostruita` per informare il pilota che la traccia deriva dalla sintesi telemetrica.
+
+
+
+---
+
+## 163. Posizionamento Geodetico del Badge Dislivello al Punto Medio della Retta Decollo-Atterraggio e Snap ai Confini della Traccia
+- **Problema**:
+  1. Nella mini-mappa cartografica di `ForecastView`, la retta geodetica tratteggiata che unisce decollo e atterraggio (`glidePolyline`) visualizzava l'orientamento spaziale e il colore di sicurezza della planata, ma mancava un'indicazione immediata del dislivello altimetrico $\Delta h$ lungo la retta stessa.
+  2. Nei test di traiettoria del modulo di ricostruzione traccia (`flightTrackReconstruction.js`), oscillazioni armoniche (S-turn) applicate all'inizio del volo senza rampa di transizione facevano discostare il primo punto campionato $P_0$ dalle coordinate esatte del decollo, violando la condizione al contorno di partenza a terra.
+- **Causa Radice**:
+  1. `LeafletMapEngine.prototype.renderSpotMiniMap` disegnava la polyline tra $T$ e $L$ ma non calcolava il punto medio né istanziava un marker indicatore.
+  2. La formula sinusoidale delle virate non applicava un fattore di smorzamento progressivo ($rampUp$) a $t = 0$, introducendo un offset orizzontale istantaneo al punto di lancio.
+- **Pattern Vincolante**:
+  1. **Calcolo Geodetico del Punto Medio e Delta Altimetrico**:
+     $$P_{\text{mid}} = \left[\frac{\text{lat}_t + \text{lat}_l}{2}, \frac{\text{lon}_t + \text{lon}_l}{2}\right], \quad \Delta h = |h_{\text{takeoff}} - h_{\text{landing}}|$$
+  2. **Micro-Badge Aeronautico Infrangibile (`.gm-glide-delta-badge`)**: Renderizzato con `L.divIcon` centrato (`iconAnchor: [27, 9]`, `zIndexOffset: 350`, `interactive: false`), stile frosted glass ad alto contrasto conforme ai token del tema (`var(--gm-bg-card)`, `var(--gm-text-primary)`), e supporto nativo per Sunlight Mode (`[data-theme="light"]`). Clic e tocchi passano attraverso (`pointer-events: none`).
+  3. **Snap Rigoroso ai Confini nella Ricostruzione Traccia**: Nel generatore di punti sintetici, forzare rigidamente $P_0 \equiv (\text{lat}_t, \text{lon}_t, h_t)$ e $P_{N-1} \equiv (\text{lat}_l, \text{lon}_l, h_l)$, applicando uno smorzamento progressivo $\min(1, \Delta t / 40)$ a qualsiasi oscillazione o virata iniziale.
+
+
+---
+
+## 164. Profilo Altimetrico Naturale a Spline Hermite con Ancore Termiche e Ripristino Focus Card da Replay 3D
+- **Problema**:
+  1. Il profilo altimetrico del Volo #50 ricostruito appariva visivamente "finto" e artificiale: una curva sinusoidale monotona che saliva costantemente fino al 60% della durata (minuto 21), ignorando che la salita in termica principale si era conclusa a 2037m alle 13:00 (minuto 3.5), seguita da veleggiamento a 1830m-1884m con altre 2 termiche e infine planata verso PeterPan. Il variometro presentava inoltre gradini di discretizzazione dovuti all'arrotondamento del metro intero.
+  2. Quando il pilota chiudeva il visualizzatore Replay 3D (o la scheda di dettaglio volo) e tornava alla lista del Logbook, la vista atterrava sempre in cima alla lista a scroll 0: la card del volo appena esaminato perdeva la posizione visiva e il focus da tastiera, costringendo l'utente a cercare e scorrere di nuovo tutti i voli.
+- **Causa Radice**:
+  1. `flightTrackReconstruction.js` utilizzava un profilo matematico parametrico a rampa unica anziché ancorarsi sulle coordinate temporali e altimetriche registrate nei metadati (`maxAltPoint` alle 13:00, termiche 1-2-3 con `entryAlt`/`exitAlt`, punto di max variometro alle 13:14 e transizione planata finale). Inoltre, `raw.reconstructionVersion` mancava, impedendo a `logbookDb.js` di aggiornare le tracce già salvate in precedenza nel database locale del browser.
+  2. La navigazione indietro in `FlightReplayView.js` (`handleExitReplay`) impostava genericamente `window.location.hash = '#logbook'`, e `ui/router.js` non estraeva né trasmetteva i parametri di query presenti nella stringa hash (`#route?key=value`), reimpostando la vista senza stato di puntamento.
+- **Pattern Vincolante**:
+  1. **Interpolazione Altimetrica a Spline Hermite Cubica con Tangenti Continue**:
+     - In `core/flightTrackReconstruction.js`, ordinare e deduplicare tutte le ancore temporali reali: Decollo, ingressi/uscite termiche con spirali geodetiche e guadagni quota, vertice di picco `maxAltPoint` (con tangente orizzontale $\dot{h}=0$), punto di `maxVarioPoint` e atterraggio.
+     - Calcolare le tangenti Hermite $m_k$ per garantire derivata prima continua (zero cuspidi o discontinuità).
+     - Applicare micro-rilievo atmosferico multi-frequenza deterministico e smussamento simmetrico del variometro (finestra a media mobile a 3 punti) per eliminare il rumore di discretizzazione.
+  2. **Migrazione Trasparente Database (`reconstructionVersion: 2`)**:
+     - In `logbookDb.js` (`getFlightDetail`), rilevare tracce con `raw.isReconstructed && (!raw.reconstructionVersion || raw.reconstructionVersion < 2)` e forzare la ri-generazione al volo, aggiornando `raw.originalPoints`, `raw.decimatedPoints`, `raw.rawIgc`, `bundle.meta.sparklineSvgPoints` e persistendo nel database IndexedDB.
+  3. **Routing con Parametri Hash e Focus Restoration (`focusFlight`)**:
+     - `ui/router.js` espone `parseHashParams(hash)`, estrae i parametri sia su evento `hashchange` sia all'avvio e, quando `validRoute === currentRoute`, inoltra i parametri a `currentMountedView.handleRouteParams(params)`.
+     - `FlightReplayView.js` naviga a `#logbook?focusFlightId=${encodeURIComponent(flightId)}`.
+     - `LogbookView.js` implementa `focusFlight(flightId)`: se il volo è nascosto da ricerca o filtri, li resetta a 'all', centra la card con `scrollIntoView({ behavior: 'smooth', block: 'center' })`, imposta `focus({ preventScroll: true })` e applica la classe `.gm-flight-card-focused` con animazione a pulsazione visiva per 2.5 secondi.
+     - `closeFlightDetailView` in `FlightDetailSheet.js` applica il medesimo puntamento automatico alla chiusura della scheda.
+
+
+---
+
+## 165. Rotazione Continua Geodetica (Shortest Path) delle Maniche a Vento allo Scrubbing Orario
+- **Problema**:
+  Durante lo scorrimento della timeline oraria nello scrubber delle previsioni (`ForecastView`), quando la direzione del vento oltrepassava la discontinuità $0^\circ / 360^\circ$ (es. rotazione da $355^\circ$ a $10^\circ$), le maniche a vento vettoriali sulla mini-mappa o sul visualizzatore di analisi volo compivano una rotazione errata nel senso opposto di $345^\circ$ in senso antiorario anziché percorrere l'arco minimo di $+15^\circ$ in senso orario.
+- **Causa Radice**:
+  L'elemento `.gm-windsock-wrapper` adotta una transizione CSS elastica (`transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)`). Quando `updateWindsockMarker` o `updateFlightProcedures` impostava `wrapper.style.transform = rotate(${k.rotation}deg)` con `k.rotation` normalizzato rigidamente nell'intervallo $[0, 360)$, il motore CSS del browser interpolava scalarmente i valori numerici da $355$ a $10$ ($\Delta = -345^\circ$), generando un giro completo al contrario ad alta velocità.
+- **Pattern Vincolante**:
+  1. **Funzione Pura Headless `calculateShortestRotation(currentAngle, targetAngle)` (`core/windsock.js`)**:
+     Calcola l'angolo continuo unwrapped percorrendo tassativamente l'arco geodetico minimo:
+     $$\text{diff} = (\text{target} - \text{current}) \pmod{360}$$
+     $$\text{if } \text{diff} > 180 \implies \text{diff} -= 360; \quad \text{if } \text{diff} < -180 \implies \text{diff} += 360$$
+     $$\text{return } \text{current} + \text{diff}$$
+     Garantisce $|\Delta \theta| \le 180^\circ$ per qualsiasi coppia di angoli (inclusi giri multipli e numeri negativi) e gestisce difensivamente input nulli o non finiti.
+  2. **Tracciamento Angolare Continuo su Engine (`ui/map/mapEngineAdapter.js`)**:
+     Sia `LeafletMapEngine` sia `HeadlessMockMapEngine` tracciano gli angoli continui (`takeoffWindsockAngle`, `landingWindsockAngle`, `flightTakeoffWindsockAngle`, `flightLandingWindsockAngle`) inizializzati in `renderSpotMiniMap`/`renderComprensorioFlightMap` e aggiornati in `updateWindsockMarker`/`updateFlightProcedures`, sincronizzati con `wrapper.dataset.currentRotation`.
+  3. **Preservazione Transizione DOM**:
+     L'aggiornamento orario applica la nuova rotazione continua all'attributo `transform` del wrapper e rigenera esclusivamente il contenuto interno dei segmenti SVG (`includeWrapper: false`), garantendo animazioni a 60 FPS senza reset o salti visivi.
+
+---
+
+## 166. Prevenzione Tempeste HTTP 429 Open-Meteo tramite In-Flight Promise Pooling, Multi-Day Cache Population e Circuit Breaker Cooldown
+- **Problema**:
+  Durante l'interazione con l'applicazione (cambio rapido di data, caricamento iniziale della vista `ForecastView` o re-mount del router), la console registrava sequenze a catena di errori `HTTP 429 (Too Many Requests)` verso le API Open-Meteo. L'applicazione continuava a martellare la rete peggiorando il rate limit, con fallimento dei retry e blocco dell'interfaccia.
+- **Causa Radice**:
+  1. *Assenza di in-flight pooling*: chiamate parallele simultanee per lo stesso URL generavano richieste di rete duplicate indipendenti, esaurendo in pochi secondi la quota oraria/minuto dell'API.
+  2. *Spreco del payload multi-giorno*: Open-Meteo restituiva un forecast orario esteso per 8 giorni (`start_date` a `end_date`), ma il client memorizzava nella cache in-memory esclusivamente la data target puntuale (`targetDate`). Ogni click sui tab data successivi ("Domani", "Dopodomani") causava un cache-miss forzato e una nuova chiamata HTTP da decine di kilobyte.
+  3. *Loop di retry non scalato e assenza di circuit breaker*: il retry si riattivava dopo appena 500ms su codice 429 senza rispettare la finestra di blocco dell'API esterna, e nessuna protezione globale intercettava il rate limit per sospendere temporaneamente le richieste di rete successive.
+- **Pattern Vincolante**:
+  1. **In-Flight Request Deduplication (`fetchWithDeduplication`)**:
+     Tutte le richieste a endpoint remoti devono transitare attraverso un pool Map indicizzato per URL canonico. Se una richiesta è già "in-flight", le successive chiamate concorrenti ricevono la medesima `Promise`, azzerando le chiamate ridondanti.
+  2. **Popolazione Multi-Day Automatica della Cache**:
+     All'arrivo del payload Open-Meteo contenente un intervallo orario multi-giorno, estrarre tutte le date distinte `YYYY-MM-DD` da `raw.hourly.time` e salvare il relativo forecast indicizzato in `weatherCache`. Il cambio data sui tab deve risultare una lettura istantanea da memoria a latenza zero ($0\text{ms}$).
+  3. **Circuit Breaker con Cooldown Attivo e Fallback Graceful**:
+     Alla ricezione di un codice HTTP 429 (e dopo fallimento del backoff esponenziale), attivare un cooldown di sicurezza (estratto dall'header `Retry-After` o predefinito a 60 secondi). Durante la finestra di cooldown, le successive richieste meteo non devono toccare la rete, ma restituire immediatamente la cache stale pregressa o un fallback sintetico contrassegnato con `{ isRateLimited: true, isSynthetic: true }`.
+  4. **Segnalazione di Stato nell'Interfaccia Pilota**:
+     In presenza di `isRateLimited: true`, l'indicatore di stato live deve comunicare sobriamente lo stato quota (`Quota API (429)`) con stile visivo ambra/caution conforme al design system, senza bloccare la navigazione o generare alert modali intrusivi.
+
+---
+
+## 167. Divieto Assoluto di Fabbricazione di Punti Traccia (Zero Synthetic/Reconstructed Track Points) e Gestione Trasparente dei Voli Privi di Coordinate GPS
+- **Problema**:
+  Nei tentativi precedenti di visualizzare una traccia per i voli importati da fogli Excel o backup parziali privi di campionamento secondo per secondo (es. Volo #50), il sistema sintetizzava traiettorie e onde sinusoidali/spline artificiali. L'utente ha giustamente sollevato la violazione di veridicità del dominio aeronautico: inventare punti geografici o profili altimetrici per un volo registrato è inaccettabile e fuorviante per l'analisi del pilota.
+- **Causa Radice**:
+  Tentativo di mascherare l'assenza di dati grezzi generando punti artificiali (`flightTrackReconstruction.js`, interpolazioni ad onda, finti B-record IGC) invece di gestire con sobrietà e trasparenza l'assenza della traccia registrata.
+- **Pattern Vincolante**:
+  1. **Divieto Assoluto di Punti Sintetici / Fittizi**:
+     - Rimozione totale del modulo di ricostruzione traccia (`core/flightTrackReconstruction.js`) e di qualsiasi algoritmo che inventi coordinate GPS o quote intermedie per voli reali.
+     - Nei moduli di importazione (`core/parameteoImporter.js`), i voli senza punti grezzi devono mantenere `points: null`, `rawPoints: []`, `decimatedPoints: []`, `rawIgc: null`, `hasDecimatedTrack: false`, `isReconstructed: false`.
+  2. **Auto-Purge Attivo nel Database Locale (`core/logbookDb.js`)**:
+     - Alla lettura nel database (`getFlightDetail`), se un volo presenta `raw.isReconstructed === true` o punti generati artificialmente in sessioni pregresse, ripulire attivamente i campi (`decimatedPoints = []`, `originalPoints = []`, `rawIgc = null`, `isReconstructed = false`) e persistere la bonifica in IndexedDB.
+  3. **Rappresentazione Veritiera nella Scheda di Dettaglio (`FlightDetailSheet.js`)**:
+     - **Mini-Mappa 2D**: Se il volo possiede coordinate di decollo e atterraggio nei metadati, renderizzare esclusivamente i marker ufficiali di decollo ("D") e atterraggio ("A") inquadrati nei bounds, senza tracciare alcuna polyline fittizia tra di essi.
+     - **Profilo Altimetrico**: Visualizzare il messaggio sobrio e trasparente: *"Tracciato altimetrico non disponibile (nessuna registrazione di coordinate GPS/IGC per questo volo)"*, accompagnato dalle metriche reali verificate (Quota Decollo, Quota Max, Quota Atterraggio, Durata, Dislivello).
+     - **Disabilitazione Controlli**: Disabilitare esplicitamente i pulsanti di Replay 3D e Assetto (`disabled aria-disabled="true" title="Replay 3D non disponibile: traccia GPS assente"`) e il download del file IGC (`title="Download IGC non disponibile: nessuna registrazione GPS"`).
+     - **Badge di Stato**: Mostrare il badge sobrio `Traccia Non Registrata`.
+  4. **Stato Vuoto Trasparente nel Replay 3D (`FlightReplayView.js`)**:
+     - Se l'utente naviga all'URL `#replay?flightId=...` per un volo privo di punti GPS, visualizzare una schermata trasparente con messaggio esplicito (*"Traccia GPS Non Disponibile: Il volo non contiene una registrazione di coordinate GPS secondo per secondo. Il Replay 3D richiede una traccia reale IGC registrata da strumento o variometro"*) e pulsante *"Torna al Flight Log"* che ripristina la vista centrata sulla card del volo (`#logbook?focusFlightId=...`).
+
+---
+
+## 168. Identificazione Veritiera della Presenza Traccia GPS nel Flight Log (`hasAttachedTrack`) e Feedback Tri-Modale di Sicurezza
+- **Problema**:
+  Nel feed del logbook, i voli privi di traccia GPS reale (es. storicizzati da tabelle Excel o importati solo con metadati tabellari) non erano distinguibili a colpo d'occhio dai voli dotati di traccia IGC registrata. Inoltre, affidarsi semplicemente al flag booleano preesistente `flight.hasTrack === true` generava falsi positivi poiché nei vecchi backup ParaMeteo tale flag era impostato a `true` anche quando l'oggetto traccia non conteneva coordinate effettive nel database.
+- **Causa Radice**:
+  Assenza di una funzione di validazione strutturale headless per la presenza fisica di traccia GPS e mancanza di un indicatore visivo dedicato sulle card del flight log.
+- **Pattern Vincolante**:
+  1. **Funzione Pura Headless `hasAttachedTrack(flight)` (`core/logbook.js`)**:
+     Valuta l'effettiva presenza di dati GPS autentici: `hasDecimatedTrack === true`, `hasRawIgc === true`, `decimatedPoints.length >= 2`, `points.length >= 2`, `rawIgc` con lunghezza $> 30$ caratteri, o bundle con traccia valida.
+     Rifiuta categoricamente `flight.isReconstructed === true`, array vuoti o assenti, ignorando il flag non verificato `flight.hasTrack`.
+  2. **Feedback Tri-Modale sulle Card del Logbook (`LogbookView.js`)**:
+     Applicare il principio tri-modale di sicurezza (`laws-of-ux` Sezione 8): combinare **Colore + Testo Esplicito + Icona Funzionale**:
+     - *Traccia Presente*: `.gm-track-badge-present` (smeraldo, icona polyline SVG, testo *"Traccia"*).
+     - *Traccia Assente*: Nessun badge renderizzato (omissione del badge negativo per azzerare il visual clutter sulle card prive di coordinate).
+     - Tipografia compatta a larghezza controllata nel blocco `.gm-flight-badge-group`, prevenendo qualsiasi troncamento del titolo del volo su display mobile 360px-390px.
+  3. **Filtri Rapidi a Scorrimento Singolo (`touch-action: pan-x`)**:
+     Nel carosello dei filtri del logbook, includere i chip `Con traccia` (`with-track`) e `Senza traccia` (`no-track`) gestiti dal controller `filterFlights`, consentendo all'utente di isolare istantaneamente i voli analizzabili in 2D/3D.
+  4. **Coerenza Semantica nel Dettaglio Volo (`FlightDetailSheet.js`)**:
+     Allineare i badge di testata (`.gm-status-pill-emerald` *"Traccia GPS"* vs `.gm-status-pill-slate` *"Traccia Non Registrata"*), garantendo un lessico coerente in tutta l'applicazione.

@@ -1722,4 +1722,123 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Suite di test globale a 753 test verdi (129 suite).
   - Registrata la Lezione Appresa #159 in [MEMORY.md](file:///MEMORY.md).
 
+---
 
+## 2026-10-13 - Fase 4/5-bis: Puntamento Dinamico e Zoom Automatico della Mini-Mappa sullo Spot Selezionato
+- **Tipo**: Cartografia / UI Interaction / Outdoor HMI / Testing
+- **Dettagli**: [.agents/worklog.d/2026-10-13_mini-map-subspot-zoom-focus.md](file:///.agents/worklog.d/2026-10-13_mini-map-subspot-zoom-focus.md)
+- **Sintesi**:
+  - Implementato in [`ui/map/mapEngineAdapter.js`](file:///ui/map/mapEngineAdapter.js) (`LeafletMapEngine` e `HeadlessMockMapEngine`) il centraggio dinamico con zoom ravvicinato (`setView(..., 15.5)`) sullo spot selezionato (decollo o atterraggio), mantenendo `fitBounds` con safe padding in modalità Overview.
+  - Aggiornata la callback `onSelectSubSpot` in [`ui/views/ForecastView.js`](file:///ui/views/ForecastView.js) per commutare istantaneamente la vista sul decollo o atterraggio toccato sulla mini-mappa, innescando lo zoom della mappa sul punto selezionato.
+  - Aggiunta la suite di test dedicati `Mini-Map Sub-Spot Zoom & Center Contracts` in [`tests/ui/forecastView.test.mjs`](file:///tests/ui/forecastView.test.mjs) (78/78 test passati).
+  - Test suite globale al 100% verde: 762 test nativi (131 suite) in Node.js puro, 0 falliti.
+  - Registrata la Lezione Appresa #161 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-13 - Logbook & Telemetria: Ricostruzione Deterministica della Traccia e Auto-Heal per Voli da Backup (Caso Volo #50)
+- **Tipo**: Bugfix Strutturale / Headless Core / Logbook / UI Robustness / Testing
+- **Dettagli**: [.agents/worklog.d/2026-10-13_flight-track-reconstruction-and-auto-heal.md](file:///.agents/worklog.d/2026-10-13_flight-track-reconstruction-and-auto-heal.md)
+- **Sintesi**:
+  - Risolto il problema del Volo #50 (e altri 39 voli da backup ParaMeteo con metadati ricchi ma privi dell'array di punti GPS grezzi in `database.flightTracks`), che presentava la mappa 2D completamente nera e il messaggio *"Tracciato altimetrico non disponibile"*.
+  - Creato il modulo headless puro [`core/flightTrackReconstruction.js`](file:///core/flightTrackReconstruction.js) per sintetizzare traiettorie 3D ad alta fedeltà a partire da coordinate decollo/atterraggio, statistiche, termiche (raggi, centri, giri) e timeline delle fasi, generando punti campionati e tracciati IGC standard conformi FAI.
+  - Aggiornato [`core/parameteoImporter.js`](file:///core/parameteoImporter.js) per ricostruire automaticamente la traccia all'importazione in assenza di punti grezzi.
+  - Implementato l'auto-heal trasparente in [`core/logbookDb.js`](file:///core/logbookDb.js) (`getFlightDetail`), riparando e persistendo in background i voli già memorizzati in locale al momento dell'apertura del dettaglio.
+  - Modificato [`ui/views/FlightDetailSheet.js`](file:///ui/views/FlightDetailSheet.js) per inizializzare difensivamente la mappa anche in caso di punti vuoti e mostrare il badge `.gm-status-pill-sky` (*Telemetria Ricostruita*).
+  - Aggiunti test completi in [`tests/core/parameteoImporter.test.mjs`](file:///tests/core/parameteoImporter.test.mjs) e [`tests/ui/flightDetailSheet.test.mjs`](file:///tests/ui/flightDetailSheet.test.mjs).
+  - Suite di test globale al 100% verde: 764 test nativi (131 suite) in Node.js nativo, 0 falliti.
+  - Registrata la Lezione Appresa #162 in [MEMORY.md](file:///MEMORY.md).
+
+
+
+
+---
+
+## 2026-10-13 - Fase 4/5-ter: Badge Dislivello al Punto Medio della Retta Decollo-Atterraggio nella Mini-Mappa
+- **Tipo**: Cartografia / UI Ergonomics / Outdoor HMI / Headless Testing
+- **Dettagli**: [.agents/worklog.d/2026-10-13_mini-map-glide-drop-midpoint-badge.md](file:///.agents/worklog.d/2026-10-13_mini-map-glide-drop-midpoint-badge.md)
+- **Sintesi**:
+  - Implementato in [`ui/map/mapEngineAdapter.js`](file:///ui/map/mapEngineAdapter.js) (`LeafletMapEngine` e `HeadlessMockMapEngine`) il calcolo geodetico del punto medio $P_{\text{mid}} = [(\text{lat}_t + \text{lat}_l)/2, (\text{lon}_t + \text{lon}_l)/2]$ e del dislivello $\Delta h = |h_{\text{takeoff}} - h_{\text{landing}}|$.
+  - Renderizzato lungo la retta geodetica di planata (`glidePolyline`) un micro-badge aeronautico centrato (`.gm-glide-delta-badge`, `L.divIcon`, `iconAnchor: [27, 9]`, `zIndexOffset: 350`, `interactive: false`), con stile rounded pill a contrasto elevato, font monospace e supporto per Sunlight Light Mode (`[data-theme="light"]`).
+  - Configurato `pointer-events: none` per consentire il passaggio trasparente dei tocchi e dei click verso la mappa e i marker sottostanti.
+  - Risolta la condizione al contorno nel generatore di tracce sintetiche ([`core/flightTrackReconstruction.js`](file:///core/flightTrackReconstruction.js)), forzando rigidamente il primo punto a coincidere con le coordinate esatte del decollo e l'ultimo con l'atterraggio.
+  - Aggiunto test specifico nei contratti mini-mappa in [`tests/ui/forecastView.test.mjs`](file:///tests/ui/forecastView.test.mjs).
+  - Suite di test globale al 100% verde: 769 test nativi (131 suite) in Node.js nativo, 0 fallimenti, 0 regressioni.
+  - Registrata la Lezione Appresa #163 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-13 - Logbook & 3D Replay: Profilo Altimetrico Naturale Hermite, Micro-Rilievo e Focus Restoration
+- **Tipo**: Bugfix Strutturale / Headless Core / UI Ergonomics / Routing / Laws of UX
+- **Dettagli**: [.agents/worklog.d/2026-10-13_hermite-spline-altimetry-and-flight-focus-restoration.md](file:///.agents/worklog.d/2026-10-13_hermite-spline-altimetry-and-flight-focus-restoration.md)
+- **Sintesi**:
+  - Risolta la forma del profilo altimetrico per i voli ricostruiti (Volo #50 Ciavanis -> PeterPan): implementata in [`core/flightTrackReconstruction.js`](file:///core/flightTrackReconstruction.js) un'interpolazione cubica Hermite con tangenti continue ancorata su coordinate temporali e quote reali: Decollo (1777m), Termica 1 con spirali orarie (1779m-2001m), picco di massima quota (2037m alle 13:00 con tangente piatta), Termiche 2 e 3 con punto di massimo variometro (1884m alle 13:14) e planata finale verso PeterPan (912m).
+  - Aggiunto micro-rilievo atmosferico multi-frequenza deterministico e smussamento variometrico a media mobile simmetrica (filtro a 3 punti).
+  - Implementata in [`core/logbookDb.js`](file:///core/logbookDb.js) la migrazione automatica di versione (`reconstructionVersion: 2`) per rigenerare e persistere in IndexedDB le tracce già memorizzate nei browser.
+  - Esteso [`ui/router.js`](file:///ui/router.js) con `parseHashParams` per gestire parametri query nella hash (`#route?key=value`), inoltrandoli a `handleRouteParams` sulla vista attiva.
+  - Implementato in [`ui/views/LogbookView.js`](file:///ui/views/LogbookView.js) il metodo `focusFlight(flightId)` con ripristino filtri, smooth scroll centrato, focus da tastiera e animazione a pulsazione visiva per 2.5s (`.gm-flight-card-focused` in [`css/theme.css`](file:///css/theme.css)).
+  - Configurato [`ui/views/FlightReplayView.js`](file:///ui/views/FlightReplayView.js) per navigare a `#logbook?focusFlightId=...` all'uscita dal Replay 3D e [`ui/views/FlightDetailSheet.js`](file:///ui/views/FlightDetailSheet.js) per focalizzare la card alla chiusura della scheda.
+  - Suite di test globale al 100% verde: 769 test nativi (131 suite) in Node.js nativo, 0 fallimenti, 0 regressioni.
+  - Registrata la Lezione Appresa #164 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-13 - Fase 4/5-ter: Rotazione Continua Geodetica (Shortest Path) delle Maniche a Vento allo Scrubbing
+- **Tipo**: Bugfix Strutturale / Cartografia UI / Headless Core / Algoritmi Geometrici
+- **Dettagli**: [.agents/worklog.d/2026-10-13_windsock-shortest-path-rotation.md](file:///.agents/worklog.d/2026-10-13_windsock-shortest-path-rotation.md)
+- **Sintesi**:
+  - Risolto il difetto di rotazione opposta ($345^\circ$) delle maniche a vento vettoriali al passaggio del vento attraverso la discontinuità $0^\circ / 360^\circ$ durante l'uso dello scrubber orario in [`ui/views/ForecastView.js`](file:///ui/views/ForecastView.js).
+  - Implementata ed esportata in [`core/windsock.js`](file:///core/windsock.js) la funzione pura `calculateShortestRotation(currentAngle, targetAngle)` che calcola l'angolo continuo unwrapped lungo l'arco geometrico minimo ($|\Delta \theta| \le 180^\circ$).
+  - Aggiunto l'attributo `data-current-rotation` al wrapper SVG generato da `generateWindsockSvg`.
+  - Integrato in [`ui/map/mapEngineAdapter.js`](file:///ui/map/mapEngineAdapter.js) (`LeafletMapEngine` e `HeadlessMockMapEngine`) il tracciamento continuo degli angoli delle maniche a vento (`takeoffWindsockAngle`, `landingWindsockAngle`, `flightTakeoffWindsockAngle`, `flightLandingWindsockAngle`) nei metodi `updateWindsockMarker` e `updateFlightProcedures`.
+  - Aggiornato `wrapper.dataset.currentRotation` e `wrapper.style.transform = rotate(${nextAngle}deg)` rigenerando in-place i 12 segmenti interni (`includeWrapper: false`) senza distruggere il nodo DOM né interrompere la transizione fluida a 60 FPS.
+  - Aggiunta suite di test unitari in [`tests/core/windsock.test.mjs`](file:///tests/core/windsock.test.mjs) e contratti di verifica scrubber in [`tests/ui/forecastView.test.mjs`](file:///tests/ui/forecastView.test.mjs).
+  - Suite di test globale al 100% verde: 774 test nativi (132 suite) in Node.js puro, 0 fallimenti, 0 regressioni.
+  - Registrata la Lezione Appresa #165 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-13 - Fase 1/4-bis: Risoluzione Tempeste HTTP 429 Open-Meteo, In-Flight Pooling e Circuit Breaker
+- **Tipo**: Resilienza di Rete / Weather API / Headless Core / UI Feedback
+- **Dettagli**: [.agents/worklog.d/2026-10-13_open-meteo-429-circuit-breaker-and-multi-day-caching.md](file:///.agents/worklog.d/2026-10-13_open-meteo-429-circuit-breaker-and-multi-day-caching.md)
+- **Sintesi**:
+  - Diagnosticata e risolta la causa radice della tempesta di errori `HTTP 429 (Too Many Requests)` verso le API Open-Meteo generata da click rapidi sui tab data, montaggi concorrenti della vista e cicli di retry a intervalli troppo brevi (500ms).
+  - Implementato in [`core/openMeteoApi.js`](file:///core/openMeteoApi.js) l'in-flight Promise pooling (`fetchWithDeduplication`): tutte le chiamate parallele per lo stesso URL canonico condividono la medesima Promise, eliminando i fetch concorrenti duplicati.
+  - Implementata la popolazione multi-day della cache: all'arrivo del payload orario esteso per 8 giorni, tutte le date `YYYY-MM-DD` contenute vengono estratte e salvate in `weatherCache`, trasformando il cambio di data sui tab in un'operazione istantanea ($0\text{ms}$) senza carico di rete.
+  - Introdotto un circuit breaker globale con cooldown reattivo (60s o da header `Retry-After`): in caso di rate limit, le successive chiamate non contattano l'API esterna e restituiscono immediatamente i dati in cache (anche se stale) o un fallback sintetico contrassegnato con `{ isRateLimited: true, isSynthetic: true }`.
+  - Aggiunte guardie di deduplicazione in-flight in [`ui/views/ForecastView.js`](file:///ui/views/ForecastView.js) sui controlli data (`select-date`, `apply-custom-date`, `pick-calendar-date`).
+  - Aggiornato il badge meteo (`.gm-live-badge.rate-limit` in [`css/theme.css`](file:///css/theme.css)) per mostrare uno stato compatto `Quota API (429)` in colorazione ambra senza alert modali bloccanti.
+  - Suite di test globale al 100% verde: 780 test nativi (132 suite) in Node.js puro, 0 fallimenti, 0 regressioni.
+  - Registrata la Lezione Appresa #166 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-13 - Integrità Scientifica: Divieto Assoluto di Punti Traccia Fittizi, Auto-Purge Database e Stati Vuoti Trasparenti
+- **Tipo**: Anti-Sycophancy / Integrità di Dominio / Rimozione Debito Tecnico / UI Ergonomics
+- **Dettagli**: [.agents/worklog.d/2026-10-13_purge-synthetic-tracks-and-honest-empty-states.md](file:///.agents/worklog.d/2026-10-13_purge-synthetic-tracks-and-honest-empty-states.md)
+- **Sintesi**:
+  - Eliminato radicalmente qualsiasi meccanismo di sintesi o invenzione di punti geografici e profili altimetrici per voli reali (incluso il Volo #50), rispettando il principio cardine di veridicità del dato del volo libero (`anti_sycophancy_integrity.md`).
+  - Rimosso permanentemente dal repository il modulo `core/flightTrackReconstruction.js` e la relativa suite `tests/core/flightTrackReconstruction.test.mjs` via `git rm -f`.
+  - In [`core/parameteoImporter.js`](file:///core/parameteoImporter.js): rimosso il blocco di ricostruzione al volo; i voli importati privi di punti GPS nel backup mantengono rigidamente `points: null`, `rawPoints: []`, `decimatedPoints: []`, `rawIgc: null`, `hasDecimatedTrack: false`, `isReconstructed: false`.
+  - In [`core/logbookDb.js`](file:///core/logbookDb.js): introdotto l'auto-purge trasparente in `getFlightDetail`; se un volo caricato in IndexedDB presenta `raw.isReconstructed === true` o punti sintetici residui, questi vengono cancellati e persistiti a vuoto nel database locale del client.
+  - In [`ui/views/FlightDetailSheet.js`](file:///ui/views/FlightDetailSheet.js): rimosso il grafico sinusoidale sintetico; se `!hasValidTrack`, visualizzato il messaggio sobrio *"Tracciato altimetrico non disponibile (nessuna registrazione di coordinate GPS/IGC per questo volo)"* preservando visibili tutte le statistiche reali verificate (quote di decollo/atterraggio/max, durata, dislivello), con badge `Traccia Non Registrata` e disabilitazione esplicita con tooltip dei pulsanti Replay 3D, Assetto e Download IGC.
+  - In [`ui/map/mapEngineAdapter.js`](file:///ui/map/mapEngineAdapter.js): la mini-mappa 2D renderizza esclusivamente i marker ufficiali di decollo ("D") e atterraggio ("A") inquadrati nei confini, senza tracciare alcuna retta o polyline fittizia.
+  - In [`ui/views/FlightReplayView.js`](file:///ui/views/FlightReplayView.js): implementato lo stato vuoto esplicito a schermo intero con messaggio trasparente e pulsante touch $\ge 48\text{px}$ *"Torna al Flight Log"* che preserva il focus centrato sulla card del volo (`#logbook?focusFlightId=...`).
+  - Suite di test globale al 100% verde: 780 test nativi (132 suite) in Node.js nativo, 0 fallimenti, 0 regressioni.
+  - Registrata la Lezione Appresa #167 in [MEMORY.md](file:///MEMORY.md).
+
+
+---
+
+## 2026-10-13 - Logbook UI: Indicatore di Traccia GPS Allegata sulle Card, Filtri Rapidi e Sincronizzazione Dettaglio
+- **Tipo**: Feature / Logbook UI / Ergonomia Outdoor / Headless Core
+- **Dettagli**: [.agents/worklog.d/2026-10-13_flight-track-attached-indicator-and-filters.md](file:///.agents/worklog.d/2026-10-13_flight-track-attached-indicator-and-filters.md)
+- **Sintesi**:
+  - Implementata nel core logbook ([`core/logbook.js`](file:///core/logbook.js)) la funzione pura headless `hasAttachedTrack(flight)` per identificare con certezza se un volo possiede dati GPS autentici (punti decimati, raw IGC, bundle), rigettando tassativamente tracce sintetiche (`isReconstructed === true`) e flag fittizi o vuoti.
+  - Inserito in ciascuna card del logbook ([`ui/views/LogbookView.js`](file:///ui/views/LogbookView.js)) il badge di stato glanceable ad alto contrasto `.gm-track-badge-present` (smeraldo, icona polyline, *"Traccia"*) per i soli voli con registrazione GPS reale, omettendo qualsiasi badge sui voli senza traccia per azzerare il visual clutter.
+  - Aggiunti due filtri rapidi nel carosello orizzontale del logbook: `Con traccia` (`with-track`) e `Senza traccia` (`no-track`), integrati con la ricerca testuale e i filtri di categoria vela.
+  - Armonizzata la scheda di dettaglio ([`ui/views/FlightDetailSheet.js`](file:///ui/views/FlightDetailSheet.js)) con pill di stato simmetrici: `Traccia GPS` (smeraldo) vs `Traccia Non Registrata` (ardesia).
+  - Aggiunti stili e token in [`css/theme.css`](file:///css/theme.css) con pieno supporto dual-theme Dark Cockpit e Sunlight Mode (`[data-theme="light"]`).
+  - Implementate suite di test dedicate in [`tests/core/logbook.test.mjs`](file:///tests/core/logbook.test.mjs) e [`tests/ui/logbookView.test.mjs`](file:///tests/ui/logbookView.test.mjs).
+  - Suite di test globale al 100% verde: 789 test nativi (133 suite) in Node.js puro, 0 fallimenti, 0 regressioni.
+  - Registrata la Lezione Appresa #168 in [MEMORY.md](file:///MEMORY.md).

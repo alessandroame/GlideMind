@@ -250,6 +250,21 @@ describe('LogbookView Controller & Outdoor Ergonomics (UI Layer)', () => {
     assert.equal(enBFlights.length, 1);
     assert.equal(enBFlights[0].id, mockFlight2.id);
 
+    // Filter by Track Presence (with-track / no-track)
+    const flightWithTrack = { ...mockFlight1, id: 'fl_track_yes', hasDecimatedTrack: true };
+    const flightNoTrack = { ...mockFlight2, id: 'fl_track_no', hasDecimatedTrack: false };
+    const flightReconstructed = { ...mockFlight1, id: 'fl_track_recon', hasDecimatedTrack: true, isReconstructed: true };
+
+    controller.activeFilter = 'with-track';
+    const withTrackFlights = controller.filterFlights([flightWithTrack, flightNoTrack, flightReconstructed]);
+    assert.equal(withTrackFlights.length, 1);
+    assert.equal(withTrackFlights[0].id, 'fl_track_yes');
+
+    controller.activeFilter = 'no-track';
+    const noTrackFlights = controller.filterFlights([flightWithTrack, flightNoTrack, flightReconstructed]);
+    assert.equal(noTrackFlights.length, 2);
+    assert.deepEqual(noTrackFlights.map((f) => f.id), ['fl_track_no', 'fl_track_recon']);
+
     // Filter by Search Query
     controller.activeFilter = 'all';
     controller.searchQuery = 'Cornizzolo';
@@ -260,6 +275,46 @@ describe('LogbookView Controller & Outdoor Ergonomics (UI Layer)', () => {
     // Reset filters
     controller.searchQuery = '';
     assert.equal(controller.filterFlights([mockFlight1, mockFlight2]).length, 2);
+  });
+
+  it('should render track presence badge only when track exists, omitting badge when absent', async () => {
+    const flightWithTrack = {
+      ...mockFlight1,
+      id: 'fl_card_with_track',
+      hasDecimatedTrack: true
+    };
+    const flightWithoutTrack = {
+      ...mockFlight2,
+      id: 'fl_card_no_track',
+      hasDecimatedTrack: false
+    };
+    const flightWithSyntheticTrack = {
+      ...mockFlight1,
+      id: 'fl_card_synthetic',
+      hasDecimatedTrack: true,
+      isReconstructed: true
+    };
+
+    storeInstance.setState({ flights: [flightWithTrack, flightWithoutTrack] });
+    await controller.mount(container);
+
+    const cardWithTrackHtml = controller.renderFlightCard(flightWithTrack, 1);
+    assert.ok(cardWithTrackHtml.includes('gm-track-badge-present'), 'Must render present badge for authentic track');
+    assert.ok(cardWithTrackHtml.includes('Traccia'), 'Must render "Traccia" label');
+    assert.ok(cardWithTrackHtml.includes('polyline points='), 'Must render polyline track SVG icon');
+
+    const cardNoTrackHtml = controller.renderFlightCard(flightWithoutTrack, 2);
+    assert.ok(!cardNoTrackHtml.includes('gm-track-badge'), 'Must NOT render any track badge when no track attached');
+    assert.ok(!cardNoTrackHtml.includes('No traccia'), 'Must NOT render "No traccia" label');
+
+    const cardSyntheticHtml = controller.renderFlightCard(flightWithSyntheticTrack, 3);
+    assert.ok(!cardSyntheticHtml.includes('gm-track-badge'), 'Synthetic reconstructed track must NOT render any track badge');
+    assert.ok(!cardSyntheticHtml.includes('No traccia'), 'Must NOT render "No traccia" label for synthetic tracks');
+
+    // Check filter chips in rendered tab
+    const tabHtml = container.innerHTML;
+    assert.ok(tabHtml.includes('data-filter="with-track"'), 'Must render Con traccia filter chip');
+    assert.ok(tabHtml.includes('data-filter="no-track"'), 'Must render Senza traccia filter chip');
   });
 
   it('should render Pilot Statistics and Currency Dashboard when switching to stats tab', async () => {
@@ -438,5 +493,49 @@ describe('LogbookView Controller & Outdoor Ergonomics (UI Layer)', () => {
 
     await controller.handleClick(dismissBtn);
     assert.ok(!container.innerHTML.includes('gm-import-summary-banner'));
+  });
+
+  it('should scroll and apply focus state to requested flight card via focusFlight and route params', async () => {
+    storeInstance.setState({ flights: [mockFlight1, mockFlight2] });
+    await controller.mount(container, { focusFlightId: mockFlight2.id });
+
+    let focused = false;
+    let scrolled = false;
+    let cardClassList = null;
+
+    const originalQuery = container.querySelector;
+    container.querySelector = (selector) => {
+      if (selector === `[data-flight-id="${mockFlight1.id}"]`) {
+        cardClassList = new Set();
+        return {
+          id: mockFlight1.id,
+          isConnected: true,
+          offsetWidth: 100,
+          classList: {
+            add(c) { cardClassList.add(c); },
+            remove(c) { cardClassList.delete(c); },
+            contains(c) { return cardClassList.has(c); }
+          },
+          scrollIntoView({ behavior, block }) {
+            scrolled = true;
+            assert.equal(behavior, 'smooth');
+            assert.equal(block, 'center');
+          },
+          focus() {
+            focused = true;
+          }
+        };
+      }
+      return originalQuery(selector);
+    };
+
+    controller.handleRouteParams({ focusFlightId: mockFlight1.id });
+
+    // Wait for microtask/timer in focusFlight
+    await new Promise((resolve) => setTimeout(resolve, 80));
+
+    assert.ok(scrolled, 'Target flight card must be scrolled into view');
+    assert.ok(focused, 'Target flight card must receive keyboard focus');
+    assert.ok(cardClassList.has('gm-flight-card-focused'), 'Card must receive gm-flight-card-focused class');
   });
 });

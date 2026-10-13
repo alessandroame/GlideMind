@@ -484,5 +484,90 @@ describe('ParaMeteo Importer - Headless Core Contracts', () => {
       assert.ok(detail.raw.decimatedPoints.length >= 2);
       assert.equal(detail.meta.hasDecimatedTrack, true);
     });
+
+    it('should purge previously reconstructed track points on load (cleansing local storage)', async () => {
+      await logbookManager.clearAll();
+      const meta = {
+        id: 'fl_heal_recon_50',
+        date: '2026-08-01',
+        takeoffTime: '12:56',
+        landingTime: '13:32',
+        durationMinutes: 36,
+        takeoffCoords: { lat: 45.3789667, lon: 7.3568167 },
+        landingCoords: { lat: 45.3650333, lon: 7.3311833 },
+        isReconstructed: true,
+        hasDecimatedTrack: true
+      };
+      const raw = {
+        id: 'fl_heal_recon_50',
+        isReconstructed: true,
+        decimatedPoints: [
+          { timeSeconds: 0, lat: 45.3789, lon: 7.3568, alt: 1777 },
+          { timeSeconds: 100, lat: 45.3650, lon: 7.3311, alt: 912 }
+        ],
+        rawIgc: 'AXXX\nB1256004522738N00721409EA0177701777\n'
+      };
+      await logbookManager.adapter.saveFlight(meta, raw);
+
+      const detail = await logbookManager.getFlightDetail('fl_heal_recon_50');
+      assert.ok(detail);
+      assert.equal(detail.raw.decimatedPoints.length, 0, 'Synthetic decimated points must be purged');
+      assert.equal(detail.raw.originalPoints, null, 'Synthetic original points must be null');
+      assert.equal(detail.meta.isReconstructed, false, 'isReconstructed flag must be cleared');
+      assert.equal(detail.meta.hasDecimatedTrack, false, 'hasDecimatedTrack must be false');
+      assert.equal(detail.meta.hasRawIgc, false, 'hasRawIgc must be false');
+      assert.equal(detail.raw.rawIgc, null, 'Fake IGC must be purged');
+    });
+
+    it('should strictly preserve real metadata without inventing GPS points for flights without tracks (Flight #50 pattern)', async () => {
+      const flight50Fixture = {
+        id: 'fl_excel_1787747985586_10',
+        date: '2026-08-01',
+        takeoffTime: '12:56',
+        landingTime: '13:32',
+        durationMinutes: 36,
+        durationSeconds: 2160,
+        takeoffLocationName: 'Decollo Ciavanis',
+        landingLocationName: 'PeterPan school / Baratonga',
+        siteName: 'Decollo Ciavanis -> PeterPan school / Baratonga',
+        pilot: 'Pilot',
+        glider: 'Axis Pluto 4',
+        hasTrack: true,
+        stats: {
+          takeoffAltitude: 1777,
+          landingAltitude: 912,
+          maxAltitude: 2037,
+          minAltitude: 910,
+          maxGainMeters: 260,
+          maxClimb: 2.4,
+          maxSink: -2.8,
+          totalDistanceKm: 14.8
+        },
+        takeoffCoords: { lat: 45.3789667, lon: 7.3568167 },
+        landingCoords: { lat: 45.3650333, lon: 7.3311833 },
+        telemetry: {
+          thermals: [
+            { thermalIndex: 1, netGain: 180, durationSeconds: 240, avgClimb: 1.5, center: { lat: 45.374, lon: 7.351 } },
+            { thermalIndex: 2, netGain: 120, durationSeconds: 180, avgClimb: 1.2, center: { lat: 45.369, lon: 7.342 } }
+          ]
+        }
+      };
+
+      const result = convertParaMeteoFlight(flight50Fixture, null);
+      assert.ok(result.meta);
+      assert.ok(result.raw);
+      assert.equal(result.meta.isReconstructed, false, 'Flight must not be marked as reconstructed');
+      assert.equal(result.meta.hasDecimatedTrack, false, 'hasDecimatedTrack must be false');
+      assert.equal(result.meta.hasRawIgc, false, 'hasRawIgc must be false');
+      assert.equal(result.raw.decimatedPoints.length, 0, 'No synthetic track points may be generated');
+      assert.equal(result.raw.originalPoints, null, 'originalPoints must be null');
+      assert.equal(result.raw.rawIgc, null, 'No synthetic IGC may be generated');
+      assert.equal(result.meta.takeoffLat, 45.3789667, 'Real takeoff coordinates must be preserved');
+      assert.equal(result.meta.takeoffLon, 7.3568167, 'Real takeoff coordinates must be preserved');
+      assert.equal(result.meta.landingLat, 45.3650333, 'Real landing coordinates must be preserved');
+      assert.equal(result.meta.landingLon, 7.3311833, 'Real landing coordinates must be preserved');
+      assert.equal(result.meta.maxAltMsl, 2037, 'Real max altitude must be preserved');
+      assert.equal(result.meta.takeoffAltMsl, 1777, 'Real takeoff altitude must be preserved');
+    });
   });
 });
