@@ -200,13 +200,19 @@ export function createParagliderMesh(THREE, options = {}) {
     vertexColors: true,
     side: THREE.DoubleSide,
     roughness: 0.45,
-    metalness: 0.05
+    metalness: 0.05,
+    depthTest: true,
+    depthWrite: true,
+    polygonOffset: true,
+    polygonOffsetFactor: -1.0,
+    polygonOffsetUnits: -2.0
   });
 
   const canopyMesh = new THREE.Mesh(canopyGeo, canopyMat);
   canopyMesh.castShadow = true;
   canopyMesh.receiveShadow = true;
   canopyMesh.name = 'GliderCanopy';
+  canopyMesh.renderOrder = 10;
   group.add(canopyMesh);
 
   // 2. Clean 2-Row Kevlar Lines Rigging
@@ -260,15 +266,19 @@ export function createParagliderMesh(THREE, options = {}) {
   const lineMat = new THREE.LineBasicMaterial({
     color: linesColor,
     transparent: true,
-    opacity: 0.55
+    opacity: 0.55,
+    depthTest: true,
+    depthWrite: false
   });
   const linesMesh = new THREE.LineSegments(lineGeo, lineMat);
   linesMesh.name = 'SuspensionLines';
+  linesMesh.renderOrder = 9;
   group.add(linesMesh);
 
   // 3. Monolithic Cocoon Pod Harness & Reclined Pilot Torso
   const pilotPod = new THREE.Group();
   pilotPod.name = 'PilotPod';
+  pilotPod.renderOrder = 10;
 
   const fuseSections = [
     { z: -1.25, y: 0.02, rx: 0.01, ry: 0.01 },
@@ -329,10 +339,16 @@ export function createParagliderMesh(THREE, options = {}) {
   const fuseMat = new THREE.MeshStandardMaterial({
     vertexColors: true,
     roughness: 0.45,
-    metalness: 0.15
+    metalness: 0.15,
+    depthTest: true,
+    depthWrite: true,
+    polygonOffset: true,
+    polygonOffsetFactor: -1.0,
+    polygonOffsetUnits: -2.0
   });
   const podHarnessMesh = new THREE.Mesh(fuseGeo, fuseMat);
   podHarnessMesh.name = 'PodCocoonHarness';
+  podHarnessMesh.renderOrder = 10;
   pilotPod.add(podHarnessMesh);
 
   // Cockpit Instrument Flight Deck

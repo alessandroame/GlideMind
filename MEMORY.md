@@ -2117,3 +2117,26 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
      - Durante il seek manuale, la traccia si sincronizza immediatamente con il punto temporale selezionato.
   3. **Allineamento Motore Headless (`HeadlessReplayEngine.js`)**:
      - In `HeadlessReplayEngine`, `getTraveledPoints()` restituisce l'intero array dei punti (`[...this.trackPoints]`) se `!this.hasPlaybackStarted`, commutando al calcolo della fetta percorsa (`0..maxIdx`) solo dopo l'attivazione di `play()` o `seek()`.
+---
+
+## 153. Motore di Scala Multi-Regime della Traiettoria 3D (Dual-Regime Hermite Scaling) e Priorità Z-Buffer Anti-Occlusione dell'Avatar
+- **Problema**:
+  - Imponendo uno spessore a schermo rigidamente costante ($6.0\text{ px}$) per tutta la traiettoria di volo a qualsiasi livello di zoom, a zoom ravvicinato ($z = 14 \dots 18$, vista cockpit, chase o ispezione manovre/spirali in termica) la larghezza fisica del prisma 3D raggiungeva proporzioni spropositate ($19.9\text{ m}$ a $z = 14$, $10.0\text{ m}$ a $z = 15$, $5.0\text{ m}$ a $z = 16$).
+  - La traccia risultava più larga dell'intera apertura alare del parapendio ($13.2\text{ m}$ per Enzo 3) e oltre 20 volte più larga dell'imbrago pod ($0.50\text{ m}$), mentre la semialtezza verticale ($6\text{ m}$ a $z=14$, $3\text{ m}$ a $z=15$) superava l'altezza del fascio funi, inghiottendo completamente pilota, funi e calotta.
+  - Nelle virate a 360° in termica (raggio $15-25\text{ m}$), i segmenti precedenti della traccia formavano una muraglia opaca impenetrabile che nascondeva l'ala.
+  - L'attacco della traccia all'avatar in `_updateTraveledTrack` avveniva al centro geometrico $(cp.x, cp.y, cp.z)$, penetrando nel torace del pilota, e un `polygonOffset` globale negativo sul ribbon faceva vincere alla traccia il test di profondità, disegnandola sopra l'avatar.
+- **Causa Radice**:
+  - Conflitto tra coordinate di schermo 2D (pixel) e coordinate mondo metriche 1:1 (metri) in proiezione prospettica Three.js.
+  - Assenza di un profilo di scala multi-regime che distingua la visualizzazione macroscopica del volo (dove la traccia è il riferimento primario) dalla visualizzazione microscopica del velivolo (dove l'aereo è il protagonista e la traccia deve essere un filamento aerodinamico sottile e discreto).
+- **Pattern Vincolante**:
+  1. **Motore di Scala a Doppio Regime con Transizione Hermite Smoothstep (`calculateRibbonDimensions`)**:
+     - *Regime Macro ($z \le 12.0$)*: Visibilità prominente costante a $\approx 5.0\text{ px}$ su schermo ($W = 66\text{m} \dots 318\text{m}$, $H \le 25\text{m}$, $h_{\text{ratio}} = 0.30$) per garantire riconoscibilità immediata della rotta e della colorazione variometrica FAI attraverso l'orografia alpina.
+     - *Regime di Transizione ($12.0 < z < 17.0$)*: Raccordo continuo $C^1$ tramite smoothstep cubico ($s(t) = 3t^2 - 2t^3$) dove lo spessore a schermo cala morbidamente da $5.0\text{ px}$ a $2.0\text{ px}$. A $z = 14$ (chase view iniziale), la larghezza scende a $13.09\text{ m}$ (contenuta entro i $13.2\text{ m}$ dell'ala) e l'altezza a $3.24\text{ m}$ ($hh = 1.62\text{ m}$, sotto le funi).
+     - *Regime Micro ($z \ge 17.0$)*: Nastro aerodinamico sottile e slanciato ($W = 0.20\text{m} \dots 0.83\text{m}$, $H \le 0.10\text{m}$, $hh \le 0.05\text{m}$, spessore schermo $2.0\text{ px}$). La traccia ha dimensioni inferiori o pari alla larghezza dell'imbrago pod ($0.50\text{m}$), garantendo zero occlusione dell'ala e delle funi anche all'interno di termiche strette.
+  2. **Attacco al Cono di Coda dell'Imbrago & Rastrematura a Punta (Pencil-Tip Tapering)**:
+     - In `_updateTraveledTrack`, il punto di aggancio di testa $nextIdx$ viene traslato all'indietro lungo il vettore di scia verso la punta posteriore affusolata dell'imbrago pod ($\text{offset} = 0.85\text{m} \cdot \text{scale}$, quota $y + 0.35\text{m} \cdot \text{scale}$).
+     - Ai vertici di testa viene applicata una rastrematura conica a cuspide ($hw_{\text{head}} \le 0.04\text{m}$, $hh_{\text{head}} \le 0.02\text{m}$), facendo scaturire la traccia morbidamente da dietro il pilota senza penetrare nell'imbrago.
+  3. **Gerarchia Z-Buffer e Ordinamento di Rendering (`renderOrder` & `depthWrite`)**:
+     - Assegnare `renderOrder = 10`, `depthTest: true`, `depthWrite: true` e `polygonOffsetFactor: -1.0, units: -2.0` alle mesh del parapendio (`canopyMesh`, `podHarnessMesh`) in `paragliderModel.js`.
+     - Assegnare `renderOrder = 1` al `trackRibbonMesh`, `renderOrder = 2` al `centerLineMesh`, e `renderOrder = 0` al `curtainMesh`, con polygon offset del ribbon ridotto a `-0.25, -1.0`.
+     - In questo modo l'avatar del parapendio vince categoricamente il test di profondità, rimanendo sempre nitido, in primo piano e perfettamente visibile rispetto alla scia retrostante.

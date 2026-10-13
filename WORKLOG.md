@@ -1629,3 +1629,18 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Risolta la discrepanza oraria nella suite di test orari di [`tests/ui/forecastView.test.mjs`](file:///tests/ui/forecastView.test.mjs) agganciando la verifica della fascia oraria ai limiti effettivi dell'effemeride solare calcolata.
   - Test suite globale al 100% verde: 726 test (125 suite), 725 passanti, 0 falliti, 1 skipped.
   - Registrata la Lezione Appresa #152 in [MEMORY.md](file:///MEMORY.md).
+---
+
+## 2026-10-13 - 3D Replay: Motore di Scala Multi-Regime della Traiettoria 3D e Priorità Z-Buffer Anti-Occlusione Parapendio
+- **Tipo**: Refactoring / UI / 3D Graphics / Three.js WebGL / Geodesia Matematica / Architettura di Rendering
+- **Dettagli**: [.agents/worklog.d/2026-10-13_3d_trajectory_ribbon_dual_regime_scaling.md](file:///.agents/worklog.d/2026-10-13_3d_trajectory_ribbon_dual_regime_scaling.md)
+- **Sintesi**:
+  - Risolta l'occlusione della vela e del pilota da parte della traccia 3D quando si zooma per visualizzare i dettagli di volo: implementato in [`core/flightReplayMath.js`](file:///core/flightReplayMath.js) un motore di scala a doppio regime multi-scala per `calculateRibbonDimensions`.
+  - Regime Macro ($z \le 12.0$): dimensione costante a circa $5.0\text{ px}$ a schermo ($W = 66\text{m} \dots 318\text{m}$, $H \le 25\text{m}$) per assicurare visibilità e riconoscibilità panoramica della rotta e della colorazione variometrica FAI attraverso le vallate alpine.
+  - Regime di Transizione ($12.0 < z < 17.0$): interpolazione smoothstep cubica Hermite $s(t) = 3t^2 - 2t^3$ priva di discontinuità visive, che riduce progressivamente lo spessore a schermo da $5.0\text{ px}$ a $2.0\text{ px}$ e ridimensiona la larghezza metrica a $z = 14$ a $13.09\text{ m}$ (contenuta nell'apertura alare di $13.2\text{ m}$) e l'altezza a $3.24\text{ m}$ ($hh = 1.62\text{ m}$, sotto il fascio funi).
+  - Regime Micro ($z \ge 17.0$): scia o nastro aerodinamico sottile ($W = 0.20\text{m} \dots 0.83\text{m}$, $H \le 0.10\text{m}$, $2.0\text{ px}$ a schermo) proporzionato all'imbrago pod ($0.50\text{m}$), garantendo zero occlusione dell'avatar anche nelle spirali strette a 360° in termica.
+  - Implementato in [`ui/3d/MapLibreThreeEngine.js`](file:///ui/3d/MapLibreThreeEngine.js) il punto di ancoraggio della testa della traccia percorsa traslato al cono di coda dell'imbrago pod con rastrematura a punta conica ($hw_{\text{head}} \le 0.04\text{m}$, $hh_{\text{head}} \le 0.02\text{m}$), eliminando la penetrazione nel torace del pilota.
+  - Blindata la gerarchia di profondità WebGL in [`ui/3d/models/paragliderModel.js`](file:///ui/3d/models/paragliderModel.js) e `MapLibreThreeEngine.js`: assegnati `renderOrder = 10`, `depthTest: true`, `depthWrite: true` e `polygonOffset` all'avatar del parapendio, con `renderOrder = 1` e offset ridotto per la traccia ribbon, garantendo che l'avatar non venga mai coperto o scavalcato nel depth buffer dalla traccia retrostante.
+  - Aggiornati i test in [`tests/core/flightReplayMath.test.mjs`](file:///tests/core/flightReplayMath.test.mjs) per verificare le soglie geometriche a zoom 14 e 18 e i limiti di spazio-schermo $[1.95\text{px}, 5.05\text{px}]$ su tutto l'arco di zoom da 10 a 19.
+  - Test suite globale al 100% verde: 726 test (125 suite), 725 passanti, 0 falliti, 1 skipped.
+  - Registrata la Lezione Appresa #153 in [MEMORY.md](file:///MEMORY.md).

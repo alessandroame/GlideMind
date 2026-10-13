@@ -469,6 +469,7 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
 
         // 4. Paraglider Avatar Mesh
         self.avatarGroup = createParagliderMesh(THREE);
+        self.avatarGroup.renderOrder = 10;
         self.threeScene.add(self.avatarGroup);
 
         // Initial avatar position with dynamic scale and traveled track alignment
@@ -699,11 +700,12 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
       opacity: 0.95,
       depthTest: true,
       polygonOffset: true,
-      polygonOffsetFactor: -1.0,
-      polygonOffsetUnits: -4.0
+      polygonOffsetFactor: -0.25,
+      polygonOffsetUnits: -1.0
     });
 
     this.trackRibbonMesh = new THREE.Mesh(geom, mat);
+    this.trackRibbonMesh.renderOrder = 1;
     this.threeScene.add(this.trackRibbonMesh);
 
     // Variometer-colored centerline spine
@@ -724,10 +726,11 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
       opacity: 0.98,
       depthTest: true,
       polygonOffset: true,
-      polygonOffsetFactor: -1.0,
-      polygonOffsetUnits: -2.0
+      polygonOffsetFactor: -0.25,
+      polygonOffsetUnits: -1.0
     });
     this.centerLineMesh = new THREE.Line(lineGeom, lineMat);
+    this.centerLineMesh.renderOrder = 2;
     this.threeScene.add(this.centerLineMesh);
 
     // Takeoff 3D Marker (Glowing Neon Green ring)
@@ -891,6 +894,7 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     });
 
     this.curtainMesh = new THREE.LineSegments(geom, mat);
+    this.curtainMesh.renderOrder = 0;
     this.threeScene.add(this.curtainMesh);
   }
 
@@ -1099,23 +1103,35 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     const g = varioCol.g;
     const b = varioCol.b;
 
+    // Pencil-tip aerodynamic tapering at the active connection to the avatar
+    const hwHead = Math.min(0.04, hw * 0.15);
+    const hhHead = Math.min(0.02, hh * 0.15);
+
+    // Compute scale and backward offset towards harness tail cone
+    const cameraDistMeters = Math.max(20, 5000000 / Math.pow(2, currentZoom));
+    const avatarScale = calculateAvatarMinScale(cameraDistMeters, 60, 800, 36, 10.5);
+    const tailOffset = 0.85 * avatarScale;
+    const attachX = cp.x - Math.sin(headingRad) * tailOffset;
+    const attachZ = cp.z + Math.cos(headingRad) * tailOffset;
+    const attachY = cp.y + 0.35 * avatarScale;
+
     if (posAttr && posAttr.array) {
       const baseIdx = nextIdx * 12;
-      posAttr.array[baseIdx]     = cp.x;
-      posAttr.array[baseIdx + 1] = cp.y + hh;
-      posAttr.array[baseIdx + 2] = cp.z;
+      posAttr.array[baseIdx]     = attachX;
+      posAttr.array[baseIdx + 1] = attachY + hhHead;
+      posAttr.array[baseIdx + 2] = attachZ;
 
-      posAttr.array[baseIdx + 3] = cp.x + nx * hw;
-      posAttr.array[baseIdx + 4] = cp.y;
-      posAttr.array[baseIdx + 5] = cp.z + nz * hw;
+      posAttr.array[baseIdx + 3] = attachX + nx * hwHead;
+      posAttr.array[baseIdx + 4] = attachY;
+      posAttr.array[baseIdx + 5] = attachZ + nz * hwHead;
 
-      posAttr.array[baseIdx + 6] = cp.x;
-      posAttr.array[baseIdx + 7] = cp.y - hh;
-      posAttr.array[baseIdx + 8] = cp.z;
+      posAttr.array[baseIdx + 6] = attachX;
+      posAttr.array[baseIdx + 7] = attachY - hhHead;
+      posAttr.array[baseIdx + 8] = attachZ;
 
-      posAttr.array[baseIdx + 9]  = cp.x - nx * hw;
-      posAttr.array[baseIdx + 10] = cp.y;
-      posAttr.array[baseIdx + 11] = cp.z - nz * hw;
+      posAttr.array[baseIdx + 9]  = attachX - nx * hwHead;
+      posAttr.array[baseIdx + 10] = attachY;
+      posAttr.array[baseIdx + 11] = attachZ - nz * hwHead;
       posAttr.needsUpdate = true;
     }
 
@@ -1137,9 +1153,9 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
         ? lineGeom.getAttribute('color')
         : lineGeom?.attributes?.color;
       if (linePos && linePos.array) {
-        linePos.array[nextIdx * 3]     = cp.x;
-        linePos.array[nextIdx * 3 + 1] = cp.y;
-        linePos.array[nextIdx * 3 + 2] = cp.z;
+        linePos.array[nextIdx * 3]     = attachX;
+        linePos.array[nextIdx * 3 + 1] = attachY;
+        linePos.array[nextIdx * 3 + 2] = attachZ;
         linePos.needsUpdate = true;
       }
       if (lineCol && lineCol.array) {

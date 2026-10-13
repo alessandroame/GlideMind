@@ -386,53 +386,99 @@ export function projectTrackToThreeLocal(points, origin = null, { relativeAltitu
 
 /**
  * Calculates dynamic 3D track ribbon width and height in meters based on map zoom and Web Mercator scale.
- * In MapLibre 3D with perspective projection, maintains a constant, crisp visual screen width
- * of exactly 6 pixels invariant across all zoom levels without engulfing the paraglider avatar or vanishing.
+ * 
+ * Implements a dual-regime multi-scale engine:
+ * 1. Macro Regime (zoom <= 12.0):
+ *    Guarantees robust screen visibility (~5.0px on screen) across vast alpine terrain and mountain valleys,
+ *    ensuring the flight trajectory is always prominent, continuous, and clearly recognizable from afar.
+ * 2. Smooth Transition (12.0 < zoom < 17.0):
+ *    Continuous C1 Hermite smoothstep transition preventing visual pops during continuous zoom/scroll.
+ * 3. Micro Aerodynamic Tracer (zoom >= 17.0):
+ *    Tapers to a sleek, delicate aerodynamic ribbon (width 0.20m - 0.83m, height <= 0.10m),
+ *    comparable to or narrower than the paraglider pod harness (0.50m) and far smaller than the
+ *    wingspan (13.2m). When zoomed in to inspect maneuvers, 360 circles, or paraglider details,
+ *    it remains elegant and never occludes or engulfs the paraglider canopy, lines, or pilot.
  * 
  * @param {number} zoom Current map zoom level (e.g. 10 - 20)
  * @param {number} [latitude=46.0] Geographic latitude for Mercator meter scale
  * @param {object} [options]
- * @param {number} [options.targetPixels=6.0] Target visual thickness on screen in pixels (strictly 6px)
- * @param {number} [options.minWidthMeters=0.20] Minimum physical width clamp in meters (close-up)
- * @param {number} [options.maxWidthMeters=1000.0] Maximum physical width clamp in meters (overview)
- * @param {number} [options.heightRatio=0.6] Ratio of vertical thickness to horizontal width
+ * @param {number} [options.targetPixels] Optional explicit target visual thickness on screen in pixels
+ * @param {number} [options.minWidthMeters=0.20] Minimum physical width clamp in meters
+ * @param {number} [options.maxWidthMeters=1000.0] Maximum physical width clamp in meters
+ * @param {number} [options.heightRatio] Optional ratio of vertical thickness to horizontal width
  * @returns {{ widthMeters: number, heightMeters: number, halfWidth: number, halfHeight: number, metersPerPixel: number }}
  */
 export function calculateRibbonDimensions(zoom, latitude = 46.0, options = {}) {
-  const targetPixels = typeof options.targetPixels === 'number' && !isNaN(options.targetPixels)
-    ? options.targetPixels
-    : 6.0;
+  const z = typeof zoom === 'number' && !isNaN(zoom) ? zoom : 14;
+  const lat = typeof latitude === 'number' && !isNaN(latitude) ? latitude : 46.0;
+  const latRad = (lat * Math.PI) / 180;
+  const cosLat = Math.max(0.1, Math.cos(latRad));
+
+  // In Web Mercator / MapLibre 3D, Earth circumference is 40,075,016.686 meters.
+  // Ground resolution at latitude lat: metersPerPixel = (40,075,016.686 * cosLat) / (512 * 2^z).
+  const metersPerPixel = (40075016.686 * cosLat) / (512 * Math.pow(2, z));
+
   const minWidth = typeof options.minWidthMeters === 'number' && !isNaN(options.minWidthMeters)
     ? options.minWidthMeters
     : 0.20;
   const maxWidth = typeof options.maxWidthMeters === 'number' && !isNaN(options.maxWidthMeters)
     ? options.maxWidthMeters
     : 1000.0;
-  const heightRatio = typeof options.heightRatio === 'number' && !isNaN(options.heightRatio)
-    ? options.heightRatio
-    : 0.6;
 
-  const z = typeof zoom === 'number' && !isNaN(zoom) ? zoom : 14;
-  const lat = typeof latitude === 'number' && !isNaN(latitude) ? latitude : 46.0;
-  const latRad = (lat * Math.PI) / 180;
-  const cosLat = Math.max(0.1, Math.cos(latRad));
+  let widthMeters;
+  let heightRatio;
+  let maxHeight;
 
-  // In Web Mercator / MapLibre 3D, the Earth circumference is 40,075,016.686 meters.
-  // At zoom z, the Mercator world size is 512 * 2^z pixels.
-  // Ground resolution at latitude lat: metersPerPixel = (40,075,016.686 * cosLat) / (512 * 2^z).
-  const metersPerPixel = (40075016.686 * cosLat) / (512 * Math.pow(2, z));
+  const hasCustomTarget = typeof options.targetPixels === 'number' && !isNaN(options.targetPixels);
+  const hasCustomHeightRatio = typeof options.heightRatio === 'number' && !isNaN(options.heightRatio);
 
-  const rawWidth = metersPerPixel * targetPixels;
-  const clampedWidth = Math.max(minWidth, Math.min(maxWidth, rawWidth));
+  if (hasCustomTarget) {
+    // Explicit custom target pixels override (linear scaling)
+    widthMeters = metersPerPixel * options.targetPixels;
+    heightRatio = hasCustomHeightRatio ? options.heightRatio : 0.30;
+    maxHeight = 1000.0;
+  } else {
+    // Dual-regime multi-scale engine:
+    if (z <= 12.0) {
+      // Regime 1: Macro Screen-Space (~5.0 px) for high visibility over mountain relief
+      widthMeters = metersPerPixel * 5.0;
+      heightRatio = 0.30;
+      maxHeight = 25.0;
+    } else if (z < 17.0) {
+      // Regime 2: Hermite Smoothstep Transition (12.0 -> 17.0)
+      const t = (z - 12.0) / 5.0;
+      const s = t * t * (3.0 - 2.0 * t);
+      const targetPx = (1.0 - s) * 5.0 + s * 2.0;
+      widthMeters = metersPerPixel * targetPx;
+      heightRatio = (1.0 - s) * 0.30 + s * 0.15;
+      maxHeight = (1.0 - s) * 20.0 + s * 0.15;
+    } else {
+      // Regime 3: Micro Aerodynamic Tracer (z >= 17.0)
+      // Slender ribbon (target 2.0px, <= 0.83m, clamped down to 0.20m)
+      widthMeters = metersPerPixel * 2.0;
+      heightRatio = 0.15;
+      maxHeight = 0.10;
+    }
+  }
+
+  if (hasCustomHeightRatio) {
+    heightRatio = options.heightRatio;
+    maxHeight = 1000.0;
+  }
+
+  const clampedWidth = Math.max(minWidth, Math.min(maxWidth, widthMeters));
   const roundedWidth = Math.round(clampedWidth * 100) / 100;
 
+  const rawHeight = roundedWidth * heightRatio;
+  const clampedHeight = Math.min(maxHeight, rawHeight);
+  const roundedHeight = Math.max(0.04, Math.round(clampedHeight * 100) / 100);
+
   const halfWidth = Math.round((roundedWidth / 2) * 100) / 100;
-  const heightMeters = Math.round((roundedWidth * heightRatio) * 100) / 100;
-  const halfHeight = Math.round((heightMeters / 2) * 100) / 100;
+  const halfHeight = Math.round((roundedHeight / 2) * 100) / 100;
 
   return {
     widthMeters: roundedWidth,
-    heightMeters,
+    heightMeters: roundedHeight,
     halfWidth,
     halfHeight,
     metersPerPixel: Math.round(metersPerPixel * 10000) / 10000

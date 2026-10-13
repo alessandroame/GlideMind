@@ -269,18 +269,21 @@ describe('Flight Replay Math - Headless Core Kinematics & Coordinates', () => {
   describe('calculateRibbonDimensions - Dynamic Zoom-Adaptive 3D Track Scaling', () => {
     it('should calculate slender ribbon dimensions when zoomed in close to the paraglider (zoom 18)', () => {
       const dims = calculateRibbonDimensions(18, 46.0);
-      assert.equal(dims.widthMeters, 1.24, `Expected close-up ribbon width 1.24m at zoom 18, got ${dims.widthMeters}`);
-      assert.equal(dims.heightMeters, 0.74, `Expected close-up ribbon height 0.74m at zoom 18, got ${dims.heightMeters}`);
+      assert.equal(dims.widthMeters, 0.41, `Expected close-up ribbon width 0.41m at zoom 18, got ${dims.widthMeters}`);
+      assert.equal(dims.heightMeters, 0.06, `Expected close-up ribbon height 0.06m at zoom 18, got ${dims.heightMeters}`);
+      assert.ok(dims.widthMeters < 0.50, 'Close-up ribbon must be narrower than paraglider pod harness (0.50m)');
+      assert.ok(dims.heightMeters < 0.10, 'Close-up ribbon height must be minimal (<= 0.10m) to clear suspension lines');
       assert.ok(dims.heightMeters < dims.widthMeters, 'Height should be proportional to width');
       assert.equal(dims.halfWidth, Math.round((dims.widthMeters / 2) * 100) / 100);
       assert.equal(dims.halfHeight, Math.round((dims.heightMeters / 2) * 100) / 100);
     });
 
-    it('should calculate exact 6px invariant ribbon in chase replay view (zoom 14)', () => {
+    it('should calculate balanced transition ribbon dimensions in chase replay view (zoom 14)', () => {
       const dims = calculateRibbonDimensions(14, 46.0);
-      // At zoom 14, 19.91m gives exactly 6px on screen at 3.32 m/px resolution
-      assert.equal(dims.widthMeters, 19.91, `Expected zoom 14 width 19.91m (6px), got ${dims.widthMeters}`);
-      assert.equal(dims.heightMeters, 11.95, `Expected zoom 14 height 11.95m, got ${dims.heightMeters}`);
+      assert.equal(dims.widthMeters, 13.09, `Expected zoom 14 width 13.09m, got ${dims.widthMeters}`);
+      assert.equal(dims.heightMeters, 3.24, `Expected zoom 14 height 3.24m, got ${dims.heightMeters}`);
+      assert.ok(dims.widthMeters <= 13.2, 'Zoom 14 ribbon must not exceed the paraglider wingspan (13.2m)');
+      assert.ok(dims.heightMeters < 7.2, 'Zoom 14 ribbon height must not exceed suspension line height (7.2m)');
     });
 
     it('should adapt dynamically across zoom levels (zoom 12 vs 19)', () => {
@@ -289,18 +292,43 @@ describe('Flight Replay Math - Headless Core Kinematics & Coordinates', () => {
 
       assert.ok(closeDims.widthMeters < overviewDims.widthMeters,
         `Expected close width (${closeDims.widthMeters}m) to be less than overview width (${overviewDims.widthMeters}m)`);
-      assert.equal(overviewDims.widthMeters, 79.65, `Expected overview width 79.65m, got ${overviewDims.widthMeters}`);
-      assert.equal(closeDims.widthMeters, 0.62, `Expected close width 0.62m, got ${closeDims.widthMeters}`);
+      assert.equal(overviewDims.widthMeters, 66.37, `Expected overview width 66.37m, got ${overviewDims.widthMeters}`);
+      assert.equal(closeDims.widthMeters, 0.21, `Expected close width 0.21m, got ${closeDims.widthMeters}`);
     });
 
-    it('should guarantee exactly 6 screen pixels across all flight zooms (10 to 19)', () => {
+    it('should guarantee continuous visibility across all flight zooms (10 to 19) without engulfing paraglider', () => {
       for (let z = 10; z <= 19; z++) {
         const dims = calculateRibbonDimensions(z, 46.0);
         const screenPixels = dims.widthMeters / dims.metersPerPixel;
+        // Screen pixels must stay within a healthy, visible, non-cluttering range [1.95px, 5.05px]
         assert.ok(
-          Math.abs(screenPixels - 6.0) < 0.05,
-          `Zoom ${z} should have 6.0 screen pixels (tolerance 0.05), got ${screenPixels.toFixed(3)}`
+          screenPixels >= 1.95 && screenPixels <= 5.05,
+          `Zoom ${z} screen pixels must be in [1.95, 5.05] range, got ${screenPixels.toFixed(3)}px`
         );
+
+        // At macro zooms (z <= 12), exactly ~5.0px on screen
+        if (z <= 12) {
+          assert.ok(
+            Math.abs(screenPixels - 5.0) < 0.05,
+            `Zoom ${z} macro should have ~5.0 screen pixels, got ${screenPixels.toFixed(3)}`
+          );
+        }
+
+        // At micro zooms (z >= 17), exactly ~2.0px on screen and physical width <= 0.85m
+        if (z >= 17) {
+          assert.ok(
+            Math.abs(screenPixels - 2.0) < 0.05,
+            `Zoom ${z} micro should have ~2.0 screen pixels, got ${screenPixels.toFixed(3)}`
+          );
+          assert.ok(
+            dims.widthMeters <= 0.85,
+            `Zoom ${z} micro ribbon width must be <= 0.85m, got ${dims.widthMeters}m`
+          );
+          assert.ok(
+            dims.heightMeters <= 0.10,
+            `Zoom ${z} micro ribbon height must be <= 0.10m, got ${dims.heightMeters}m`
+          );
+        }
       }
     });
 
