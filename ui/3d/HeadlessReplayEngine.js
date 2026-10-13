@@ -27,6 +27,7 @@ export class HeadlessReplayEngine extends IReplay3dEngine {
     this.elevationOffset = 0;
     this.currentSample = null;
     this._stepTimer = null;
+    this.hasPlaybackStarted = false;
   }
 
   /**
@@ -60,6 +61,7 @@ export class HeadlessReplayEngine extends IReplay3dEngine {
     }
 
     this.seek(0);
+    this.hasPlaybackStarted = false;
   }
 
   /**
@@ -68,6 +70,7 @@ export class HeadlessReplayEngine extends IReplay3dEngine {
    */
   seek(progressFraction) {
     if (this.isDestroyed || this.isContextLost) return;
+    this.hasPlaybackStarted = true;
 
     this.progress = Math.max(0, Math.min(1, progressFraction || 0));
     this.currentTimeSec = Math.round(this.progress * this.totalDurationSec * 10) / 10;
@@ -113,6 +116,7 @@ export class HeadlessReplayEngine extends IReplay3dEngine {
    */
   getTraveledPoints() {
     if (!this.trackPoints || this.trackPoints.length === 0) return [];
+    if (!this.hasPlaybackStarted) return [...this.trackPoints];
     if (this.progress <= 0) return [];
     if (this.progress >= 1.0) return [...this.trackPoints];
     const n = this.trackPoints.length;
@@ -157,6 +161,7 @@ export class HeadlessReplayEngine extends IReplay3dEngine {
    */
   play() {
     if (this.isDestroyed || this.isContextLost) return;
+    this.hasPlaybackStarted = true;
     if (this.progress >= 1.0) {
       this.seek(0);
     }
@@ -212,6 +217,7 @@ export class HeadlessReplayEngine extends IReplay3dEngine {
    */
   destroy() {
     this.pause();
+    this.hasPlaybackStarted = false;
     this.trackPoints = [];
     this.projected = null;
     this.currentSample = null;

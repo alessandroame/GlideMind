@@ -25,7 +25,8 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.equal(typeof controller.mount, 'function');
     assert.equal(typeof controller.unmount, 'function');
     assert.equal(typeof controller.renderHtml, 'function');
-    assert.equal(controller.selectedHour >= 8 && controller.selectedHour <= 20, true, 'Default hour must be in flight window');
+    const daylight = controller.getDaylightWindow();
+    assert.equal(controller.selectedHour >= daylight.sunriseHour && controller.selectedHour <= daylight.sunsetHour, true, 'Default hour must be in flight window');
     assert.equal(typeof controller.activeDate, 'string');
   });
 

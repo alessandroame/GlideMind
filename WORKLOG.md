@@ -1600,3 +1600,32 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Aggiornati i test in [`tests/core/flightReplayMath.test.mjs`](file:///tests/core/flightReplayMath.test.mjs), verificando la convergenza rigorosa a 6.0 pixel di spazio-schermo ($|\text{pixels} - 6.0| < 0.05$) su tutto l'arco dei livelli di zoom da 10 a 19.
   - Test suite globale al 100% verde: 721 test (125 suite), 720 passanti, 0 falliti, 1 skipped.
   - Registrata la Lezione Appresa #150 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-12 - 3D Replay: Risoluzione Blocco della Vista 3D in Riproduzione e Notifica Continua di Repaint WebGL
+- **Tipo**: Bug Fix / UI / 3D Graphics / MapLibre GL JS / Three.js WebGL / Resilienza Operativa
+- **Dettagli**: [.agents/worklog.d/2026-10-12_maplibre_3d_replay_continuous_repaint_and_freeze_fix.md](file:///.agents/worklog.d/2026-10-12_maplibre_3d_replay_continuous_repaint_and_freeze_fix.md)
+- **Sintesi**:
+  - Diagnosticata e risolta la causa del blocco della vista 3D durante il replay di volo (`MapLibreThreeEngine`): MapLibre GL JS opera con un'architettura di rendering on-demand (dirty check) che si arresta non appena termina l'animazione iniziale `fitBounds`. Poiché `_runLoop()` e `play()` non chiamavano `this.map.triggerRepaint()`, MapLibre non ridisegnava il canvas WebGL e il metodo `render(gl, matrix)` del `CustomLayer` Three.js non veniva mai eseguito.
+  - Inserita la chiamata obbligatoria a `this.map.triggerRepaint()` ad ogni iterazione di frame in `_runLoop()`, garantendo rendering continuo a 60 FPS in tutte le modalità telecamera (`chase`, `cockpit`, `free`).
+  - Aggiunta l'invocazione di `this.map.triggerRepaint()` in `play()`, `pause()`, `seek()`, `setCameraMode()` e `setElevationOffset()` per assicurare un aggiornamento visivo immediato a 0ms ad ogni interazione dell'utente.
+  - Implementato l'auto-rewind automatico al decollo (`this.seek(0)`) in `play()` qualora la riproduzione venga avviata con progresso a fine volo ($p = 1.0$).
+  - Disaccoppiato il puntamento della telecamera `_updateCameraForFrame(pt)` dallo stato di istanziazione dell'avatar `avatarGroup`, con controllo difensivo `typeof this.map.jumpTo === 'function'`.
+  - Aggiunti 4 test automatici dedicati in [`tests/ui/replayTakeoffLandingTrackVisibility.test.mjs`](file:///tests/ui/replayTakeoffLandingTrackVisibility.test.mjs) per verificare la notifica continua di repaint in tutti gli stati e modalità.
+  - Test suite globale al 100% verde: 725 test (125 suite), 724 passanti, 0 falliti, 1 skipped.
+  - Registrata la Lezione Appresa #151 in [MEMORY.md](file:///MEMORY.md).
+---
+
+## 2026-10-13 - 3D Replay: Panoramica Traccia Completa all'Apertura e Transizione a Traccia Dinamica su Play
+- **Tipo**: Feature / UI / 3D Graphics / MapLibre GL JS / Three.js WebGL / Ergonomia Replay
+- **Dettagli**: [.agents/worklog.d/2026-10-13_initial_full_track_overview_and_play_transition_in_3d_replay.md](file:///.agents/worklog.d/2026-10-13_initial_full_track_overview_and_play_transition_in_3d_replay.md)
+- **Sintesi**:
+  - Implementata la logica di transizione tra stato iniziale di panoramica completa e modalità di riproduzione dinamica nel motore di replay 3D ([`ui/3d/MapLibreThreeEngine.js`](file:///ui/3d/MapLibreThreeEngine.js) e [`ui/3d/HeadlessReplayEngine.js`](file:///ui/3d/HeadlessReplayEngine.js)): all'apertura del render 3D l'intera traccia volumetrica di volo, la linea centrale e la cortina al suolo sono visibili al 100% per consentire al pilota di esaminare l'intero percorso a colpo d'occhio.
+  - Introdotto il flag di stato `this.hasPlaybackStarted`: inizializzato e resettato a `false` ad ogni `loadTrack()`. In `_buildTrackRibbon()`, `_buildDropCurtain()` e `_updateTraveledTrack()` (Caso 0), se `!this.hasPlaybackStarted`, il `BufferGeometry.drawRange` viene mantenuto al 100% dell'intero buffer preallocato.
+  - Al tocco del pulsante "Play" (`play()`) o durante lo scrubbing manuale sulla timeline (`seek()`), `this.hasPlaybackStarted` commuta a `true`. La traccia viene immediatamente aggiornata alla posizione corrente: al decollo ($p = 0$) il range si riduce istantaneamente a 0 per poi crescere fluidamente a 60 FPS dietro l'avatar del parapendio.
+  - Allineato il motore headless (`HeadlessReplayEngine.js`): `getTraveledPoints()` restituisce tutti i punti della traccia prima dell'avvio della riproduzione, passando al filtraggio della traccia percorsa non appena si preme play o si effettua un seek.
+  - Aggiunti test automatici dedicati in [`tests/ui/replayTakeoffLandingTrackVisibility.test.mjs`](file:///tests/ui/replayTakeoffLandingTrackVisibility.test.mjs) per verificare la visibilità completa all'apertura e la transizione immediata a traccia dinamica su `play()`.
+  - Risolta la discrepanza oraria nella suite di test orari di [`tests/ui/forecastView.test.mjs`](file:///tests/ui/forecastView.test.mjs) agganciando la verifica della fascia oraria ai limiti effettivi dell'effemeride solare calcolata.
+  - Test suite globale al 100% verde: 726 test (125 suite), 725 passanti, 0 falliti, 1 skipped.
+  - Registrata la Lezione Appresa #152 in [MEMORY.md](file:///MEMORY.md).

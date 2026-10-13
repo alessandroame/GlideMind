@@ -701,13 +701,38 @@ function createMockThree() {
       };
     });
 
-    it('should start with 0 track drawRange when progress is 0 (at takeoff)', async () => {
+    it('should show full track on initial load and switch to traveled track only when play() is called', async () => {
+      const cornizzoloFlight = DEFAULT_SEED_FLIGHTS[0];
+      const pts = view._generateFallbackTrackPoints(cornizzoloFlight);
+      await engine.loadTrack(pts);
+
+      const n = engine.projectedTrack.points.length;
+      const totalIndices = (n - 1) * 24;
+
+      // 1. Initial state on open (before play): entire track is visible
+      assert.equal(engine.hasPlaybackStarted, false);
+      assert.equal(engine.trackRibbonMesh.geometry.drawRange.count, totalIndices, 'Full ribbon must be drawn on initial open');
+      assert.equal(engine.centerLineMesh.geometry.drawRange.count, n, 'Full centerline must be drawn on initial open');
+      assert.equal(engine.curtainMesh.geometry.drawRange.count, engine._totalCurtainVertices, 'Full curtain must be drawn on initial open');
+
+      // 2. Play is pressed: switches to dynamic traveled track mode
+      engine.play();
+      assert.equal(engine.hasPlaybackStarted, true);
+      assert.equal(engine.trackRibbonMesh.geometry.drawRange.count, 0, 'At takeoff instant, ribbon drawRange switches to 0');
+      assert.equal(engine.centerLineMesh.geometry.drawRange.count, 0, 'At takeoff instant, centerline drawRange switches to 0');
+      assert.equal(engine.curtainMesh.geometry.drawRange.count, 0, 'At takeoff instant, curtain drawRange switches to 0');
+
+      engine.pause();
+    });
+
+    it('should clamp to 0 track drawRange when seek(0) is called (at takeoff)', async () => {
       const cornizzoloFlight = DEFAULT_SEED_FLIGHTS[0];
       const pts = view._generateFallbackTrackPoints(cornizzoloFlight);
       await engine.loadTrack(pts);
 
       engine.seek(0);
 
+      assert.equal(engine.hasPlaybackStarted, true);
       assert.equal(engine.trackRibbonMesh.geometry.drawRange.count, 0, 'Ribbon must have 0 drawn indices at takeoff');
       assert.equal(engine.centerLineMesh.geometry.drawRange.count, 0, 'Centerline must have 0 drawn vertices at takeoff');
       assert.equal(engine.curtainMesh.geometry.drawRange.count, 0, 'Curtain must have 0 drawn vertices at takeoff');
@@ -777,7 +802,12 @@ function createMockThree() {
       const pts = view._generateFallbackTrackPoints(cornizzoloFlight);
       await headless.loadTrack(pts);
 
+      // Initially on load, before play/seek, full track is returned
+      assert.equal(headless.hasPlaybackStarted, false);
+      assert.equal(headless.getTraveledPoints().length, pts.length, 'Initially on load, full track must be returned');
+
       headless.seek(0);
+      assert.equal(headless.hasPlaybackStarted, true);
       assert.equal(headless.getTraveledPoints().length, 0);
 
       headless.seek(0.5);
@@ -786,6 +816,82 @@ function createMockThree() {
 
       headless.seek(1.0);
       assert.equal(headless.getTraveledPoints().length, pts.length);
+    });
+
+    it('should trigger map repaint on play, pause, seek, and continuously during _runLoop', async () => {
+      const cornizzoloFlight = DEFAULT_SEED_FLIGHTS[0];
+      const pts = view._generateFallbackTrackPoints(cornizzoloFlight);
+      await engine.loadTrack(pts);
+
+      let repaints = 0;
+      mockMap.triggerRepaint = () => { repaints++; };
+
+      repaints = 0;
+      engine.play();
+      assert.ok(repaints >= 1, 'play() must trigger initial repaint immediately');
+
+      // Execute a loop step directly
+      const repaintsBeforeStep = repaints;
+      engine._runLoop();
+      assert.ok(repaints > repaintsBeforeStep, '_runLoop() must trigger map repaint on each frame');
+
+      // Pause must trigger repaint
+      repaints = 0;
+      engine.pause();
+      assert.equal(repaints, 1, 'pause() must trigger a final crisp map repaint');
+
+      // Seek must trigger repaint
+      repaints = 0;
+      engine.seek(0.4);
+      assert.equal(repaints, 1, 'seek() must trigger map repaint');
+    });
+
+    it('should trigger map repaint during playback even in free camera mode', async () => {
+      const cornizzoloFlight = DEFAULT_SEED_FLIGHTS[0];
+      const pts = view._generateFallbackTrackPoints(cornizzoloFlight);
+      await engine.loadTrack(pts);
+
+      engine.setCameraMode('free');
+      let repaints = 0;
+      mockMap.triggerRepaint = () => { repaints++; };
+
+      engine.play();
+      assert.ok(repaints >= 1, 'play() in free mode must trigger map repaint');
+
+      const beforeStep = repaints;
+      engine._runLoop();
+      assert.ok(repaints > beforeStep, '_runLoop() in free mode must trigger map repaint');
+      engine.pause();
+    });
+
+    it('should auto-rewind to takeoff when play() is invoked at 100% progress', async () => {
+      const cornizzoloFlight = DEFAULT_SEED_FLIGHTS[0];
+      const pts = view._generateFallbackTrackPoints(cornizzoloFlight);
+      await engine.loadTrack(pts);
+
+      engine.seek(1.0);
+      assert.equal(engine.progress, 1.0);
+
+      engine.play();
+      assert.equal(engine.progress, 0, 'play() at 100% progress must auto-rewind to 0');
+      assert.equal(engine.isPlaying, true);
+      engine.pause();
+    });
+
+    it('should trigger map repaint when switching cameraMode or elevationOffset', async () => {
+      const cornizzoloFlight = DEFAULT_SEED_FLIGHTS[0];
+      const pts = view._generateFallbackTrackPoints(cornizzoloFlight);
+      await engine.loadTrack(pts);
+
+      let repaints = 0;
+      mockMap.triggerRepaint = () => { repaints++; };
+
+      engine.setCameraMode('cockpit');
+      assert.equal(repaints, 1, 'setCameraMode must trigger map repaint');
+
+      repaints = 0;
+      engine.setElevationOffset(50);
+      assert.equal(repaints, 1, 'setElevationOffset must trigger map repaint');
     });
   });
 });

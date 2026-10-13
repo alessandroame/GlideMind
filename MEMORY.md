@@ -2077,3 +2077,43 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
      - Registrare il listener dell'evento `'zoom'` della mappa (`this.map.on('zoom', this._onMapZoom)`) per intercettare lo zoom interattivo continuo (rotella mouse, pinch to zoom mobile) e stringere il delta di controllo nel loop di rendering a $> 0.02$ di zoom per le animazioni di camera.
      - Modulare i vertici del nastro prismatico 3D in-place su `posAttr.array` sfruttando le normali unitarie precalcolate `_ribbonNormals`, senza allocare nuove geometrie né sollecitare il garbage collector.
      - Pulire il listener in `destroy()` con `this.map.off('zoom', this._onMapZoom)`.
+
+---
+
+## 151. Notifica Continua di Repaint WebGL (`this.map.triggerRepaint()`) nel Loop di Riproduzione 3D di MapLibre GL JS
+- **Problema**:
+  - Nel replay 3D del volo (`MapLibreThreeEngine`), quando l'utente avviava la riproduzione premendo "Play", la vista 3D appariva completamente immobile/congelata. L'avatar non si muoveva, la telecamera non inseguiva e il nastro della traccia percorsa non avanzava, sebbene lo scrubber 2D della timeline avanzasse regolarmente.
+- **Causa Radice**:
+  - MapLibre GL JS adotta un ciclo di rendering WebGL strettamente *on-demand* (dirty checking) per azzerare il consumo di batteria e GPU su dispositivi mobili. Al termine della transizione iniziale `fitBounds` (1200ms), se l'utente non interagisce con il tocco, la mappa entra in stato di riposo (*idle*).
+  - Il loop interno `_runLoop()` avanzava `currentTimeSec`, interpolava il punto attivo e aggiornava le geometrie Three.js a 60 FPS in `requestAnimationFrame`, ma **non invocava `this.map.triggerRepaint()`**.
+  - Poiché il repaint di MapLibre non veniva risvegliato, il metodo `render(gl, matrix)` del `CustomLayer` Three.js non veniva mai eseguito. Inoltre, in modalità telecamera `free` non veniva invocato `jumpTo()`, e in modalità `chase` i micro-delta di spostamento della fotocamera a 60 FPS venivano considerati sub-pixel e ignorati dal runtime MapLibre.
+- **Pattern Vincolante**:
+  1. **Risveglio Continuo ad Ogni Frame (`_runLoop`)**:
+     - Invocare sistematicamente `if (this.map && typeof this.map.triggerRepaint === 'function') { this.map.triggerRepaint(); }` ad ogni iterazione di `_runLoop()` per garantire che MapLibre ridisegni il canvas WebGL e chiami `glCustomLayer.render()` a 60 FPS.
+  2. **Notifica Immediata sui Cambi di Stato di Riproduzione e Vista**:
+     - Chiamare `this.map.triggerRepaint()` in `play()`, `pause()`, `seek()`, `setCameraMode()` e `setElevationOffset()`.
+  3. **Auto-Rewind Deterministico su Play a Fine Volo**:
+     - In `play()`, se `this.progress >= 1.0`, riavvolgere automaticamente la riproduzione al decollo (`this.seek(0)`) prima di far partire il loop.
+  4. **Disaccoppiamento della Telecamera dall'Avatar**:
+     - `_updateCurrentFrame(pt)` deve aggiornare la telecamera `_updateCameraForFrame(pt)` in presenza di `this.map` indipendentemente dallo stato di caricamento dell'avatar `this.avatarGroup`, proteggendo l'invocazione con `typeof this.map.jumpTo === 'function'`.
+
+
+---
+
+## 152. Stato Iniziale di Panoramica Completa vs Modalità Riproduzione Dinamica nel Replay 3D (`hasPlaybackStarted`)
+- **Problema**:
+  - All'apertura della vista di replay 3D del volo, la traccia volumetrica non era visibile per intero ma azzerata al decollo ($p = 0$). Il pilota non poteva esaminare la panoramica completa della rotta prima di avviare la riproduzione, perdendo il colpo d'occhio sull'intero percorso di volo.
+  - L'utente ha esplicitamente richiesto: *"quando apro il render 3d mostra tutta la traccia. Solo quando si fa play la traccia viene mostrata fino all'istante di riproduzione"*.
+- **Causa Radice**:
+  - L'inizializzazione delle geometrie Three.js e la chiamata immediata a `_updateTraveledTrack()` in `loadTrack()` impostavano il `drawRange` a $0$ poiché $p = 0$, senza distinguere tra la fase di ispezione iniziale a traccia intera (pre-riproduzione) e la modalità di traccia percorsa dinamica (riproduzione o scrubbing attivo).
+- **Pattern Vincolante**:
+  1. **Flag di Stato Esplicito (`this.hasPlaybackStarted`)**:
+     - Inizializzato a `false` nel costruttore e reimpostato a `false` ad ogni caricamento di traccia in `loadTrack()`.
+     - In `_buildTrackRibbon()` e `_buildDropCurtain()`, se `!this.hasPlaybackStarted`, impostare il `drawRange` al 100% delle geometrie (`(n - 1) * 24` per il nastro volumetrico, `n` per la spina centrale, `_totalCurtainVertices` per la cortina).
+     - In `_updateTraveledTrack(currentPoint)`, aggiungere la guardia di **Caso 0**: se `!this.hasPlaybackStarted`, mantenere il `drawRange` al 100% e ritornare immediatamente.
+  2. **Transizione Deterministica alla Modalità Dinamica**:
+     - In `play()` e `seek()`, commutare `this.hasPlaybackStarted = true`.
+     - All'invocazione di `play()`, invocare `_updateTraveledTrack()` per l'istante temporale corrente prima di avviare il loop: a $p = 0$ la traccia si azzera al decollo e cresce fluidamente frame per frame a 60 FPS dietro l'avatar in movimento.
+     - Durante il seek manuale, la traccia si sincronizza immediatamente con il punto temporale selezionato.
+  3. **Allineamento Motore Headless (`HeadlessReplayEngine.js`)**:
+     - In `HeadlessReplayEngine`, `getTraveledPoints()` restituisce l'intero array dei punti (`[...this.trackPoints]`) se `!this.hasPlaybackStarted`, commutando al calcolo della fetta percorsa (`0..maxIdx`) solo dopo l'attivazione di `play()` o `seek()`.

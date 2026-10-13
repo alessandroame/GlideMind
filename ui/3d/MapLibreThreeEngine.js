@@ -116,6 +116,7 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     this.terrainDelta = 0;
     this._hasSnappedTerrain = false;
     this._lastValidCenterElevation = 0;
+    this.hasPlaybackStarted = false;
 
     // Preallocated reusable scratch objects for 60 FPS render loop (Lesson 116)
     this._mProj = null;
@@ -366,6 +367,7 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     this.origin = this.projectedTrack.origin;
     this.currentTimeSec = this.projectedTrack.points[0].timeSeconds || 0;
     this.progress = 0;
+    this.hasPlaybackStarted = false;
 
     if (this.isHeadless || !this.map || !this.THREE || !this.maplibregl) {
       this._emitTimeUpdate(this.projectedTrack.points[0]);
@@ -684,7 +686,9 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     geom.setIndex(indices);
 
     if (typeof geom.setDrawRange === 'function') {
-      const initialIndices = (this.progress > 0) ? Math.floor(this.progress * (n - 1)) * 24 : 0;
+      const initialIndices = !this.hasPlaybackStarted
+        ? (n - 1) * 24
+        : ((this.progress > 0) ? Math.floor(this.progress * (n - 1)) * 24 : 0);
       geom.setDrawRange(0, initialIndices);
     }
 
@@ -708,7 +712,9 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     lineGeom.setAttribute('color', new THREE.Float32BufferAttribute(lineColors, 3));
 
     if (typeof lineGeom.setDrawRange === 'function') {
-      const initialLineCount = (this.progress > 0) ? Math.floor(this.progress * (n - 1)) + 1 : 0;
+      const initialLineCount = !this.hasPlaybackStarted
+        ? n
+        : ((this.progress > 0) ? Math.floor(this.progress * (n - 1)) + 1 : 0);
       lineGeom.setDrawRange(0, initialLineCount);
     }
 
@@ -866,9 +872,11 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     geom.setAttribute('color', new THREE.Float32BufferAttribute(lineColors, 3));
 
     if (typeof geom.setDrawRange === 'function') {
-      const initialCurtainCount = (this.progress > 0)
-        ? Math.min(this._totalCurtainVertices, (Math.floor((this.progress * (n - 1)) / step) + 1) * 2)
-        : 0;
+      const initialCurtainCount = !this.hasPlaybackStarted
+        ? this._totalCurtainVertices
+        : ((this.progress > 0)
+          ? Math.min(this._totalCurtainVertices, (Math.floor((this.progress * (n - 1)) / step) + 1) * 2)
+          : 0);
       geom.setDrawRange(0, initialCurtainCount);
     }
 
@@ -985,6 +993,25 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     if (n < 2) return;
 
     this._lastCurrentPoint = currentPoint;
+
+    // Case 0: Initial overview before playback starts - show full flight trajectory
+    if (!this.hasPlaybackStarted) {
+      if (this._lastModifiedIndex !== null) {
+        this._restoreRibbonPoint(this._lastModifiedIndex);
+        this._lastModifiedIndex = null;
+      }
+      const totalIndices = (n - 1) * 24;
+      if (typeof this.trackRibbonMesh.geometry.setDrawRange === 'function') {
+        this.trackRibbonMesh.geometry.setDrawRange(0, totalIndices);
+      }
+      if (this.centerLineMesh && typeof this.centerLineMesh.geometry.setDrawRange === 'function') {
+        this.centerLineMesh.geometry.setDrawRange(0, n);
+      }
+      if (this.curtainMesh && typeof this.curtainMesh.geometry.setDrawRange === 'function') {
+        this.curtainMesh.geometry.setDrawRange(0, this._totalCurtainVertices || 0);
+      }
+      return;
+    }
 
     const startSec = pts[0].timeSeconds || 0;
     const endSec = pts[n - 1].timeSeconds || (n - 1);
@@ -1152,8 +1179,18 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
    */
   play() {
     if (this.isPlaying) return;
+    this.hasPlaybackStarted = true;
+    if (this.progress >= 1.0 && this.projectedTrack && this.projectedTrack.points.length > 0) {
+      this.seek(0);
+    } else if (this.projectedTrack && this.projectedTrack.points.length > 0) {
+      const currentPoint = this._interpolatePointAtTime(this.currentTimeSec);
+      this._updateTraveledTrack(currentPoint);
+    }
     this.isPlaying = true;
     this._lastFrameTimeMs = Date.now();
+    if (this.map && typeof this.map.triggerRepaint === 'function') {
+      this.map.triggerRepaint();
+    }
     this._runLoop();
     this.emit('play');
   }
@@ -1171,6 +1208,9 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
         clearTimeout(this._animationFrameId);
       }
       this._animationFrameId = null;
+    }
+    if (this.map && typeof this.map.triggerRepaint === 'function') {
+      this.map.triggerRepaint();
     }
     this.emit('pause');
   }
@@ -1201,6 +1241,9 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
       this.currentTimeSec = endSec;
       this.progress = 1.0;
       this._updateCurrentFrame(pts[pts.length - 1]);
+      if (this.map && typeof this.map.triggerRepaint === 'function') {
+        this.map.triggerRepaint();
+      }
       this.pause();
       this.emit('ended');
       return;
@@ -1209,6 +1252,10 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     this.progress = Math.max(0, Math.min(1, (this.currentTimeSec - startSec) / totalDuration));
     const currentPoint = this._interpolatePointAtTime(this.currentTimeSec);
     this._updateCurrentFrame(currentPoint);
+
+    if (this.map && typeof this.map.triggerRepaint === 'function') {
+      this.map.triggerRepaint();
+    }
 
     if (typeof requestAnimationFrame === 'function') {
       this._animationFrameId = requestAnimationFrame(() => this._runLoop());
@@ -1224,6 +1271,7 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
    */
   seek(progressFraction) {
     if (!this.projectedTrack || this.projectedTrack.points.length === 0) return;
+    this.hasPlaybackStarted = true;
     const pts = this.projectedTrack.points;
     const startSec = pts[0].timeSeconds || 0;
     const endSec = pts[pts.length - 1].timeSeconds || (pts.length - 1);
@@ -1235,7 +1283,7 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     const currentPoint = this._interpolatePointAtTime(this.currentTimeSec);
     this._updateCurrentFrame(currentPoint);
 
-    if (this.map) {
+    if (this.map && typeof this.map.triggerRepaint === 'function') {
       this.map.triggerRepaint();
     }
   }
@@ -1284,23 +1332,22 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
   _updateCurrentFrame(pt) {
     if (!pt) return;
 
-    if (this.avatarGroup && this.map) {
-      // Perspective scale multiplier
-      const cameraCenter = this.map.getCenter();
-      const zoom = this.map.getZoom();
-      // Approximate camera distance from zoom
+    if (this.map) {
+      const zoom = (typeof this.map.getZoom === 'function') ? this.map.getZoom() : 14;
       const cameraDistMeters = Math.max(20, 5000000 / Math.pow(2, zoom));
       const scale = calculateAvatarMinScale(cameraDistMeters, 60, 800, 36, 10.5);
 
-      updateAvatarPose(this.avatarGroup, {
-        x: pt.x,
-        y: pt.y + this.elevationOffset,
-        z: pt.z,
-        headingDeg: pt.heading,
-        pitchDeg: pt.pitchAngle,
-        bankDeg: pt.bankAngle,
-        scale
-      });
+      if (this.avatarGroup) {
+        updateAvatarPose(this.avatarGroup, {
+          x: pt.x,
+          y: pt.y + this.elevationOffset,
+          z: pt.z,
+          headingDeg: pt.heading,
+          pitchDeg: pt.pitchAngle,
+          bankDeg: pt.bankAngle,
+          scale
+        });
+      }
 
       this._updateCameraForFrame(pt);
     }
@@ -1316,13 +1363,13 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
   _updateCameraForFrame(pt) {
     if (!this.map || this.isHeadless) return;
 
-    if (this.cameraMode === 'chase') {
+    if (this.cameraMode === 'chase' && typeof this.map.jumpTo === 'function') {
       this.map.jumpTo({
         center: [pt.lon, pt.lat],
         bearing: pt.heading,
         pitch: 62
       });
-    } else if (this.cameraMode === 'cockpit') {
+    } else if (this.cameraMode === 'cockpit' && typeof this.map.jumpTo === 'function') {
       this.map.jumpTo({
         center: [pt.lon, pt.lat],
         bearing: pt.heading,
@@ -1353,6 +1400,9 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     if (this.projectedTrack) {
       const currentPoint = this._interpolatePointAtTime(this.currentTimeSec);
       this._updateCameraForFrame(currentPoint);
+      if (this.map && typeof this.map.triggerRepaint === 'function') {
+        this.map.triggerRepaint();
+      }
     }
   }
 
@@ -1365,6 +1415,9 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     if (this.projectedTrack) {
       const currentPoint = this._interpolatePointAtTime(this.currentTimeSec);
       this._updateCurrentFrame(currentPoint);
+      if (this.map && typeof this.map.triggerRepaint === 'function') {
+        this.map.triggerRepaint();
+      }
     }
   }
 
@@ -1419,6 +1472,7 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
    */
   destroy() {
     this.isDestroyed = true;
+    this.hasPlaybackStarted = false;
     this.pause();
 
     this._mProj = null;
