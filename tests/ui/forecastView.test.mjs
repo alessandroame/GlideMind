@@ -3123,6 +3123,28 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
         const eqZoomOut = computeGlideBalloonEquilibrium(tCoord, lCoord, { zoom: 12, tWindDir: 0, lWindDir: 0, tHeading: 135 });
         const eqZoomIn = computeGlideBalloonEquilibrium(tCoord, lCoord, { zoom: 16, tWindDir: 0, lWindDir: 0, tHeading: 135 });
         assert.ok(eqZoomOut.distancePx > eqZoomIn.distancePx, `Zoomed-out magnetic repulsion (${eqZoomOut.distancePx}px) must push balloon farther than zoomed-in elastic equilibrium (${eqZoomIn.distancePx}px)`);
+
+        // Expanded Flight Analysis map must also render the 2-line magneto-elastic glide balloon & SVG tether
+        capturedDivIcons.length = 0;
+        engine.renderComprensorioFlightMap(engine.container, {
+          comprensorio: spot,
+          takeoff: spot.takeoffs[0],
+          landing: spot.landings[0],
+          takeoffWeather: { windSpeed: 12, windGust: 16, windDirection: 0, turbulence: 0.1 },
+          landingWeather: { windSpeed: 10, windGust: 14, windDirection: 0, turbulence: 0.1 },
+          glideMetrics: { requiredGlideRatio: 4.5, isSafe: true }
+        });
+        const expandedBalloonIcon = capturedDivIcons.find(ic => ic.html && ic.html.includes('gm-glide-balloon'));
+        assert.ok(expandedBalloonIcon, 'Expanded flight analysis map must also create 2-line glide balloon divIcon');
+        assert.ok(expandedBalloonIcon.html.includes(`Δ ${expectedDelta}m`), 'Expanded map balloon must display elevation drop Δ');
+        assert.ok(expandedBalloonIcon.html.includes('gm-glide-tether-svg'), 'Expanded map balloon must render SVG elastic tether');
+        assert.equal(engine.glideBalloonPlacement, 'top', 'North wind on expanded map must place balloon at top');
+
+        engine.updateFlightProcedures(null, {
+          takeoffWeather: { windSpeed: 12, windGust: 16, windDirection: 180, turbulence: 0.1 },
+          landingWeather: { windSpeed: 10, windGust: 14, windDirection: 180, turbulence: 0.1 }
+        });
+        assert.equal(engine.glideBalloonPlacement, 'bottom', 'South wind update on expanded map must dynamically move balloon to bottom');
       } finally {
         globalThis.window = originalWindow;
       }

@@ -1887,7 +1887,7 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
 - **Changes**:
   - Removed takeoff altitude `<text>` from `generateTakeoffSectorSvg` in `ui/map/mapEngineAdapter.js`.
   - Upgraded the midpoint glide badge (`.gm-glide-delta-badge`) into a 2-line callout balloon (`.gm-glide-balloon`) displaying both elevation drop (`Δ ${deltaH}m`) and horizontal straight-line distance (`↔ ${distLabel}` via `computeDistanceKm`).
-  - Implemented `computeGlideBalloonEquilibrium` and `resolveGlideBalloonPlacement` in [`ui/map/mapEngineAdapter.js`](file:///c:/github/GlideMind/ui/map/mapEngineAdapter.js) using a 2D overdamped magneto-elastic model (`F_spring = -k * r` toward midpoint origin + magnetic repulsion from Takeoff, Landing, Windsocks, and Takeoff Sector Cone + axial magnetic cradle + viscous Stokes damping `cubic-bezier(0.16, 1, 0.3, 1)`), complete with an SVG elastic tether (`.gm-glide-tether-svg`, `.gm-glide-tether-line`) that dynamically stretches on `zoomOut` and retracts toward the midpoint on `zoomIn` or wind changes.
+  - Implemented `computeGlideBalloonEquilibrium`, `resolveGlideBalloonPlacement`, and `startGlideBalloonOrganicLoop` in [`ui/map/mapEngineAdapter.js`](file:///c:/github/GlideMind/ui/map/mapEngineAdapter.js) across both the contextual mini-map (`renderSpotMiniMap`, `updateWindsockMarker`) and the expanded full-screen Flight Analysis map (`renderComprensorioFlightMap`, `updateFlightProcedures`, `centerOnComprensorio`), with strict `z-index` layering (`z-index: 0` SVG curved Bézier tether and `z-index: -1` pointer beneath the opaque `z-index: 10` balloon) and 60fps hydrodynamic relaxation.
 
 ---
 

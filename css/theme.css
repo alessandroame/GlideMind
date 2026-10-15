@@ -7693,6 +7693,7 @@ input.gm-input:focus {
 .gm-flight-sparkline-wrap,
 .gm-flight-metrics-row,
 .gm-flight-card-sub,
+.gm-flight-site-title,
 .gm-flight-title-group {
   pointer-events: none;
 }
@@ -7700,7 +7701,7 @@ input.gm-input:focus {
 .gm-flight-card-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 6px;
   width: 100%;
   min-width: 0;
@@ -7708,8 +7709,8 @@ input.gm-input:focus {
 
 .gm-flight-title-group {
   display: flex;
-  align-items: flex-start;
-  gap: 6px;
+  align-items: center;
+  gap: 7px;
   min-width: 0;
   flex: 1 1 0%;
   overflow: hidden;
@@ -7737,18 +7738,21 @@ input.gm-input:focus {
   border-color: rgba(2, 132, 199, 0.38);
 }
 
+.gm-flight-date-text {
+  font-weight: 600;
+  color: var(--gm-text-secondary);
+}
+
 .gm-flight-site-title {
-  font-weight: 700;
-  font-size: 0.92rem;
-  line-height: 1.28;
-  color: var(--gm-text-primary);
+  font-weight: 500;
+  font-size: 0.78rem;
+  line-height: 1.25;
+  color: var(--gm-text-secondary);
   margin: 0;
   min-width: 0;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  white-space: nowrap;
   overflow: hidden;
-  word-break: break-word;
+  text-overflow: ellipsis;
 }
 
 /* Subtle Borderless Inline Flight Track Waveform Indicator (Metadata Row) */
@@ -7823,9 +7827,9 @@ input.gm-input:focus {
   gap: 5px;
   align-items: center;
   flex-wrap: wrap;
-  font-size: 0.74rem;
-  line-height: 1.2;
-  color: var(--gm-text-muted);
+  font-size: 0.80rem;
+  line-height: 1.25;
+  color: var(--gm-text-secondary);
   min-width: 0;
   overflow: hidden;
 }

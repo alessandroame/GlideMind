@@ -1753,8 +1753,8 @@ export class LeafletMapEngine {
   }
 
   updateGlideBalloonPosition(tWeatherOverride = null, lWeatherOverride = null) {
-    if (!this.glideDeltaMarker || !this.activeMiniMapSpotData) return null;
-    const spotData = this.activeMiniMapSpotData;
+    const spotData = this.activeMiniMapSpotData || this.activeFlightData;
+    if (!this.glideDeltaMarker || !spotData) return null;
     const tCoord = parseCoordinates(spotData.takeoff?.coordinates || spotData.comprensorio?.takeoffs?.[0]?.coordinates);
     const lCoord = parseCoordinates(spotData.landing?.coordinates || spotData.comprensorio?.landings?.[0]?.coordinates);
     if (!tCoord || !lCoord) return null;
@@ -1942,6 +1942,7 @@ export class LeafletMapEngine {
 
     if (!this.map || !this.overlayLayerGroup) return this;
     this.overlayLayerGroup.clearLayers();
+    this.activeMiniMapSpotData = null;
     this.activeFlightData = data;
     this.renderedMode = 'flightAnalysis';
     this.circuitLayers = {};
@@ -1951,6 +1952,7 @@ export class LeafletMapEngine {
     this.flightLandingPin = null;
     this.flightLandingWindsock = null;
     this.flightGlideLine = null;
+    this.glideDeltaMarker = null;
 
     if (!data) return this;
 
@@ -1974,6 +1976,7 @@ export class LeafletMapEngine {
 
     this.flightTakeoffWindsockAngle = (tDir + 180) % 360;
     this.flightLandingWindsockAngle = (lDir + 180) % 360;
+    this.lastGlideWeatherState = { tDir, lDir, tHeading };
 
     // 1. Takeoff Slope Exposure Sector (Cono e Azimut di Decollo) + Windsock
     if (tCoord) {
@@ -2050,7 +2053,7 @@ export class LeafletMapEngine {
       this.overlayLayerGroup.addLayer(this.flightLandingWindsock);
     }
 
-    // 3. Geodesic Glide Cone Line
+    // 3. Geodesic Glide Cone Line & Midpoint Magneto-Elastic Callout Balloon
     if (tCoord && lCoord) {
       const glide = data.glideMetrics || { isSafe: true };
       const glideColor = glide.isSafe ? '#16a34a' : (glide.severity === 1 ? '#ca8a04' : '#dc2626');
@@ -2064,6 +2067,53 @@ export class LeafletMapEngine {
         }
       );
       this.overlayLayerGroup.addLayer(this.flightGlideLine);
+
+      const midLat = (tCoord.lat + lCoord.lat) / 2;
+      const midLon = (tCoord.lon + lCoord.lon) / 2;
+      const deltaH = Math.abs(Math.round(Number(tAlt || 0) - Number(lAlt || 0)));
+      const distKm = computeDistanceKm(tCoord.lat, tCoord.lon, lCoord.lat, lCoord.lon);
+      const distLabel = formatGlideDistanceLabel(distKm);
+      const eq = this.computeCurrentGlideBalloonEquilibrium(tCoord, lCoord, tDir, lDir, tHeading);
+      this.glideBalloonPlacement = eq.placement;
+      this.glideBalloonEquilibrium = eq;
+      this.glideBalloonAnimState = {
+        x: eq.dx,
+        y: eq.dy,
+        vx: 0,
+        vy: 0,
+        ctrlX: 80 + eq.dx * 0.5,
+        ctrlY: 80 + eq.dy * 0.5,
+        targetX: eq.dx,
+        targetY: eq.dy,
+        placement: eq.placement
+      };
+
+      const endX = Math.round((80 + eq.dx) * 10) / 10;
+      const endY = Math.round((80 + eq.dy) * 10) / 10;
+      const ctrlX = Math.round((80 + eq.dx * 0.5) * 10) / 10;
+      const ctrlY = Math.round((80 + eq.dy * 0.5) * 10) / 10;
+
+      const deltaIcon = window.L.divIcon({
+        className: 'gm-glide-delta-badge-container',
+        html: `
+          <svg class="gm-glide-tether-svg" width="160" height="160" viewBox="0 0 160 160" style="position:absolute;inset:0;width:160px;height:160px;pointer-events:none;overflow:visible;z-index:0;" aria-hidden="true">
+            <circle cx="80" cy="80" r="2.5" class="gm-glide-tether-origin" />
+            <path d="M 80 80 Q ${ctrlX} ${ctrlY} ${endX} ${endY}" x1="80" y1="80" x2="${endX}" y2="${endY}" class="gm-glide-tether-line" fill="none" />
+          </svg>
+          <div class="gm-glide-delta-badge gm-glide-balloon gm-glide-balloon-${eq.placement}" data-placement="${eq.placement}" data-dx="${eq.dx}" data-dy="${eq.dy}" style="position:relative;z-index:10;transform:translate3d(${eq.dx}px, ${eq.dy}px, 0);" title="Dislivello: ${deltaH}m · Distanza: ${distLabel}">
+            <span class="gm-glide-balloon-row">Δ ${deltaH}m</span>
+            <span class="gm-glide-balloon-row gm-glide-balloon-dist">↔ ${distLabel}</span>
+          </div>
+        `,
+        iconSize: [160, 160],
+        iconAnchor: [80, 80]
+      });
+      this.glideDeltaMarker = window.L.marker([midLat, midLon], {
+        icon: deltaIcon,
+        zIndexOffset: 350,
+        interactive: false
+      });
+      this.overlayLayerGroup.addLayer(this.glideDeltaMarker);
     }
 
     // 4. Fit bounds strictly on authentic aeronautical points
@@ -2075,11 +2125,13 @@ export class LeafletMapEngine {
       const bounds = window.L.latLngBounds(allPoints);
       this.lastComprensorioBounds = bounds;
       this.map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
+      this.updateGlideBalloonPosition();
       if (typeof window !== 'undefined') {
         setTimeout(() => {
           if (this.map) {
             this.map.invalidateSize();
             this.map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
+            this.updateGlideBalloonPosition();
           }
         }, 60);
       }
@@ -2093,8 +2145,12 @@ export class LeafletMapEngine {
   }
 
   updateFlightProcedures(circuitData, options = {}) {
+    if (options.takeoff && this.activeFlightData) {
+      this.activeFlightData.takeoff = options.takeoff;
+    }
+
     if (options.takeoffWeather && this.flightTakeoffWindsock) {
-      const el = this.flightTakeoffWindsock.getElement();
+      const el = this.flightTakeoffWindsock.getElement?.();
       if (el) {
         const speed = options.takeoffWeather.windSpeed ?? 0;
         const gust = options.takeoffWeather.windGust ?? speed;
@@ -2127,14 +2183,14 @@ export class LeafletMapEngine {
       const tHeading = options.takeoff?.heading ?? this.activeFlightData?.takeoff?.heading ?? null;
       const tAlt = options.takeoff?.altitude || this.activeFlightData?.takeoff?.altitude || 1000;
       const dir = weather.windDirection ?? weather.windDir ?? 180;
-      const el = this.flightTakeoffSector.getElement();
+      const el = this.flightTakeoffSector.getElement?.();
       if (el) {
         el.innerHTML = generateTakeoffSectorSvg(tHeading, dir, tAlt, { prefix: 'fl-to-sector-' });
       }
     }
 
     if (options.landingWeather && this.flightLandingWindsock) {
-      const el = this.flightLandingWindsock.getElement();
+      const el = this.flightLandingWindsock.getElement?.();
       if (el) {
         const speed = options.landingWeather.windSpeed ?? 0;
         const gust = options.landingWeather.windGust ?? speed;
@@ -2166,6 +2222,11 @@ export class LeafletMapEngine {
       const glideColor = options.glideMetrics.isSafe ? '#16a34a' : (options.glideMetrics.severity === 1 ? '#ca8a04' : '#dc2626');
       this.flightGlideLine.setStyle({ color: glideColor });
     }
+
+    this.updateGlideBalloonPosition(
+      options.takeoffWeather || options.weatherSnapshot || null,
+      options.landingWeather || options.weatherSnapshot || null
+    );
   }
 
   invalidateSize() {
@@ -2179,6 +2240,7 @@ export class LeafletMapEngine {
     if (!this.map) return this;
     if (this.lastComprensorioBounds) {
       this.map.fitBounds(this.lastComprensorioBounds, { padding: [50, 50], maxZoom: 16 });
+      this.updateGlideBalloonPosition();
     } else if (this.activeFlightData) {
       const tCoord = parseCoordinates(this.activeFlightData.takeoff?.coordinates || this.activeFlightData.comprensorio?.takeoffs?.[0]?.coordinates);
       const lCoord = parseCoordinates(this.activeFlightData.landing?.coordinates || this.activeFlightData.comprensorio?.landings?.[0]?.coordinates);
@@ -2187,6 +2249,7 @@ export class LeafletMapEngine {
       if (lCoord) pts.push([lCoord.lat, lCoord.lon]);
       if (pts.length >= 2 && window.L) {
         this.map.fitBounds(window.L.latLngBounds(pts), { padding: [50, 50], maxZoom: 16 });
+        this.updateGlideBalloonPosition();
       } else if (pts.length === 1) {
         this.map.setView(pts[0], 15);
       }
