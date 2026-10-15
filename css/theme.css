@@ -165,7 +165,6 @@
 
 [data-theme="light"] .gm-date-tab.active,
 [data-theme="light"] .gm-date-tab-calendar.active,
-[data-theme="light"] .gm-date-grid-item.active,
 [data-theme="light"] .gm-theme-btn.active,
 [data-theme="light"] .gm-theme-menu-item.active {
   background-color: var(--gm-accent);
@@ -173,10 +172,11 @@
   border-color: var(--gm-accent-strong);
 }
 
-[data-theme="light"] .gm-date-grid-item.active .grid-fly-status {
-  background-color: rgba(0, 0, 0, 0.1);
-  color: #09090b;
-  border-color: rgba(0, 0, 0, 0.25);
+[data-theme="light"] .gm-date-grid-item.active {
+  background-color: rgba(2, 132, 199, 0.10);
+  color: var(--gm-text-primary);
+  border-color: #0284c7;
+  box-shadow: 0 0 0 1.5px #0284c7;
 }
 
 /* -------------------------------------------------------------
@@ -2761,30 +2761,99 @@ input.gm-input:focus {
 
 .gm-date-tabs {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
   width: 100%;
+  min-height: 36px;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-x;
   scrollbar-width: none;
-  padding-bottom: 2px;
+  padding: 2px 0;
 }
 
 .gm-date-tabs::-webkit-scrollbar {
   display: none;
 }
 
-.gm-date-tab {
-  flex: 1 0 auto;
-  min-width: 68px;
-  min-height: var(--gm-touch-min);
-  padding: 6px 12px;
-  display: flex;
-  flex-direction: column;
+/* Integrated Prev / Calendar / Next Stepper Pill */
+.gm-date-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 34px;
+  padding: 2px;
+  background-color: var(--gm-bg-surface);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-sm);
+  flex-shrink: 0;
+  scroll-snap-align: start;
+}
+
+.gm-date-step-btn {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  background: transparent;
+  color: var(--gm-text-secondary);
+  border: none;
+  border-radius: calc(var(--gm-radius-sm) - 2px);
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color var(--gm-transition-fast), color var(--gm-transition-fast);
+}
+
+.gm-date-step-btn::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  bottom: -10px;
+  left: -6px;
+  right: -6px;
+  min-width: 40px;
+  min-height: var(--gm-touch-min, 48px);
+}
+
+.gm-date-step-btn:hover:not(:disabled) {
+  background-color: var(--gm-bg-hover);
+  color: var(--gm-text-primary);
+}
+
+.gm-date-step-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.gm-date-quick-chips {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.gm-date-tab {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 42px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0 8px;
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   background-color: var(--gm-bg-surface);
   color: var(--gm-text-secondary);
   border: 1px solid var(--gm-border);
@@ -2795,13 +2864,24 @@ input.gm-input:focus {
   transition: background-color var(--gm-transition-fast), border-color var(--gm-transition-fast), color var(--gm-transition-fast);
 }
 
+.gm-date-tab::before {
+  content: '';
+  position: absolute;
+  top: -7px;
+  bottom: -7px;
+  left: 0;
+  right: 0;
+  min-height: var(--gm-touch-min, 48px);
+}
+
 .gm-date-tab:hover {
   background-color: var(--gm-bg-hover);
   color: var(--gm-text-primary);
 }
 
 .gm-date-tab:focus-visible,
-.gm-date-tab-calendar:focus-visible {
+.gm-date-tab-calendar:focus-visible,
+.gm-date-step-btn:focus-visible {
   outline: 2px solid var(--gm-accent);
   outline-offset: 2px;
 }
@@ -2814,13 +2894,16 @@ input.gm-input:focus {
 }
 
 .gm-date-tab-main {
-  font-size: 0.85rem;
+  font-size: 0.76rem;
   font-weight: 700;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }
 
 .gm-date-tab-sub {
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   opacity: 0.85;
   white-space: nowrap;
 }
@@ -2829,22 +2912,53 @@ input.gm-input:focus {
   border-style: dashed;
 }
 
-/* Calendar Button (48x48px Touch Target) */
+/* Central Calendar Trigger Pill inside Stepper (48px Touch Target via ::before) */
 .gm-date-tab-calendar {
-  flex: 0 0 48px;
-  width: 48px;
-  min-height: var(--gm-touch-min);
-  display: flex;
+  position: relative;
+  flex: 0 0 auto;
+  height: 28px;
+  min-height: 28px;
+  padding: 0 7px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--gm-bg-surface);
-  color: var(--gm-text-secondary);
-  border: 1px solid var(--gm-border);
-  border-radius: var(--gm-radius-sm);
+  gap: 4px;
+  background-color: rgba(255, 255, 255, 0.04);
+  color: var(--gm-text-primary);
+  border: 1px solid transparent;
+  border-radius: calc(var(--gm-radius-sm) - 2px);
+  font-size: 0.76rem;
+  font-weight: 700;
+  white-space: nowrap;
   cursor: pointer;
   scroll-snap-align: start;
   flex-shrink: 0;
   transition: background-color var(--gm-transition-fast), border-color var(--gm-transition-fast), color var(--gm-transition-fast);
+}
+
+.gm-date-tab-calendar::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  bottom: -10px;
+  left: 0;
+  right: 0;
+  min-height: var(--gm-touch-min, 48px);
+}
+
+.gm-date-cal-icon {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.gm-date-active-label {
+  letter-spacing: -0.01em;
+}
+
+.gm-date-cal-caret {
+  font-size: 0.65rem;
+  opacity: 0.7;
+  margin-left: 1px;
 }
 
 .gm-date-tab-calendar:hover {
@@ -2856,6 +2970,10 @@ input.gm-input:focus {
   background-color: var(--gm-accent);
   color: var(--gm-text-inverse);
   border-color: var(--gm-accent-strong);
+}
+
+[data-theme="light"] .gm-date-tab-calendar:not(.active) {
+  background-color: rgba(15, 23, 42, 0.05);
 }
 
 /* Horizon Warning Notice (> 7 days) - Floating Bottom Anchored Above Bottom Bar */
@@ -2965,23 +3083,43 @@ input.gm-input:focus {
   background: rgba(0, 0, 0, 0.1);
 }
 
-/* Date Picker Sheet Content & Grid */
+/* Date Picker Sheet Content & 7-Column 2-Week Calendar Grid */
 .gm-date-picker-sheet {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
+}
+
+.gm-date-weekday-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 4px;
+  text-align: center;
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--gm-text-muted);
 }
 
 .gm-date-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
 }
 
-@media (max-width: 440px) {
-  .gm-date-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
+.gm-date-grid-spacer {
+  min-height: 48px;
+  border-radius: var(--gm-radius-sm);
+  background-color: rgba(255, 255, 255, 0.015);
+  border: 1px dashed rgba(255, 255, 255, 0.05);
+  pointer-events: none;
+}
+
+[data-theme="light"] .gm-date-grid-spacer {
+  background-color: rgba(15, 23, 42, 0.02);
+  border-color: rgba(15, 23, 42, 0.08);
 }
 
 .gm-date-grid-item {
@@ -2989,8 +3127,8 @@ input.gm-input:focus {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 64px;
-  padding: 8px 4px 6px 4px;
+  min-height: 48px;
+  padding: 4px 2px 3px 2px;
   background-color: var(--gm-bg-surface);
   border: 1px solid var(--gm-border);
   border-bottom: 3px solid transparent;
@@ -3012,88 +3150,101 @@ input.gm-input:focus {
 }
 
 .gm-date-grid-item.active {
-  background-color: var(--gm-accent);
-  border-color: var(--gm-accent-strong);
-  border-bottom-color: var(--gm-accent-strong);
-  color: var(--gm-text-inverse);
+  background-color: rgba(56, 189, 248, 0.14);
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 1.5px #38bdf8;
+  color: var(--gm-text-primary);
   font-weight: 700;
 }
 
-.gm-date-grid-item.weekend:not(.active) {
-  border-color: rgba(255, 160, 0, 0.35);
+.gm-date-grid-item.today:not(.active) {
+  border-color: rgba(255, 255, 255, 0.35);
 }
 
-/* 4-Color Semantic Bottom Bars (Verde, Giallo, Rosso, Nero) */
-.gm-date-grid-item.fly-flyable:not(.active) {
+[data-theme="light"] .gm-date-grid-item.today:not(.active) {
+  border-color: rgba(15, 23, 42, 0.35);
+}
+
+.gm-date-grid-item.weekend:not(.active) {
+  border-color: rgba(255, 160, 0, 0.28);
+}
+
+/* 4-Color Semantic Bottom Bars (Verde, Giallo, Rosso, Nero) — preserved even when .active */
+.gm-date-grid-item.fly-flyable {
   border-bottom-color: var(--gm-status-flyable);
 }
 
-.gm-date-grid-item.fly-caution:not(.active) {
+.gm-date-grid-item.fly-caution {
   border-bottom-color: var(--gm-status-caution);
 }
 
-.gm-date-grid-item.fly-unflyable:not(.active) {
+.gm-date-grid-item.fly-unflyable {
   border-bottom-color: var(--gm-status-unflyable);
 }
 
-.gm-date-grid-item.fly-severe:not(.active) {
+.gm-date-grid-item.fly-severe {
   border-bottom-color: #09090b;
   box-shadow: inset 0 -3px 0 0 #ef4444;
 }
 
+.gm-date-grid-item.fly-severe.active {
+  box-shadow: 0 0 0 1.5px #38bdf8, inset 0 -3px 0 0 #ef4444;
+}
+
+[data-theme="light"] .gm-date-grid-item.fly-severe.active {
+  box-shadow: 0 0 0 1.5px #0284c7, inset 0 -3px 0 0 #ef4444;
+}
+
 .gm-date-grid-item .grid-day-name {
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  font-weight: 600;
+  display: none;
 }
 
 .gm-date-grid-item .grid-day-number {
-  font-size: 1.05rem;
+  font-size: 0.92rem;
   font-weight: 700;
   line-height: 1.1;
-  margin: 1px 0;
+  margin: 0;
 }
 
 .gm-date-grid-item .grid-month {
-  font-size: 0.68rem;
-  opacity: 0.8;
+  font-size: 0.58rem;
+  opacity: 0.78;
+  line-height: 1.1;
 }
 
 .gm-date-grid-item .grid-fly-status {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  font-size: 0.60rem;
+  gap: 2px;
+  font-size: 0.56rem;
   font-weight: 700;
-  padding: 1px 6px;
+  padding: 1px 4px;
   border-radius: 9999px;
-  margin-top: 4px;
-  max-width: 90%;
+  margin-top: 2px;
+  max-width: 92%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   letter-spacing: 0.02em;
   text-transform: uppercase;
-  line-height: 1.2;
+  line-height: 1.1;
 }
 
-.gm-date-grid-item.active .grid-fly-status {
-  background-color: rgba(0, 0, 0, 0.25);
-  color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.4);
+.gm-date-grid-item .grid-fly-label {
+  display: none;
 }
 
 .gm-date-grid-item .grid-fly-icon {
-  font-size: 0.65rem;
+  font-size: 0.62rem;
   line-height: 1;
 }
 
 .gm-date-grid-item .grid-synoptic-dot {
   position: absolute;
-  top: 4px;
-  right: 6px;
-  font-size: 0.55rem;
+  top: 2px;
+  right: 4px;
+  font-size: 0.48rem;
   color: var(--gm-status-caution);
 }
 
@@ -10498,10 +10649,117 @@ input.gm-input:focus {
   box-shadow: 0 0 0 1.5px var(--gm-accent-strong), 0 2px 8px var(--gm-accent-glow);
 }
 
+/* ==========================================================================
+   Quick Sub-Spot Forecast Switcher & Conditional Inline Multi-Spot Combo
+   ========================================================================== */
 
+.gm-quick-subspot-switcher {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 3px;
+  margin-bottom: 8px;
+  background-color: var(--gm-bg-base);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-sm);
+}
 
+.gm-quick-subspot-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 4px 8px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--gm-text-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--gm-radius-xs);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background-color var(--gm-transition-fast), color var(--gm-transition-fast), border-color var(--gm-transition-fast);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
 
+.gm-quick-subspot-pill::before {
+  content: "";
+  position: absolute;
+  inset: -6px 0;
+}
 
+.gm-quick-subspot-pill:hover {
+  color: var(--gm-text-primary);
+  background-color: var(--gm-bg-hover);
+}
 
+.gm-quick-subspot-pill.active {
+  color: var(--gm-text-inverse);
+  background-color: var(--gm-accent);
+  border-color: var(--gm-accent);
+}
 
+.gm-quick-subspot-pill:focus-visible {
+  outline: 2px solid var(--gm-accent);
+  outline-offset: 1px;
+}
 
+.gm-flight-stat-row-interactive {
+  cursor: pointer;
+  border-radius: var(--gm-radius-xs);
+  padding: 2px 4px;
+  margin: -2px -4px;
+  transition: background-color var(--gm-transition-fast);
+}
+
+.gm-flight-stat-row-interactive:hover {
+  background-color: var(--gm-bg-hover);
+}
+
+.gm-flight-stat-row-interactive:focus-visible {
+  outline: 2px solid var(--gm-accent);
+  outline-offset: 1px;
+}
+
+.gm-inline-subspot-select {
+  appearance: auto;
+  background-color: var(--gm-bg-elevated);
+  color: var(--gm-text-primary);
+  border: 1px solid var(--gm-border-strong);
+  border-radius: var(--gm-radius-xs);
+  padding: 2px 6px;
+  font-size: 0.80rem;
+  font-weight: 700;
+  line-height: 1.25;
+  max-width: 165px;
+  min-height: 30px;
+  cursor: pointer;
+  text-overflow: ellipsis;
+  transition: border-color var(--gm-transition-fast), background-color var(--gm-transition-fast);
+}
+
+.gm-inline-subspot-select:hover,
+.gm-inline-subspot-select:focus-visible {
+  border-color: var(--gm-accent);
+  outline: none;
+}
+
+[data-theme="light"] .gm-quick-subspot-switcher {
+  background-color: var(--gm-bg-surface);
+  border-color: var(--gm-border);
+}
+
+[data-theme="light"] .gm-quick-subspot-pill.active {
+  background-color: var(--gm-accent);
+  color: var(--gm-text-inverse);
+}
+
+[data-theme="light"] .gm-inline-subspot-select {
+  background-color: var(--gm-bg-surface);
+  color: var(--gm-text-primary);
+  border-color: var(--gm-border-strong);
+}

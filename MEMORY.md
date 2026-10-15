@@ -2492,3 +2492,47 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
      - **Riga 2 (`.gm-home-timeline`)**: striscia oraria diurna dall'alba al tramonto (`resolveDaylightHours` da `core/daylight.js`, tipicamente `08`..`18`), composta da slot `.gm-home-timeline-slot` con ora a 2 cifre (`.gm-home-timeline-hour`) e barra cromatica a 4 stati (`.gm-home-timeline-bar`: `status-flyable`, `status-caution`, `status-unflyable`, `status-severe`, oppure `status-unavailable` in assenza di dati offline).
   2. **Deep-Linking Orario a 1-Tap (`data-action="view-forecast-hour"`)**:
      - Toccare uno slot orario specifico (`data-hour="11"`) imposta `{ selectedSpot, selectedHour: 11 }` nello store e naviga direttamente a `ForecastView` posizionata su quell'ora esatta.
+
+---
+
+## 173. Selettore Rapido Previsioni Sub-Spot (`Panoramica | Decollo | Atterraggio`) e Combo Inline Condizionale per Spot Multipli (`[NOTE-002]`)
+- **Problema**:
+  In `ForecastView.js`, dopo l'unificazione dell'header in `.gm-unified-spot-bar`, il passaggio tra la vista `Panoramica` e le previsioni analitiche del singolo `Decollo` o `Atterraggio` (nonché il cambio di decollo/atterraggio attivo nei comprensori multi-spot) richiedeva l'apertura del bottom sheet `Seleziona Comprensorio` (`openPickerSheet`), introducendo un cambio di contesto modale non necessario quando il pilota sta già esaminando la card di riepilogo (`#forecast-summary-card`) o la card del punto specifico (`#forecast-specific-spot-card`).
+- **Causa Radice**:
+  Le righe di decollo e atterraggio dentro `.gm-flight-data-grid` (`renderSummaryMetrics`) e l'intestazione di `renderSpecificSpotMetrics` erano puramente statiche, prive sia di una barra di commutazione rapida in-place sia di un selettore inline contestuale per i comprensori con più decolli o più atterraggi.
+- **Pattern Vincolante**:
+  1. **Selettore Rapido a 1-Tap (`.gm-quick-subspot-switcher`) e Righe Interattive (`.gm-flight-stat-row-interactive`)**:
+     - In testa a `#forecast-spot-metrics-container` (sia in `renderSummaryMetrics` sia in `renderSpecificSpotMetrics`) esporre la barra a 3 pillole `role="tablist"` (`Panoramica`, `Decollo`, `Atterraggio`) con `data-action="select-subspot"` e area di tocco espansa (`::before`), permettendo la commutazione istantanea a 1-tap senza aprire lo sheet.
+     - Le righe `.gm-flight-stat-row` in `renderSummaryMetrics` espongono anch'esse `data-action="select-subspot"` verso il decollo o l'atterraggio mostrato.
+  2. **Combo Inline Condizionale (`.gm-inline-subspot-select`, Occam's Razor)**:
+     - Renderizzare un elemento `<select class="gm-inline-subspot-select gm-flight-target" data-action="change-active-takeoff|change-active-landing">` al posto del nome statico **esclusivamente** quando il comprensorio dispone di più opzioni per quel ruolo (`spot.takeoffs.length > 1` o `spot.landings.length > 1`). Quando esiste un solo decollo o un solo atterraggio (`length <= 1`), mostrare testo statico pulito `<span class="gm-flight-target">` privo di frecce dropdown superflue.
+  3. **Persistenza del Binomio Scelto al Ritorno in Panoramica**:
+     - Quando l'utente seleziona `Panoramica` (`subSpotId === 'overview'`), preservare `this.activeTakeoffId` e `this.activeLandingId` se appartengono già al comprensorio corrente, anziché resettarli forzatamente al decollo/atterraggio primario.
+  4. **Reattività della Timeline Oraria (`evaluateTimelineSlot`) e Disambiguazione Chiave `weatherCache`**:
+     - `getWeatherData(spot, dateStr)` deve includere `takeoff.id` e `landing.id` nella chiave di cache (`${spot.id}_${takeoff.id || 't0'}_${landing?.id || 'l0'}_${dateStr}`) e verificare `_landingId` prima di riutilizzare `landingWeather`, evitando di servire l'aerologia del primo decollo/atterraggio quando si cambia spot tramite combo.
+     - `renderTimelineGrid`, `renderStickyScrubber` e `setHour` devono valutare ogni slot tramite `evaluateTimelineSlot(spot, weatherData, h, glider, activeSub)` anziché invocare direttamente `evaluateComprensorio` (che valuta sempre il decollo primario + cono di planata), differenziando:
+       - `overview` (`· Panoramica`): severità combinata peggiore tra decollo, cono di planata e brezza di valle in atterraggio;
+       - `takeoff` (`· ↗ <Decollo>`): volabilità pura del decollo selezionato con altezza barra modulata dall'allineamento azimutale (`diffFromFront`) e dal vento in quota;
+       - `landing` (`· ↘ <Atterraggio>`): volabilità specifica dell'atterraggio (`getFlyabilityScore(..., isTakeoff = false)` + guardia brezza di valle pomeridiana $\ge 15\text{ km/h}$ / raffiche $\ge 21\text{ km/h}$).
+
+---
+
+## 174. Date Picker Compatto Monoriga (`36px`) con Stepper Prev/Next Integrato e Griglia Calendario a 7 Colonne (`Lun–Dom`)
+- **Problema**:
+  1. I tab data a 2 righe (`.gm-date-tab` alti `48px` visivi, larghi `>= 68px`) occupavano troppo spazio verticale nell'header di `HomeDashboardView`, `ForecastView` e `SpotMapView`, e l'aggiunta dinamica di un 5° chip `.custom` quando si sceglieva una data fuori dai preset provocava overflow orizzontale sui viewport mobile (`360px–390px`).
+  2. Mancava la possibilità di avanzare o retrocedere rapidamente di un giorno (`Prev / Next`) senza dover aprire ogni volta il bottom sheet del calendario.
+  3. Il bottom sheet del calendario usava una griglia a 3/4 colonne non allineata ai giorni della settimana (`Lun–Dom`) più un blocco secondario ridondante (`<input type="date">` nativo + pulsante `Conferma`).
+- **Causa Radice**:
+  Accoppiamento tra visualizzazione della data attiva e lista dei chip preset, assenza di metadati di navigazione sequenziale (`prevDate`/`nextDate`) in `core/datePresets.js` e layout a card larghe nello sheet.
+- **Pattern Vincolante**:
+  1. **Stepper Integrato + Quick Chips Monoriga (`36px` visivi, Touch Floor $\ge 48\text{px}$ via `::before`)**:
+     - `.gm-date-tabs` è diviso in due gruppi compatti sulla stessa riga:
+       - `.gm-date-stepper`: `[‹ prev-date] [📅 open-date-picker-sheet (activeDisplayLabel) ▾] [› next-date]`. La pillola centrale mostra sempre la data attiva corrente (preset o custom) e apre lo sheet 14 giorni.
+       - `.gm-date-quick-chips`: renderizza esclusivamente `smartData.quickPresets` (`!p.isCustom`) con etichette corte su 1 riga (`Oggi`, `Dom`, `Sab`, `Dom`), mantenendo larghezza fissa e zero layout shift anche quando è attiva una data custom.
+  2. **Griglia Calendario 2 Settimane a 7 Colonne (`Lun–Dom`) senza Input Nativo Ridondante**:
+     - In `openDatePickerSheet()`, esporre l'intestazione `.gm-date-weekday-header` (`WEEKDAY_HEADERS_MON`: `Lun..Dom`) sopra `.gm-date-grid` (`grid-template-columns: repeat(7, 1fr)`), precedendo i 14 giorni con `availableDates[0].weekdayIndexMonday` celle `.gm-date-grid-spacer` per garantire l'allineamento rigoroso di ogni data sotto la propria colonna settimanale. Non includere mai il campo ridondante `#custom-date-native-input`.
+  3. **Invarianza del Colore di Volabilità sul Giorno Selezionato (`.gm-date-grid-item.active`)**:
+     - È vietato colorare l'intero sfondo di `.gm-date-grid-item.active` con `var(--gm-accent)` (giallo/ambra), poiché si confonde con lo stato semantico `Cautela` e nasconde la volabilità del giorno selezionato.
+     - `.gm-date-grid-item.active` deve usare un anello di selezione ciano neutro (`border-color: #38bdf8; box-shadow: 0 0 0 1.5px #38bdf8; background-color: rgba(56, 189, 248, 0.14)` in dark / `#0284c7` in light), preservando **sempre** sia la barra inferiore a 4 colori (`.gm-date-grid-item.fly-*` senza `:not(.active)`) sia il colore semantico originale del badge `.grid-fly-status`.
+
+

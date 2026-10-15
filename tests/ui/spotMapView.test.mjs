@@ -520,12 +520,15 @@ describe('Spot Map View - Controller & Cartography Contracts (UI Layer)', () => 
 
     assert.ok(mockContainer.innerHTML.includes('id="gm-map-date-bar"'), 'Must contain #gm-map-date-bar');
     assert.ok(mockContainer.innerHTML.includes('gm-date-tabs'), 'Must contain .gm-date-tabs container');
+    assert.ok(mockContainer.innerHTML.includes('gm-date-stepper'), 'Must contain .gm-date-stepper container');
+    assert.ok(mockContainer.innerHTML.includes('data-action="prev-date"'), 'Must contain prev-date button');
+    assert.ok(mockContainer.innerHTML.includes('data-action="next-date"'), 'Must contain next-date button');
     assert.ok(mockContainer.innerHTML.includes('data-action="select-date"'), 'Must contain select-date buttons');
     assert.ok(mockContainer.innerHTML.includes('data-action="open-date-picker-sheet"'), 'Must contain calendar button');
     assert.ok(mockContainer.innerHTML.includes('gm-date-tab-calendar'), 'Must declare gm-date-tab-calendar class');
   });
 
-  it('should update activeDate and date tabs on select-date click and store changes', () => {
+  it('should update activeDate and date tabs on select-date, next-date click and store changes', () => {
     spotMapView.mount(mockContainer);
 
     // Initial state
@@ -545,12 +548,26 @@ describe('Spot Map View - Controller & Cartography Contracts (UI Layer)', () => 
     assert.equal(spotMapView.activeDate, '2026-10-15');
     assert.equal(store.getState().activeDate, '2026-10-15');
 
+    // Simulate clicking next-date stepper button
+    spotMapView.handleClick({
+      target: {
+        getAttribute: (k) => k === 'data-action' ? 'next-date' : (k === 'data-date' ? '2026-10-16' : null),
+        closest: (sel) => sel.includes('data-action') ? {
+          disabled: false,
+          getAttribute: (k) => k === 'data-action' ? 'next-date' : (k === 'data-date' ? '2026-10-16' : null)
+        } : null
+      }
+    });
+
+    assert.equal(spotMapView.activeDate, '2026-10-16');
+    assert.equal(store.getState().activeDate, '2026-10-16');
+
     // External store update
     store.setState({ activeDate: '2026-10-18' });
     assert.equal(spotMapView.activeDate, '2026-10-18');
   });
 
-  it('should open the 14-day date picker sheet with clean neutral calendar grid in SpotMapView', async () => {
+  it('should open the 14-day date picker sheet with clean neutral 7-column calendar grid in SpotMapView', async () => {
     const { initSheetManager } = await import('../../ui/sheetManager.js');
     let capturedHtml = '';
     const mockSheetContainer = {
@@ -577,9 +594,9 @@ describe('Spot Map View - Controller & Cartography Contracts (UI Layer)', () => 
     spotMapView.openDatePickerSheet();
 
     assert.ok(capturedHtml.includes('Calendario Previsioni (Prossimi 14 Giorni)'));
+    assert.ok(capturedHtml.includes('gm-date-weekday-header'), 'Must include 7-column Mon-Sun weekday header');
     assert.ok(capturedHtml.includes('data-action="pick-calendar-date"'));
-    assert.ok(capturedHtml.includes('id="custom-date-native-input"'));
-    assert.ok(capturedHtml.includes('data-action="apply-custom-date"'));
+    assert.ok(!capturedHtml.includes('id="custom-date-native-input"'), 'Should not include redundant secondary native date input');
     assert.ok(!capturedHtml.includes('grid-fly-status'), 'Map calendar should not include spot-specific flyability badges');
   });
 

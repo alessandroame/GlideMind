@@ -32,6 +32,7 @@ import {
 import {
   DEFAULT_GLIDER,
   GLIDER_CLASSES,
+  getFlyabilityScore,
   calculateDailyFlyabilitySummary
 } from '../../core/flyability.js';
 import { resolveDaylightHours } from '../../core/daylight.js';
@@ -53,7 +54,8 @@ import {
   getAvailableCalendarDates,
   formatDateIso,
   parseDateIso,
-  formatShortDate
+  formatShortDate,
+  WEEKDAY_HEADERS_MON
 } from '../../core/datePresets.js';
 import { calculateFlightWindows } from '../../core/flightWindows.js';
 import { calculatePilotSafetyFactor, DEFAULT_SEED_FLIGHTS } from '../../core/logbook.js';
@@ -693,11 +695,31 @@ export class ForecastViewController {
    * @returns {object}
    */
   getWeatherData(spot, dateStr) {
-    const key = `${spot.id}_${dateStr}`;
+    const activeSub = this.resolveActiveSubSpot(spot);
+    const activeTakeoffId = (activeSub && activeSub.spotType === 'takeoff')
+      ? activeSub.id
+      : (this.activeTakeoffId || (this.store ? this.store.getState()?.activeTakeoffId : null));
+    const activeLandingId = (activeSub && activeSub.spotType === 'landing')
+      ? activeSub.id
+      : (this.activeLandingId || (this.store ? this.store.getState()?.activeLandingId : null));
+
+    const takeoff = (spot.takeoffs && spot.takeoffs.find(t => t.id === activeTakeoffId))
+      || (spot.takeoffs && spot.takeoffs.find(t => t.isPrimary))
+      || (spot.takeoffs && spot.takeoffs[0])
+      || { id: 't0', altitude: 1000, heading: null };
+    const landing = (spot.landings && spot.landings.find(l => l.id === activeLandingId))
+      || (spot.landings && spot.landings.find(l => l.isPrimary || l.isOfficial))
+      || (spot.landings && spot.landings[0])
+      || null;
+
+    const baseKey = `${spot.id}_${dateStr}`;
+    const key = `${spot.id}_${takeoff.id || 't0'}_${landing?.id || 'l0'}_${dateStr}`;
+
     const ensureLandingWeather = (weatherPayload) => {
-      if (!weatherPayload || weatherPayload.landingWeather) return weatherPayload;
-      const activeLandingId = (this.store ? this.store.getState()?.activeLandingId : this.activeLandingId) || spot.landings?.[0]?.id;
-      const landing = (spot.landings && spot.landings.find(l => l.id === activeLandingId)) || (spot.landings && spot.landings[0]) || null;
+      if (!weatherPayload) return weatherPayload;
+      if (weatherPayload.landingWeather && (!landing || !weatherPayload._landingId || weatherPayload._landingId === landing.id)) {
+        return weatherPayload;
+      }
       if (landing && landing.coordinates) {
         const lCoords = parseCoordinates(landing.coordinates);
         if (lCoords) {
@@ -720,6 +742,7 @@ export class ForecastViewController {
             weatherPayload.landingWeather = enrichedLanding;
             weatherPayload.points = [weatherPayload, enrichedLanding];
           }
+          weatherPayload._landingId = landing.id || null;
         }
       }
       return weatherPayload;
@@ -733,9 +756,25 @@ export class ForecastViewController {
       return data;
     }
 
-    // Check store global weatherData if matching spot
+    if (this.cachedWeatherMap.has(baseKey)) {
+      const baseEntry = this.cachedWeatherMap.get(baseKey);
+      if (!baseEntry._takeoffId || baseEntry._takeoffId === takeoff.id) {
+        const data = ensureLandingWeather(baseEntry);
+        if (data && !data._isSynthetic && !data.isStaleOfflineFallback && !this._networkFailed) {
+          this.networkStatus = 'live';
+        }
+        return data;
+      }
+    }
+
+    // Check store global weatherData if matching spot and takeoff
     const state = this.store ? this.store.getState() : {};
-    if (state.weatherData && state.selectedSpot && state.selectedSpot.id === spot.id) {
+    if (
+      state.weatherData &&
+      state.selectedSpot &&
+      state.selectedSpot.id === spot.id &&
+      (!state.weatherData._takeoffId || state.weatherData._takeoffId === takeoff.id)
+    ) {
       const data = ensureLandingWeather(state.weatherData);
       this.cachedWeatherMap.set(key, data);
       if (!data._isSynthetic && !data.isStaleOfflineFallback && !this._networkFailed) {
@@ -745,15 +784,13 @@ export class ForecastViewController {
     }
 
     // Check defaultWeatherCache
-    const activeTakeoffId = this.store ? this.store.getState().activeTakeoffId : this.activeTakeoffId;
-    const takeoff = (spot.takeoffs && spot.takeoffs.find(t => t.id === activeTakeoffId))
-      || (spot.takeoffs && spot.takeoffs[0])
-      || { altitude: 1000, heading: null };
     const coords = parseCoordinates(takeoff.coordinates) || { lat: 45.833, lon: 9.302 };
     const cached = getCachedWeatherData(coords, dateStr, { weatherModel: 'best_match' });
     if (cached && !cached.isStale) {
+      cached._takeoffId = takeoff.id || null;
       const data = ensureLandingWeather(cached);
       this.cachedWeatherMap.set(key, data);
+      this.cachedWeatherMap.set(baseKey, data);
       if (!data._isSynthetic && !data.isStaleOfflineFallback && !this._networkFailed) {
         this.networkStatus = 'live';
       }
@@ -778,11 +815,7 @@ export class ForecastViewController {
     const enriched = enrichWeatherData(synthetic, dateStr, Date.now(), {
       customHeading: takeoffHeading
     });
-
-    const activeLandingId = this.store ? this.store.getState()?.activeLandingId : this.activeLandingId;
-    const landing = (spot.landings && spot.landings.find(l => l.id === activeLandingId))
-      || (spot.landings && spot.landings[0])
-      || null;
+    enriched._takeoffId = takeoff.id || null;
 
     if (landing && landing.coordinates) {
       const lCoords = parseCoordinates(landing.coordinates);
@@ -800,10 +833,12 @@ export class ForecastViewController {
         const enrichedLanding = enrichWeatherData(landingSynthetic, dateStr, Date.now(), {});
         enriched.landingWeather = enrichedLanding;
         enriched.points = [enriched, enrichedLanding];
+        enriched._landingId = landing.id || null;
       }
     }
 
     this.cachedWeatherMap.set(key, enriched);
+    this.cachedWeatherMap.set(baseKey, enriched);
     return enriched;
   }
 
@@ -1484,42 +1519,68 @@ export class ForecastViewController {
           ` : ''}
         </select>
 
-        <!-- Smart Adaptive Date Tabs + Calendar Button -->
+        <!-- Smart Compact Date Stepper + Quick Chips -->
         <div class="gm-date-tabs" role="tablist" aria-label="Selettore data previsione">
-          ${smartData.presets.map(p => `
+          <div class="gm-date-stepper" role="group" aria-label="Navigazione giorno precedente e successivo">
+            <button
+              type="button"
+              class="gm-date-step-btn"
+              data-action="prev-date"
+              data-date="${smartData.prevDate}"
+              ${!smartData.canPrev ? 'disabled aria-disabled="true"' : ''}
+              aria-label="Giorno precedente"
+              title="Giorno precedente (${smartData.prevDate})"
+            >‹</button>
+
             <button 
               type="button" 
-              class="gm-date-tab ${p.isActive ? 'active' : ''} ${p.isCustom ? 'custom' : ''}"
-              data-action="select-date"
-              data-date="${p.isoDate}"
+              class="gm-date-tab-calendar ${smartData.isCustomActive ? 'active' : ''}"
+              data-action="open-date-picker-sheet"
               role="tab"
-              aria-selected="${p.isActive ? 'true' : 'false'}"
-              title="${p.label} - ${p.subLabel}${p.flyability && p.flyability.status !== 'unknown' ? ` (${p.flyability.label})` : ''}"
+              aria-selected="${smartData.isCustomActive ? 'true' : 'false'}"
+              aria-label="Scegli data dal calendario (${escapeHtml(smartData.activeDisplayLabel)})"
+              title="Apri calendario 14 giorni (${escapeHtml(smartData.activeDisplayLabel)})"
             >
-              <span class="gm-date-tab-main">
-                ${p.label}
-                ${p.flyability && p.flyability.status !== 'unknown' ? `<span class="gm-tab-fly-dot fly-${p.flyability.status}" title="${escapeHtml(p.flyability.label)}"></span>` : ''}
-              </span>
-              <span class="gm-date-tab-sub">${p.subLabel}</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true" class="gm-date-cal-icon">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+              </svg>
+              <span class="gm-date-active-label">${escapeHtml(smartData.activeDisplayLabel)}</span>
+              ${smartData.activeFlyability && smartData.activeFlyability.status !== 'unknown' ? `<span class="gm-tab-fly-dot fly-${smartData.activeFlyability.status}" title="${escapeHtml(smartData.activeFlyability.label)}"></span>` : ''}
+              <span class="gm-date-cal-caret" aria-hidden="true">▾</span>
             </button>
-          `).join('')}
 
-          <button 
-            type="button" 
-            class="gm-date-tab-calendar ${smartData.isCustomActive ? 'active' : ''}"
-            data-action="open-date-picker-sheet"
-            role="tab"
-            aria-selected="${smartData.isCustomActive ? 'true' : 'false'}"
-            aria-label="Scegli data dal calendario"
-            title="Scegli altra data"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-              <line x1="16" y1="2" x2="16" y2="6"></line>
-              <line x1="8" y1="2" x2="8" y2="6"></line>
-              <line x1="3" y1="10" x2="21" y2="10"></line>
-            </svg>
-          </button>
+            <button
+              type="button"
+              class="gm-date-step-btn"
+              data-action="next-date"
+              data-date="${smartData.nextDate}"
+              ${!smartData.canNext ? 'disabled aria-disabled="true"' : ''}
+              aria-label="Giorno successivo"
+              title="Giorno successivo (${smartData.nextDate})"
+            >›</button>
+          </div>
+
+          <div class="gm-date-quick-chips">
+            ${(smartData.quickPresets || smartData.presets.filter(p => !p.isCustom)).map(p => `
+              <button 
+                type="button" 
+                class="gm-date-tab ${p.isActive ? 'active' : ''}"
+                data-action="select-date"
+                data-date="${p.isoDate}"
+                role="tab"
+                aria-selected="${p.isActive ? 'true' : 'false'}"
+                title="${p.label} - ${p.subLabel}${p.flyability && p.flyability.status !== 'unknown' ? ` (${p.flyability.label})` : ''}"
+              >
+                <span class="gm-date-tab-main">
+                  ${p.shortLabel || p.label}
+                  ${p.flyability && p.flyability.status !== 'unknown' ? `<span class="gm-tab-fly-dot fly-${p.flyability.status}" title="${escapeHtml(p.flyability.label)}"></span>` : ''}
+                </span>
+              </button>
+            `).join('')}
+          </div>
         </div>
 
         ${smartData.activeHorizon && smartData.activeHorizon.isSynoptic && this.dismissedHorizonDate !== this.activeDate ? `
@@ -1558,18 +1619,124 @@ export class ForecastViewController {
   }
 
   /**
+   * Renders the 1-tap quick forecast view switcher (Panoramica / Decollo / Atterraggio).
+   * @param {object} spot
+   * @param {object} [activeTakeoff]
+   * @param {object} [activeLanding]
+   * @returns {string}
+   */
+  renderQuickSubSpotSwitcher(spot, activeTakeoff = null, activeLanding = null) {
+    const takeoffs = Array.isArray(spot?.takeoffs) ? spot.takeoffs : [];
+    const landings = Array.isArray(spot?.landings) ? spot.landings : [];
+    const resolvedTakeoff = (activeTakeoff && activeTakeoff.id)
+      ? activeTakeoff
+      : (takeoffs.find(t => t.id === this.activeTakeoffId) || takeoffs.find(t => t.isPrimary) || takeoffs[0] || null);
+    const resolvedLanding = (activeLanding && activeLanding.id)
+      ? activeLanding
+      : (landings.find(l => l.id === this.activeLandingId) || landings.find(l => l.isPrimary || l.isOfficial) || landings[0] || null);
+
+    if (!resolvedTakeoff && !resolvedLanding) return '';
+
+    const isOverview = !this.selectedSubSpot || this.selectedSubSpot === 'overview';
+    const isTakeoffActive = Boolean(!isOverview && resolvedTakeoff && this.selectedSubSpot === resolvedTakeoff.id);
+    const isLandingActive = Boolean(!isOverview && resolvedLanding && this.selectedSubSpot === resolvedLanding.id);
+
+    return `
+      <div class="gm-quick-subspot-switcher" role="tablist" aria-label="Selezione rapida vista previsioni">
+        <button
+          type="button"
+          role="tab"
+          aria-selected="${isOverview}"
+          class="gm-quick-subspot-pill ${isOverview ? 'active' : ''}"
+          data-action="select-subspot"
+          data-subspot-id="overview"
+        >
+          Panoramica
+        </button>
+        ${resolvedTakeoff ? `
+          <button
+            type="button"
+            role="tab"
+            aria-selected="${isTakeoffActive}"
+            class="gm-quick-subspot-pill ${isTakeoffActive ? 'active' : ''}"
+            data-action="select-subspot"
+            data-subspot-id="${escapeHtml(resolvedTakeoff.id)}"
+          >
+            Decollo
+          </button>
+        ` : ''}
+        ${resolvedLanding ? `
+          <button
+            type="button"
+            role="tab"
+            aria-selected="${isLandingActive}"
+            class="gm-quick-subspot-pill ${isLandingActive ? 'active' : ''}"
+            data-action="select-subspot"
+            data-subspot-id="${escapeHtml(resolvedLanding.id)}"
+          >
+            Atterraggio
+          </button>
+        ` : ''}
+      </div>
+    `;
+  }
+
+  /**
+   * Renders either a conditional inline <select> combo (when > 1 sub-spot exists for the role)
+   * or clean static text (when only 1 sub-spot exists).
+   * @param {'takeoff'|'landing'} role
+   * @param {object} currentItem
+   * @param {Array<object>} items
+   * @param {boolean} [stripRolePrefix=true]
+   * @returns {string}
+   */
+  renderInlineSubSpotControl(role, currentItem, items, stripRolePrefix = true) {
+    const isTakeoff = role === 'takeoff';
+    const defaultLabel = isTakeoff ? 'Decollo' : 'Atterraggio';
+    const prefixRegex = isTakeoff ? /^Decollo\s*/i : /^Atterraggio\s*/i;
+    const formatLabel = (rawName) => {
+      const base = rawName || defaultLabel;
+      return stripRolePrefix ? (base.replace(prefixRegex, '') || base) : base;
+    };
+
+    const list = Array.isArray(items) ? items : [];
+    const currentLabel = formatLabel(currentItem?.name);
+
+    if (list.length > 1) {
+      const actionName = isTakeoff ? 'change-active-takeoff' : 'change-active-landing';
+      const ariaLabel = isTakeoff ? 'Seleziona decollo' : 'Seleziona atterraggio';
+      return `
+        <select
+          class="gm-inline-subspot-select gm-flight-target"
+          data-action="${actionName}"
+          aria-label="${ariaLabel}"
+        >
+          ${list.map(item => {
+            const itemLabel = formatLabel(item?.name);
+            const isSelected = Boolean(currentItem && item.id === currentItem.id);
+            return `<option value="${escapeHtml(item.id)}" ${isSelected ? 'selected' : ''}>${escapeHtml(itemLabel)}</option>`;
+          }).join('')}
+        </select>
+      `;
+    }
+
+    return `<span class="gm-flight-target">${escapeHtml(currentLabel)}</span>`;
+  }
+
+  /**
    * Renders the internal metrics for the Unico Binomio Summary Card.
    * @param {object} evalData
    * @returns {string}
    */
   renderSummaryMetrics(evalData) {
+    const spot = this.getCurrentSpot() || {};
+    const takeoffs = Array.isArray(spot.takeoffs) ? spot.takeoffs : [];
+    const landings = Array.isArray(spot.landings) ? spot.landings : [];
     const takeoff = evalData.takeoff || {};
     const landing = evalData.landing || {};
     const glide = evalData.glideMetrics || { requiredGlideRatio: '-', isSafe: true };
     const weather = evalData.weatherSnapshot || {};
 
-    const takeoffName = (takeoff.name || 'Decollo').replace(/^Decollo\s*/i, '');
-    const landingName = (landing.name || 'Atterraggio').replace(/^Atterraggio\s*/i, '');
     const takeoffAlt = takeoff.altitude ? `${takeoff.altitude}m` : '-';
     const landingAlt = landing.altitude ? `${landing.altitude}m` : '-';
 
@@ -1578,6 +1745,7 @@ export class ForecastViewController {
     const windDirStr = dirVal != null ? `${getCardinalDirection(dirVal)} (${Math.round(dirVal)}°)` : '';
 
     return `
+      ${this.renderQuickSubSpotSwitcher(spot, takeoff, landing)}
       <!-- Top Row: Hour & Status Badge -->
       <div class="flex items-center justify-between border-b border-[var(--gm-border)] pb-2 mb-2">
         <div class="flex items-center gap-2">
@@ -1596,10 +1764,13 @@ export class ForecastViewController {
 
       <!-- Dual Launch/Landing Info -->
       <div class="gm-flight-data-grid">
-        <div class="gm-flight-stat-row">
+        <div
+          class="gm-flight-stat-row gm-flight-stat-row-interactive"
+          ${takeoff.id ? `data-action="select-subspot" data-subspot-id="${escapeHtml(takeoff.id)}" role="button" tabindex="0" title="Mostra previsioni decollo"` : ''}
+        >
           <div class="gm-flight-label">
             <span class="gm-flight-icon">↗</span>
-            <span class="gm-flight-target">${escapeHtml(takeoffName)}</span>
+            ${this.renderInlineSubSpotControl('takeoff', takeoff, takeoffs, true)}
             <span class="gm-flight-alt">(${takeoffAlt})</span>
           </div>
           <div class="gm-flight-data">
@@ -1608,10 +1779,13 @@ export class ForecastViewController {
           </div>
         </div>
 
-        <div class="gm-flight-stat-row">
+        <div
+          class="gm-flight-stat-row gm-flight-stat-row-interactive"
+          ${landing.id ? `data-action="select-subspot" data-subspot-id="${escapeHtml(landing.id)}" role="button" tabindex="0" title="Mostra previsioni atterraggio"` : ''}
+        >
           <div class="gm-flight-label">
             <span class="gm-flight-icon">↘</span>
-            <span class="gm-flight-target">${escapeHtml(landingName)}</span>
+            ${this.renderInlineSubSpotControl('landing', landing, landings, true)}
             <span class="gm-flight-alt">(${landingAlt})</span>
           </div>
           <div class="gm-flight-data">
@@ -1775,7 +1949,9 @@ export class ForecastViewController {
    */
   renderSpecificSpotMetrics(subSpot, evalData) {
     if (!subSpot) return this.renderSummaryMetrics(evalData);
+    const spot = this.getCurrentSpot() || {};
     const isTakeoff = subSpot.spotType === 'takeoff';
+    const roleItems = isTakeoff ? (spot.takeoffs || []) : (spot.landings || []);
     const weather = isTakeoff
       ? (evalData.takeoffWeather || evalData.weatherSnapshot || {})
       : (evalData.landingWeather || evalData.weatherSnapshot || {});
@@ -1786,9 +1962,11 @@ export class ForecastViewController {
     const windDirStr = dirVal != null ? `${getCardinalDirection(dirVal)} (${Math.round(dirVal)}°)` : '';
 
     return `
+      ${this.renderQuickSubSpotSwitcher(spot, isTakeoff ? subSpot : evalData.takeoff, !isTakeoff ? subSpot : evalData.landing)}
       <div class="flex items-center justify-between border-b border-[var(--gm-border)] pb-2 mb-2">
-        <div class="flex items-center gap-2">
-          <span class="text-sm font-bold text-[var(--gm-accent)]">${icon} ${escapeHtml(subSpot.name)}</span>
+        <div class="flex items-center gap-2 min-w-0">
+          <span class="text-sm font-bold text-[var(--gm-accent)]">${icon}</span>
+          ${this.renderInlineSubSpotControl(isTakeoff ? 'takeoff' : 'landing', subSpot, roleItems, false)}
           <span class="text-xs text-[var(--gm-text-muted)] font-mono">(${subSpot.altitude}m)</span>
         </div>
         <span class="text-xs font-mono font-bold text-[var(--gm-text-secondary)]">
@@ -3964,6 +4142,149 @@ export class ForecastViewController {
    * @returns {string}
    */
   /**
+   * Evaluates a single hourly timeline slot according to the active view context:
+   * - 'overview': combined comprensorio safety (Takeoff + Glide Cone + Landing valley breeze)
+   * - 'takeoff': strictly the selected takeoff's wind, gusts, instability, and slope alignment
+   * - 'landing': strictly the selected landing's wind, gusts, valley breeze, and approach safety
+   *
+   * @param {object} spot
+   * @param {object} weatherData
+   * @param {number} hourIndex
+   * @param {object} glider
+   * @param {object|null} [activeSubSpotObj=null]
+   * @returns {object}
+   */
+  evaluateTimelineSlot(spot, weatherData, hourIndex, glider, activeSubSpotObj = null) {
+    if (!spot) {
+      return {
+        badge: 'N/D',
+        status: 'unavailable',
+        severity: 2,
+        fillPct: 35,
+        contextLabel: 'Panoramica',
+        weatherSnapshot: {}
+      };
+    }
+
+    const effectiveTakeoffId = (activeSubSpotObj && activeSubSpotObj.spotType === 'takeoff')
+      ? activeSubSpotObj.id
+      : this.activeTakeoffId;
+    const effectiveLandingId = (activeSubSpotObj && activeSubSpotObj.spotType === 'landing')
+      ? activeSubSpotObj.id
+      : this.activeLandingId;
+
+    const baseEval = evaluateComprensorio({
+      comprensorio: spot,
+      weatherData,
+      hourIndex,
+      glider,
+      targetDate: this.activeDate,
+      takeoffId: effectiveTakeoffId,
+      landingId: effectiveLandingId
+    });
+
+    const tw = baseEval.takeoffWeather || baseEval.weatherSnapshot || {};
+    const lw = baseEval.landingWeather || baseEval.weatherSnapshot || {};
+
+    // Evaluate landing aerology specifically (isTakeoff = false)
+    const landingScore = getFlyabilityScore(
+      lw.windSpeed ?? 10,
+      lw.windGust ?? 14,
+      lw.cape ?? 100,
+      lw.turbulence ?? 0.1,
+      lw.rain ?? 0,
+      lw.windDirection ?? lw.windDir ?? 180,
+      null,
+      false,
+      glider
+    );
+    let landingSeverity = landingScore.severity;
+    let landingReason = landingScore.reason;
+
+    // Valley breeze reinforcement check at landing (aligned with Brezza di Valle parameter card)
+    if (landingSeverity === 0 && ((lw.windSpeed || 0) >= 15 || (lw.windGust || 0) >= 21)) {
+      landingSeverity = 1;
+      landingReason = 'Brezza di valle sostenuta in atterraggio';
+    }
+
+    // CASE 1: Specific Landing selected
+    if (activeSubSpotObj && activeSubSpotObj.spotType === 'landing') {
+      let severity = landingSeverity;
+      let reason = landingReason;
+      if (baseEval.glideMetrics && baseEval.glideMetrics.isSafe === false && severity === 0) {
+        severity = 1;
+        reason = baseEval.glideMetrics.warningText || 'Cono di planata marginale';
+      }
+      const status = severity === 0 ? 'flyable' : (severity === 1 ? 'caution' : 'unflyable');
+      const badge = severity === 0 ? 'Volabile' : (severity === 1 ? 'Cautela' : 'Non Volabile');
+      const lSpeed = lw.windSpeed || 0;
+      const lGust = lw.windGust || 0;
+      const fillPct = status === 'flyable'
+        ? Math.max(70, Math.min(100, Math.round(100 - Math.max(0, lSpeed - 5) * 2.2)))
+        : (status === 'caution'
+          ? Math.max(48, Math.min(68, Math.round(66 - Math.max(0, lGust - 18))))
+          : 32);
+      const shortName = (activeSubSpotObj.name || 'Atterraggio').replace(/^Atterraggio\s*/i, '');
+
+      return {
+        ...baseEval,
+        status,
+        badge,
+        severity,
+        reason,
+        fillPct,
+        contextLabel: `↘ ${shortName}`,
+        weatherSnapshot: lw
+      };
+    }
+
+    // CASE 2: Specific Takeoff selected
+    if (activeSubSpotObj && activeSubSpotObj.spotType === 'takeoff') {
+      const takeoffEval = baseEval.bestTakeoffEval || {};
+      const severity = takeoffEval.severity ?? (baseEval.status === 'flyable' ? 0 : (baseEval.status === 'caution' ? 1 : 2));
+      const status = severity === 0 ? 'flyable' : (severity === 1 ? 'caution' : 'unflyable');
+      const badge = severity === 0 ? 'Volabile' : (severity === 1 ? 'Cautela' : 'Non Volabile');
+      const diffFromFront = takeoffEval.diffFromFront || 0;
+      const tSpeed = tw.windSpeed || 0;
+      const fillPct = status === 'flyable'
+        ? Math.max(74, Math.min(100, Math.round(100 - diffFromFront * 0.35 - Math.abs(tSpeed - 11) * 1.3)))
+        : (status === 'caution'
+          ? Math.max(50, Math.min(68, Math.round(65 - diffFromFront * 0.15)))
+          : 35);
+      const shortName = (activeSubSpotObj.name || 'Decollo').replace(/^Decollo\s*/i, '');
+
+      return {
+        ...baseEval,
+        status,
+        badge,
+        severity,
+        reason: takeoffEval.reason || baseEval.reason,
+        fillPct,
+        contextLabel: `↗ ${shortName}`,
+        weatherSnapshot: tw
+      };
+    }
+
+    // CASE 3: Overview (Panoramica) — Combined Takeoff + Glide Cone + Landing safety
+    const baseSeverity = baseEval.status === 'flyable' ? 0 : (baseEval.status === 'caution' ? 1 : 2);
+    const combinedSeverity = Math.max(baseSeverity, landingSeverity);
+    const status = combinedSeverity === 0 ? 'flyable' : (combinedSeverity === 1 ? 'caution' : 'unflyable');
+    const badge = combinedSeverity === 0 ? 'Volabile' : (combinedSeverity === 1 ? 'Cautela' : 'Non Volabile');
+    const reason = combinedSeverity > baseSeverity ? landingReason : baseEval.reason;
+    const fillPct = status === 'flyable' ? 100 : (status === 'caution' ? 65 : 35);
+
+    return {
+      ...baseEval,
+      status,
+      badge,
+      severity: combinedSeverity,
+      reason,
+      fillPct,
+      contextLabel: 'Panoramica'
+    };
+  }
+
+  /**
    * Renders the 13-slot hourly flyability timeline grid (08:00 - 20:00).
    * Shared between the bottom docked scrubber and the flight analysis overlay.
    * 
@@ -3980,21 +4301,11 @@ export class ForecastViewController {
     const currentHour = now.getHours();
 
     const activeSub = this.resolveActiveSubSpot(spot);
-    const effectiveTakeoffId = (activeSub && activeSub.spotType === 'takeoff') ? activeSub.id : this.activeTakeoffId;
-    const effectiveLandingId = (activeSub && activeSub.spotType === 'landing') ? activeSub.id : this.activeLandingId;
 
     const daylight = this.getDaylightWindow(spot, weatherData, this.activeDate);
     const hours = [];
     for (let h = daylight.sunriseHour; h <= daylight.sunsetHour; h++) {
-      const evalHour = evaluateComprensorio({
-        comprensorio: spot,
-        weatherData,
-        hourIndex: h,
-        glider,
-        targetDate: this.activeDate,
-        takeoffId: effectiveTakeoffId,
-        landingId: effectiveLandingId
-      });
+      const evalHour = this.evaluateTimelineSlot(spot, weatherData, h, glider, activeSub);
       hours.push({
         hour: h,
         eval: evalHour,
@@ -4004,23 +4315,25 @@ export class ForecastViewController {
       });
     }
 
+    const activeModeAttr = activeSub ? activeSub.spotType : 'overview';
+
     return `
-      <div id="${stripId}" class="gm-timeline-grid-13" style="--gm-timeline-slots: ${hours.length}; grid-template-columns: repeat(${hours.length}, 1fr);" role="tablist" aria-label="Timeline oraria">
+      <div id="${stripId}" data-timeline-context="${activeModeAttr}" class="gm-timeline-grid-13" style="--gm-timeline-slots: ${hours.length}; grid-template-columns: repeat(${hours.length}, 1fr);" role="tablist" aria-label="Timeline oraria">
         ${hours.map(slot => {
           const h = slot.hour;
           const evalH = slot.eval;
           const weather = evalH.weatherSnapshot || {};
           const speed = Math.round(weather.windSpeed || 0);
 
-          let fillPct = 35;
+          let fillPct = evalH.fillPct ?? 35;
           let fillColor = 'var(--gm-status-unflyable)';
           let slotBgColor = 'var(--gm-status-unflyable-bg)';
           if (evalH.status === 'flyable') {
-            fillPct = 100;
+            fillPct = evalH.fillPct ?? 100;
             fillColor = 'var(--gm-status-flyable)';
             slotBgColor = 'var(--gm-status-flyable-bg)';
           } else if (evalH.status === 'caution') {
-            fillPct = 65;
+            fillPct = evalH.fillPct ?? 65;
             fillColor = 'var(--gm-status-caution)';
             slotBgColor = 'var(--gm-status-caution-bg)';
           }
@@ -4039,7 +4352,7 @@ export class ForecastViewController {
               data-hour="${h}"
               role="tab"
               aria-selected="${slot.isActive ? 'true' : 'false'}"
-              aria-label="Ore ${String(h).padStart(2, '0')}:00, ${evalH.badge}, Vento ${speed} km/h${slot.isCurrentHour ? ' (Ora attuale)' : ''}"
+              aria-label="Ore ${String(h).padStart(2, '0')}:00, ${evalH.contextLabel ? `${evalH.contextLabel}: ` : ''}${evalH.badge}, Vento ${speed} km/h${slot.isCurrentHour ? ' (Ora attuale)' : ''}"
               tabindex="${slot.isActive ? '0' : '-1'}"
             >
               ${slot.isCurrentHour ? '<span class="compact-now-badge" aria-label="Ora attuale">ORA</span>' : ''}
@@ -4063,19 +4376,9 @@ export class ForecastViewController {
    */
   renderStickyScrubber(spot, weatherData, glider) {
     const activeSub = this.resolveActiveSubSpot(spot);
-    const effectiveTakeoffId = (activeSub && activeSub.spotType === 'takeoff') ? activeSub.id : this.activeTakeoffId;
-    const effectiveLandingId = (activeSub && activeSub.spotType === 'landing') ? activeSub.id : this.activeLandingId;
-
-    const evalCurrent = spot ? evaluateComprensorio({
-      comprensorio: spot,
-      weatherData,
-      hourIndex: this.selectedHour,
-      glider,
-      targetDate: this.activeDate,
-      takeoffId: effectiveTakeoffId,
-      landingId: effectiveLandingId
-    }) : { badge: 'N/D', status: 'unavailable' };
+    const evalCurrent = this.evaluateTimelineSlot(spot, weatherData, this.selectedHour, glider, activeSub);
     const statusColor = (STATUS_COLORS && STATUS_COLORS[evalCurrent?.status]?.fill) || 'var(--gm-text-secondary)';
+    const contextText = evalCurrent?.contextLabel ? ` · ${evalCurrent.contextLabel}` : '';
 
     return `
       <aside 
@@ -4087,7 +4390,7 @@ export class ForecastViewController {
           <div class="gm-map-scrubber-title-group">
             <span class="gm-map-scrubber-title">Timeline Volabilità</span>
             <span id="forecast-scrubber-spot-pill" class="gm-map-scrubber-spot-pill" style="color: ${statusColor};">
-              ${spot?.name || 'Località'} (${evalCurrent?.badge || 'N/D'})
+              ${spot?.name || 'Località'}${contextText} (${evalCurrent?.badge || 'N/D'})
             </span>
           </div>
           <div class="gm-map-scrubber-hour-display">
@@ -4479,29 +4782,33 @@ export class ForecastViewController {
 
   /**
    * Opens the accessible bottom sheet to select any date within the forecast horizon (up to 14 days).
+   * Uses a compact 7-column Monday-Sunday 2-week grid with 4-color semantic flyability indicators.
    */
   openDatePickerSheet() {
     const today = new Date();
-    const minDate = formatDateIso(today);
-    const maxDate = formatDateIso(new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000));
     const spot = this.getCurrentSpot();
     const flySummaries = this.getMultiDayFlyability(spot, 14);
     const availableDates = getAvailableCalendarDates(today, 14, flySummaries);
+    const leadingSpacers = availableDates.length > 0 ? (availableDates[0].weekdayIndexMonday || 0) : 0;
 
     const renderContent = () => `
-      <div class="gm-date-picker-sheet flex flex-col gap-4">
-        <!-- 14-Day Fast Tap Grid (Hero Primary Action) -->
+      <div class="gm-date-picker-sheet flex flex-col gap-3">
+        <!-- 14-Day 7-Column Calendar Grid (Mon-Sun) -->
         <div class="gm-date-sheet-section">
           <span class="text-xs font-bold uppercase tracking-wider text-[var(--gm-text-muted)] block mb-2">
             Calendario Previsioni (Prossimi 14 Giorni)
           </span>
+          <div class="gm-date-weekday-header" aria-hidden="true">
+            ${WEEKDAY_HEADERS_MON.map(w => `<span>${w}</span>`).join('')}
+          </div>
           <div class="gm-date-grid">
+            ${Array.from({ length: leadingSpacers }, () => `<span class="gm-date-grid-spacer" aria-hidden="true"></span>`).join('')}
             ${availableDates.map(d => {
               const isSelected = d.isoDate === this.activeDate;
               return `
                 <button 
                   type="button" 
-                  class="gm-date-grid-item ${isSelected ? 'active' : ''} ${d.isWeekend ? 'weekend' : ''} fly-${d.flyability.status}"
+                  class="gm-date-grid-item ${isSelected ? 'active' : ''} ${d.isToday ? 'today' : ''} ${d.isWeekend ? 'weekend' : ''} fly-${d.flyability.status}"
                   data-action="pick-calendar-date"
                   data-date="${d.isoDate}"
                   aria-selected="${isSelected ? 'true' : 'false'}"
@@ -4509,7 +4816,7 @@ export class ForecastViewController {
                 >
                   <span class="grid-day-name">${escapeHtml(d.dayName)}</span>
                   <span class="grid-day-number">${d.dayNumber}</span>
-                  <span class="grid-month">${escapeHtml(d.formatted.split(' ')[1])}</span>
+                  <span class="grid-month">${escapeHtml(d.shortMonth || d.formatted.split(' ')[1])}</span>
 
                   <span class="grid-fly-status ${d.flyability.badgeClass}" title="${escapeHtml(d.flyability.label)}">
                     <span class="grid-fly-icon" aria-hidden="true">${d.flyability.icon}</span>
@@ -4530,56 +4837,13 @@ export class ForecastViewController {
             <span class="flex items-center gap-1"><span class="text-[#f87171]">⚡</span> Severo</span>
           </div>
         </div>
-
-        <!-- Secondary Native Input -->
-        <div class="gm-form-field pt-2 border-t border-[var(--gm-border)]">
-          <label for="custom-date-native-input" class="gm-form-label font-bold text-xs uppercase tracking-wider text-[var(--gm-text-muted)] block mb-1">
-            Oppure specifica altra data:
-          </label>
-          <div class="flex items-center gap-2">
-            <input 
-              type="date" 
-              id="custom-date-native-input" 
-              class="gm-form-control flex-1 font-mono text-sm" 
-              min="${minDate}" 
-              max="${maxDate}" 
-              value="${this.activeDate}" 
-              aria-label="Data personalizzata"
-            />
-            <button 
-              type="button" 
-              class="gm-btn gm-btn-primary px-3 py-2 font-bold text-xs" 
-              data-action="apply-custom-date"
-            >
-              Conferma
-            </button>
-          </div>
-        </div>
       </div>
     `;
 
     openSheet({
       id: 'date-picker-sheet',
       title: 'Seleziona Data di Volo',
-      content: renderContent(),
-      onOpen: () => {
-        if (typeof document !== 'undefined') {
-          const input = document.getElementById('custom-date-native-input');
-          if (input) {
-            input.addEventListener('change', (e) => {
-              const val = e.target.value;
-              if (val) {
-                this.activeDate = val;
-                if (this.store) {
-                  this.store.setState({ activeDate: val });
-                }
-                closeSheet();
-                this.render();
-              }
-            });
-          }
-        }
-      }
+      content: renderContent()
     });
   }
 
@@ -4723,14 +4987,16 @@ export class ForecastViewController {
     }
 
     // 6. Update scrubber header labels in place if present
+    const slotEval = this.evaluateTimelineSlot(spot, weatherData, hour, glider, activeSubSpotObj);
+    const contextText = slotEval?.contextLabel ? ` · ${slotEval.contextLabel}` : '';
     const forecastHourLabel = this.containerEl?.querySelector('#forecast-active-hour-label');
     if (forecastHourLabel) {
       forecastHourLabel.textContent = `Ore ${String(hour).padStart(2, '0')}:00`;
     }
     const forecastSpotPill = this.containerEl?.querySelector('#forecast-scrubber-spot-pill');
     if (forecastSpotPill) {
-      forecastSpotPill.textContent = `${spot?.name || 'Località'} (${evaluated.badge})`;
-      forecastSpotPill.style.color = (STATUS_COLORS && STATUS_COLORS[evaluated.status]?.fill) || 'var(--gm-text-secondary)';
+      forecastSpotPill.textContent = `${spot?.name || 'Località'}${contextText} (${slotEval.badge})`;
+      forecastSpotPill.style.color = (STATUS_COLORS && STATUS_COLORS[slotEval.status]?.fill) || 'var(--gm-text-secondary)';
     }
 
     const faHourLabel = this.flightAnalysisOverlayEl?.querySelector('#flight-analysis-active-hour-label');
@@ -4739,8 +5005,8 @@ export class ForecastViewController {
     }
     const faSpotPill = this.flightAnalysisOverlayEl?.querySelector('#flight-analysis-scrubber-spot-pill');
     if (faSpotPill) {
-      faSpotPill.textContent = `${spot?.name || 'Comprensorio'} (${evaluated.badge})`;
-      faSpotPill.style.color = (STATUS_COLORS && STATUS_COLORS[evaluated.status]?.fill) || 'var(--gm-text-secondary)';
+      faSpotPill.textContent = `${spot?.name || 'Comprensorio'}${contextText} (${slotEval.badge})`;
+      faSpotPill.style.color = (STATUS_COLORS && STATUS_COLORS[slotEval.status]?.fill) || 'var(--gm-text-secondary)';
     }
 
     // 7. Update Flight Analysis Overlay if open
@@ -5004,8 +5270,12 @@ export class ForecastViewController {
           if (this.store) this.store.setState({ activeLandingId: subSpotId });
         }
         if (subSpotId === 'overview') {
-          this.activeTakeoffId = spot.takeoffs?.find(t => t.isPrimary)?.id || spot.takeoffs?.[0]?.id || null;
-          this.activeLandingId = spot.landings?.find(l => l.isPrimary || l.isOfficial)?.id || spot.landings?.[0]?.id || null;
+          if (!this.activeTakeoffId || !spot.takeoffs?.some(t => t.id === this.activeTakeoffId)) {
+            this.activeTakeoffId = spot.takeoffs?.find(t => t.isPrimary)?.id || spot.takeoffs?.[0]?.id || null;
+          }
+          if (!this.activeLandingId || !spot.landings?.some(l => l.id === this.activeLandingId)) {
+            this.activeLandingId = spot.landings?.find(l => l.isPrimary || l.isOfficial)?.id || spot.landings?.[0]?.id || null;
+          }
           if (this.store) this.store.setState({ activeTakeoffId: this.activeTakeoffId, activeLandingId: this.activeLandingId });
         }
       }
@@ -5156,7 +5426,10 @@ export class ForecastViewController {
           this.render();
         }
       }
-    } else if (action === 'select-date') {
+    } else if (action === 'select-date' || action === 'prev-date' || action === 'next-date') {
+      if ((action === 'prev-date' || action === 'next-date') && (actionEl.disabled || actionEl.getAttribute('aria-disabled') === 'true')) {
+        return;
+      }
       const dateAttr = actionEl.getAttribute('data-date');
       if (dateAttr) {
         if (dateAttr === this.activeDate) return;
@@ -5170,22 +5443,6 @@ export class ForecastViewController {
       }
     } else if (action === 'open-date-picker-sheet') {
       this.openDatePickerSheet();
-    } else if (action === 'apply-custom-date') {
-      const input = document.getElementById('custom-date-native-input');
-      if (input && input.value) {
-        if (input.value === this.activeDate) {
-          closeSheet();
-          return;
-        }
-        this.activeDate = input.value;
-        this.selectedHour = this._resolveInitialHour(this.activeDate);
-        if (this.store) {
-          this.store.setState({ activeDate: input.value });
-        }
-        closeSheet();
-        this.render();
-        this.fetchWeatherDataAsync(this.getCurrentSpot(), this.activeDate);
-      }
     } else if (action === 'pick-calendar-date') {
       const dateAttr = actionEl.getAttribute('data-date');
       if (dateAttr) {
@@ -5327,7 +5584,42 @@ export class ForecastViewController {
   handleChange(evt) {
     const target = evt.target;
     if (!target) return;
-    if (target.id === 'forecast-spot-select') {
+    const action = typeof target.getAttribute === 'function' ? target.getAttribute('data-action') : null;
+
+    if (action === 'change-active-takeoff') {
+      const takeoffId = target.value;
+      const spot = this.getCurrentSpot();
+      if (takeoffId && takeoffId !== this.activeTakeoffId) {
+        this.activeTakeoffId = takeoffId;
+        if (this.selectedSubSpot && this.selectedSubSpot !== 'overview') {
+          const isInTakeoffView = spot?.takeoffs?.some(t => t.id === this.selectedSubSpot);
+          if (isInTakeoffView) {
+            this.selectedSubSpot = takeoffId;
+          }
+        }
+        if (this.store) {
+          this.store.setState({ activeTakeoffId: takeoffId });
+        }
+        this.render();
+        this.fetchWeatherDataAsync(spot, this.activeDate);
+      }
+    } else if (action === 'change-active-landing') {
+      const landingId = target.value;
+      const spot = this.getCurrentSpot();
+      if (landingId && landingId !== this.activeLandingId) {
+        this.activeLandingId = landingId;
+        if (this.selectedSubSpot && this.selectedSubSpot !== 'overview') {
+          const isInLandingView = spot?.landings?.some(l => l.id === this.selectedSubSpot);
+          if (isInLandingView) {
+            this.selectedSubSpot = landingId;
+          }
+        }
+        if (this.store) {
+          this.store.setState({ activeLandingId: landingId });
+        }
+        this.render();
+      }
+    } else if (target.id === 'forecast-spot-select') {
       const spot = this.comprensoriCatalog.find(c => c.id === target.value);
       if (spot) {
         this.activeTakeoffId = spot.takeoffs?.find(t => t.isPrimary)?.id || spot.takeoffs?.[0]?.id || null;

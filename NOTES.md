@@ -6,14 +6,6 @@ Buffer di cattura rapida a zero cambio di contesto (`/take-note`). Le osservazio
 
 ## 📥 Da Analizzare (Open)
 
-### [NOTE-002] Selezione rapida decollo/atterraggio e combo per spot multipli in Previsioni
-- **Stato**: `📥 Da Analizzare`
-- **Data Cattura**: 2026-10-15 19:44
-- **Lavorazione Attiva al Momento della Nota**: Nessun task `🟡 In Lavorazione` in `DESIDERATA.md`
-- **Ambito Presunto**: `ForecastView` (Selettore sub-spot decollo/atterraggio)
-- **Testo Originale**:
-  > Nella pagina delle previsioni invece vorrei una selezione rapida delle previsioni del decollo o attarraggio mostrati e se c'è più di uno spot disponibilie per decollo o atterraggio la possibilità di selezionarne un'altro (magari una combo per al posto del nome dello spot risolverebbe il problema)
-
 ### [NOTE-003] Revisione semantica pill "Live" solo sullo spot e pagina esplicita dati in tempo reale
 - **Stato**: `📥 Da Analizzare`
 - **Data Cattura**: 2026-10-15 19:44
@@ -46,3 +38,9 @@ Buffer di cattura rapida a zero cambio di contesto (`/take-note`). Le osservazio
 - **Stato**: `✅ Consolidata & Implementata`
 - **Data Cattura**: 2026-10-15 19:44
 - **Risoluzione**: Implementato in [`HomeDashboardView.js`](file:///c:/github/GlideMind/ui/views/HomeDashboardView.js) (`buildDeterminantReasonPills`, `data-action="toggle-spot-reasons"`, `.gm-spot-reasons-drawer` e `.gm-reason-pill`): rimossa la micro-causa troncata dall'header e introdotta l'espansione a 1-tap sul badge di stato che rivela i pills espressivi dei fattori determinanti (finestra volabile, pioggia, vento/raffiche, direzione/esposizione, turbolenza/CAPE, cono di rientro, margine pilota).
+
+### [NOTE-002] Selezione rapida decollo/atterraggio e combo per spot multipli in Previsioni
+- **Stato**: `✅ Consolidata & Implementata`
+- **Data Cattura**: 2026-10-15 19:44
+- **Risoluzione**: Implementato in [`ForecastView.js`](file:///c:/github/GlideMind/ui/views/ForecastView.js) (`renderQuickSubSpotSwitcher`, `renderInlineSubSpotControl`, `handleChange` con `change-active-takeoff` / `change-active-landing`) e [`css/theme.css`](file:///c:/github/GlideMind/css/theme.css) (`.gm-quick-subspot-switcher`, `.gm-quick-subspot-pill`, `.gm-inline-subspot-select`): introdotto il selettore rapido a 1-tap (`Panoramica | Decollo | Atterraggio`) nella card di sintesi/dettaglio spot e la combo inline `<select>` condizionale al posto del nome statico quando il comprensorio dispone di più decolli (`takeoffs.length > 1`) o più atterraggi (`landings.length > 1`), preservando il binomio selezionato nel passaggio tra viste.
+

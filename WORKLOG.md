@@ -1914,3 +1914,27 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Compressa verticalmente `.gm-flight-card` (`padding: 8px 12px; gap: 4px;`, deduplicata in [`css/theme.css`](file:///css/theme.css)) con supporto esplicito a `+0 m` e conteggio `thermalsCount`.
   - Aggiornati e validati i test in [`tests/ui/logbookView.test.mjs`](file:///tests/ui/logbookView.test.mjs) e [`tests/ui/logbookFlightDetailInteraction.test.mjs`](file:///tests/ui/logbookFlightDetailInteraction.test.mjs) (77/77 test logbook/detail/governance superati).
 
+---
+
+## 2026-10-16 - Fase 4: Selezione Rapida Previsioni Decollo/Atterraggio, Combo Inline e Timeline Contestuale (`[NOTE-002]`)
+- **Tipo**: Ergonomia UX / Previsioni Meteo / 1-Tap Sub-Spot Navigation & Reactive Timeline
+- **Dettagli**: [.agents/worklog.d/2026-10-16_forecast-quick-subspot-switcher-and-combo.md](file:///.agents/worklog.d/2026-10-16_forecast-quick-subspot-switcher-and-combo.md)
+- **Sintesi**:
+  - Implementato in [`ui/views/ForecastView.js`](file:///ui/views/ForecastView.js) il selettore rapido a 1-tap `.gm-quick-subspot-switcher` (`Panoramica | Decollo | Atterraggio`) e le righe interattive `.gm-flight-stat-row-interactive` dentro `#forecast-spot-metrics-container`, consentendo di commutare istantaneamente tra panoramica del comprensorio e previsioni micro-aerologiche del decollo o dell'atterraggio senza aprire il bottom sheet.
+  - Implementata la combo inline condizionale `.gm-inline-subspot-select` (`renderInlineSubSpotControl`, `data-action="change-active-takeoff|change-active-landing"`) al posto del nome statico dello spot quando il comprensorio dispone di più decolli (`takeoffs.length > 1`) o più atterraggi (`landings.length > 1`), preservando il binomio selezionato anche tornando in `Panoramica`.
+  - Resa reattiva la timeline oraria (`#forecast-timeline-strip`, `#forecast-scrubber-spot-pill` in `renderTimelineGrid`, `renderStickyScrubber` e `setHour`) tramite `evaluateTimelineSlot` e disambiguazione della chiave `weatherCache` per `takeoffId`/`landingId`, differenziando stato, altezza barre e pillola di contesto tra `Panoramica`, `↗ <Decollo>` e `↘ <Atterraggio>`.
+  - Aggiunti gli stili dual-theme in [`css/theme.css`](file:///css/theme.css) e i test unitari/integrazione in [`tests/ui/forecastView.test.mjs`](file:///tests/ui/forecastView.test.mjs) (100/100 test verdi tra `forecastView.test.mjs`, `offlineWeatherUX.test.mjs` e `uiIntegrityAudit.test.mjs`).
+  - Consolidata `[NOTE-002]` in [NOTES.md](file:///NOTES.md) e registrata la Lezione Appresa #173 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-16 - Fase 4: Riprogettazione Date Picker Compatto con Stepper Prev/Next e Calendario a 7 Colonne
+- **Tipo**: Ergonomia UX / Outdoor HMI / Navigazione Temporale
+- **Dettagli**: [.agents/worklog.d/2026-10-16_compact-date-picker-stepper-and-calendar.md](file:///.agents/worklog.d/2026-10-16_compact-date-picker-stepper-and-calendar.md)
+- **Sintesi**:
+  - Esteso [`core/datePresets.js`](file:///core/datePresets.js) con metadati di navigazione sequenziale (`prevDate`, `nextDate`, `canPrev`, `canNext`, `activeDisplayLabel`, `quickPresets`, `shortLabel`) e allineamento settimanale Lun–Dom (`weekdayIndexMonday`, `WEEKDAY_HEADERS_MON`).
+  - Riprogettata la barra della data in [`ui/views/HomeDashboardView.js`](file:///ui/views/HomeDashboardView.js), [`ui/views/ForecastView.js`](file:///ui/views/ForecastView.js) e [`ui/views/SpotMapView.js`](file:///ui/views/SpotMapView.js) su una singola riga compatta (`36px` visivi, touch target $\ge 48\text{px}$ via `::before`) con **Stepper integrato** (`[‹] [📅 Data Attiva ▾] [›]`) affiancato da **Quick Chips monoriga** (`Oggi`, `Dom`, `Sab`, `Dom`).
+  - Riprogettato il bottom sheet del calendario (`openDatePickerSheet`) come griglia compatta a **7 colonne (`Lun–Dom`, 2 settimane)** con indicatori semantici a 4 colori e rimozione del blocco `<input type="date">` nativo ridondante.
+  - Aggiornati e validati i test in [`tests/core/datePresets.test.mjs`](file:///tests/core/datePresets.test.mjs), [`tests/ui/homeDashboardView.test.mjs`](file:///tests/ui/homeDashboardView.test.mjs), [`tests/ui/forecastView.test.mjs`](file:///tests/ui/forecastView.test.mjs) e [`tests/ui/spotMapView.test.mjs`](file:///tests/ui/spotMapView.test.mjs) (157/157 test verdi).
+  - Registrata la Lezione Appresa #174 in [MEMORY.md](file:///MEMORY.md).
+

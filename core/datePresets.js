@@ -175,6 +175,7 @@ export function getSmartDatePresets(refDate = new Date(), activeDateIso = null, 
     presets.push({
       isoDate: todayIso,
       label: 'Oggi',
+      shortLabel: 'Oggi',
       subLabel: formatShortDate(ref),
       isToday: true,
       isWeekend: false
@@ -183,6 +184,7 @@ export function getSmartDatePresets(refDate = new Date(), activeDateIso = null, 
     presets.push({
       isoDate: formatDateIso(tomorrowDate),
       label: 'Domani',
+      shortLabel: 'Dom',
       subLabel: formatShortDate(tomorrowDate),
       isToday: false,
       isWeekend: false
@@ -191,6 +193,7 @@ export function getSmartDatePresets(refDate = new Date(), activeDateIso = null, 
     presets.push({
       isoDate: formatDateIso(satDate),
       label: 'Sabato',
+      shortLabel: 'Sab',
       subLabel: formatShortDate(satDate),
       isToday: false,
       isWeekend: true
@@ -199,6 +202,7 @@ export function getSmartDatePresets(refDate = new Date(), activeDateIso = null, 
     presets.push({
       isoDate: formatDateIso(sunDate),
       label: 'Domenica',
+      shortLabel: 'Dom',
       subLabel: formatShortDate(sunDate),
       isToday: false,
       isWeekend: true
@@ -211,6 +215,7 @@ export function getSmartDatePresets(refDate = new Date(), activeDateIso = null, 
     presets.push({
       isoDate: todayIso,
       label: 'Oggi',
+      shortLabel: 'Oggi',
       subLabel: formatShortDate(ref),
       isToday: true,
       isWeekend: false
@@ -219,6 +224,7 @@ export function getSmartDatePresets(refDate = new Date(), activeDateIso = null, 
     presets.push({
       isoDate: formatDateIso(satDate),
       label: 'Sabato',
+      shortLabel: 'Sab',
       subLabel: formatShortDate(satDate),
       isToday: false,
       isWeekend: true
@@ -227,6 +233,7 @@ export function getSmartDatePresets(refDate = new Date(), activeDateIso = null, 
     presets.push({
       isoDate: formatDateIso(sunDate),
       label: 'Domenica',
+      shortLabel: 'Dom',
       subLabel: formatShortDate(sunDate),
       isToday: false,
       isWeekend: true
@@ -239,6 +246,7 @@ export function getSmartDatePresets(refDate = new Date(), activeDateIso = null, 
     presets.push({
       isoDate: todayIso,
       label: 'Oggi',
+      shortLabel: 'Oggi',
       subLabel: formatShortDate(ref),
       isToday: true,
       isWeekend: true
@@ -247,6 +255,7 @@ export function getSmartDatePresets(refDate = new Date(), activeDateIso = null, 
     presets.push({
       isoDate: formatDateIso(sunDate),
       label: 'Domani',
+      shortLabel: 'Dom',
       subLabel: formatShortDate(sunDate),
       isToday: false,
       isWeekend: true
@@ -255,6 +264,7 @@ export function getSmartDatePresets(refDate = new Date(), activeDateIso = null, 
     presets.push({
       isoDate: formatDateIso(nextSatDate),
       label: 'Sabato',
+      shortLabel: 'Sab',
       subLabel: formatShortDate(nextSatDate),
       isToday: false,
       isWeekend: true
@@ -267,6 +277,7 @@ export function getSmartDatePresets(refDate = new Date(), activeDateIso = null, 
     presets.push({
       isoDate: todayIso,
       label: 'Oggi',
+      shortLabel: 'Oggi',
       subLabel: formatShortDate(ref),
       isToday: true,
       isWeekend: true
@@ -275,6 +286,7 @@ export function getSmartDatePresets(refDate = new Date(), activeDateIso = null, 
     presets.push({
       isoDate: formatDateIso(tomorrowDate),
       label: 'Domani',
+      shortLabel: 'Dom',
       subLabel: formatShortDate(tomorrowDate),
       isToday: false,
       isWeekend: false
@@ -283,6 +295,7 @@ export function getSmartDatePresets(refDate = new Date(), activeDateIso = null, 
     presets.push({
       isoDate: formatDateIso(nextSatDate),
       label: 'Sabato',
+      shortLabel: 'Sab',
       subLabel: formatShortDate(nextSatDate),
       isToday: false,
       isWeekend: true
@@ -294,11 +307,12 @@ export function getSmartDatePresets(refDate = new Date(), activeDateIso = null, 
   let isCustomActive = false;
 
   if (matchedIndex === -1) {
-    // Custom active date chosen by user via calendar picker
+    // Custom active date chosen by user via calendar picker or stepper
     const customDate = parseDateIso(activeIso);
     presets.push({
       isoDate: activeIso,
       label: formatShortDate(customDate),
+      shortLabel: formatShortDate(customDate),
       subLabel: getDayName(customDate, true),
       isToday: activeIso === todayIso,
       isWeekend: customDate.getDay() === 0 || customDate.getDay() === 6,
@@ -323,9 +337,34 @@ export function getSmartDatePresets(refDate = new Date(), activeDateIso = null, 
   const dayOffset = diffDaysIso(todayIso, activeIso);
   const activeHorizon = classifyForecastHorizon(dayOffset);
 
+  const activeDateObj = parseDateIso(activeIso);
+  const activeFormatted = formatShortDate(activeDateObj);
+  const activeDayShort = getDayName(activeDateObj, true);
+  let activeDisplayLabel = `${activeDayShort} ${activeFormatted}`;
+  if (activeIso === todayIso) {
+    activeDisplayLabel = `Oggi · ${activeFormatted}`;
+  } else if (dayOffset === 1) {
+    activeDisplayLabel = `Dom · ${activeFormatted}`;
+  }
+
+  const prevDate = formatDateIso(addDays(activeDateObj, -1));
+  const nextDate = formatDateIso(addDays(activeDateObj, 1));
+  const canPrev = dayOffset > 0;
+  const canNext = dayOffset < 13;
+  const activeFlyability = map && map[activeIso] ? normalizeDateFlyability(map[activeIso]) : null;
+
   return {
     presets: finalPresets,
+    quickPresets: finalPresets.filter(p => !p.isCustom),
     activeDate: activeIso,
+    activeFormatted,
+    activeDayShort,
+    activeDisplayLabel,
+    activeFlyability,
+    prevDate,
+    nextDate,
+    canPrev,
+    canNext,
     activeHorizon,
     isCustomActive
   };
@@ -499,6 +538,12 @@ export function attachFlyabilityToCalendarDates(calendarDates, flyabilityMap = n
 }
 
 /**
+ * Monday-first Italian short weekday headers for 7-column calendar grids.
+ * @type {Array<string>}
+ */
+export const WEEKDAY_HEADERS_MON = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
+
+/**
  * Generates an array of available calendar dates for picker sheets up to maxDays in the future,
  * optionally enriched with daily flyability evaluations.
  * @param {Date|string} [refDate=new Date()]
@@ -507,8 +552,11 @@ export function attachFlyabilityToCalendarDates(calendarDates, flyabilityMap = n
  * @returns {Array<{
  *   isoDate: string,
  *   formatted: string,
+ *   shortMonth: string,
  *   dayName: string,
  *   dayNumber: number,
+ *   weekdayIndexMonday: number,
+ *   isToday: boolean,
  *   isWeekend: boolean,
  *   horizon: { level: string, label: string, isSynoptic: boolean },
  *   flyability: {
@@ -536,14 +584,19 @@ export function getAvailableCalendarDates(refDate = new Date(), maxDays = 14, fl
   for (let i = 0; i < maxDays; i++) {
     const d = addDays(ref, i);
     const dayOfWeek = d.getDay();
+    const weekdayIndexMonday = (dayOfWeek + 6) % 7;
     const iso = formatDateIso(d);
+    const formatted = formatShortDate(d);
     const fly = map[iso] || null;
 
     list.push({
       isoDate: iso,
-      formatted: formatShortDate(d),
+      formatted,
+      shortMonth: formatted.split(' ')[1] || '',
       dayName: getDayName(d, true),
       dayNumber: d.getDate(),
+      weekdayIndexMonday,
+      isToday: i === 0,
       isWeekend: dayOfWeek === 0 || dayOfWeek === 6,
       horizon: classifyForecastHorizon(i),
       flyability: normalizeDateFlyability(fly)
@@ -551,3 +604,4 @@ export function getAvailableCalendarDates(refDate = new Date(), maxDays = 14, fl
   }
   return list;
 }
+

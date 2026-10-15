@@ -286,4 +286,48 @@ describe('GlideMind Phase 4 - Smart Date Selector & Calendar Presets Engine', ()
     assert.equal(smart.presets[1].flyability.status, 'caution');
     assert.equal(smart.presets[1].flyability.label, 'Cautela');
   });
+
+  it('should compute prevDate, nextDate, canPrev, canNext, activeDisplayLabel, and quickPresets for compact stepper', () => {
+    // Today active (dayOffset = 0): canPrev = false, canNext = true
+    const onToday = getSmartDatePresets('2026-10-09', '2026-10-09');
+    assert.equal(onToday.canPrev, false);
+    assert.equal(onToday.canNext, true);
+    assert.equal(onToday.prevDate, '2026-10-08');
+    assert.equal(onToday.nextDate, '2026-10-10');
+    assert.equal(onToday.activeDisplayLabel, 'Oggi · 9 Ott');
+    assert.equal(onToday.quickPresets.length, 3);
+    assert.equal(onToday.quickPresets[0].shortLabel, 'Oggi');
+    assert.equal(onToday.quickPresets[1].shortLabel, 'Sab');
+
+    // Tomorrow active (dayOffset = 1): canPrev = true, canNext = true
+    const onTomorrow = getSmartDatePresets('2026-10-09', '2026-10-10');
+    assert.equal(onTomorrow.canPrev, true);
+    assert.equal(onTomorrow.canNext, true);
+    assert.equal(onTomorrow.prevDate, '2026-10-09');
+    assert.equal(onTomorrow.nextDate, '2026-10-11');
+    assert.equal(onTomorrow.activeDisplayLabel, 'Dom · 10 Ott');
+
+    // Custom date active (dayOffset = 5): quickPresets stays compact without adding 5th chip
+    const onCustom = getSmartDatePresets('2026-10-07', '2026-10-14');
+    assert.equal(onCustom.presets.length, 5);
+    assert.equal(onCustom.quickPresets.length, 4);
+    assert.equal(onCustom.activeDisplayLabel, 'Mer 14 Ott');
+
+    // Max horizon active (dayOffset = 13): canPrev = true, canNext = false
+    const onMax = getSmartDatePresets('2026-10-09', '2026-10-22');
+    assert.equal(onMax.canPrev, true);
+    assert.equal(onMax.canNext, false);
+  });
+
+  it('should compute Monday-aligned weekdayIndexMonday (0=Lun .. 6=Dom) for 7-column calendar grid', () => {
+    // 2026-10-09 is Friday -> weekdayIndexMonday = 4
+    const list = getAvailableCalendarDates('2026-10-09', 14);
+    assert.equal(list[0].weekdayIndexMonday, 4);
+    assert.equal(list[0].isToday, true);
+    // 2026-10-11 is Sunday -> weekdayIndexMonday = 6
+    assert.equal(list[2].weekdayIndexMonday, 6);
+    // 2026-10-12 is Monday -> weekdayIndexMonday = 0
+    assert.equal(list[3].weekdayIndexMonday, 0);
+  });
 });
+

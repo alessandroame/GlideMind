@@ -340,12 +340,15 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     assert.ok(methodStr.includes('gm-past-presets'), 'Must provide fast past date presets (Oggi, Ieri, Weekend)');
   });
 
-  it('should render smart date bar in Volabilità section and allow switching date', () => {
-    const mockStore = createStore({ activeDate: '2026-10-09' });
+  it('should render smart date bar in Volabilità section and allow switching date and stepping prev/next', () => {
+    const mockStore = createStore({ activeDate: '2026-10-18' });
     const controller = new HomeDashboardViewController({ store: mockStore });
 
     const html = controller.renderHtml();
     assert.ok(html.includes('gm-date-tabs'), 'Must render smart date tabs in Home');
+    assert.ok(html.includes('gm-date-stepper'), 'Must render compact prev/next stepper in Home');
+    assert.ok(html.includes('data-action="prev-date"'), 'Must render prev-date button in Home');
+    assert.ok(html.includes('data-action="next-date"'), 'Must render next-date button in Home');
     assert.ok(html.includes('data-action="open-date-picker-sheet"'), 'Must render calendar button in Home');
 
     // Simulate clicking a date preset
@@ -356,7 +359,7 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
             return {
               getAttribute(attr) {
                 if (attr === 'data-action') return 'select-date';
-                if (attr === 'data-date') return '2026-10-10';
+                if (attr === 'data-date') return '2026-10-19';
                 return null;
               }
             };
@@ -366,10 +369,31 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
       }
     });
 
-    assert.equal(mockStore.getState().activeDate, '2026-10-10');
+    assert.equal(mockStore.getState().activeDate, '2026-10-19');
+
+    // Simulate clicking next-date stepper button
+    controller.handleClick({
+      target: {
+        closest(sel) {
+          if (sel === '[data-action]') {
+            return {
+              disabled: false,
+              getAttribute(attr) {
+                if (attr === 'data-action') return 'next-date';
+                if (attr === 'data-date') return '2026-10-20';
+                return null;
+              }
+            };
+          }
+          return null;
+        }
+      }
+    });
+
+    assert.equal(mockStore.getState().activeDate, '2026-10-20');
   });
 
-  it('should open the 14-day date picker sheet with symmetric flyability status badges and legend in HomeDashboard', async () => {
+  it('should open the 14-day date picker sheet with 7-column Mon-Sun grid, symmetric flyability status badges and legend in HomeDashboard', async () => {
     const { initSheetManager } = await import('../../ui/sheetManager.js');
     let capturedHtml = '';
     const mockContainer = {
@@ -397,9 +421,11 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     controller.openDatePickerSheet();
 
     assert.ok(capturedHtml.includes('Calendario Previsioni (Prossimi 14 Giorni)'));
+    assert.ok(capturedHtml.includes('gm-date-weekday-header'), 'Must include 7-column Mon-Sun weekday header');
     assert.ok(capturedHtml.includes('data-action="pick-calendar-date"'));
     assert.ok(capturedHtml.includes('grid-fly-status'), 'Home calendar must include 14-day flyability status badges symmetric with ForecastView');
     assert.ok(capturedHtml.includes('gm-date-sheet-legend'), 'Home calendar must include semantic 4-color flyability legend');
+    assert.ok(!capturedHtml.includes('id="custom-date-native-input"'), 'Should not include redundant secondary native date input');
   });
 
   it('should display only favorite spots and react to store pinnedSpotIds changes', () => {
@@ -1064,6 +1090,11 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     // Verify light theme contrast override for active date items
     assert.ok(css.includes('[data-theme="light"] .gm-date-tab.active'), 'theme.css must declare light theme contrast override for active date tab');
     assert.ok(css.includes('[data-theme="light"] .gm-date-grid-item.active'), 'theme.css must declare light theme contrast override for active date grid item');
+
+    // Verify selected calendar day (.gm-date-grid-item.active) preserves 4-color flyability bottom bar and badge
+    assert.ok(css.includes('.gm-date-grid-item.fly-flyable {'), 'theme.css must apply fly-flyable border even when .active');
+    assert.ok(!css.includes('.gm-date-grid-item.fly-flyable:not(.active)'), 'theme.css must not suppress flyability border on .active calendar day');
+    assert.ok(!css.includes('.gm-date-grid-item.active .grid-fly-status'), 'theme.css must not overwrite semantic .grid-fly-status badge colors on .active day');
 
     // Verify theme switcher dropdown styling
     assert.ok(css.includes('.gm-theme-selector'), 'theme.css must declare .gm-theme-selector styles');

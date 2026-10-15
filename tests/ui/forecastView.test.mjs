@@ -493,13 +493,16 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.ok(soundingChartHtml.includes('id="forecast-sounding-chart-box"'), 'Must render sounding chart box');
   });
 
-  it('should render smart date tabs with calendar trigger and custom date support', () => {
-    const mockStore = createStore({ activeDate: '2026-10-25' }); // 16 days in future
+  it('should render smart date tabs with prev/next stepper, calendar trigger and custom date support', () => {
+    const mockStore = createStore({ activeDate: '2026-10-25' }); // > 7 days in future
     const controller = new ForecastViewController({ store: mockStore });
     controller.activeDate = '2026-10-25';
 
     const html = controller.renderHtml();
     assert.ok(html.includes('gm-date-tabs'), 'Must render smart date tabs');
+    assert.ok(html.includes('gm-date-stepper'), 'Must render compact prev/next stepper');
+    assert.ok(html.includes('data-action="prev-date"'), 'Must render prev-date button');
+    assert.ok(html.includes('data-action="next-date"'), 'Must render next-date button');
     assert.ok(html.includes('data-action="open-date-picker-sheet"'), 'Must render calendar button');
     assert.ok(html.includes('gm-date-tab-calendar'), 'Must style calendar button');
     assert.ok(html.includes('gm-horizon-notice'), 'Must render synoptic horizon notice for > 7 days');
@@ -527,6 +530,30 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
 
     assert.equal(controller.activeDate, '2026-10-18');
     assert.equal(mockStore.getState().activeDate, '2026-10-18');
+    assert.equal(rendered, true);
+
+    // Test stepping to prev-date
+    rendered = false;
+    controller.handleClick({
+      target: {
+        closest(sel) {
+          if (sel === '[data-action]') {
+            return {
+              disabled: false,
+              getAttribute(attr) {
+                if (attr === 'data-action') return 'prev-date';
+                if (attr === 'data-date') return '2026-10-17';
+                return null;
+              }
+            };
+          }
+          return null;
+        }
+      }
+    });
+
+    assert.equal(controller.activeDate, '2026-10-17');
+    assert.equal(mockStore.getState().activeDate, '2026-10-17');
     assert.equal(rendered, true);
   });
 
@@ -556,7 +583,7 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.equal(changeRemoved, true);
   });
 
-  it('should open the 14-day date picker sheet with 4-color flyability indicators and legend', async () => {
+  it('should open the 14-day date picker sheet with 7-column Mon-Sun grid, 4-color flyability indicators and legend', async () => {
     const { initSheetManager } = await import('../../ui/sheetManager.js');
     let capturedHtml = '';
     const mockContainer = {
@@ -584,12 +611,14 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     controller.openDatePickerSheet();
 
     assert.ok(capturedHtml.includes('Calendario Previsioni (Prossimi 14 Giorni)'));
+    assert.ok(capturedHtml.includes('gm-date-weekday-header'), 'Must include 7-column Mon-Sun weekday header');
     assert.ok(capturedHtml.includes('grid-fly-status'));
     assert.ok(capturedHtml.includes('gm-date-sheet-legend'));
     assert.ok(capturedHtml.includes('Volabile'));
     assert.ok(capturedHtml.includes('Cautela'));
     assert.ok(capturedHtml.includes('Non Volabile'));
     assert.ok(capturedHtml.includes('Severo'));
+    assert.ok(!capturedHtml.includes('id="custom-date-native-input"'), 'Should not include redundant secondary native date input');
   });
 
   it('should enforce semantic header layout with safe-area and Fitts touch target in ForecastView', async () => {
@@ -3150,7 +3179,171 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
       }
     });
   });
+
+  describe('Quick Sub-Spot Forecast Switcher & Conditional Inline Multi-Spot Combo ([NOTE-002])', () => {
+    it('renders 1-tap quick switcher pills (Panoramica / Decollo / Atterraggio) and conditional inline <select> combo only when > 1 spot exists', () => {
+      // Cornizzolo has 2 takeoffs (Risparmio, Centrale) and 1 landing (Suello)
+      const cornizzolo = DEFAULT_COMPRENSORI[0];
+      assert.ok(cornizzolo.takeoffs.length > 1, 'Fixture must have multiple takeoffs');
+      assert.equal(cornizzolo.landings.length, 1, 'Fixture must have single landing');
+
+      const mockStore = createStore({ selectedSpot: cornizzolo });
+      const controller = new ForecastViewController({ store: mockStore });
+      const html = controller.renderHtml();
+
+      // 1. Quick switcher bar rendered in overview
+      assert.ok(html.includes('gm-quick-subspot-switcher'), 'Must render .gm-quick-subspot-switcher bar');
+      assert.ok(html.includes('data-subspot-id="overview"'), 'Must render Panoramica pill');
+      assert.ok(html.includes(`data-subspot-id="${cornizzolo.takeoffs[0].id}"`), 'Must render Decollo pill targeting active takeoff');
+      assert.ok(html.includes(`data-subspot-id="${cornizzolo.landings[0].id}"`), 'Must render Atterraggio pill targeting active landing');
+
+      // 2. Conditional inline combo: rendered for takeoffs (> 1), NOT rendered for landings (=== 1)
+      assert.ok(html.includes('data-action="change-active-takeoff"'), 'Must render inline <select> combo when takeoffs.length > 1');
+      assert.ok(!html.includes('data-action="change-active-landing"'), 'Must NOT render inline <select> combo when landings.length === 1');
+    });
+
+    it('renders inline <select> combo for both takeoff and landing when both have > 1 options, and switches active sub-spot on change', () => {
+      const multiSpot = {
+        ...DEFAULT_COMPRENSORI[0],
+        id: 'multi-spot-test',
+        name: 'Comprensorio Multi-Spot Test',
+        takeoffs: [
+          { id: 't-alpha', name: 'Decollo Alpha', altitude: 1100, lat: 45.84, lon: 9.30, heading: 180, isPrimary: true },
+          { id: 't-beta', name: 'Decollo Beta', altitude: 950, lat: 45.83, lon: 9.31, heading: 200, isPrimary: false }
+        ],
+        landings: [
+          { id: 'l-main', name: 'Atterraggio Ufficiale', altitude: 270, lat: 45.81, lon: 9.31, isOfficial: true, isPrimary: true },
+          { id: 'l-alt', name: 'Atterraggio Emergenza', altitude: 265, lat: 45.80, lon: 9.32, isOfficial: false, isPrimary: false }
+        ]
+      };
+
+      const mockStore = createStore({ selectedSpot: multiSpot });
+      const controller = new ForecastViewController({ store: mockStore });
+      let html = controller.renderHtml();
+
+      assert.ok(html.includes('data-action="change-active-takeoff"'), 'Must render takeoff select combo');
+      assert.ok(html.includes('data-action="change-active-landing"'), 'Must render landing select combo');
+
+      // Simulate changing takeoff via inline combo in Overview mode
+      controller.handleChange({
+        target: {
+          value: 't-beta',
+          getAttribute: (attr) => (attr === 'data-action' ? 'change-active-takeoff' : null)
+        }
+      });
+      assert.equal(controller.activeTakeoffId, 't-beta', 'Must update activeTakeoffId to t-beta');
+      assert.equal(controller.selectedSubSpot, 'overview', 'Must remain in overview mode when changed from overview');
+      assert.equal(mockStore.getState().activeTakeoffId, 't-beta', 'Must sync activeTakeoffId to store');
+
+      // Switch to Takeoff forecast view via quick switcher pill
+      controller.handleClick({
+        target: {
+          closest: (sel) => (sel === '[data-action]' ? {
+            getAttribute: (attr) => {
+              if (attr === 'data-action') return 'select-subspot';
+              if (attr === 'data-subspot-id') return 't-beta';
+              return null;
+            }
+          } : null)
+        }
+      });
+      assert.equal(controller.selectedSubSpot, 't-beta', 'Must switch to t-beta forecast view');
+
+      // In Specific Spot view, inline combo must also be present and changing it must switch selectedSubSpot to t-alpha
+      html = controller.renderHtml();
+      assert.ok(html.includes('id="forecast-specific-spot-card"'), 'Must render specific spot card');
+      assert.ok(html.includes('data-action="change-active-takeoff"'), 'Must render takeoff combo inside specific spot card');
+
+      controller.handleChange({
+        target: {
+          value: 't-alpha',
+          getAttribute: (attr) => (attr === 'data-action' ? 'change-active-takeoff' : null)
+        }
+      });
+      assert.equal(controller.activeTakeoffId, 't-alpha', 'Must update activeTakeoffId to t-alpha');
+      assert.equal(controller.selectedSubSpot, 't-alpha', 'Must update selectedSubSpot to t-alpha when already in takeoff view');
+
+      // Returning to Panoramica must preserve the chosen activeLandingId / activeTakeoffId
+      controller.handleChange({
+        target: {
+          value: 'l-alt',
+          getAttribute: (attr) => (attr === 'data-action' ? 'change-active-landing' : null)
+        }
+      });
+      assert.equal(controller.activeLandingId, 'l-alt');
+
+      controller.handleClick({
+        target: {
+          closest: (sel) => (sel === '[data-action]' ? {
+            getAttribute: (attr) => {
+              if (attr === 'data-action') return 'select-subspot';
+              if (attr === 'data-subspot-id') return 'overview';
+              return null;
+            }
+          } : null)
+        }
+      });
+      assert.equal(controller.selectedSubSpot, 'overview');
+      assert.equal(controller.activeLandingId, 'l-alt', 'Must preserve selected landing when switching back to Panoramica');
+    });
+
+    it('reactively updates the hourly timeline strip and scrubber spot pill when switching between Panoramica, Decollo, and Atterraggio', () => {
+      const cornizzolo = DEFAULT_COMPRENSORI[0];
+      const takeoff0 = cornizzolo.takeoffs[0];
+      const takeoff1 = cornizzolo.takeoffs[1];
+      const landing0 = cornizzolo.landings[0];
+
+      const mockStore = createStore({ selectedSpot: cornizzolo });
+      const controller = new ForecastViewController({ store: mockStore });
+      controller.selectedHour = 14;
+
+      // 1. Overview (Panoramica)
+      controller.selectedSubSpot = 'overview';
+      const htmlOverview = controller.renderHtml();
+      const stripOverview = controller.renderTimelineGrid(
+        cornizzolo,
+        controller.getWeatherData(cornizzolo, controller.activeDate),
+        controller.getActiveGlider()
+      );
+      assert.ok(htmlOverview.includes('data-timeline-context="overview"'), 'Timeline strip must declare overview context');
+      assert.ok(htmlOverview.includes('· Panoramica ('), 'Scrubber pill must indicate Panoramica context');
+
+      // 2. Switch to Takeoff 0 (Decollo Risparmio)
+      controller.selectedSubSpot = takeoff0.id;
+      controller.activeTakeoffId = takeoff0.id;
+      const htmlTakeoff0 = controller.renderHtml();
+      const stripTakeoff0 = controller.renderTimelineGrid(
+        cornizzolo,
+        controller.getWeatherData(cornizzolo, controller.activeDate),
+        controller.getActiveGlider()
+      );
+      assert.ok(htmlTakeoff0.includes('data-timeline-context="takeoff"'), 'Timeline strip must declare takeoff context');
+      assert.ok(htmlTakeoff0.includes('· ↗ '), 'Scrubber pill must indicate active takeoff context');
+      assert.notEqual(stripOverview, stripTakeoff0, 'Timeline strip HTML must react when switching from Panoramica to Decollo');
+
+      // 3. Switch to Takeoff 1 (Decollo Centrale)
+      controller.selectedSubSpot = takeoff1.id;
+      controller.activeTakeoffId = takeoff1.id;
+      const stripTakeoff1 = controller.renderTimelineGrid(
+        cornizzolo,
+        controller.getWeatherData(cornizzolo, controller.activeDate),
+        controller.getActiveGlider()
+      );
+      assert.notEqual(stripTakeoff0, stripTakeoff1, 'Timeline strip HTML must react when switching between different takeoffs');
+
+      // 4. Switch to Landing 0 (Atterraggio Suello)
+      controller.selectedSubSpot = landing0.id;
+      controller.activeLandingId = landing0.id;
+      const htmlLanding0 = controller.renderHtml();
+      const stripLanding0 = controller.renderTimelineGrid(
+        cornizzolo,
+        controller.getWeatherData(cornizzolo, controller.activeDate),
+        controller.getActiveGlider()
+      );
+      assert.ok(htmlLanding0.includes('data-timeline-context="landing"'), 'Timeline strip must declare landing context');
+      assert.ok(htmlLanding0.includes('· ↘ '), 'Scrubber pill must indicate active landing context');
+      assert.notEqual(stripOverview, stripLanding0, 'Timeline strip HTML must react when switching from Panoramica to Atterraggio');
+      assert.notEqual(stripTakeoff0, stripLanding0, 'Timeline strip HTML must react when switching from Decollo to Atterraggio');
+    });
+  });
 });
-
-
-

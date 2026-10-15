@@ -50,7 +50,8 @@ import {
   getSmartDatePresets,
   getAvailableCalendarDates,
   getPastDatePresets,
-  formatDateIso
+  formatDateIso,
+  WEEKDAY_HEADERS_MON
 } from '../../core/datePresets.js';
 import { resolveDaylightHours } from '../../core/daylight.js';
 import { getFormattedVersion, getFormattedBuild } from '../../core/version.js';
@@ -921,7 +922,7 @@ export class HomeDashboardViewController {
   }
 
   /**
-   * Renders the Smart Date Bar for comprensori flyability filtering.
+   * Renders the compact Smart Date Bar with Prev/Next stepper and 1-line Quick Chips.
    * @param {object} state
    * @returns {string}
    */
@@ -929,42 +930,66 @@ export class HomeDashboardViewController {
     const resolvedState = state || (this.store ? this.store.getState() : {});
     const activeDate = resolvedState.activeDate || formatDateIso(new Date());
     const smartData = getSmartDatePresets(new Date(), activeDate);
+    const quickList = smartData.quickPresets || smartData.presets.filter(p => !p.isCustom);
 
     return `
       <div class="gm-date-tabs mb-1" role="tablist" aria-label="Selettore data previsioni">
-        ${smartData.presets.map(p => `
+        <div class="gm-date-stepper" role="group" aria-label="Navigazione giorno precedente e successivo">
+          <button
+            type="button"
+            class="gm-date-step-btn"
+            data-action="prev-date"
+            data-date="${smartData.prevDate}"
+            ${!smartData.canPrev ? 'disabled aria-disabled="true"' : ''}
+            aria-label="Giorno precedente"
+            title="Giorno precedente (${smartData.prevDate})"
+          >‹</button>
+
           <button 
             type="button" 
-            class="gm-date-tab ${p.isActive ? 'active' : ''} ${p.isCustom ? 'custom' : ''}" 
-            data-action="select-date" 
-            data-date="${p.isoDate}" 
+            class="gm-date-tab-calendar ${smartData.isCustomActive ? 'active' : ''}" 
+            data-action="open-date-picker-sheet" 
             role="tab" 
-            aria-selected="${p.isActive ? 'true' : 'false'}" 
-            title="${p.label} - ${p.subLabel}"
+            aria-selected="${smartData.isCustomActive ? 'true' : 'false'}"
+            aria-label="Scegli data dal calendario (${escapeHtml(smartData.activeDisplayLabel)})" 
+            title="Apri calendario 14 giorni (${escapeHtml(smartData.activeDisplayLabel)})"
           >
-            <span class="gm-date-tab-main">
-              ${p.label}
-            </span>
-            <span class="gm-date-tab-sub">${p.subLabel}</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true" class="gm-date-cal-icon">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="16" y1="2" x2="16" y2="6"></line>
+              <line x1="8" y1="2" x2="8" y2="6"></line>
+              <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+            <span class="gm-date-active-label">${escapeHtml(smartData.activeDisplayLabel)}</span>
+            <span class="gm-date-cal-caret" aria-hidden="true">▾</span>
           </button>
-        `).join('')}
 
-        <button 
-          type="button" 
-          class="gm-date-tab-calendar ${smartData.isCustomActive ? 'active' : ''}" 
-          data-action="open-date-picker-sheet" 
-          role="tab" 
-          aria-selected="${smartData.isCustomActive ? 'true' : 'false'}"
-          aria-label="Scegli data dal calendario" 
-          title="Scegli altra data"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-            <line x1="16" y1="2" x2="16" y2="6"></line>
-            <line x1="8" y1="2" x2="8" y2="6"></line>
-            <line x1="3" y1="10" x2="21" y2="10"></line>
-          </svg>
-        </button>
+          <button
+            type="button"
+            class="gm-date-step-btn"
+            data-action="next-date"
+            data-date="${smartData.nextDate}"
+            ${!smartData.canNext ? 'disabled aria-disabled="true"' : ''}
+            aria-label="Giorno successivo"
+            title="Giorno successivo (${smartData.nextDate})"
+          >›</button>
+        </div>
+
+        <div class="gm-date-quick-chips">
+          ${quickList.map(p => `
+            <button 
+              type="button" 
+              class="gm-date-tab ${p.isActive ? 'active' : ''}" 
+              data-action="select-date" 
+              data-date="${p.isoDate}" 
+              role="tab" 
+              aria-selected="${p.isActive ? 'true' : 'false'}" 
+              title="${p.label} - ${p.subLabel}"
+            >
+              <span class="gm-date-tab-main">${p.shortLabel || p.label}</span>
+            </button>
+          `).join('')}
+        </div>
       </div>
       ${smartData.activeHorizon && smartData.activeHorizon.isSynoptic && this.dismissedHorizonDate !== activeDate ? `
         <div class="gm-horizon-notice" role="status">
@@ -1912,31 +1937,34 @@ export class HomeDashboardViewController {
 
   /**
    * Opens the accessible bottom sheet to select any date within the forecast horizon (up to 14 days).
-   * Symmetric with ForecastView: includes 14-day flyability status badges and semantic 4-color legend.
+   * Symmetric with ForecastView: uses a 7-column Monday-Sunday 2-week grid with semantic 4-color legend.
    */
   openDatePickerSheet() {
     const state = this.store ? this.store.getState() : {};
     const activeDate = state.activeDate || formatDateIso(new Date());
     const today = new Date();
-    const minDate = formatDateIso(today);
-    const maxDate = formatDateIso(new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000));
     const flySummaries = this.getMultiDayFlyability(null, 14);
     const availableDates = getAvailableCalendarDates(today, 14, flySummaries);
+    const leadingSpacers = availableDates.length > 0 ? (availableDates[0].weekdayIndexMonday || 0) : 0;
 
     const renderContent = () => `
-      <div class="gm-date-picker-sheet flex flex-col gap-4">
-        <!-- 14-Day Fast Tap Grid (Hero Primary Action) -->
+      <div class="gm-date-picker-sheet flex flex-col gap-3">
+        <!-- 14-Day 7-Column Calendar Grid (Mon-Sun) -->
         <div class="gm-date-sheet-section">
           <span class="text-xs font-bold uppercase tracking-wider text-[var(--gm-text-muted)] block mb-2">
             Calendario Previsioni (Prossimi 14 Giorni)
           </span>
+          <div class="gm-date-weekday-header" aria-hidden="true">
+            ${WEEKDAY_HEADERS_MON.map(w => `<span>${w}</span>`).join('')}
+          </div>
           <div class="gm-date-grid">
+            ${Array.from({ length: leadingSpacers }, () => `<span class="gm-date-grid-spacer" aria-hidden="true"></span>`).join('')}
             ${availableDates.map(d => {
               const isSelected = d.isoDate === activeDate;
               return `
                 <button 
                   type="button" 
-                  class="gm-date-grid-item ${isSelected ? 'active' : ''} ${d.isWeekend ? 'weekend' : ''} fly-${d.flyability.status}"
+                  class="gm-date-grid-item ${isSelected ? 'active' : ''} ${d.isToday ? 'today' : ''} ${d.isWeekend ? 'weekend' : ''} fly-${d.flyability.status}"
                   data-action="pick-calendar-date"
                   data-date="${d.isoDate}"
                   aria-selected="${isSelected ? 'true' : 'false'}"
@@ -1944,7 +1972,7 @@ export class HomeDashboardViewController {
                 >
                   <span class="grid-day-name">${escapeHtml(d.dayName)}</span>
                   <span class="grid-day-number">${d.dayNumber}</span>
-                  <span class="grid-month">${escapeHtml(d.formatted.split(' ')[1])}</span>
+                  <span class="grid-month">${escapeHtml(d.shortMonth || d.formatted.split(' ')[1])}</span>
 
                   <span class="grid-fly-status ${d.flyability.badgeClass}" title="${escapeHtml(d.flyability.label)}">
                     <span class="grid-fly-icon" aria-hidden="true">${d.flyability.icon}</span>
@@ -1965,55 +1993,13 @@ export class HomeDashboardViewController {
             <span class="flex items-center gap-1"><span class="text-[#f87171]">⚡</span> Severo</span>
           </div>
         </div>
-
-        <!-- Secondary Native Input -->
-        <div class="gm-form-field pt-2 border-t border-[var(--gm-border)]">
-          <label for="custom-date-native-input" class="gm-form-label font-bold text-xs uppercase tracking-wider text-[var(--gm-text-muted)] block mb-1">
-            Oppure specifica altra data:
-          </label>
-          <div class="flex items-center gap-2">
-            <input 
-              type="date" 
-              id="custom-date-native-input" 
-              class="gm-form-control flex-1 font-mono text-sm" 
-              min="${minDate}" 
-              max="${maxDate}" 
-              value="${activeDate}" 
-              aria-label="Data personalizzata"
-            />
-            <button 
-              type="button" 
-              class="gm-btn gm-btn-primary px-3 py-2 font-bold text-xs" 
-              data-action="apply-custom-date"
-            >
-              Conferma
-            </button>
-          </div>
-        </div>
       </div>
     `;
 
     openSheet({
       id: 'home-date-picker-sheet',
       title: 'Seleziona Data Previsioni',
-      content: renderContent(),
-      onOpen: () => {
-        if (typeof document !== 'undefined') {
-          const input = document.getElementById('custom-date-native-input');
-          if (input) {
-            input.addEventListener('change', (e) => {
-              const val = e.target.value;
-              if (val && this.store) {
-                this.store.setState({ activeDate: val });
-                closeSheet();
-                if (!this.storeUnsubscribe) {
-                  this.render();
-                }
-              }
-            });
-          }
-        }
-      }
+      content: renderContent()
     });
   }
 
@@ -2158,7 +2144,10 @@ export class HomeDashboardViewController {
         }
       }
       this.render();
-    } else if (action === 'select-date') {
+    } else if (action === 'select-date' || action === 'prev-date' || action === 'next-date') {
+      if ((action === 'prev-date' || action === 'next-date') && (actionEl.disabled || actionEl.getAttribute('aria-disabled') === 'true')) {
+        return;
+      }
       const dateAttr = actionEl.getAttribute('data-date');
       if (dateAttr && this.store) {
         this.store.setState({ activeDate: dateAttr });
@@ -2169,16 +2158,6 @@ export class HomeDashboardViewController {
       }
     } else if (action === 'open-date-picker-sheet') {
       this.openDatePickerSheet();
-    } else if (action === 'apply-custom-date') {
-      const input = document.getElementById('custom-date-native-input');
-      if (input && input.value && this.store) {
-        this.store.setState({ activeDate: input.value });
-        closeSheet();
-        if (!this.storeUnsubscribe) {
-          this.render();
-          this.fetchBatchWeatherAsync();
-        }
-      }
     } else if (action === 'pick-calendar-date') {
       const dateAttr = actionEl.getAttribute('data-date');
       if (dateAttr && this.store) {
