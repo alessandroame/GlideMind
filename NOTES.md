@@ -6,14 +6,6 @@ Buffer di cattura rapida a zero cambio di contesto (`/take-note`). Le osservazio
 
 ## 📥 Da Analizzare (Open)
 
-### [NOTE-001] Espansione volabilità comprensorio con pills dei fattori determinanti
-- **Stato**: `📥 Da Analizzare`
-- **Data Cattura**: 2026-10-15 19:44
-- **Lavorazione Attiva al Momento della Nota**: Nessun task `🟡 In Lavorazione` in `DESIDERATA.md`
-- **Ambito Presunto**: `HomeDashboardView` / `ForecastView` (Card volabilità comprensorio)
-- **Testo Originale**:
-  > vorrei nella visualizzazione compressa della volabilità del comprensorio dare la possibilità di espanderla e mostra dei pills con i motivi determinanti il livello (es se non volabile scrivere per la piggia (se ce n'è) per il vento etc)
-
 ### [NOTE-002] Selezione rapida decollo/atterraggio e combo per spot multipli in Previsioni
 - **Stato**: `📥 Da Analizzare`
 - **Data Cattura**: 2026-10-15 19:44
@@ -41,3 +33,8 @@ Buffer di cattura rapida a zero cambio di contesto (`/take-note`). Le osservazio
 ---
 
 ## ✅ Analizzate & Consolidate (Resolved)
+
+### [NOTE-001] Espansione volabilità comprensorio con pills dei fattori determinanti
+- **Stato**: `✅ Consolidata & Implementata`
+- **Data Cattura**: 2026-10-15 19:44
+- **Risoluzione**: Implementato in [`HomeDashboardView.js`](file:///c:/github/GlideMind/ui/views/HomeDashboardView.js) (`buildDeterminantReasonPills`, `data-action="toggle-spot-reasons"`, `.gm-spot-reasons-drawer` e `.gm-reason-pill`): rimossa la micro-causa troncata dall'header e introdotta l'espansione a 1-tap sul badge di stato che rivela i pills espressivi dei fattori determinanti (finestra volabile, pioggia, vento/raffiche, direzione/esposizione, turbolenza/CAPE, cono di rientro, margine pilota).

@@ -88,7 +88,7 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     assert.ok(html.includes('data-action="view-forecast-hour"'), 'Must render interactive hourly slots in diurnal timeline');
   });
 
-  it('should filter comprensori via instant search input (NN/G #6)', () => {
+  it('should filter comprensori via instant search input and display sub-spot match context when searching by takeoff name (NN/G #6)', () => {
     const mockStore = createStore();
     const controller = new HomeDashboardViewController({ store: mockStore });
 
@@ -96,11 +96,26 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     let list = controller.getEvaluatedComprensori();
     assert.equal(list.length, 3);
 
-    // Apply search filter
+    // Apply search filter by comprensorio name
     controller.searchQuery = 'cornizzolo';
     list = controller.getEvaluatedComprensori();
     assert.equal(list.length, 1);
     assert.equal(list[0].name, 'Monte Cornizzolo');
+    assert.equal(list[0].searchMatch, null);
+
+    // Search by sub-spot takeoff name ("felci" -> Pian delle Felci in Monte Cavallaria)
+    controller.searchQuery = 'felci';
+    list = controller.getEvaluatedComprensori();
+    assert.ok(list.length >= 1, 'Must find Monte Cavallaria when searching for takeoff Pian delle Felci');
+    const cavallaria = list.find(c => c.name.includes('Cavallaria'));
+    assert.ok(cavallaria, 'Monte Cavallaria must be returned');
+    assert.ok(cavallaria.searchMatch, 'Must attach searchMatch context when query matches a sub-spot');
+    assert.equal(cavallaria.searchMatch.type, 'takeoff');
+    assert.ok(cavallaria.searchMatch.label.toLowerCase().includes('felci'), 'searchMatch label must display the matched takeoff name');
+
+    const searchHtml = controller.renderHtml();
+    assert.ok(searchHtml.includes('gm-spot-search-match'), 'Card header must render .gm-spot-search-match pill');
+    assert.ok(searchHtml.includes('data-matched-takeoff-id='), 'Card must bind data-matched-takeoff-id for direct navigation');
 
     // Filter by province
     controller.searchQuery = 'AQ';
@@ -112,6 +127,21 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     controller.searchQuery = '';
     list = controller.getEvaluatedComprensori();
     assert.equal(list.length, 3);
+
+    // Verify expandable determinant reason pills ([NOTE-001]) on badge toggle
+    const firstSpotId = list[0].comprensorioId;
+    controller.handleClick({
+      target: {
+        closest: (sel) => sel === '[data-action]' ? {
+          getAttribute: (attr) => attr === 'data-action' ? 'toggle-spot-reasons' : (attr === 'data-id' ? firstSpotId : null)
+        } : null
+      },
+      preventDefault: () => {}
+    });
+    assert.ok(controller.expandedReasonSpotIds.has(firstSpotId), 'Must mark spot reasons as expanded on badge click');
+    const expandedHtml = controller.renderHtml();
+    assert.ok(expandedHtml.includes('gm-spot-reasons-drawer') && expandedHtml.includes('is-expanded'), 'Must expand determinant factor pills drawer');
+    assert.ok(expandedHtml.includes('gm-reason-pill'), 'Must render determinant factor pills inside drawer');
   });
 
   it('should sort comprensori dynamically by flyability descending (Flyable -> Caution -> Unflyable)', () => {

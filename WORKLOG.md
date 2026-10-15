@@ -1905,11 +1905,12 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
 
 ---
 
-## 2026-10-15 - Refactoring Card Flight Log: Layout Compatto (~74px), Griglia 4-KPI (Termiche), Micro-Badge Traccia e Spostamento Elimina nella Scheda Volo
+## 2026-10-15 - Refactoring Card Flight Log: Layout Compatto (~70px), Inversione Gerarchica Data/Località, Griglia 4-KPI (Termiche) e Traccia Inline senza Box
 - **Tipo**: UI Layout / Ergonomia Mobile / Laws of UX / Flight Logbook
 - **Dettagli**: [.agents/worklog.d/2026-10-15_compact-flight-card-4kpi.md](file:///.agents/worklog.d/2026-10-15_compact-flight-card-4kpi.md)
 - **Sintesi**:
   - Rimosso il pulsante inline `×` dalle card del Flight Log e integrato il pulsante `#btn-delete-from-detail` (`>= 48px`) nella topbar di [`ui/views/FlightDetailSheet.js`](file:///ui/views/FlightDetailSheet.js), collegato tramite callback `onDelete` al banner di annullamento 5s (`startPendingDeletion`) di [`ui/views/LogbookView.js`](file:///ui/views/LogbookView.js).
-  - Compattato `.gm-track-badge` a icona SVG (`24x20px`) con testo `.sr-only`, liberando `+102px` orizzontali per l'espansione del titolo `Decollo → Atterraggio` sulla prima riga.
+  - Invertita la gerarchia delle prime due righe secondo l'**Opzione B**: **Riga 1** con badge `#N` maggiorato (`0.92rem`) + Data/Ora + Vela + icona traccia inline senza box (`0.80rem`, `var(--gm-text-secondary)`); **Riga 2** con località `Decollo → Atterraggio` a larghezza piena in stile secondario (`0.78rem`, peso `500`, `var(--gm-text-secondary)`), riservando il bianco pieno bold ai soli 4 valori numerici KPI.
   - Compressa verticalmente `.gm-flight-card` (`padding: 8px 12px; gap: 4px;`, deduplicata in [`css/theme.css`](file:///css/theme.css)) ed estesa la griglia KPI a 4 colonne (`Tempo`, `Quota MSL`, `Guadagno` con supporto esplicito a `+0 m`, e `Termiche` con conteggio `thermalsCount`).
   - Aggiornati e validati i test in [`tests/ui/logbookView.test.mjs`](file:///tests/ui/logbookView.test.mjs) e [`tests/ui/logbookFlightDetailInteraction.test.mjs`](file:///tests/ui/logbookFlightDetailInteraction.test.mjs) (77/77 test logbook/detail/governance superati).
+
