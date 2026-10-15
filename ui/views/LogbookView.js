@@ -661,44 +661,47 @@ export class LogbookViewController {
         data-flight-id="${escapeHtml(flightId)}"
         tabindex="0"
       >
-        <!-- Flight Card Header Row (100% Dedicated to Prominent #N Badge + Full-Width Route) -->
+        <!-- Row 1: Left (#N + Date/Time) <-> Right (Glider + Track Waveform) -->
         <div class="gm-flight-card-header">
           <div class="gm-flight-title-group">
             ${flightNumber != null ? `<span class="gm-flight-number-badge" aria-label="Volo numero ${flightNumber}">#${escapeHtml(flightNumber)}</span>` : ''}
-            <h4 id="fl-title-${escapeHtml(flightId)}" class="gm-flight-site-title" title="${escapeHtml(displayTitle)}">
-              ${escapeHtml(displayTitle)}
-            </h4>
+            <div class="gm-flight-card-sub">
+              <span class="gm-flight-date-text">${escapeHtml(dateFormatted)}</span>
+              ${takeoffTime ? `<span class="text-[var(--gm-text-muted)]">•</span><span>${escapeHtml(takeoffTime)}</span>` : ''}
+            </div>
+          </div>
+          <div class="gm-flight-header-right">
+            <span class="gm-flight-glider-text">${escapeHtml(glider)}</span>
+            ${trackBadgeHtml}
           </div>
         </div>
 
-        <!-- Compact Date, Time, Glider & Subtle Inline Track Waveform Row -->
-        <div class="gm-flight-card-sub">
-          <span>${escapeHtml(dateFormatted)}</span>
-          ${takeoffTime ? `<span>•</span><span>${escapeHtml(takeoffTime)}</span>` : ''}
-          ${siteArea ? `<span>•</span><span class="font-medium text-[var(--gm-text-secondary)]">${escapeHtml(siteArea)}</span>` : ''}
-          <span class="text-[var(--gm-text-secondary)] font-medium">• ${escapeHtml(glider)}</span>
-          ${trackBadgeHtml ? `<span>•</span>${trackBadgeHtml}` : ''}
+        <!-- Row 2: Left (Secondary Locality / Takeoff → Landing Route) <-> Right (Chevron) -->
+        <div class="gm-flight-route-row">
+          <h4 id="fl-title-${escapeHtml(flightId)}" class="gm-flight-site-title" title="${escapeHtml(displayTitle)}">
+            ${escapeHtml(displayTitle)}${siteArea ? ` <span class="text-[var(--gm-text-muted)] font-normal">• ${escapeHtml(siteArea)}</span>` : ''}
+          </h4>
+          <span class="gm-flight-chevron" aria-hidden="true">&#8250;</span>
         </div>
 
-        <!-- Glanceable 4-Metric Row (Tempo, Quota MSL, Guadagno, Termiche) -->
+        <!-- Row 3: Edge-to-Edge Symmetrical 4-Metric Row (Tempo, Quota MSL, Guadagno, Termiche) -->
         <div class="gm-flight-metrics-row">
           <div class="gm-flight-metric-item">
             <span class="gm-flight-metric-val">${escapeHtml(duration)}</span>
             <span class="gm-flight-metric-lbl">Tempo</span>
           </div>
-          <div class="gm-flight-metric-item">
+          <div class="gm-flight-metric-item gm-flight-metric-center">
             <span class="gm-flight-metric-val">${escapeHtml(maxAlt)}</span>
             <span class="gm-flight-metric-lbl">Quota MSL</span>
           </div>
-          <div class="gm-flight-metric-item">
+          <div class="gm-flight-metric-item gm-flight-metric-center">
             <span class="gm-flight-metric-val">${escapeHtml(maxGain)}</span>
             <span class="gm-flight-metric-lbl">Guadagno</span>
           </div>
-          <div class="gm-flight-metric-item">
+          <div class="gm-flight-metric-item gm-flight-metric-end">
             <span class="gm-flight-metric-val ${thermalsCount > 0 ? 'gm-flight-metric-val-thermal' : ''}">${escapeHtml(thermalsCount)}</span>
             <span class="gm-flight-metric-lbl">Termiche</span>
           </div>
-          <span class="gm-flight-chevron" aria-hidden="true">&#8250;</span>
         </div>
       </article>
     `;

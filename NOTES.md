@@ -30,6 +30,14 @@ Buffer di cattura rapida a zero cambio di contesto (`/take-note`). Le osservazio
 - **Testo Originale**:
   > la classe della vela non è un'indicazione delle sue performance. Mi turba vederla come se invece lo fosse.. la toglierei se non necessaria
 
+### [NOTE-005] Filtri Log di Volo a pills espandibili per argomento e metriche (vela, anno, traccia/termica, distanza, durata)
+- **Stato**: `📥 Da Analizzare`
+- **Data Cattura**: 2026-10-15 21:31
+- **Lavorazione Attiva al Momento della Nota**: Nessun task `🟡 In Lavorazione` in `DESIDERATA.md`
+- **Ambito Presunto**: `LogbookView` (Barra filtri sfaccettati del Flight Log)
+- **Testo Originale**:
+  > nei filtri del log di volo vorrei dei pills per argomento espandibili stile menu es. Gruppo Vela con le vele con cui ho volato gruppo data per anno per altre caratteristiche con traccia, con volo in termica. oppure ancora vorrei per distanza percorsa o tempo percorso poter fare filtri
+
 ---
 
 ## ✅ Analizzate & Consolidate (Resolved)
