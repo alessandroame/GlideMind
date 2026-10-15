@@ -30,6 +30,14 @@ Buffer di cattura rapida a zero cambio di contesto (`/take-note`). Le osservazio
 - **Testo Originale**:
   > L'indicazione live (la pill verde) mi turba perchè per me ha senso solo sullo spot e poi vorrei che ci fosse una pagina eplicita con i dati in tempo reale
 
+### [NOTE-004] Rimozione o revisione della classe di omologazione vela usata come indicatore di performance
+- **Stato**: `📥 Da Analizzare`
+- **Data Cattura**: 2026-10-15 21:18
+- **Lavorazione Attiva al Momento della Nota**: Nessun task `🟡 In Lavorazione` in `DESIDERATA.md`
+- **Ambito Presunto**: Selettore Vela / Catalogo Vele / Logbook & Previsioni
+- **Testo Originale**:
+  > la classe della vela non è un'indicazione delle sue performance. Mi turba vederla come se invece lo fosse.. la toglierei se non necessaria
+
 ---
 
 ## ✅ Analizzate & Consolidate (Resolved)

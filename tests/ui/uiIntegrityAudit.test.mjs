@@ -30,10 +30,10 @@ describe('UI Integrity, Progressive Disclosure & Anti-Naked Data Audit', () => {
     );
   });
 
-  it('enforces that wind direction in Home comprensorio cards couples cardinal point with degrees', () => {
+  it('enforces that Home comprensorio cards render diurnal flyability timeline slots with explicit hour and unit context', () => {
     assert.ok(
-      homeViewSrc.includes('getCardinalDirection(weather.windDir)'),
-      'HomeDashboardView must couple cardinal direction with numerical degrees'
+      homeViewSrc.includes('gm-home-timeline') && homeViewSrc.includes('km/h'),
+      'HomeDashboardView must render diurnal timeline slots with explicit km/h unit in tooltip'
     );
   });
 

@@ -12,6 +12,7 @@
  */
 
 import { parseCoordinates } from '../../core/comprensorio.js';
+import { computeDistanceKm, calculateBearing } from '../../core/geoSpatialMath.js';
 import {
   normalizeAngle,
   calculateWindsockKinematics,
@@ -552,9 +553,6 @@ export function generateTakeoffSectorSvg(heading = null, windDirection = null, a
         <circle cx="${center}" cy="${center}" r="${radius}" fill="none" stroke="var(--gm-border)" stroke-width="1.5" stroke-dasharray="3,3" />
         <circle cx="${center}" cy="${center}" r="14" fill="var(--gm-bg-base)" stroke="var(--gm-border-strong)" stroke-width="1.5" />
         <text x="${center}" y="${center + 3}" font-size="8" font-family="monospace" font-weight="700" fill="var(--gm-text-muted)" text-anchor="middle">N/D</text>
-        ${altitude != null ? `
-          <text x="${center}" y="${size - 4}" font-size="9" font-family="monospace" font-weight="700" fill="var(--gm-text-muted)" text-anchor="middle">${Math.round(altitude)}m</text>
-        ` : ''}
       </svg>
     `;
   }
@@ -644,9 +642,237 @@ export function generateTakeoffSectorSvg(heading = null, windDirection = null, a
       <!-- Center Hub Pivot Ring -->
       <circle id="${prefix}hub" cx="${center}" cy="${center}" r="11" fill="var(--gm-bg-card, #12161f)" stroke="${statusColor}" stroke-width="2" />
       <text x="${center}" y="${center + 3.5}" font-size="10" font-weight="800" fill="${statusColor}" text-anchor="middle">▲</text>
-      ${altitude ? `<text x="${center}" y="${center + 21}" font-family="monospace" font-size="8.5" font-weight="700" fill="#cbd5e1" text-anchor="middle" filter="drop-shadow(0 1px 2px rgba(0,0,0,0.9))">${altitude}m</text>` : ''}
     </svg>
   `;
+}
+
+/**
+ * Formats horizontal geodesic distance between takeoff and landing into a compact label.
+ * @param {number} distanceKm
+ * @returns {string}
+ */
+export function formatGlideDistanceLabel(distanceKm) {
+  const d = Number(distanceKm);
+  if (!Number.isFinite(d) || d <= 0) return '0m';
+  if (d < 1) {
+    return `${Math.round(d * 1000)}m`;
+  }
+  return `${d.toFixed(1)}km`;
+}
+
+/**
+ * Projects WGS84 coordinates into Web Mercator world pixels at a given zoom level.
+ * Pure mathematical projection (100% deterministic in both browser and headless Node.js).
+ *
+ * @param {number} lat
+ * @param {number} lon
+ * @param {number} zoom
+ * @returns {{ x: number, y: number }}
+ */
+function projectWebMercatorPx(lat, lon, zoom = 14) {
+  const z = Number.isFinite(Number(zoom)) ? Number(zoom) : 14;
+  const worldSize = 256 * Math.pow(2, z);
+  const x = ((Number(lon) + 180) / 360) * worldSize;
+  const sinLat = Math.sin((Number(lat) * Math.PI) / 180);
+  const clampedSin = Math.max(-0.9999, Math.min(0.9999, sinLat));
+  const y = (0.5 - Math.log((1 + clampedSin) / (1 - clampedSin)) / (4 * Math.PI)) * worldSize;
+  return { x, y };
+}
+
+/**
+ * Computes the overdamped magneto-elastic 2D equilibrium offset (dx, dy) in pixels
+ * for the glide midpoint balloon relative to the midpoint origin P0(0,0).
+ *
+ * Physical Model:
+ * - Takeoff and Landing hubs + their windsock lobes + takeoff sector cone act as
+ *   same-polarity magnetic repellers: F_rep = Q * d / (|d|^2 + a^2)^1.5.
+ * - As zoom decreases (Takeoff and Landing move closer in pixels), the magnetic
+ *   repulsion and midpoint pinch-field push the balloon outward.
+ * - As zoom increases (Takeoff and Landing move apart in pixels), magnetic repulsion
+ *   at the midpoint weakens and the elastic tether (F_spring = -k * r) pulls the
+ *   balloon back toward its origin P0(0,0).
+ * - Solved via overdamped Stokes relaxation in a dense viscous fluid (zero inertia,
+ *   zero oscillations).
+ *
+ * @param {{lat: number, lon: number}} tCoord
+ * @param {{lat: number, lon: number}} lCoord
+ * @param {object} [options={}]
+ * @returns {{ dx: number, dy: number, distancePx: number, halfSpanPx: number, placement: 'top' | 'bottom' }}
+ */
+export function computeGlideBalloonEquilibrium(tCoord, lCoord, options = {}) {
+  if (!tCoord || !lCoord) {
+    return { dx: 0, dy: -22, distancePx: 22, halfSpanPx: 40, placement: 'top' };
+  }
+
+  const zoom = Number.isFinite(Number(options.zoom)) ? Number(options.zoom) : 14;
+  const tWindDir = options.tWindDir ?? 180;
+  const lWindDir = options.lWindDir ?? tWindDir;
+  const tHeading = options.tHeading ?? null;
+
+  let tPx = options.tPointPx;
+  let lPx = options.lPointPx;
+  if (!tPx || !lPx || !Number.isFinite(tPx.x) || !Number.isFinite(lPx.x)) {
+    tPx = projectWebMercatorPx(tCoord.lat, tCoord.lon, zoom);
+    lPx = projectWebMercatorPx(lCoord.lat, lCoord.lon, zoom);
+  }
+
+  // Coordinates of Takeoff (Pt) and Landing (Pl) relative to midpoint origin P0(0,0)
+  const ptX = (tPx.x - lPx.x) / 2;
+  const ptY = (tPx.y - lPx.y) / 2;
+  const plX = -ptX;
+  const plY = -ptY;
+
+  const halfSpanPx = Math.hypot(ptX, ptY);
+  const ux = halfSpanPx > 0.001 ? plX / halfSpanPx : 1;
+  const uy = halfSpanPx > 0.001 ? plY / halfSpanPx : 0;
+
+  // Windsock flow unit vectors in screen space (+X East, +Y South/Down)
+  const toFlowRad = (((Number(tWindDir) || 0) + 180) % 360) * (Math.PI / 180);
+  const ldFlowRad = (((Number(lWindDir) || 0) + 180) % 360) * (Math.PI / 180);
+  const wtX = Math.sin(toFlowRad);
+  const wtY = -Math.cos(toFlowRad);
+  const wlX = Math.sin(ldFlowRad);
+  const wlY = -Math.cos(ldFlowRad);
+
+  let wNetX = wtX + wlX;
+  let wNetY = wtY + wlY;
+  if (tHeading != null && !isNaN(Number(tHeading))) {
+    const hRad = (Number(tHeading) * Math.PI) / 180;
+    wNetX += 0.45 * Math.sin(hRad);
+    wNetY += 0.45 * (-Math.cos(hRad));
+  }
+
+  // Two unit normals perpendicular to the glide line
+  const n1 = { x: -uy, y: ux };
+  const n2 = { x: uy, y: -ux };
+  const dot1 = n1.x * wNetX + n1.y * wNetY;
+  const dot2 = n2.x * wNetX + n2.y * wNetY;
+
+  let nFree;
+  if (Math.abs(dot1 - dot2) > 0.08) {
+    nFree = dot1 < dot2 ? n1 : n2;
+  } else {
+    nFree = n1.y <= n2.y ? n1 : n2;
+  }
+
+  // Escape unit vector blending perpendicular normal and anti-windsock direction
+  let escX = 0.65 * nFree.x - 0.35 * wNetX;
+  let escY = 0.65 * nFree.y - 0.35 * wNetY;
+  if (Math.abs(wtY + wlY) > 0.25) {
+    // Ensure vertical component opposes dominant windsock vertical direction
+    const preferredSignY = (wtY + wlY) < 0 ? 1 : -1;
+    if (escY * preferredSignY < 0) {
+      escY = preferredSignY * Math.max(0.4, Math.abs(escY));
+    }
+  }
+  const escLen = Math.hypot(escX, escY) || 1;
+  escX /= escLen;
+  escY /= escLen;
+
+  // Magnetic repeller poles relative to midpoint P0(0,0)
+  const wsReachPx = 28;
+  const repellers = [
+    { x: ptX, y: ptY, q: 52000, a: 26 },
+    { x: plX, y: plY, q: 52000, a: 26 },
+    { x: ptX + wsReachPx * wtX, y: ptY + wsReachPx * wtY, q: 44000, a: 24 },
+    { x: plX + wsReachPx * wlX, y: plY + wsReachPx * wlY, q: 44000, a: 24 }
+  ];
+
+  if (tHeading != null && !isNaN(Number(tHeading))) {
+    const hRad = (Number(tHeading) * Math.PI) / 180;
+    repellers.push({
+      x: ptX + 28 * Math.sin(hRad),
+      y: ptY - 28 * Math.cos(hRad),
+      q: 26000,
+      a: 24
+    });
+  }
+
+  // Overdamped Stokes relaxation in dense viscous liquid (zero inertia, zero oscillation)
+  const kSpring = 1.25;
+  const kAxialCradle = 2.8;
+  const viscosity = 3.5;
+  const maxStepPx = 3.2;
+  const maxStretchPx = 44;
+
+  // Attenuate magnetic pinch when takeoff and landing move far apart (high zoom)
+  const pinchFactor = 1 / (1 + Math.pow(halfSpanPx / 75, 2));
+  let rx = escX * 6 * pinchFactor;
+  let ry = escY * 6 * pinchFactor;
+
+  for (let iter = 0; iter < 32; iter++) {
+    // 1. Elastic restoring force toward midpoint origin P0(0,0)
+    let fx = -kSpring * rx;
+    let fy = -kSpring * ry;
+
+    // 2. Magnetic corridor pinch force when Takeoff & Landing poles approach each other in pixels
+    const pinchMag = (74000 * pinchFactor) / Math.pow(halfSpanPx * halfSpanPx + rx * rx + ry * ry + 720, 1.12);
+    fx += pinchMag * escX;
+    fy += pinchMag * escY;
+
+    // 3. Pairwise magnetic repulsion from Takeoff, Landing, Windsocks, and Sector Cone
+    let repFx = 0;
+    let repFy = 0;
+    for (let i = 0; i < repellers.length; i++) {
+      const rep = repellers[i];
+      const dx = rx - rep.x;
+      const dy = ry - rep.y;
+      const distSq = dx * dx + dy * dy;
+      // Smooth cutoff when repeller is far away (> 140px) so high zoom relaxes cleanly via elastic tether
+      if (distSq < 19600) {
+        const taper = 1 - distSq / 19600;
+        const denom = Math.pow(distSq + rep.a * rep.a, 1.5);
+        const fMag = (rep.q * taper) / denom;
+        repFx += fMag * dx;
+        repFy += fMag * dy;
+      }
+    }
+
+    // Project repulsion onto escape hemisphere and apply magnetic cradle damping along glide axis u
+    const repEscDot = repFx * escX + repFy * escY;
+    const repMag = Math.hypot(repFx, repFy);
+    fx += Math.max(0, repEscDot) * escX + 0.35 * repMag * escX;
+    fy += Math.max(0, repEscDot) * escY + 0.35 * repMag * escY;
+
+    // Axial cradle force from opposing Takeoff/Landing poles keeps balloon centered on midpoint bisector
+    const axialProj = rx * ux + ry * uy;
+    fx -= kAxialCradle * axialProj * ux;
+    fy -= kAxialCradle * axialProj * uy;
+
+    // Overdamped velocity step dr = F / viscosity
+    let stepX = fx / viscosity;
+    let stepY = fy / viscosity;
+    const stepLen = Math.hypot(stepX, stepY);
+    if (stepLen > maxStepPx) {
+      stepX = (stepX / stepLen) * maxStepPx;
+      stepY = (stepY / stepLen) * maxStepPx;
+    }
+
+    rx += stepX;
+    ry += stepY;
+
+    const rLen = Math.hypot(rx, ry);
+    if (rLen > maxStretchPx) {
+      rx = (rx / rLen) * maxStretchPx;
+      ry = (ry / rLen) * maxStretchPx;
+    }
+  }
+
+  const dx = Math.round(rx * 10) / 10;
+  const dy = Math.round(ry * 10) / 10;
+  const distancePx = Math.round(Math.hypot(dx, dy) * 10) / 10;
+  const placement = dy > 0 ? 'bottom' : 'top';
+
+  return { dx, dy, distancePx, halfSpanPx: Math.round(halfSpanPx * 10) / 10, placement };
+}
+
+/**
+ * Resolves the optimal anti-collision balloon placement ('top' vs 'bottom')
+ * relative to the midpoint of the glide line.
+ */
+export function resolveGlideBalloonPlacement(tCoord, lCoord, tWindDir = 180, lWindDir = 180, tHeading = null, zoom = 14) {
+  const eq = computeGlideBalloonEquilibrium(tCoord, lCoord, { zoom, tWindDir, lWindDir, tHeading });
+  return eq.placement;
 }
 
 function escapeHtml(str) {
@@ -776,7 +1002,12 @@ export class LeafletMapEngine {
       }
     });
 
+    this.map.on('zoom', () => {
+      this.updateGlideBalloonPosition();
+    });
+
     this.map.on('zoomend', () => {
+      this.updateGlideBalloonPosition();
       if (typeof this.options.onZoomEnd === 'function') {
         this.options.onZoomEnd(this.map.getZoom());
       }
@@ -1129,6 +1360,7 @@ export class LeafletMapEngine {
     if (this.map && typeof this.map.zoomIn === 'function') {
       this.map.zoomIn(delta);
     }
+    this.updateGlideBalloonPosition();
     return this;
   }
 
@@ -1136,6 +1368,7 @@ export class LeafletMapEngine {
     if (this.map && typeof this.map.zoomOut === 'function') {
       this.map.zoomOut(delta);
     }
+    this.updateGlideBalloonPosition();
     return this;
   }
 
@@ -1204,6 +1437,7 @@ export class LeafletMapEngine {
 
     this.takeoffWindsockAngle = (tDir + 180) % 360;
     this.landingWindsockAngle = (lDir + 180) % 360;
+    this.lastGlideWeatherState = { tDir, lDir, tHeading };
 
     // 1. Takeoff Slope Exposure Sector (Cono e Azimut di Decollo)
     if (tCoord) {
@@ -1241,19 +1475,18 @@ export class LeafletMapEngine {
       this.overlayLayerGroup.addLayer(this.takeoffWindsockMarker);
     }
 
-    // 3. Landing Marker (Compact aeronautical pin, zero location name clutter) + Landing Windsock
+    // 3. Landing Marker (Compact aeronautical pin, zero location/altitude clutter) + Landing Windsock
     if (lCoord) {
       const landingName = (spotData.landing?.name || 'Atterraggio').replace(/^Atterraggio\s*/i, '');
       const lIcon = window.L.divIcon({
         className: 'gm-map-div-icon',
         html: `
-          <div class="gm-mini-pin gm-mini-pin-landing ${isLandingSelected ? 'gm-mini-pin-focused' : ''}" title="Atterraggio ${landingName} (${lAlt}m)">
+          <div class="gm-mini-pin gm-mini-pin-landing ${isLandingSelected ? 'gm-mini-pin-focused' : ''}" title="Atterraggio ${landingName}">
             <span class="gm-mini-pin-glyph">⏚</span>
-            <span class="gm-mini-pin-alt">${lAlt}m</span>
           </div>
         `,
-        iconSize: [54, 22],
-        iconAnchor: [27, 11]
+        iconSize: [22, 22],
+        iconAnchor: [11, 11]
       });
       this.landingMarker = window.L.marker([lCoord.lat, lCoord.lon], {
         icon: lIcon,
@@ -1281,7 +1514,7 @@ export class LeafletMapEngine {
       this.overlayLayerGroup.addLayer(this.landingWindsockMarker);
     }
 
-    // 4. Geodesic Glide Cone Line & Midpoint Elevation Drop Badge
+    // 4. Geodesic Glide Cone Line & Midpoint Magneto-Elastic Callout Balloon
     if (tCoord && lCoord) {
       const glideColor = glide.isSafe ? '#16a34a' : (glide.severity === 1 ? '#ca8a04' : '#dc2626');
       this.glidePolyline = window.L.polyline(
@@ -1295,16 +1528,47 @@ export class LeafletMapEngine {
       );
       this.overlayLayerGroup.addLayer(this.glidePolyline);
 
-      // Place aeronautical elevation drop badge at midpoint of the glide line
+      // Place aeronautical 2-line callout balloon (elevation drop + straight-line distance) at midpoint
+      // tied with an SVG elastic tether and subject to overdamped magnetic repulsion from Takeoff/Landing
       const midLat = (tCoord.lat + lCoord.lat) / 2;
       const midLon = (tCoord.lon + lCoord.lon) / 2;
-      const deltaH = Math.abs(Number(tAlt || 0) - Number(lAlt || 0));
+      const deltaH = Math.abs(Math.round(Number(tAlt || 0) - Number(lAlt || 0)));
+      const distKm = computeDistanceKm(tCoord.lat, tCoord.lon, lCoord.lat, lCoord.lon);
+      const distLabel = formatGlideDistanceLabel(distKm);
+      const eq = this.computeCurrentGlideBalloonEquilibrium(tCoord, lCoord, tDir, lDir, tHeading);
+      this.glideBalloonPlacement = eq.placement;
+      this.glideBalloonEquilibrium = eq;
+      this.glideBalloonAnimState = {
+        x: eq.dx,
+        y: eq.dy,
+        vx: 0,
+        vy: 0,
+        ctrlX: 80 + eq.dx * 0.5,
+        ctrlY: 80 + eq.dy * 0.5,
+        targetX: eq.dx,
+        targetY: eq.dy,
+        placement: eq.placement
+      };
+
+      const endX = Math.round((80 + eq.dx) * 10) / 10;
+      const endY = Math.round((80 + eq.dy) * 10) / 10;
+      const ctrlX = Math.round((80 + eq.dx * 0.5) * 10) / 10;
+      const ctrlY = Math.round((80 + eq.dy * 0.5) * 10) / 10;
 
       const deltaIcon = window.L.divIcon({
         className: 'gm-glide-delta-badge-container',
-        html: `<div class="gm-glide-delta-badge" title="Dislivello: ${deltaH}m">Δ ${deltaH}m</div>`,
-        iconSize: [54, 18],
-        iconAnchor: [27, 9]
+        html: `
+          <svg class="gm-glide-tether-svg" width="160" height="160" viewBox="0 0 160 160" style="position:absolute;inset:0;width:160px;height:160px;pointer-events:none;overflow:visible;z-index:0;" aria-hidden="true">
+            <circle cx="80" cy="80" r="2.5" class="gm-glide-tether-origin" />
+            <path d="M 80 80 Q ${ctrlX} ${ctrlY} ${endX} ${endY}" x1="80" y1="80" x2="${endX}" y2="${endY}" class="gm-glide-tether-line" fill="none" />
+          </svg>
+          <div class="gm-glide-delta-badge gm-glide-balloon gm-glide-balloon-${eq.placement}" data-placement="${eq.placement}" data-dx="${eq.dx}" data-dy="${eq.dy}" style="position:relative;z-index:10;transform:translate3d(${eq.dx}px, ${eq.dy}px, 0);" title="Dislivello: ${deltaH}m · Distanza: ${distLabel}">
+            <span class="gm-glide-balloon-row">Δ ${deltaH}m</span>
+            <span class="gm-glide-balloon-row gm-glide-balloon-dist">↔ ${distLabel}</span>
+          </div>
+        `,
+        iconSize: [160, 160],
+        iconAnchor: [80, 80]
       });
       this.glideDeltaMarker = window.L.marker([midLat, midLon], {
         icon: deltaIcon,
@@ -1317,33 +1581,39 @@ export class LeafletMapEngine {
     // 5. Fit bounds with safe padding (overview) OR zoom directly on selected sub-spot
     if (isTakeoffSelected && tCoord) {
       this.map.setView([tCoord.lat, tCoord.lon], 15.5);
+      this.updateGlideBalloonPosition();
       if (typeof window !== 'undefined') {
         setTimeout(() => {
           if (this.map) {
             this.map.invalidateSize();
             this.map.setView([tCoord.lat, tCoord.lon], 15.5);
+            this.updateGlideBalloonPosition();
           }
         }, 50);
       }
     } else if (isLandingSelected && lCoord) {
       this.map.setView([lCoord.lat, lCoord.lon], 15.5);
+      this.updateGlideBalloonPosition();
       if (typeof window !== 'undefined') {
         setTimeout(() => {
           if (this.map) {
             this.map.invalidateSize();
             this.map.setView([lCoord.lat, lCoord.lon], 15.5);
+            this.updateGlideBalloonPosition();
           }
         }, 50);
       }
     } else if (tCoord && lCoord) {
       const bounds = window.L.latLngBounds([[tCoord.lat, tCoord.lon], [lCoord.lat, lCoord.lon]]);
       this.map.fitBounds(bounds, { padding: [35, 35], maxZoom: 15 });
+      this.updateGlideBalloonPosition();
 
       if (typeof window !== 'undefined') {
         setTimeout(() => {
           if (this.map) {
             this.map.invalidateSize();
             this.map.fitBounds(bounds, { padding: [35, 35], maxZoom: 15 });
+            this.updateGlideBalloonPosition();
           }
         }, 50);
       }
@@ -1356,11 +1626,186 @@ export class LeafletMapEngine {
     // Schedule invalidateSize for layout readiness in SPAs
     if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
       window.requestAnimationFrame(() => {
-        if (this.map) this.map.invalidateSize();
+        if (this.map) {
+          this.map.invalidateSize();
+          this.updateGlideBalloonPosition();
+        }
       });
     }
 
     return this;
+  }
+
+  computeCurrentGlideBalloonEquilibrium(tCoord, lCoord, tDir = 180, lDir = 180, tHeading = null) {
+    const zoom = (this.map && typeof this.map.getZoom === 'function')
+      ? Number(this.map.getZoom())
+      : 13.5;
+    return computeGlideBalloonEquilibrium(tCoord, lCoord, {
+      zoom: Number.isFinite(zoom) ? zoom : 13.5,
+      tWindDir: tDir,
+      lWindDir: lDir,
+      tHeading
+    });
+  }
+
+  applyGlideBalloonDomFrame(x, y, ctrlX, ctrlY, placement) {
+    if (!this.glideDeltaMarker || typeof this.glideDeltaMarker.getElement !== 'function') return;
+    const deltaRoot = this.glideDeltaMarker.getElement();
+    if (!deltaRoot) return;
+
+    const rx = Math.round(x * 100) / 100;
+    const ry = Math.round(y * 100) / 100;
+    const badgeEl = deltaRoot.querySelector?.('.gm-glide-balloon') || deltaRoot;
+    if (badgeEl) {
+      if (badgeEl.classList) {
+        badgeEl.classList.remove('gm-glide-balloon-top', 'gm-glide-balloon-bottom');
+        badgeEl.classList.add(`gm-glide-balloon-${placement}`);
+      }
+      if (badgeEl.dataset) {
+        badgeEl.dataset.placement = placement;
+        badgeEl.dataset.dx = String(Math.round(rx * 10) / 10);
+        badgeEl.dataset.dy = String(Math.round(ry * 10) / 10);
+      }
+      if (badgeEl.style) {
+        badgeEl.style.zIndex = '10';
+        badgeEl.style.transform = `translate3d(${rx}px, ${ry}px, 0)`;
+      }
+    }
+
+    const tetherLine = deltaRoot.querySelector?.('.gm-glide-tether-line');
+    if (tetherLine && typeof tetherLine.setAttribute === 'function') {
+      const endX = Math.round((80 + rx) * 10) / 10;
+      const endY = Math.round((80 + ry) * 10) / 10;
+      const cx = Math.round(ctrlX * 10) / 10;
+      const cy = Math.round(ctrlY * 10) / 10;
+      tetherLine.setAttribute('d', `M 80 80 Q ${cx} ${cy} ${endX} ${endY}`);
+      tetherLine.setAttribute('x2', String(endX));
+      tetherLine.setAttribute('y2', String(endY));
+    }
+  }
+
+  startGlideBalloonOrganicLoop() {
+    if (typeof window === 'undefined' || typeof window.requestAnimationFrame !== 'function') {
+      const st = this.glideBalloonAnimState;
+      if (st) {
+        st.x = st.targetX;
+        st.y = st.targetY;
+        st.ctrlX = 80 + st.targetX * 0.5;
+        st.ctrlY = 80 + st.targetY * 0.5;
+        this.applyGlideBalloonDomFrame(st.x, st.y, st.ctrlX, st.ctrlY, st.placement);
+      }
+      return;
+    }
+
+    if (this.glideBalloonRafId) return;
+
+    const stepFrame = () => {
+      this.glideBalloonRafId = null;
+      const st = this.glideBalloonAnimState;
+      if (!st || !this.glideDeltaMarker) return;
+
+      const errX = st.targetX - st.x;
+      const errY = st.targetY - st.y;
+      const distErr = Math.hypot(errX, errY);
+      const speed = Math.hypot(st.vx, st.vy);
+
+      // Add subtle hydrodynamic swirl perpendicular to displacement so transitions arc organically around origin
+      const cross = st.x * st.targetY - st.y * st.targetX;
+      const swirlSign = cross >= 0 ? 1 : -1;
+      const swirlFactor = Math.min(0.18, distErr / 180) * swirlSign;
+      const driveX = errX - swirlFactor * errY;
+      const driveY = errY + swirlFactor * errX;
+
+      // Soft elastic pull + dense viscous fluid damping (overdamped, organic acceleration & settling)
+      const kPull = 0.085;
+      const fluidDrag = 0.76;
+      st.vx = (st.vx + driveX * kPull) * fluidDrag;
+      st.vy = (st.vy + driveY * kPull) * fluidDrag;
+
+      st.x += st.vx;
+      st.y += st.vy;
+
+      // Hydrodynamic lag on the elastic tether midpoint control node (bends gently in viscous liquid)
+      const idealCtrlX = 80 + st.x * 0.52 - st.vy * 1.35;
+      const idealCtrlY = 80 + st.y * 0.52 + st.vx * 1.35;
+      st.ctrlX += (idealCtrlX - st.ctrlX) * 0.18;
+      st.ctrlY += (idealCtrlY - st.ctrlY) * 0.18;
+
+      const livePlacement = st.y > 0 ? 'bottom' : 'top';
+      st.placement = livePlacement;
+      this.applyGlideBalloonDomFrame(st.x, st.y, st.ctrlX, st.ctrlY, livePlacement);
+
+      const ctrlErr = Math.hypot(80 + st.targetX * 0.5 - st.ctrlX, 80 + st.targetY * 0.5 - st.ctrlY);
+      if (distErr > 0.15 || speed > 0.08 || ctrlErr > 0.25) {
+        this.glideBalloonRafId = window.requestAnimationFrame(stepFrame);
+      } else {
+        st.x = st.targetX;
+        st.y = st.targetY;
+        st.vx = 0;
+        st.vy = 0;
+        st.ctrlX = 80 + st.targetX * 0.5;
+        st.ctrlY = 80 + st.targetY * 0.5;
+        this.applyGlideBalloonDomFrame(st.x, st.y, st.ctrlX, st.ctrlY, st.placement);
+      }
+    };
+
+    this.glideBalloonRafId = window.requestAnimationFrame(stepFrame);
+  }
+
+  updateGlideBalloonPosition(tWeatherOverride = null, lWeatherOverride = null) {
+    if (!this.glideDeltaMarker || !this.activeMiniMapSpotData) return null;
+    const spotData = this.activeMiniMapSpotData;
+    const tCoord = parseCoordinates(spotData.takeoff?.coordinates || spotData.comprensorio?.takeoffs?.[0]?.coordinates);
+    const lCoord = parseCoordinates(spotData.landing?.coordinates || spotData.comprensorio?.landings?.[0]?.coordinates);
+    if (!tCoord || !lCoord) return null;
+
+    const prev = this.lastGlideWeatherState || {};
+    const tDir = tWeatherOverride?.windDirection ?? tWeatherOverride?.windDir ?? prev.tDir ?? 180;
+    const lDir = lWeatherOverride?.windDirection ?? lWeatherOverride?.windDir ?? prev.lDir ?? tDir;
+    const tHeading = spotData.takeoff?.heading ?? prev.tHeading ?? null;
+    this.lastGlideWeatherState = { tDir, lDir, tHeading };
+
+    const eq = this.computeCurrentGlideBalloonEquilibrium(tCoord, lCoord, tDir, lDir, tHeading);
+    this.glideBalloonPlacement = eq.placement;
+    this.glideBalloonEquilibrium = eq;
+
+    if (!this.glideBalloonAnimState) {
+      this.glideBalloonAnimState = {
+        x: eq.dx,
+        y: eq.dy,
+        vx: 0,
+        vy: 0,
+        ctrlX: 80 + eq.dx * 0.5,
+        ctrlY: 80 + eq.dy * 0.5,
+        targetX: eq.dx,
+        targetY: eq.dy,
+        placement: eq.placement
+      };
+    } else {
+      this.glideBalloonAnimState.targetX = eq.dx;
+      this.glideBalloonAnimState.targetY = eq.dy;
+      this.glideBalloonAnimState.placement = eq.placement;
+    }
+
+    // Update dataset attributes immediately for deterministic inspection while animating visual transform organically
+    if (typeof this.glideDeltaMarker.getElement === 'function') {
+      const deltaRoot = this.glideDeltaMarker.getElement();
+      const badgeEl = deltaRoot?.querySelector?.('.gm-glide-balloon') || deltaRoot;
+      if (badgeEl) {
+        if (badgeEl.classList) {
+          badgeEl.classList.remove('gm-glide-balloon-top', 'gm-glide-balloon-bottom');
+          badgeEl.classList.add(`gm-glide-balloon-${eq.placement}`);
+        }
+        if (badgeEl.dataset) {
+          badgeEl.dataset.placement = eq.placement;
+          badgeEl.dataset.dx = String(eq.dx);
+          badgeEl.dataset.dy = String(eq.dy);
+        }
+      }
+    }
+
+    this.startGlideBalloonOrganicLoop();
+    return eq;
   }
 
   updateWindsockMarker(takeoffWeather, landingWeatherOrIsLanding = false, takeoff = null) {
@@ -1457,6 +1902,9 @@ export class LeafletMapEngine {
         }
       }
     }
+
+    // 3. Dynamically recalculate magneto-elastic equilibrium when wind direction changes
+    this.updateGlideBalloonPosition(tWeather, lWeather);
   }
 
   updateGlideLine(glideMetrics) {
@@ -1570,13 +2018,12 @@ export class LeafletMapEngine {
       const lIcon = window.L.divIcon({
         className: 'gm-map-div-icon',
         html: `
-          <div class="gm-mini-pin gm-mini-pin-landing gm-mini-pin-focused" title="Atterraggio ${landingName} (${lAlt}m)">
+          <div class="gm-mini-pin gm-mini-pin-landing gm-mini-pin-focused" title="Atterraggio ${landingName}">
             <span class="gm-mini-pin-glyph">⏚</span>
-            <span class="gm-mini-pin-alt">${lAlt}m</span>
           </div>
         `,
-        iconSize: [60, 24],
-        iconAnchor: [30, 12]
+        iconSize: [22, 22],
+        iconAnchor: [11, 11]
       });
       this.flightLandingPin = window.L.marker([lCoord.lat, lCoord.lon], {
         icon: lIcon,

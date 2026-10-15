@@ -17,16 +17,16 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     assert.equal(typeof controller.renderHtml, 'function');
   });
 
-  it('should render the minimal 2-block architecture without PIN or favorites icons', () => {
+  it('should render Volabilità as the primary Above-the-Fold section without the 4-row pilot activity card', () => {
     const mockStore = createStore();
     const controller = new HomeDashboardViewController({ store: mockStore });
     const html = controller.renderHtml();
 
-    // Block 1: Volabilità SITI
+    // Primary section: Volabilità SITI
     assert.ok(html.includes('Volabilità</h2>'), 'Must include clean Volabilità section heading');
     assert.ok(html.includes('Chialamberto'), 'Must render default favorite spot name');
-    assert.ok(html.includes('gm-spot-flight-row'), 'Must show flight metrics row');
-    assert.ok(html.includes('gm-spot-explain'), 'Must include Explainability callout');
+    assert.ok(html.includes('gm-home-timeline'), 'Must show diurnal flyability timeline row (Option A)');
+    assert.ok(html.includes('gm-spot-explain'), 'Must include compact micro-reason in header');
 
     // Strict check: No PIN or favorites elements
     assert.equal(html.includes('data-action="unpin"'), false, 'Must NOT contain unpin action');
@@ -52,52 +52,40 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     assert.ok(headerMatch, 'Header must exist');
     assert.equal(/\b\d{4}-\d{2}-\d{2}\b/.test(headerMatch[0]), false, 'Header must NOT contain date string');
 
-    // Block 2: Pilot Activity & Logbook KPIs
-    assert.ok(html.includes('Attività Pilota'), 'Must include Pilot Activity section');
-    assert.ok(html.includes('Ore di Volo'), 'Must include flight hours KPI tile');
-    assert.ok(html.includes('Termica'), 'Must include thermal sessions KPI tile');
-    assert.ok(html.includes('Esercizi'), 'Must include exercise sessions KPI tile');
-    assert.ok(html.includes('30 Giorni'), 'Must include 30-day period toggle');
-    assert.ok(html.includes('Anno'), 'Must include year period toggle');
-    assert.ok(html.includes('Registra Volo'), 'Must include manual flight log registration action');
-    assert.ok(html.includes('Traccia IGC'), 'Must include IGC track upload action');
+    // Home must NOT render the heavy 4-row .gm-pilot-card Above-the-Fold
+    assert.equal(html.includes('gm-pilot-card'), false, 'Home must not render the 4-row pilot card Above-the-Fold');
+    assert.ok(html.includes('id="btn-home-select-glider"'), 'Must render compact active glider pill on filter bar');
   });
 
-  it('should render Attività Pilota as the first section before Volabilità', () => {
+  it('should render Volabilità immediately after the header for instant meteorological triage', () => {
     const mockStore = createStore();
     const controller = new HomeDashboardViewController({ store: mockStore });
     const html = controller.renderHtml();
 
-    const pilotIdx = html.indexOf('heading-pilot-currency');
+    const headerEndIdx = html.indexOf('</header>');
     const spotsIdx = html.indexOf('heading-comprensori');
 
-    assert.ok(pilotIdx > 0, 'Pilot currency heading must exist');
-    assert.ok(spotsIdx > 0, 'Volabilità spots heading must exist');
-    assert.ok(pilotIdx < spotsIdx, 'Attività Pilota must appear before Volabilità spots');
+    assert.ok(headerEndIdx > 0, 'Header must exist');
+    assert.ok(spotsIdx > headerEndIdx, 'Volabilità spots heading must appear right after header');
+    assert.equal(html.includes('heading-pilot-currency'), false, 'Pilot currency section heading must be moved out of Home');
   });
 
-  it('should strictly enforce the Unico Binomio contract (1 takeoff, 1 landing) with explicit names per card', () => {
+  it('should strictly enforce the Unico Binomio contract (1 takeoff, 1 landing) and render diurnal flyability timeline per card', () => {
     const mockStore = createStore();
     const controller = new HomeDashboardViewController({ store: mockStore });
     const html = controller.renderHtml();
 
-    // Verify all 4 cards contain exactly 1 takeoff arrow (↗) and 1 landing arrow (↘)
-    const takeoffMatches = html.match(/class="gm-flight-icon">↗<\/span>/g);
-    const landingMatches = html.match(/class="gm-flight-icon">↘<\/span>/g);
+    // Verify all 3 cards expose 1 takeoff and 1 landing via semantic data attributes and aria-label, plus a diurnal timeline
+    const timelineMatches = html.match(/class="gm-home-timeline"/g);
+    assert.equal(timelineMatches ? timelineMatches.length : 0, 3, 'Must render 1 diurnal timeline per comprensorio card');
 
-    assert.equal(takeoffMatches ? takeoffMatches.length : 0, 3, 'Must have exactly 3 takeoff indicators (1 per card)');
-    assert.equal(landingMatches ? landingMatches.length : 0, 3, 'Must have exactly 3 landing indicators (1 per card)');
-
-    // Verify explicit names are rendered (not cryptic symbols or just "Decollo")
-    assert.ok(html.includes('Ciavanis') || html.includes('Cossiglia'), 'Chialamberto takeoff name must be explicit');
-    assert.ok(html.includes('Baratonga') || html.includes('PeterPan'), 'Chialamberto landing name must be explicit');
-    assert.ok(html.includes('Martiniana'), 'Martiniana takeoff/landing name must be explicit');
-    assert.ok(html.includes('Manifestazione') || html.includes('Cavallaria'), 'Cavallaria takeoff name must be explicit');
-    assert.ok(html.includes('Lessolo'), 'Cavallaria landing name must be explicit');
-
-    // Verify glide efficiency label and ratio format
-    assert.ok(html.includes('gm-glide-label">Efficienza</span>'), 'Landing glide efficiency label must exist');
-    assert.ok(/1:\d+\.\d+/.test(html), 'Landing glide ratio must be formatted as 1:X.X');
+    // Verify explicit binomio names are bound in aria-label / data attributes without cluttering visible card text
+    assert.ok(html.includes('Ciavanis') || html.includes('Cossiglia'), 'Chialamberto takeoff name must be bound');
+    assert.ok(html.includes('Baratonga') || html.includes('PeterPan'), 'Chialamberto landing name must be bound');
+    assert.ok(html.includes('Martiniana'), 'Martiniana name must be bound');
+    assert.ok(html.includes('Manifestazione') || html.includes('Cavallaria'), 'Cavallaria takeoff name must be bound');
+    assert.ok(html.includes('Lessolo'), 'Cavallaria landing name must be bound');
+    assert.ok(html.includes('data-action="view-forecast-hour"'), 'Must render interactive hourly slots in diurnal timeline');
   });
 
   it('should filter comprensori via instant search input (NN/G #6)', () => {
@@ -250,27 +238,42 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     assert.equal(listenerRemoved, true);
   });
 
-  it('should toggle pilot period between 30 Giorni and Anno, recalculating flight hours and sessions', () => {
+  it('should toggle optional Pilot Currency & Experience factor and apply conservative derating to flyability with explainability', () => {
     const mockStore = createStore({
-      activeDate: '2026-10-08'
+      activeDate: '2026-10-10',
+      usePilotCurrencyFactor: false,
+      flights: [
+        { id: 'f-lapsed', date: '2026-05-01', durationMinutes: 40 }
+      ],
+      weatherData: {
+        hourly: {
+          time: ['2026-10-10T14:00'],
+          wind_speed_10m: [14],
+          wind_gusts_10m: [21], // 7 km/h spread: optimal for standard EN-A (<=8), but caution when derated by 0.75x (limit 6 km/h)
+          wind_direction_10m: [180], // aligned with Chialamberto South (180 deg)
+          precipitation: [0],
+          cape: [100],
+          turbulence_edr: [0.10],
+          temperature_2m: [20]
+        }
+      }
     });
     const controller = new HomeDashboardViewController({ store: mockStore });
 
-    // Initial state: 30 Giorni (month)
-    assert.equal(controller.pilotPeriod, 'month');
-    let html = controller.renderHtml();
-    assert.ok(html.includes('3 h</span>'), 'Month should show 3 h total');
-    assert.equal(html.includes('gm-kpi-sub'), false, 'Must not render cluttered sub-line');
+    // With factor disabled: Chialamberto is flyable
+    let evaluated = controller.getEvaluatedComprensori();
+    const chialambertoPure = evaluated.find(s => s.id === 'chialamberto-valli-di-lanzo-to-to' || s.name === 'Chialamberto');
+    assert.ok(chialambertoPure);
+    assert.equal(chialambertoPure.status, 'flyable');
 
-    // Simulate clicking period toggle: 'year'
-    const mockEventYear = {
+    // Simulate toggling the pilot currency factor ON
+    controller.handleClick({
       target: {
-        closest(selector) {
-          if (selector === '[data-action]') {
+        closest(sel) {
+          if (sel === '[data-action]') {
             return {
               getAttribute(attr) {
-                if (attr === 'data-action') return 'set-pilot-period';
-                if (attr === 'data-period') return 'year';
+                if (attr === 'data-action') return 'toggle-pilot-currency-factor';
                 return null;
               }
             };
@@ -278,57 +281,27 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
           return null;
         }
       }
-    };
+    });
 
-    controller.handleClick(mockEventYear);
-    assert.equal(controller.pilotPeriod, 'year');
-    html = controller.renderHtml();
-    assert.ok(html.includes('7.4 h</span>'), 'Year should show 7.4 h total');
-    assert.equal(html.includes('gm-kpi-sub'), false, 'Year view must not render cluttered sub-line');
-
-    // Toggle back to 'month'
-    const mockEventMonth = {
-      target: {
-        closest(selector) {
-          if (selector === '[data-action]') {
-            return {
-              getAttribute(attr) {
-                if (attr === 'data-action') return 'set-pilot-period';
-                if (attr === 'data-period') return 'month';
-                return null;
-              }
-            };
-          }
-          return null;
-        }
-      }
-    };
-
-    controller.handleClick(mockEventMonth);
-    assert.equal(controller.pilotPeriod, 'month');
-    html = controller.renderHtml();
-    assert.ok(html.includes('3 h</span>'), 'Month should revert to 3 h total');
+    assert.equal(mockStore.getState().usePilotCurrencyFactor, true);
+    evaluated = controller.getEvaluatedComprensori();
+    const chialambertoDerated = evaluated.find(s => s.id === 'chialamberto-valli-di-lanzo-to-to' || s.name === 'Chialamberto');
+    assert.ok(chialambertoDerated);
+    assert.equal(chialambertoDerated.status, 'caution', 'Should downgrade from flyable to caution when pilot is lapsed (>90d) and factor is enabled');
+    assert.ok(
+      chialambertoDerated.reason.includes('Prudenza pilota') || chialambertoDerated.reason.includes('Meteo favorevole per la vela'),
+      'Reason must explicitly explain that downgrade is due to pilot currency/experience factor'
+    );
   });
 
   it('should not ask the pilot for session type in flight log entry sheet and support automated activity deduction', () => {
     const mockStore = createStore();
     const controller = new HomeDashboardViewController({ store: mockStore });
 
-    // Mock openSheet to inspect passed contentHtml
-    let sheetConfig = null;
-    const originalOpenSheet = globalThis.__mockOpenSheet;
-    
-    // We can call openAddFlightSheet and capture the sheet content
-    let capturedContent = '';
-    // Temporarily spy on openSheet
-    const sheetManagerModule = import('../../ui/sheetManager.js');
-    
     // Check renderHtml does not contain any session type prompt on the main dashboard
     const html = controller.renderHtml();
     assert.equal(html.includes('gm-type-selector'), false, 'Main dashboard must not contain session type selector');
 
-    // Call openAddFlightSheet and verify the DOM if in browser, or verify sheet config
-    // Let's inspect the openAddFlightSheet code string directly via controller
     const methodStr = controller.openAddFlightSheet.toString();
     assert.equal(methodStr.includes('Tipo Sessione'), false, 'Must NOT contain Tipo Sessione label');
     assert.equal(methodStr.includes('gm-type-selector'), false, 'Must NOT contain gm-type-selector');
@@ -337,7 +310,7 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     assert.ok(methodStr.includes('gm-past-presets'), 'Must provide fast past date presets (Oggi, Ieri, Weekend)');
   });
 
-  it('should render smart date bar in Section 2 (Volabilità) and allow switching date', () => {
+  it('should render smart date bar in Volabilità section and allow switching date', () => {
     const mockStore = createStore({ activeDate: '2026-10-09' });
     const controller = new HomeDashboardViewController({ store: mockStore });
 
@@ -366,7 +339,7 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     assert.equal(mockStore.getState().activeDate, '2026-10-10');
   });
 
-  it('should open the 14-day date picker sheet with clean neutral dates in HomeDashboard', async () => {
+  it('should open the 14-day date picker sheet with symmetric flyability status badges and legend in HomeDashboard', async () => {
     const { initSheetManager } = await import('../../ui/sheetManager.js');
     let capturedHtml = '';
     const mockContainer = {
@@ -395,8 +368,8 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
 
     assert.ok(capturedHtml.includes('Calendario Previsioni (Prossimi 14 Giorni)'));
     assert.ok(capturedHtml.includes('data-action="pick-calendar-date"'));
-    assert.ok(!capturedHtml.includes('grid-fly-status'), 'Home calendar should not include spot-specific flyability badges');
-    assert.ok(!capturedHtml.includes('gm-date-sheet-legend'), 'Home calendar should not include single-spot flyability legend');
+    assert.ok(capturedHtml.includes('grid-fly-status'), 'Home calendar must include 14-day flyability status badges symmetric with ForecastView');
+    assert.ok(capturedHtml.includes('gm-date-sheet-legend'), 'Home calendar must include semantic 4-color flyability legend');
   });
 
   it('should display only favorite spots and react to store pinnedSpotIds changes', () => {
@@ -428,29 +401,30 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     assert.ok(emptyHtml.includes('data-action="go-to-forecast"'));
   });
 
-  it('should render the active glider pill in Pilot Currency section', () => {
+  it('should render the compact active glider pill on the filter bar at zero vertical cost', () => {
     const mockStore = createStore();
     const controller = new HomeDashboardViewController({ store: mockStore });
     const html = controller.renderHtml();
 
-    assert.ok(html.includes('gm-pilot-glider-row'), 'Must contain glider selector row');
-    assert.ok(html.includes('Vela Attiva'), 'Must contain Vela Attiva label');
+    assert.ok(html.includes('gm-filter-chips-right'), 'Must contain right-aligned filter bar container');
     assert.ok(html.includes('btn-home-select-glider'), 'Must contain select glider button');
+    assert.ok(html.includes('gm-glider-pill-compact'), 'Must use compact glider pill class');
     assert.ok(html.includes('EN-A'), 'Default glider class badge must be EN-A');
   });
 
-  it('should render 4-tier pilot continuity badges with explainability tooltips', () => {
+  it('should render conditional pilot continuity warning badge in Home only when non-optimal (Option B)', () => {
     const mockStore = createStore();
     const controller = new HomeDashboardViewController({ store: mockStore });
 
     // 1. Empty flights -> 'Nessun volo' with gm-badge-nd
     mockStore.setState({ flights: [] });
     let html = controller.renderHtml();
+    assert.ok(html.includes('id="home-pilot-currency-alert"'));
     assert.ok(html.includes('gm-badge gm-badge-nd'));
     assert.ok(html.includes('Nessun volo'));
     assert.ok(html.includes('Nessun volo registrato nel libretto'));
 
-    // 2. Recent flight -> 'In attività' with gm-badge-flyable
+    // 2. Recent flight (<=35 days) -> 'In attività' is optimal, so NO warning badge in Home (0px cost)
     mockStore.setState({
       activeDate: '2026-10-10',
       flights: [
@@ -458,9 +432,7 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
       ]
     });
     html = controller.renderHtml();
-    assert.ok(html.includes('gm-badge gm-badge-flyable'));
-    assert.ok(html.includes('In attività'));
-    assert.ok(html.includes('Continuità di volo ottimale'));
+    assert.equal(html.includes('id="home-pilot-currency-alert"'), false, 'Optimal currency must not clutter Home filter bar');
 
     // 3. Reentry (36-90 days) -> 'Ripresa graduale' with gm-badge-caution
     mockStore.setState({
@@ -470,6 +442,7 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
       ]
     });
     html = controller.renderHtml();
+    assert.ok(html.includes('id="home-pilot-currency-alert"'));
     assert.ok(html.includes('gm-badge gm-badge-caution'));
     assert.ok(html.includes('Ripresa graduale'));
     assert.ok(html.includes('Consigliata ripresa con condizioni tranquille'));
@@ -482,6 +455,7 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
       ]
     });
     html = controller.renderHtml();
+    assert.ok(html.includes('id="home-pilot-currency-alert"'));
     assert.ok(html.includes('gm-badge gm-badge-alert'));
     assert.ok(html.includes('Fermo prolungato'));
     assert.ok(html.includes('Consigliata cautela, campetto di gonfiaggio'));
@@ -1068,26 +1042,27 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     assert.ok(css.includes('.gm-theme-menu-item'), 'theme.css must declare .gm-theme-menu-item styles');
   });
 
-  it('should render quick flyability filter chips and filter spots by flyable status (Hick\'s Law & Baymard Facet Filtering)', () => {
+  it('should render symbiotic single-row toolbar with search, single flyability toggle pill, and hide filter toggle when searching (Hick\'s Law & Baymard Facet Filtering)', () => {
     const mockStore = createStore();
     const controller = new HomeDashboardViewController({ store: mockStore });
 
-    const html = controller.renderHtml();
-    assert.ok(html.includes('gm-filter-chips'), 'Must render gm-filter-chips container');
-    assert.ok(html.includes('data-filter="all"'), 'Must render Tutti filter chip');
-    assert.ok(html.includes('data-filter="flyable"'), 'Must render Volabili / Cautela filter chip');
+    let html = controller.renderHtml();
+    assert.ok(html.includes('id="home-symbiotic-toolbar"'), 'Must render symbiotic single-row toolbar');
+    assert.ok(html.includes('id="btn-home-fly-filter-toggle"'), 'Must render single flyability toggle pill');
+    assert.ok(html.includes('data-action="toggle-fly-filter"'), 'Must bind toggle-fly-filter action');
+    assert.ok(html.includes('Tutti ('), 'Default toggle pill must show Tutti (N)');
 
     // Default state: all spots
     assert.equal(controller.flyabilityFilter, 'all');
 
-    // Simulate clicking "Volabili / Cautela"
-    const mockChipEvent = {
+    // Simulate clicking single toggle pill to switch to "flyable"
+    const mockToggleToFlyable = {
       target: {
         closest(sel) {
           if (sel === '[data-action]') {
             return {
               getAttribute(attr) {
-                if (attr === 'data-action') return 'set-fly-filter';
+                if (attr === 'data-action') return 'toggle-fly-filter';
                 if (attr === 'data-filter') return 'flyable';
                 return null;
               }
@@ -1098,8 +1073,21 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
       }
     };
 
-    controller.handleClick(mockChipEvent);
+    controller.handleClick(mockToggleToFlyable);
     assert.equal(controller.flyabilityFilter, 'flyable');
+    html = controller.renderHtml();
+    assert.ok(html.includes('Volabili ('), 'Active toggle pill must show Volabili (M)');
+
+    // When starting a search, the flyability filter toggle must hide to give space to search box
+    controller.handleSearchInput({ target: { value: 'lecco' } });
+    html = controller.renderHtml();
+    assert.ok(html.includes('gm-symbiotic-toolbar is-searching'), 'Toolbar must have is-searching class during active search');
+    assert.ok(html.includes('gm-fly-filter-toggle active hidden') || html.includes('gm-fly-filter-toggle hidden'), 'Flyability filter toggle pill must be hidden when searching');
+
+    // Clear search -> filter toggle reappears
+    controller.clearSearch();
+    html = controller.renderHtml();
+    assert.equal(html.includes('is-searching'), false, 'Toolbar must remove is-searching after clearing search');
 
     // Switch back to "all"
     const mockAllEvent = {
@@ -1108,7 +1096,7 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
           if (sel === '[data-action]') {
             return {
               getAttribute(attr) {
-                if (attr === 'data-action') return 'set-fly-filter';
+                if (attr === 'data-action') return 'toggle-fly-filter';
                 if (attr === 'data-filter') return 'all';
                 return null;
               }
@@ -1141,6 +1129,43 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     // Verify filter chips styling
     assert.ok(css.includes('.gm-filter-chips'), 'Must declare .gm-filter-chips layout styles');
     assert.ok(css.includes('.gm-filter-chip.active'), 'Must declare active state for filter chips');
+  });
+
+  it('should render synoptic horizon notice as a floating bottom panel with a working close button', () => {
+    const css = fs.readFileSync(path.resolve('css/theme.css'), 'utf-8');
+    assert.ok(css.includes('.gm-horizon-notice {'), 'Must declare .gm-horizon-notice');
+    assert.ok(css.includes('.gm-warning-close-btn'), 'Must declare .gm-warning-close-btn');
+    assert.ok(css.includes('.gm-floating-warning-stack'), 'Must declare .gm-floating-warning-stack for Logbook floating banners');
+
+    const mockStore = createStore();
+    const synopticDate = new Date(Date.now() + 9 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    mockStore.setState({ activeDate: synopticDate });
+    const controller = new HomeDashboardViewController({ store: mockStore });
+
+    let dateBarHtml = controller.renderDateBar();
+    assert.ok(dateBarHtml.includes('gm-horizon-notice'), 'Must render horizon notice for synoptic date (>7d)');
+    assert.ok(dateBarHtml.includes('data-action="dismiss-horizon-notice"'), 'Must render close button on horizon notice');
+
+    // Click close button
+    controller.handleClick({
+      target: {
+        closest(sel) {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute(attr) {
+                if (attr === 'data-action') return 'dismiss-horizon-notice';
+                return null;
+              }
+            };
+          }
+          return null;
+        }
+      }
+    });
+
+    assert.equal(controller.dismissedHorizonDate, synopticDate, 'Must record dismissed horizon date');
+    dateBarHtml = controller.renderDateBar();
+    assert.equal(dateBarHtml.includes('gm-horizon-notice'), false, 'Must hide horizon notice after dismissal');
   });
 });
 

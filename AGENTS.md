@@ -12,15 +12,12 @@ Questo documento definisce i vincoli architetturali e operativi vincolanti per l
 
 ## 2. Riferimenti alle Specifiche di Dominio
 
-Per l'implementazione e la verifica dei moduli del progetto, consultare le specifiche dedicate in `.agents/rules/`:
-- **Integrità Scientifica e Anti-Sycophancy**: [.agents/rules/anti_sycophancy_integrity.md](file:///c:/github/GlideMind/.agents/rules/anti_sycophancy_integrity.md)
-- **Protocollo di Qualità Shift-Left & Pre-Delivery Gates**: [.agents/rules/shift_left_quality_gate.md](file:///c:/github/GlideMind/.agents/rules/shift_left_quality_gate.md)
+Per l'implementazione e la verifica dei moduli del progetto, consultare le specifiche di dominio dedicate in `.agents/rules/` (le regole trasversali di sobrietà, shift-left, mock guard e UX sono fornite dai plugin globali in `~/.gemini/config/plugins/`):
 - **Comprensorio e Binomio Decollo-Atterraggio**: [.agents/rules/comprensorio_locality_spec.md](file:///c:/github/GlideMind/.agents/rules/comprensorio_locality_spec.md)
 - **Profilo Pilota Principiante (EN-A)**: [.agents/rules/novice_pilot_spec.md](file:///c:/github/GlideMind/.agents/rules/novice_pilot_spec.md)
 - **Layout UI Mobile ed Ergonomia Visiva**: [.agents/rules/ui_layout_spec.md](file:///c:/github/GlideMind/.agents/rules/ui_layout_spec.md)
 - **Ergonomia Grafici e Serie Temporali (Parameteo Standard)**: [.agents/rules/ui_chart_design_spec.md](file:///c:/github/GlideMind/.agents/rules/ui_chart_design_spec.md)
 - **Design System UI & Coerenza Visiva**: [.agents/rules/ui_design_system_spec.md](file:///c:/github/GlideMind/.agents/rules/ui_design_system_spec.md)
-- **Guardia Mock Dati Meteo nei Test**: [.agents/rules/testing_weather_mock_guard.md](file:///c:/github/GlideMind/.agents/rules/testing_weather_mock_guard.md)
 - **Geodesia e Motore WebGL 3D**: [.agents/rules/geodesy_webgl_3d_spec.md](file:///c:/github/GlideMind/.agents/rules/geodesy_webgl_3d_spec.md)
 
 ---

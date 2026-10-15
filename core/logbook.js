@@ -302,6 +302,95 @@ export function calculatePilotPeriodMetrics(options = {}) {
 }
 
 /**
+ * Calculates the optional Pilot Currency & Experience Safety Factor for pre-flight flyability evaluation.
+ * Applies a conservative derating multiplier (never > 1.0) on active piloting thresholds
+ * (gust delta, atmospheric turbulence EDR, crosswind tolerance, convective CAPE) while leaving
+ * pure aerodynamic limits (max wind penetration vs trim speed and glide ratio to landing) untouched.
+ *
+ * Tiers:
+ * - 'optimal': currencyStatus === 'active' (<= 35d) AND totalFlights >= 15 -> multiplier 1.0
+ * - 'reentry': currencyStatus === 'reentry' (36-90d) -> multiplier 0.85 (-15% threshold margin)
+ * - 'low_experience': currencyStatus === 'active' or 'no_flights' AND totalFlights < 15 -> multiplier 0.85 (-15% margin)
+ * - 'lapsed': currencyStatus === 'lapsed' (> 90d) -> multiplier 0.75 (-25% threshold margin)
+ *
+ * @param {Object} [options]
+ * @param {Array<Object>} [options.flights=[]] - Recorded flights from logbook
+ * @param {string|Date} [options.referenceDate] - Reference date for recency calculation
+ * @param {boolean} [options.enabled=false] - Whether the optional factor is enabled by the pilot
+ * @returns {{
+ *   enabled: boolean,
+ *   tier: 'optimal' | 'reentry' | 'low_experience' | 'lapsed',
+ *   multiplier: number,
+ *   rawMultiplier: number,
+ *   daysSinceLastFlight: number | null,
+ *   currencyStatus: string,
+ *   currencyLabel: string,
+ *   currencyDescription: string,
+ *   totalFlights: number,
+ *   totalHours: number,
+ *   shortLabel: string,
+ *   reasonTag: string | null
+ * }}
+ */
+export function calculatePilotSafetyFactor(options = {}) {
+  const flights = Array.isArray(options.flights) ? options.flights : [];
+  const enabled = Boolean(options.enabled);
+  const metrics = calculatePilotPeriodMetrics({
+    flights,
+    period: 'year',
+    referenceDate: options.referenceDate
+  });
+
+  const validFlights = flights.filter(f => f && f.date);
+  const totalFlights = validFlights.length;
+  const totalMinutesAllTime = validFlights.reduce((sum, f) => {
+    return sum + Math.max(0, parseInt(f.durationMinutes, 10) || 0);
+  }, 0);
+  const totalHours = Number((totalMinutesAllTime / 60).toFixed(1));
+
+  let tier = 'optimal';
+  let rawMultiplier = 1.0;
+  let shortLabel = metrics.currencyLabel;
+  let reasonTag = null;
+
+  if (metrics.currencyStatus === PILOT_CURRENCY_STATUS.LAPSED) {
+    tier = 'lapsed';
+    rawMultiplier = 0.75;
+    shortLabel = metrics.currencyLabel;
+    reasonTag = `Cautela per ripresa dopo ${metrics.daysSinceLastFlight}gg di stop`;
+  } else if (metrics.currencyStatus === PILOT_CURRENCY_STATUS.REENTRY) {
+    tier = 'reentry';
+    rawMultiplier = 0.85;
+    shortLabel = metrics.currencyLabel;
+    reasonTag = `Margine prudenziale per ripresa (${metrics.daysSinceLastFlight}gg dall'ultimo volo)`;
+  } else if (totalFlights < 15) {
+    tier = 'low_experience';
+    rawMultiplier = 0.85;
+    shortLabel = totalFlights === 0 ? PILOT_CURRENCY_LABELS.no_flights : `${metrics.currencyLabel} (${totalFlights} voli)`;
+    reasonTag = totalFlights === 0
+      ? 'Margine prudenziale (nessun volo a libretto)'
+      : `Margine prudenziale per esperienza (${totalFlights} voli a libretto)`;
+  }
+
+  const multiplier = enabled ? rawMultiplier : 1.0;
+
+  return {
+    enabled,
+    tier,
+    multiplier,
+    rawMultiplier,
+    daysSinceLastFlight: metrics.daysSinceLastFlight,
+    currencyStatus: metrics.currencyStatus,
+    currencyLabel: metrics.currencyLabel,
+    currencyDescription: metrics.currencyDescription,
+    totalFlights,
+    totalHours,
+    shortLabel,
+    reasonTag: enabled ? reasonTag : null
+  };
+}
+
+/**
  * Validates, normalizes, and creates an immutable flight log entry.
  * Note: Does NOT force the user to classify the flight!
  * Activities are deduced from trackPoints or debriefing notes.

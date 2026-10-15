@@ -77,6 +77,7 @@ export class LogbookViewController {
     // View sub-tabs: 'flights' | 'stats'
     this.activeTab = 'flights';
     this.statsMetric = 'hours'; // 'hours' | 'flights'
+    this.pilotPeriod = this.store.getState().pilotPeriod || 'month'; // 'month' | 'year'
 
     // Search and filter state
     this.searchQuery = '';
@@ -283,9 +284,11 @@ export class LogbookViewController {
 
     return `
       <section class="gm-logbook-view" role="region" aria-label="Flight Log e Telemetria">
-        ${this.renderStorageWarningBanner()}
-        ${this.renderUndoBanner()}
-        ${this.renderImportSummaryBanner()}
+        <div class="gm-floating-warning-stack">
+          ${this.renderStorageWarningBanner()}
+          ${this.renderUndoBanner()}
+          ${this.renderImportSummaryBanner()}
+        </div>
 
         <!-- Header Bar: Title, Import Trigger & Segmented Control -->
         <header class="gm-logbook-header">
@@ -468,7 +471,13 @@ export class LogbookViewController {
    * @returns {string}
    */
   renderStatsTab(flights) {
-    return renderLogbookStatsHtml(flights, { metric: this.statsMetric || 'hours' });
+    const state = this.store.getState();
+    const period = this.pilotPeriod || state.pilotPeriod || 'month';
+    return renderLogbookStatsHtml(flights, {
+      metric: this.statsMetric || 'hours',
+      period,
+      referenceDate: state.activeDate || new Date()
+    });
   }
 
   /**
@@ -487,12 +496,11 @@ export class LogbookViewController {
         </div>
         <button
           type="button"
-          class="gm-btn gm-btn-ghost text-xs"
+          class="gm-warning-close-btn"
           data-action="dismiss-storage-warning"
           aria-label="Ignora promemoria archiviazione"
-        >
-          OK
-        </button>
+          title="Chiudi avviso"
+        >✕</button>
       </div>
     `;
   }
@@ -538,12 +546,11 @@ export class LogbookViewController {
         </div>
         <button
           type="button"
-          class="gm-btn gm-btn-ghost text-xs"
+          class="gm-warning-close-btn"
           data-action="dismiss-import-summary"
           aria-label="Chiudi notifica importazione"
-        >
-          OK
-        </button>
+          title="Chiudi avviso"
+        >✕</button>
       </div>
     `;
   }
@@ -613,29 +620,35 @@ export class LogbookViewController {
   }
 
   /**
-   * Renders a single lean flight card (~85px height).
+   * Renders a single vertically compact flight card (~74px height) with 4 glanceable metrics.
    * @param {Object} flight
    * @param {number|string} [flightNumber=null] - Progressive flight number
    * @returns {string}
    */
   renderFlightCard(flight, flightNumber = null) {
     const flightId = flight.id || flight.flightId || '';
-    const title = flight.siteName || flight.site || 'Volo da IGC';
+    const rawTitle = flight.siteName || flight.site || 'Volo da IGC';
+    const displayTitle = String(rawTitle).replace(/\s*->\s*/g, ' → ');
     const dateFormatted = flight.date || 'Data N/D';
-    const takeoffTime = flight.takeoffTime ? `Ore ${flight.takeoffTime}` : '';
+    const takeoffTime = flight.takeoffTime ? String(flight.takeoffTime) : '';
     const duration = flight.durationMinutes ? `${flight.durationMinutes} min` : '--';
     const glider = flight.glider || 'Parapendio';
-    const maxAlt = flight.maxAltMsl ? `${flight.maxAltMsl} m` : '--';
-    const maxGain = flight.maxGainMeters ? `+${flight.maxGainMeters} m` : '--';
-    const isRedundant = isTakeoffRedundant(flight.site, title, flight.takeoffLocationName);
+    const maxAlt = flight.maxAltMsl != null && flight.maxAltMsl !== '' ? `${flight.maxAltMsl} m` : '--';
+    const maxGain = flight.maxGainMeters != null && flight.maxGainMeters !== '' ? `+${flight.maxGainMeters} m` : '--';
+    const thermalsCount = typeof flight.thermalsCount === 'number'
+      ? flight.thermalsCount
+      : (Array.isArray(flight.telemetry?.thermals)
+          ? flight.telemetry.thermals.length
+          : (flight.hasThermals ? 1 : 0));
+    const isRedundant = isTakeoffRedundant(flight.site, rawTitle, flight.takeoffLocationName);
     const siteArea = !isRedundant ? flight.site : '';
     const hasTrack = hasAttachedTrack(flight);
     const trackBadgeHtml = hasTrack
       ? `<span class="gm-track-badge gm-track-badge-present" title="Traccia GPS allegata (visualizzazione 2D e Replay 3D attivi)" aria-label="Traccia GPS presente">
-          <svg class="gm-track-badge-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <svg class="gm-track-badge-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
           </svg>
-          <span>Traccia</span>
+          <span class="sr-only">Traccia</span>
         </span>`
       : '';
 
@@ -648,39 +661,26 @@ export class LogbookViewController {
         data-flight-id="${escapeHtml(flightId)}"
         tabindex="0"
       >
-        <!-- Flight Card Header Row -->
+        <!-- Flight Card Header Row (100% Dedicated to Prominent #N Badge + Full-Width Route) -->
         <div class="gm-flight-card-header">
           <div class="gm-flight-title-group">
             ${flightNumber != null ? `<span class="gm-flight-number-badge" aria-label="Volo numero ${flightNumber}">#${escapeHtml(flightNumber)}</span>` : ''}
-            <h4 id="fl-title-${escapeHtml(flightId)}" class="gm-flight-site-title" title="${escapeHtml(title)}">
-              ${escapeHtml(title)}
+            <h4 id="fl-title-${escapeHtml(flightId)}" class="gm-flight-site-title" title="${escapeHtml(displayTitle)}">
+              ${escapeHtml(displayTitle)}
             </h4>
-          </div>
-
-          <div class="gm-flight-badge-group">
-            ${trackBadgeHtml}
-            <button
-              type="button"
-              class="gm-flight-delete-btn"
-              data-action="delete-flight"
-              data-flight-id="${escapeHtml(flightId)}"
-              aria-label="Elimina volo ${escapeHtml(title)}"
-              title="Elimina volo"
-            >
-              &times;
-            </button>
           </div>
         </div>
 
-        <!-- Date & Glider info row (No redundant takeoff repetition) -->
+        <!-- Compact Date, Time, Glider & Subtle Inline Track Waveform Row -->
         <div class="gm-flight-card-sub">
           <span>${escapeHtml(dateFormatted)}</span>
           ${takeoffTime ? `<span>•</span><span>${escapeHtml(takeoffTime)}</span>` : ''}
           ${siteArea ? `<span>•</span><span class="font-medium text-[var(--gm-text-secondary)]">${escapeHtml(siteArea)}</span>` : ''}
           <span class="text-[var(--gm-text-secondary)] font-medium">• ${escapeHtml(glider)}</span>
+          ${trackBadgeHtml ? `<span>•</span>${trackBadgeHtml}` : ''}
         </div>
 
-        <!-- Glanceable 3-Metric Row (Grid-based: Never wraps) -->
+        <!-- Glanceable 4-Metric Row (Tempo, Quota MSL, Guadagno, Termiche) -->
         <div class="gm-flight-metrics-row">
           <div class="gm-flight-metric-item">
             <span class="gm-flight-metric-val">${escapeHtml(duration)}</span>
@@ -693,6 +693,10 @@ export class LogbookViewController {
           <div class="gm-flight-metric-item">
             <span class="gm-flight-metric-val">${escapeHtml(maxGain)}</span>
             <span class="gm-flight-metric-lbl">Guadagno</span>
+          </div>
+          <div class="gm-flight-metric-item">
+            <span class="gm-flight-metric-val ${thermalsCount > 0 ? 'gm-flight-metric-val-thermal' : ''}">${escapeHtml(thermalsCount)}</span>
+            <span class="gm-flight-metric-lbl">Termiche</span>
           </div>
           <span class="gm-flight-chevron" aria-hidden="true">&#8250;</span>
         </div>
@@ -733,6 +737,15 @@ export class LogbookViewController {
         const metric = actionBtn.getAttribute('data-metric');
         if (metric && (metric === 'hours' || metric === 'flights')) {
           this.statsMetric = metric;
+          this.render();
+        }
+        break;
+      }
+      case 'set-pilot-period': {
+        const period = actionBtn.getAttribute('data-period');
+        if (period && (period === 'month' || period === 'year')) {
+          this.pilotPeriod = period;
+          this.store.setState({ pilotPeriod: period });
           this.render();
         }
         break;
@@ -1019,7 +1032,11 @@ export class LogbookViewController {
         flightNum = DEFAULT_SEED_FLIGHTS[idx].flightNumber != null ? DEFAULT_SEED_FLIGHTS[idx].flightNumber : (DEFAULT_SEED_FLIGHTS.length - idx);
       }
     }
-    await openFlightDetailSheet(flightId, { store: this.store, flightNumber: flightNum });
+    await openFlightDetailSheet(flightId, {
+      store: this.store,
+      flightNumber: flightNum,
+      onDelete: (id) => this.startPendingDeletion(id)
+    });
   }
 }
 

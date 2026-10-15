@@ -13,6 +13,9 @@
 
 import { openSheet, closeSheet } from '../sheetManager.js';
 import { logbookManager } from '../../core/logbookDb.js';
+import { createFlightLogEntry } from '../../core/logbook.js';
+import { DEFAULT_COMPRENSORI } from '../../core/comprensorio.js';
+import { getPastDatePresets, formatDateIso } from '../../core/datePresets.js';
 import { store } from '../../core/store.js';
 
 /**
@@ -31,15 +34,28 @@ function escapeHtml(str) {
 }
 
 /**
- * Generates the HTML markup for the Import Sheet content body.
+ * Generates the HTML markup for the unified Import & Manual Flight Sheet content body.
+ * @param {Object} [options={}]
  * @returns {string} HTML string
  */
-export function renderImportSheetHtml() {
+export function renderImportSheetHtml(options = {}) {
+  const targetStore = options.store || store;
+  const state = targetStore && typeof targetStore.getState === 'function' ? targetStore.getState() : {};
+  const today = state.activeDate || formatDateIso(new Date());
+  const pastPresets = getPastDatePresets(new Date(), 4);
+  const catalog = Array.isArray(state.locationsCatalog) && state.locationsCatalog.length > 0
+    ? state.locationsCatalog
+    : DEFAULT_COMPRENSORI;
+  const spotOptions = catalog.map((c) => {
+    const label = `${c.name}${c.province ? ` (${c.province})` : ''}`;
+    return `<option value="${escapeHtml(c.name)}">${escapeHtml(label)}</option>`;
+  }).join('');
+
   return `
-    <div class="gm-import-sheet-content" role="region" aria-label="Importazione Tracce e Backup">
+    <div class="gm-import-sheet-content" role="region" aria-label="Importazione Tracce e Registrazione Volo">
       <div class="gm-import-sheet-header">
         <p class="gm-import-sheet-intro">
-          Carica i tuoi file di volo per analizzare termiche, guadagni e visualizzare la traccia in 3D.
+          Carica un file di volo (.IGC o backup .JSON) oppure registra rapidamente una sessione manuale nel libretto.
         </p>
       </div>
 
@@ -84,6 +100,64 @@ export function renderImportSheetHtml() {
           <li><strong>Backup ParaMeteo:</strong> esportazioni complete V1 e V2 con unione cronologica e deduplicazione automatica.</li>
         </ul>
       </div>
+
+      <!-- Manual Flight Entry Collapsible Section -->
+      <details class="gm-glider-custom-details" id="gm-manual-flight-details">
+        <summary class="gm-glider-custom-summary">Registra Volo Manualmente (Senza Traccia)</summary>
+        <form id="gm-manual-flight-form" class="gm-sheet-form" style="margin-top: 10px;">
+          <div class="gm-form-group">
+            <label for="gm-manual-flight-date" class="gm-form-label">Data del Volo</label>
+            <div class="gm-past-presets" role="group" aria-label="Scelta rapida data">
+              ${pastPresets.map(p => `
+                <button
+                  type="button"
+                  class="gm-past-preset-chip ${p.date === today ? 'active' : ''}"
+                  data-manual-date-preset="${escapeHtml(p.date)}"
+                >${escapeHtml(p.label)}</button>
+              `).join('')}
+            </div>
+            <input type="date" id="gm-manual-flight-date" class="gm-form-input" value="${escapeHtml(today)}" required />
+          </div>
+
+          <div class="gm-form-group">
+            <label for="gm-manual-flight-site" class="gm-form-label">Località / Comprensorio</label>
+            <select id="gm-manual-flight-site" class="gm-form-input">
+              ${spotOptions}
+            </select>
+          </div>
+
+          <div class="gm-form-group">
+            <label for="gm-manual-flight-duration" class="gm-form-label">Durata (minuti)</label>
+            <div class="gm-duration-presets">
+              <button type="button" class="gm-preset-chip" data-manual-duration-add="15">+15m</button>
+              <button type="button" class="gm-preset-chip" data-manual-duration-add="30">+30m</button>
+              <button type="button" class="gm-preset-chip" data-manual-duration-add="60">+60m</button>
+              <button type="button" class="gm-preset-chip" data-manual-duration-add="90">+90m</button>
+            </div>
+            <input type="number" id="gm-manual-flight-duration" class="gm-form-input" value="45" min="1" max="600" required />
+          </div>
+
+          <div class="gm-form-group">
+            <label for="gm-manual-flight-notes" class="gm-form-label">Note / Debriefing (opzionale)</label>
+            <textarea
+              id="gm-manual-flight-notes"
+              class="gm-form-textarea"
+              rows="2"
+              placeholder="Es. Termica generosa in cresta, orecchie e wingover in discesa..."
+            ></textarea>
+            <span class="gm-form-hint">Le sessioni di termica ed esercizi vengono dedotte in automatico dalle note.</span>
+          </div>
+
+          <button
+            type="submit"
+            class="gm-btn gm-btn-primary gm-btn-full"
+            id="gm-manual-flight-save-btn"
+            style="min-height: var(--gm-touch-min, 48px);"
+          >
+            Salva Volo nel Libretto
+          </button>
+        </form>
+      </details>
 
       <!-- Progress Section (Dynamic) -->
       <div id="gm-import-progress-wrap" class="gm-import-progress-section" style="display: none;" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
@@ -221,7 +295,7 @@ export async function processImportFiles(files, options = {}) {
 }
 
 /**
- * Opens the dedicated Import Flight Sheet.
+ * Opens the dedicated Import & Manual Flight Entry Sheet.
  * @param {Object} [options={}]
  * @param {typeof logbookManager} [options.logbookManager]
  * @param {typeof store} [options.store]
@@ -233,8 +307,8 @@ export function openImportFlightSheet(options = {}) {
 
   openSheet({
     id: 'import-flight',
-    title: 'Importa Traccia o Backup',
-    content: renderImportSheetHtml(),
+    title: 'Aggiungi o Importa Volo',
+    content: renderImportSheetHtml({ store: targetStore }),
     onOpen: () => {
       if (typeof document === 'undefined') return;
 
@@ -242,6 +316,7 @@ export function openImportFlightSheet(options = {}) {
       const browseBtn = document.getElementById('gm-import-browse-btn');
       const dropzone = document.getElementById('gm-import-sheet-dropzone');
       const doneBtn = document.getElementById('gm-import-done-btn');
+      const manualForm = /** @type {HTMLFormElement} */ (document.getElementById('gm-manual-flight-form'));
 
       if (browseBtn && fileInput) {
         browseBtn.addEventListener('click', () => {
@@ -289,6 +364,64 @@ export function openImportFlightSheet(options = {}) {
               onSuccess: options.onSuccess
             });
           }
+        });
+      }
+
+      if (manualForm) {
+        // Date preset chips
+        const datePresets = manualForm.querySelectorAll('[data-manual-date-preset]');
+        const dateInput = /** @type {HTMLInputElement} */ (document.getElementById('gm-manual-flight-date'));
+        datePresets.forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const val = btn.getAttribute('data-manual-date-preset');
+            if (val && dateInput) {
+              dateInput.value = val;
+              datePresets.forEach((b) => b.classList.toggle('active', b === btn));
+            }
+          });
+        });
+
+        // Duration preset chips
+        const durBtns = manualForm.querySelectorAll('[data-manual-duration-add]');
+        const durInput = /** @type {HTMLInputElement} */ (document.getElementById('gm-manual-flight-duration'));
+        durBtns.forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const addVal = parseInt(btn.getAttribute('data-manual-duration-add'), 10) || 15;
+            if (durInput) {
+              durInput.value = String(addVal);
+            }
+          });
+        });
+
+        // Manual form submission
+        manualForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const siteInput = /** @type {HTMLSelectElement} */ (document.getElementById('gm-manual-flight-site'));
+          const notesInput = /** @type {HTMLTextAreaElement} */ (document.getElementById('gm-manual-flight-notes'));
+          const state = targetStore && typeof targetStore.getState === 'function' ? targetStore.getState() : {};
+          const activeGlider = state.activeGlider || state.glider || {};
+
+          const newFlight = createFlightLogEntry({
+            date: dateInput ? dateInput.value : undefined,
+            siteName: siteInput ? siteInput.value : 'Monte Cornizzolo',
+            site: siteInput ? siteInput.value : 'Monte Cornizzolo',
+            durationMinutes: durInput ? parseInt(durInput.value, 10) || 45 : 45,
+            glider: activeGlider.brand && activeGlider.model
+              ? `${activeGlider.brand} ${activeGlider.model}`
+              : (activeGlider.name || 'Parapendio'),
+            gliderClass: activeGlider.category || 'EN-A',
+            notes: notesInput ? notesInput.value : ''
+          });
+
+          const currentFlights = Array.isArray(state.flights) ? state.flights : [];
+          if (targetStore && typeof targetStore.setState === 'function') {
+            targetStore.setState({ flights: [newFlight, ...currentFlights] });
+          }
+
+          if (typeof options.onSuccess === 'function') {
+            options.onSuccess({ importedFlightsCount: 1, tracksImportedCount: 0 });
+          }
+          closeSheet();
         });
       }
 

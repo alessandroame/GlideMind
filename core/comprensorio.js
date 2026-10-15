@@ -638,12 +638,20 @@ export function evaluateComprensorio({
   weatherData = null,
   hourIndex = 14,
   glider = null,
+  pilotSafetyFactor = null,
   targetDate = null,
   allowSynthetic = true,
   takeoffId = null,
   landingId = null
 }) {
-  const activeGlider = glider || DEFAULT_GLIDER;
+  const baseGlider = glider || DEFAULT_GLIDER;
+  const effectivePilotFactor = pilotSafetyFactor || baseGlider?.pilotSafetyFactor || null;
+  const activeGlider = (effectivePilotFactor && effectivePilotFactor.enabled)
+    ? { ...baseGlider, pilotSafetyFactor: effectivePilotFactor }
+    : baseGlider;
+  const pureGlider = baseGlider?.pilotSafetyFactor
+    ? { ...baseGlider, pilotSafetyFactor: null }
+    : baseGlider;
   const takeoffs = comprensorio.takeoffs || [];
   const landings = comprensorio.landings || [];
 
@@ -875,6 +883,9 @@ export function evaluateComprensorio({
       true, // isTakeoff
       activeGlider
     );
+    const pureScore = (effectivePilotFactor && effectivePilotFactor.enabled && effectivePilotFactor.multiplier < 1.0)
+      ? getFlyabilityScore(windSpeed, windGust, cape, turbulence, rain, windDir, heading, true, pureGlider)
+      : flyScore;
 
     // Compute numerical score: 100 base, penalize severity and crosswind
     let score = 100;
@@ -886,6 +897,7 @@ export function evaluateComprensorio({
       takeoff: t,
       heading,
       flyScore,
+      pureSeverity: pureScore.severity,
       severity: flyScore.severity,
       score,
       statusText: flyScore.text,
@@ -990,6 +1002,13 @@ export function evaluateComprensorio({
   let reason = '';
 
   const isLandingUnsafe = Boolean(glideMetrics && !glideMetrics.isSafe);
+  const isPilotDowngraded = Boolean(
+    effectivePilotFactor &&
+    effectivePilotFactor.enabled &&
+    effectivePilotFactor.reasonTag &&
+    selectedTakeoffEval &&
+    selectedTakeoffEval.severity > selectedTakeoffEval.pureSeverity
+  );
 
   if (!selectedTakeoffEval || selectedTakeoffEval.severity >= 2) {
     status = 'unflyable';
@@ -1000,6 +1019,8 @@ export function evaluateComprensorio({
     const takeoffReason = selectedTakeoffEval ? selectedTakeoffEval.statusText : 'Nessun decollo praticabile';
     if (isLandingUnsafe) {
       reason = `${takeoffReason} • Rientro fuori cono (1:${glideMetrics.requiredGlideRatio} > 1:${glideMetrics.safeLimit})`;
+    } else if (isPilotDowngraded) {
+      reason = `${takeoffReason} • ${effectivePilotFactor.reasonTag}`;
     } else {
       reason = takeoffReason;
     }
@@ -1014,6 +1035,8 @@ export function evaluateComprensorio({
       reason = `${selectedTakeoffEval.statusText} • Rientro critico (1:${glideMetrics.requiredGlideRatio} > 1:${glideMetrics.safeLimit})`;
     } else if (isLandingUnsafe) {
       reason = `Rientro critico: efficienza richiesta 1:${glideMetrics.requiredGlideRatio} > 1:${glideMetrics.safeLimit}`;
+    } else if (isPilotDowngraded) {
+      reason = `Meteo favorevole per la vela • ${effectivePilotFactor.reasonTag} (${selectedTakeoffEval.statusText})`;
     } else {
       reason = isTakeoffOverridden
         ? (takeoffOverrideReason ? `${takeoffOverrideReason} • ${selectedTakeoffEval.statusText}` : `Alt. ${selectedTakeoff.name}: ${selectedTakeoffEval.statusText}`)
@@ -1045,6 +1068,21 @@ export function evaluateComprensorio({
       }
     } else {
       reason = `Vento ${Math.round(windSpeed)} km/h da ${windDir}° (${getCardinalDirection(windDir)}) • Esposizione N/D`;
+    }
+
+    // If pilot is in lapsed state (>90 days without flying) with optional factor enabled and conditions are active (not dead calm), recommend Caution
+    if (
+      effectivePilotFactor &&
+      effectivePilotFactor.enabled &&
+      effectivePilotFactor.tier === 'lapsed' &&
+      (windSpeed >= 10 || windGust >= 16 || cape >= 250 || turbulence >= 0.14)
+    ) {
+      status = 'caution';
+      badge = 'Cautela';
+      badgeColor = 'var(--gm-status-caution)';
+      badgeBg = 'var(--gm-status-caution-bg)';
+      overallScore = Math.min(overallScore, 68);
+      reason = `Meteo favorevole (${reason}) • ${effectivePilotFactor.reasonTag}`;
     }
   }
 

@@ -76,6 +76,7 @@ export class SpotMapView {
     this.activeScrubStrip = null;
     this.isAimMenuOpen = false;
     this.sheetContainerEl = null;
+    this.dismissedHorizonDate = null;
 
     this.boundClickHandler = this.handleClick.bind(this);
     this.boundPointerDown = this.handlePointerDown.bind(this);
@@ -1621,14 +1622,23 @@ export class SpotMapView {
           </svg>
         </button>
       </div>
-      ${smartData.activeHorizon && smartData.activeHorizon.isSynoptic ? `
-        <div class="gm-horizon-notice mb-1" role="status">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="gm-horizon-icon" aria-hidden="true">
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="12" y1="16" x2="12" y2="12"></line>
-            <line x1="12" y1="8" x2="12.01" y2="8"></line>
-          </svg>
-          <span><strong>Tendenza a lungo raggio:</strong> oltre 7 giorni le previsioni sono indicative.</span>
+      ${smartData.activeHorizon && smartData.activeHorizon.isSynoptic && this.dismissedHorizonDate !== activeDate ? `
+        <div class="gm-horizon-notice" role="status">
+          <div class="gm-horizon-notice-body">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="gm-horizon-icon" aria-hidden="true">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            <span><strong>Tendenza a lungo raggio:</strong> oltre 7 giorni le previsioni sono indicative.</span>
+          </div>
+          <button
+            type="button"
+            class="gm-warning-close-btn"
+            data-action="dismiss-horizon-notice"
+            aria-label="Chiudi avviso tendenza a lungo raggio"
+            title="Chiudi avviso"
+          >✕</button>
         </div>
       ` : ''}
     `;
@@ -1819,6 +1829,10 @@ export class SpotMapView {
       if (spot) {
         this.handleSpotClick(spot);
       }
+    } else if (action === 'dismiss-horizon-notice') {
+      const state = (store && typeof store.getState === 'function') ? store.getState() : {};
+      this.dismissedHorizonDate = this.activeDate || state.activeDate || formatDateIso(new Date());
+      this.updateDateBarInDom();
     }
   }
 }

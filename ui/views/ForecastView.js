@@ -56,6 +56,7 @@ import {
   formatShortDate
 } from '../../core/datePresets.js';
 import { calculateFlightWindows } from '../../core/flightWindows.js';
+import { calculatePilotSafetyFactor, DEFAULT_SEED_FLIGHTS } from '../../core/logbook.js';
 
 /**
  * Normalizes an angle to [0, 360) range.
@@ -496,12 +497,26 @@ export class ForecastViewController {
   }
 
   /**
-   * Gets active glider specification.
+   * Gets active glider specification, attaching optional pilot safety factor when enabled.
    * @returns {object}
    */
   getActiveGlider() {
     const state = this.store ? this.store.getState() : {};
-    return state.activeGlider || state.glider || DEFAULT_GLIDER || GLIDER_CLASSES.EN_A;
+    const baseGlider = state.activeGlider || state.glider || DEFAULT_GLIDER || GLIDER_CLASSES.EN_A;
+    if (!state.usePilotCurrencyFactor) {
+      return baseGlider;
+    }
+    const flights = state.flights || DEFAULT_SEED_FLIGHTS;
+    const referenceDate = this.activeDate || state.activeDate || formatDateIso(new Date());
+    const pilotSafetyFactor = calculatePilotSafetyFactor({
+      flights,
+      referenceDate,
+      enabled: true
+    });
+    return {
+      ...baseGlider,
+      pilotSafetyFactor
+    };
   }
 
   /**
@@ -1507,14 +1522,23 @@ export class ForecastViewController {
           </button>
         </div>
 
-        ${smartData.activeHorizon && smartData.activeHorizon.isSynoptic ? `
+        ${smartData.activeHorizon && smartData.activeHorizon.isSynoptic && this.dismissedHorizonDate !== this.activeDate ? `
           <div class="gm-horizon-notice" role="status">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="gm-horizon-icon" aria-hidden="true">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="12" y1="16" x2="12" y2="12"></line>
-              <line x1="12" y1="8" x2="12.01" y2="8"></line>
-            </svg>
-            <span><strong>Tendenza a lungo raggio:</strong> oltre 7 giorni le previsioni sono soggette a variazioni sinottiche.</span>
+            <div class="gm-horizon-notice-body">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="gm-horizon-icon" aria-hidden="true">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+              </svg>
+              <span><strong>Tendenza a lungo raggio:</strong> oltre 7 giorni le previsioni sono soggette a variazioni sinottiche.</span>
+            </div>
+            <button
+              type="button"
+              class="gm-warning-close-btn"
+              data-action="dismiss-horizon-notice"
+              aria-label="Chiudi avviso tendenza a lungo raggio"
+              title="Chiudi avviso"
+            >✕</button>
           </div>
         ` : ''}
       </header>
@@ -5064,6 +5088,23 @@ export class ForecastViewController {
         this.store.setState({ selectedSpot: spot });
       }
       this.openFlightAnalysisOverlay();
+    } else if (action === 'dismiss-horizon-notice') {
+      this.dismissedHorizonDate = this.activeDate;
+      if (this.containerEl && typeof this.containerEl.querySelector === 'function') {
+        const noticeEl = this.containerEl.querySelector('.gm-horizon-notice');
+        if (noticeEl && typeof noticeEl.remove === 'function') {
+          noticeEl.remove();
+          return;
+        }
+      }
+      this.render();
+    } else if (action === 'dismiss-safety-warning') {
+      if (this.flightAnalysisOverlayEl && typeof this.flightAnalysisOverlayEl.querySelector === 'function') {
+        const bannerContainer = this.flightAnalysisOverlayEl.querySelector('#flight-safety-banner-container');
+        if (bannerContainer) {
+          bannerContainer.innerHTML = '';
+        }
+      }
     } else if (action === 'close-flight-analysis') {
       this.closeFlightAnalysisOverlay();
     } else if (action === 'toggle-aim-menu') {
@@ -5560,7 +5601,7 @@ export class ForecastViewController {
           </div>
 
           <div id="flight-safety-banner-container">
-            ${circuitData.isSafetyWarning ? `<div class="gm-flight-safety-warning-banner" role="alert">${circuitData.warningReason}</div>` : ''}
+            ${circuitData.isSafetyWarning ? `<div class="gm-flight-safety-warning-banner" role="alert"><span>${circuitData.warningReason}</span><button type="button" class="gm-warning-close-btn" data-action="dismiss-safety-warning" aria-label="Chiudi avviso">✕</button></div>` : ''}
           </div>
 
           <p id="flight-procedure-explanation" class="gm-flight-analysis-explanation">
@@ -5863,7 +5904,7 @@ export class ForecastViewController {
       const bannerContainer = this.flightAnalysisOverlayEl.querySelector('#flight-safety-banner-container');
       if (bannerContainer) {
         bannerContainer.innerHTML = circuitData.isSafetyWarning
-          ? `<div class="gm-flight-safety-warning-banner" role="alert">${circuitData.warningReason}</div>`
+          ? `<div class="gm-flight-safety-warning-banner" role="alert"><span>${circuitData.warningReason}</span><button type="button" class="gm-warning-close-btn" data-action="dismiss-safety-warning" aria-label="Chiudi avviso sicurezza" title="Chiudi avviso">✕</button></div>`
           : '';
       }
 

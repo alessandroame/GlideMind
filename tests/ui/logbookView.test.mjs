@@ -171,12 +171,13 @@ describe('LogbookView Controller & Outdoor Ergonomics (UI Layer)', () => {
     assert.ok(html.includes('gm-flight-number-badge'), 'Must render flight number badge');
     assert.ok(html.includes('#2'), 'Must render progressive flight number #2 for newest flight');
     assert.ok(html.includes('#1'), 'Must render progressive flight number #1 for older flight');
-    assert.ok(html.includes('Decollo Risparmio') && html.includes('Atterraggio Ufficiale Suello'));
+    assert.ok(html.includes('Decollo Risparmio → Atterraggio Ufficiale Suello'));
     assert.ok(html.includes('Axis Compact 4'));
     assert.ok(html.includes('EN-A'));
     assert.ok(html.includes('1480 m'), 'Must show max altitude');
     assert.ok(html.includes('+420 m'), 'Must show altitude gain');
     assert.ok(html.includes('45 min'), 'Must show duration');
+    assert.ok(html.includes('Termiche'), 'Must show 4th KPI column for thermals count');
 
     // Altimetric sparkline removed from flight list cards
     assert.ok(!html.includes('gm-flight-sparkline'), 'Must not render altimetric sparkline in flight list cards');
@@ -189,17 +190,18 @@ describe('LogbookView Controller & Outdoor Ergonomics (UI Layer)', () => {
     assert.ok(html.includes('1750 m'));
     assert.ok(html.includes('+850 m'));
     assert.ok(html.includes('70 min'));
+    assert.ok(html.includes('gm-flight-metric-val-thermal">3</span>'), 'Must show 3 thermals for flight 2');
 
-    // Entire card is touch interactive (Card-as-Target)
+    // Entire card is touch interactive (Card-as-Target); delete button moved inside FlightDetailSheet
     assert.ok(html.includes('data-action="open-flight-detail"'));
-    assert.ok(html.includes('data-action="delete-flight"'));
+    assert.ok(!html.includes('gm-flight-delete-btn'), 'Card header must not contain delete button (moved to detail sheet)');
 
     // Button clutter eliminated from feed (moved to detail sheet)
     assert.ok(!html.includes('Visualizza Replay 3D'), 'Must not clutter card with 3D replay button');
     assert.ok(!html.includes('Scarica IGC'), 'Must not clutter card with download button');
   });
 
-  it('should prevent redundant takeoff in subtitle and exclude EN category badge from card header', async () => {
+  it('should prevent redundant takeoff in subtitle, format +0 m gain and exclude EN category badge from card header', async () => {
     const flightWithTakeoffInTitle = {
       id: 'fl_ciavanis_94',
       date: '2026-10-11',
@@ -212,7 +214,8 @@ describe('LogbookView Controller & Outdoor Ergonomics (UI Layer)', () => {
       glider: 'Axis Pluto 4',
       gliderClass: 'EN-B',
       maxAltMsl: 1775,
-      maxGainMeters: 0
+      maxGainMeters: 0,
+      thermalsCount: 0
     };
 
     storeInstance.setState({ flights: [flightWithTakeoffInTitle] });
@@ -226,9 +229,11 @@ describe('LogbookView Controller & Outdoor Ergonomics (UI Layer)', () => {
 
     // Subtitle must NOT repeat "Decollo Ciavanis"
     assert.ok(!cardHtml.includes('• Decollo Ciavanis •'), 'Subtitle must not repeat takeoff when already in title');
+    assert.ok(cardHtml.includes('Decollo Ciavanis → PeterPan Santa Elisabetta'));
     assert.ok(cardHtml.includes('2026-10-11'));
-    assert.ok(cardHtml.includes('Ore 16:42'));
+    assert.ok(cardHtml.includes('16:42'));
     assert.ok(cardHtml.includes('Axis Pluto 4'));
+    assert.ok(cardHtml.includes('+0 m'), 'Zero altitude gain must render as +0 m instead of --');
   });
 
   it('should filter flights by category chips and search query', async () => {
@@ -327,11 +332,37 @@ describe('LogbookView Controller & Outdoor Ergonomics (UI Layer)', () => {
 
     const html = container.innerHTML;
 
-    // Currency Card
+    // Currency Card & 30 Giorni / Anno Toggle
     assert.ok(html.includes('Valuta &amp; Continuità Pilota'));
     assert.ok(html.includes('gm-currency-card'));
     assert.ok(html.includes('Voli (ultimi 30 gg)'));
     assert.ok(html.includes('Ore (ultimi 30 gg)'));
+    assert.ok(html.includes('data-action="set-pilot-period"'));
+    assert.ok(html.includes('data-period="month"'));
+    assert.ok(html.includes('data-period="year"'));
+
+    // Simulate switching period to 'year'
+    await controller.handleClick({
+      stopPropagation() {},
+      preventDefault() {},
+      target: {
+        closest(sel) {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute(attr) {
+                if (attr === 'data-action') return 'set-pilot-period';
+                if (attr === 'data-period') return 'year';
+                return null;
+              }
+            };
+          }
+          return null;
+        }
+      }
+    });
+    assert.equal(controller.pilotPeriod, 'year');
+    assert.ok(container.innerHTML.includes('Voli (ultimo anno)'));
+    assert.ok(container.innerHTML.includes('Ore (ultimo anno)'));
 
     // Career Totals
     assert.ok(html.includes('Totali di Carriera'));
@@ -361,6 +392,13 @@ describe('LogbookView Controller & Outdoor Ergonomics (UI Layer)', () => {
     assert.ok(html.includes('gm-mixed-chart-legend'));
     assert.ok(html.includes('Ore di Volo'));
     assert.ok(html.includes('Numero Voli'));
+
+    // Verify unified ImportFlightSheet contains both IGC dropzone and Manual Flight registration form
+    const { renderImportSheetHtml } = await import('../../ui/views/ImportFlightSheet.js');
+    const sheetHtml = renderImportSheetHtml();
+    assert.ok(sheetHtml.includes('id="gm-import-sheet-dropzone"'), 'Unified sheet must contain IGC/JSON dropzone');
+    assert.ok(sheetHtml.includes('id="gm-manual-flight-form"'), 'Unified sheet must contain manual flight entry form');
+    assert.ok(sheetHtml.includes('Registra Volo Manualmente (Senza Traccia)'), 'Unified sheet must label manual flight entry');
   });
 
   it('should adhere to Laws of UX (Von Restorff, Fitts >= 48px, WAI-ARIA and no banned emojis)', async () => {

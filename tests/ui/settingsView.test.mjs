@@ -157,4 +157,40 @@ describe('GlideMind Phase 8-bis - SettingsView Architecture & Map Layer Persiste
     assert.equal(controller.storeUnsub, null);
     assert.ok(listenerRemoved, 'Must remove click event listener');
   });
+
+  it('should render direct Cambia Vela button and toggle usePilotCurrencyFactor in store', () => {
+    const mockStore = createStore({ usePilotCurrencyFactor: false });
+    const controller = new SettingsViewController({ store: mockStore });
+
+    let html = controller.renderHtml();
+    assert.ok(html.includes('data-action="open-glider-sheet"'), 'Must render direct open-glider-sheet button instead of #home link');
+    assert.ok(html.includes('Cambia Vela'), 'Must show Cambia Vela button');
+    assert.ok(html.includes('data-action="toggle-pilot-currency-factor"'), 'Must render pilot currency factor toggle');
+    assert.ok(html.includes('Disattivato'), 'Default state should show Disattivato');
+
+    // Simulate clicking toggle-pilot-currency-factor
+    controller.handleClick({
+      target: {
+        closest(sel) {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute(attr) {
+                if (attr === 'data-action') return 'toggle-pilot-currency-factor';
+                return null;
+              }
+            };
+          }
+          return null;
+        }
+      }
+    });
+
+    assert.equal(mockStore.getState().usePilotCurrencyFactor, true, 'Must toggle usePilotCurrencyFactor to true');
+    html = controller.renderHtml();
+    assert.ok(html.includes('aria-checked="true"'), 'Switch must reflect aria-checked="true"');
+
+    // Reset preferences resets usePilotCurrencyFactor to false
+    controller.resetPreferences();
+    assert.equal(mockStore.getState().usePilotCurrencyFactor, false, 'resetPreferences must reset usePilotCurrencyFactor to false');
+  });
 });

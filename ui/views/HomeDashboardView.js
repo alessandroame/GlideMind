@@ -39,6 +39,7 @@ import {
 } from '../../core/openMeteoApi.js';
 import {
   calculatePilotPeriodMetrics,
+  calculatePilotSafetyFactor,
   createFlightLogEntry,
   DEFAULT_SEED_FLIGHTS
 } from '../../core/logbook.js';
@@ -51,6 +52,7 @@ import {
   getPastDatePresets,
   formatDateIso
 } from '../../core/datePresets.js';
+import { resolveDaylightHours } from '../../core/daylight.js';
 import { getFormattedVersion, getFormattedBuild } from '../../core/version.js';
 
 /**
@@ -107,6 +109,7 @@ export class HomeDashboardViewController {
     this.pilotPeriod = 'month';
     this.flyabilityFilter = 'all'; // 'all' | 'flyable'
     this.networkStatus = 'offline'; // 'live' | 'loading' | 'offline'
+    this.dismissedHorizonDate = null;
     this.cachedWeatherMap = new Map(); // key: spotId -> weatherPayload
     this._customFetchFn = options.fetchFn || null;
   }
@@ -316,6 +319,8 @@ export class HomeDashboardViewController {
           state.pinnedSpotIds !== prev.pinnedSpotIds ||
           state.activeGlider !== prev.activeGlider ||
           state.glider !== prev.glider ||
+          state.usePilotCurrencyFactor !== prev.usePilotCurrencyFactor ||
+          state.flights !== prev.flights ||
           themeChanged
         ) {
           if (state.locationsCatalog && state.locationsCatalog !== this.comprensoriCatalog) {
@@ -388,6 +393,30 @@ export class HomeDashboardViewController {
   }
 
   /**
+   * Resolves the effective active glider profile, attaching optional pilot safety factor when enabled.
+   * @param {object|null} [state=null]
+   * @returns {object}
+   */
+  getEffectiveGlider(state = null) {
+    const st = state || (this.store ? this.store.getState() : {});
+    const baseGlider = st.activeGlider || st.glider || DEFAULT_GLIDER;
+    const usePilotFactor = Boolean(st.usePilotCurrencyFactor);
+    if (!usePilotFactor) return baseGlider;
+
+    const flights = st.flights || DEFAULT_SEED_FLIGHTS;
+    const referenceDate = st.activeDate || formatDateIso(new Date());
+    const pilotSafetyFactor = calculatePilotSafetyFactor({
+      flights,
+      referenceDate,
+      enabled: true
+    });
+    return {
+      ...baseGlider,
+      pilotSafetyFactor
+    };
+  }
+
+  /**
    * Evaluates comprensori and sorts them dynamically by flyability.
    * @param {boolean} [applyFlyFilter=true]
    * @returns {Array<object>}
@@ -395,7 +424,7 @@ export class HomeDashboardViewController {
   getEvaluatedComprensori(applyFlyFilter = true) {
     const state = this.store ? this.store.getState() : {};
     const weatherData = state.weatherData || null;
-    const activeGlider = state.activeGlider || DEFAULT_GLIDER;
+    const activeGlider = this.getEffectiveGlider(state);
     const pinnedIds = state.pinnedSpotIds || [];
 
     // Filter catalog to include ONLY spots pinned as favorites from Forecast view
@@ -433,13 +462,55 @@ export class HomeDashboardViewController {
         }
       }
 
-      const result = evaluateComprensorio({
+      const searchMatch = query ? this.resolveSearchMatchContext(comprensorio, query) : null;
+      const activeTakeoffId = searchMatch?.takeoffId || null;
+
+      let result = evaluateComprensorio({
         comprensorio,
         weatherData: spotWeather,
         glider: activeGlider,
+        pilotSafetyFactor: activeGlider.pilotSafetyFactor || null,
+        activeTakeoffId,
         targetDate,
         allowSynthetic: false
       });
+
+      const diurnalTimeline = this.buildDiurnalTimeline(comprensorio, spotWeather, activeGlider, targetDate, activeTakeoffId);
+
+      // Align daily card verdict with the diurnal timeline when multi-hour weather is present:
+      // if a spot has >= 2 flyable hours during daylight, do not penalize the whole card because 14:00 alone is yellow.
+      if (spotWeather && Array.isArray(spotWeather.hourly?.wind_speed_10m) && spotWeather.hourly.wind_speed_10m.length > 1) {
+        const flyableSlots = diurnalTimeline.slots.filter(s => s.status === 'flyable');
+        const cautionSlots = diurnalTimeline.slots.filter(s => s.status === 'caution');
+        if (flyableSlots.length >= 2 && result.status !== 'flyable') {
+          const repHour = flyableSlots[Math.floor(flyableSlots.length / 2)].hour;
+          result = evaluateComprensorio({
+            comprensorio,
+            weatherData: spotWeather,
+            hourIndex: repHour,
+            glider: activeGlider,
+            pilotSafetyFactor: activeGlider.pilotSafetyFactor || null,
+            activeTakeoffId,
+            targetDate,
+            allowSynthetic: false
+          });
+        } else if (flyableSlots.length === 0 && cautionSlots.length >= 2 && (result.status === 'unflyable' || result.status === 'severe')) {
+          const repHour = cautionSlots[Math.floor(cautionSlots.length / 2)].hour;
+          result = evaluateComprensorio({
+            comprensorio,
+            weatherData: spotWeather,
+            hourIndex: repHour,
+            glider: activeGlider,
+            pilotSafetyFactor: activeGlider.pilotSafetyFactor || null,
+            activeTakeoffId,
+            targetDate,
+            allowSynthetic: false
+          });
+        }
+      }
+
+      result.diurnalTimeline = diurnalTimeline;
+      result.searchMatch = searchMatch;
 
       evaluated.push(result);
     }
@@ -449,6 +520,126 @@ export class HomeDashboardViewController {
       return sorted.filter(item => item.status === 'flyable' || item.status === 'caution');
     }
     return sorted;
+  }
+
+  /**
+   * Resolves contextual match information when a search query hits a sub-spot (takeoff/landing)
+   * or municipality/region that is not already obvious from the comprensorio name.
+   * @param {object} comprensorio
+   * @param {string} normalizedQuery
+   * @returns {{ type: string, label: string, takeoffId?: string, landingId?: string }|null}
+   */
+  resolveSearchMatchContext(comprensorio, normalizedQuery) {
+    if (!comprensorio || !normalizedQuery) return null;
+    const normName = normalizeSearchText(comprensorio.name);
+    if (normName.includes(normalizedQuery)) return null;
+
+    if (Array.isArray(comprensorio.takeoffs)) {
+      const matchedTakeoffs = comprensorio.takeoffs.filter(t => normalizeSearchText(t.name).includes(normalizedQuery));
+      if (matchedTakeoffs.length > 0) {
+        const cleanNames = matchedTakeoffs.map(t => (t.name || '').replace(/^Decollo\s*/i, '').trim()).filter(Boolean);
+        return {
+          type: 'takeoff',
+          label: `▲ ${cleanNames.join(' · ')}`,
+          takeoffId: matchedTakeoffs[0].id
+        };
+      }
+    }
+
+    if (Array.isArray(comprensorio.landings)) {
+      const matchedLandings = comprensorio.landings.filter(l => normalizeSearchText(l.name).includes(normalizedQuery));
+      if (matchedLandings.length > 0) {
+        const cleanNames = matchedLandings.map(l => (l.name || '').replace(/^Atterraggio\s*/i, '').trim()).filter(Boolean);
+        return {
+          type: 'landing',
+          label: `⏚ ${cleanNames.join(' · ')}`,
+          landingId: matchedLandings[0].id
+        };
+      }
+    }
+
+    if (comprensorio.location && normalizeSearchText(comprensorio.location).includes(normalizedQuery)) {
+      return {
+        type: 'location',
+        label: comprensorio.location
+      };
+    }
+
+    if (comprensorio.region && normalizeSearchText(comprensorio.region).includes(normalizedQuery)) {
+      return {
+        type: 'region',
+        label: comprensorio.region
+      };
+    }
+
+    return null;
+  }
+
+  /**
+   * Builds the diurnal hourly flyability timeline (Sunrise -> Sunset) for a comprensorio card.
+   * @param {object} comprensorio
+   * @param {object|null} spotWeather
+   * @param {object} activeGlider
+   * @param {string|null} targetDate
+   * @returns {{ sunriseHour: number, sunsetHour: number, sunriseStr: string, sunsetStr: string, slots: Array<{ hour: number, status: string, badge: string, reason: string }> }}
+   */
+  buildDiurnalTimeline(comprensorio, spotWeather, activeGlider, targetDate, activeTakeoffId = null) {
+    if (!this._diurnalTimelineCache) {
+      this._diurnalTimelineCache = new Map();
+    }
+    const dateIso = targetDate || (this.store ? this.store.getState().activeDate : null) || formatDateIso(new Date());
+    const gliderKey = `${activeGlider?.id || activeGlider?.category || 'EN-A'}_${activeGlider?.pilotSafetyFactor?.multiplier || 1}_${activeTakeoffId || ''}`;
+    const weatherTag = spotWeather
+      ? `${spotWeather.hourly?.time?.[0] || 'w'}_${spotWeather.hourly?.wind_speed_10m?.[0] ?? ''}_${spotWeather.hourly?.wind_gusts_10m?.[0] ?? ''}`
+      : 'offline';
+    const cacheKey = `${comprensorio.id}_${dateIso}_${gliderKey}_${weatherTag}`;
+
+    if (this._diurnalTimelineCache.has(cacheKey)) {
+      return this._diurnalTimelineCache.get(cacheKey);
+    }
+
+    const daylight = resolveDaylightHours(spotWeather, dateIso, comprensorio);
+
+    const slots = daylight.hours.map(hour => {
+      if (!spotWeather) {
+        return {
+          hour,
+          status: 'unavailable',
+          badge: 'Dati N/D',
+          reason: 'Previsione non disponibile offline',
+          windSpeed: null
+        };
+      }
+      const windArr = spotWeather.hourly?.wind_speed_10m;
+      const effectiveHourIdx = Array.isArray(windArr) && windArr[hour] === undefined && windArr.length > 0 ? 0 : hour;
+      const hourEval = evaluateComprensorio({
+        comprensorio,
+        weatherData: spotWeather,
+        hourIndex: effectiveHourIdx,
+        glider: activeGlider,
+        pilotSafetyFactor: activeGlider?.pilotSafetyFactor || null,
+        activeTakeoffId,
+        targetDate: dateIso,
+        allowSynthetic: false
+      });
+      return {
+        hour,
+        status: hourEval.status || 'unavailable',
+        badge: hourEval.badge || 'Dati N/D',
+        reason: hourEval.reason || '',
+        windSpeed: hourEval.weatherSnapshot?.windSpeed ?? null
+      };
+    });
+
+    const timeline = {
+      sunriseHour: daylight.sunriseHour,
+      sunsetHour: daylight.sunsetHour,
+      sunriseStr: daylight.sunriseStr,
+      sunsetStr: daylight.sunsetStr,
+      slots
+    };
+    this._diurnalTimelineCache.set(cacheKey, timeline);
+    return timeline;
   }
 
   /**
@@ -467,7 +658,7 @@ export class HomeDashboardViewController {
     const themeIcons = {
       light: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>`,
       dark: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`,
-      auto: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`
+      auto: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`
     };
     const themeMeta = {
       light: { label: 'Chiaro', icon: themeIcons.light },
@@ -475,6 +666,40 @@ export class HomeDashboardViewController {
       auto: { label: 'Auto', icon: themeIcons.auto }
     };
     const currentThemeMeta = themeMeta[currentTheme] || themeMeta.dark;
+
+    const flights = state.flights || DEFAULT_SEED_FLIGHTS;
+    const activeDate = state.activeDate || formatDateIso(new Date());
+    const metrics = calculatePilotPeriodMetrics({
+      flights,
+      period: this.pilotPeriod,
+      referenceDate: activeDate
+    });
+    const activeGlider = state.activeGlider || state.glider || DEFAULT_GLIDER;
+    const usePilotFactor = Boolean(state.usePilotCurrencyFactor);
+    const safetyFactor = calculatePilotSafetyFactor({
+      flights,
+      referenceDate: activeDate,
+      enabled: usePilotFactor
+    });
+
+    let currencyBadgeHtml = '';
+    if (metrics.currencyStatus !== 'active') {
+      let cBadgeClass = 'gm-badge-nd';
+      if (metrics.currencyStatus === 'reentry') {
+        cBadgeClass = 'gm-badge-caution';
+      } else if (metrics.currencyStatus === 'lapsed') {
+        cBadgeClass = 'gm-badge-alert';
+      }
+      currencyBadgeHtml = `
+        <span 
+          id="home-pilot-currency-alert" 
+          class="gm-badge ${cBadgeClass} gm-filter-currency-badge" 
+          title="${escapeHtml(metrics.currencyDescription || metrics.currencyLabel)}"
+        >
+          ${escapeHtml(metrics.currencyLabel)}
+        </span>
+      `;
+    }
 
     return `
       <div class="gm-home-view max-w-4xl mx-auto flex flex-col gap-2">
@@ -554,14 +779,8 @@ export class HomeDashboardViewController {
           </div>
         </header>
 
-        <!-- SEZIONE 1: Stato Attività Pilota (Prima Sezione) -->
-        <section aria-labelledby="heading-pilot-currency" class="flex flex-col gap-2">
-          <h2 id="heading-pilot-currency" class="sr-only">Attività Pilota</h2>
-          ${this.renderPilotCurrencyBlock(state)}
-        </section>
-
-        <!-- SEZIONE 2: Volabilità SITI (Con ricerca sotto il titolo) -->
-        <section aria-labelledby="heading-comprensori" class="flex flex-col gap-2 pt-1 border-t border-[var(--gm-border)]">
+        <!-- SEZIONE PRIMARIA: Volabilità SITI (Triage meteorologico immediato Above-the-Fold) -->
+        <section aria-labelledby="heading-comprensori" class="flex flex-col gap-2">
           <div class="flex items-center justify-between text-xs text-[var(--gm-text-muted)] font-bold uppercase tracking-wider px-0.5">
             <h2 id="heading-comprensori">Volabilità</h2>
             <div class="flex items-center gap-2">
@@ -573,57 +792,72 @@ export class HomeDashboardViewController {
           <!-- Smart Date Selector for Comprensori Flyability (Weekend & Quick Presets) -->
           ${this.renderDateBar(state)}
 
-          <!-- Compact Search Bar (Sotto il titolo Volabilità) -->
-          <div class="gm-search-wrapper">
-            <svg class="gm-search-icon" viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" fill="none" stroke-width="2" aria-hidden="true">
-              <circle cx="11" cy="11" r="8"></circle>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-            </svg>
-            <input 
-              type="search" 
-              id="home-spot-search" 
-              class="gm-search-input" 
-              placeholder="Ricerca..." 
-              value="${escapeHtml(this.searchQuery)}" 
-              autocomplete="off" 
-              aria-label="Ricerca" 
-              aria-controls="home-spots-list"
-            />
-            <button 
-              type="button" 
-              id="home-search-clear-btn" 
-              class="gm-search-clear ${this.searchQuery ? '' : 'hidden'}" 
-              data-action="clear-search" 
-              aria-label="Cancella testo di ricerca" 
-              title="Cancella ricerca"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
+          <!-- Symbiotic Single-Row Toolbar: Search + Single Flyability Toggle + Active Glider Pill -->
+          <div id="home-symbiotic-toolbar" class="gm-filter-chips gm-symbiotic-toolbar ${this.searchQuery ? 'is-searching' : ''}" role="group" aria-label="Ricerca, filtro volabilità e vela attiva">
+            <div class="gm-search-wrapper gm-symbiotic-search">
+              <svg class="gm-search-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2" aria-hidden="true">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
               </svg>
-            </button>
-          </div>
+              <input 
+                type="search" 
+                id="home-spot-search" 
+                class="gm-search-input" 
+                placeholder="Ricerca..." 
+                value="${escapeHtml(this.searchQuery)}" 
+                autocomplete="off" 
+                aria-label="Ricerca" 
+                aria-controls="home-spots-list"
+              />
+              <button 
+                type="button" 
+                id="home-search-clear-btn" 
+                class="gm-search-clear ${this.searchQuery ? '' : 'hidden'}" 
+                data-action="clear-search" 
+                aria-label="Cancella testo di ricerca" 
+                title="Cancella ricerca"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
 
-          <!-- Quick Flyability Filter Chips (Hick's Law & Baymard Benchmark) -->
-          <div class="gm-filter-chips" role="group" aria-label="Filtro volabilità">
             <button 
               type="button" 
-              class="gm-filter-chip ${this.flyabilityFilter === 'all' ? 'active' : ''}" 
-              data-action="set-fly-filter" 
-              data-filter="all"
-              aria-pressed="${this.flyabilityFilter === 'all'}"
-            >
-              Tutti (${totalCount})
-            </button>
-            <button 
-              type="button" 
-              class="gm-filter-chip ${this.flyabilityFilter === 'flyable' ? 'active' : ''}" 
-              data-action="set-fly-filter" 
-              data-filter="flyable"
+              id="btn-home-fly-filter-toggle"
+              class="gm-filter-chip gm-fly-filter-toggle ${this.flyabilityFilter === 'flyable' ? 'active' : ''} ${this.searchQuery ? 'hidden' : ''}" 
+              data-action="toggle-fly-filter" 
+              data-filter="${this.flyabilityFilter === 'flyable' ? 'all' : 'flyable'}"
               aria-pressed="${this.flyabilityFilter === 'flyable'}"
+              title="${this.flyabilityFilter === 'flyable' ? 'Filtro attivo: solo volabili o in cautela. Tocca per mostrare tutti i siti' : 'Mostra tutti i siti. Tocca per filtrare solo i siti volabili o in cautela'}"
             >
-              Volabili / Cautela (${flyableCount})
+              ${this.flyabilityFilter === 'flyable' ? `Volabili (${flyableCount})` : `Tutti (${totalCount})`}
             </button>
+
+            <div class="gm-filter-chips-right">
+              ${currencyBadgeHtml}
+              <button 
+                type="button" 
+                id="btn-home-select-glider"
+                class="gm-glider-pill gm-glider-pill-compact" 
+                data-action="open-glider-sheet" 
+                aria-label="Cambia classe vela attiva, attualmente ${escapeHtml(activeGlider.name || activeGlider.category)}${usePilotFactor ? ` (${safetyFactor.shortLabel})` : ''}"
+                title="Vela attiva: ${escapeHtml(activeGlider.name || activeGlider.category)}${usePilotFactor ? ` • Prudenza adattata (${safetyFactor.shortLabel})` : ''}"
+              >
+                <span class="gm-glider-pill-badge ${escapeHtml(activeGlider.category ? activeGlider.category.toLowerCase() : 'en-a')}">
+                  ${escapeHtml(activeGlider.category || 'EN-A')}
+                </span>
+                <span class="gm-glider-pill-name">
+                  ${escapeHtml(activeGlider.name || 'Standard')}
+                </span>
+                ${usePilotFactor ? `<span class="gm-glider-pill-factor" title="${escapeHtml(safetyFactor.reasonTag || safetyFactor.shortLabel)}">${escapeHtml(safetyFactor.shortLabel)}</span>` : ''}
+                <svg class="gm-glider-pill-chevron" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </button>
+            </div>
           </div>
 
           ${this.renderComprensoriList(evaluatedList)}
@@ -645,9 +879,11 @@ export class HomeDashboardViewController {
     const targetSpot = spot || favorites[0] || this.comprensoriCatalog[0] || DEFAULT_COMPRENSORI[0];
     if (!targetSpot) return [];
 
+    const effectiveGlider = this.getEffectiveGlider(state);
+    const gliderKey = `${effectiveGlider.id || effectiveGlider.category || 'EN-A'}_${state.usePilotCurrencyFactor ? 'pf1' : 'pf0'}`;
     const today = new Date();
     const todayIso = formatDateIso(today);
-    const key = `fly_home_multi_${targetSpot.id}_${todayIso}_${days}`;
+    const key = `fly_home_multi_${targetSpot.id}_${todayIso}_${days}_${gliderKey}`;
     if (this._homeFlyCache && this._homeFlyCache[key]) {
       return this._homeFlyCache[key];
     }
@@ -679,7 +915,7 @@ export class HomeDashboardViewController {
       });
     }
 
-    const summaries = calculateDailyFlyabilitySummary(payload, takeoff, null, days);
+    const summaries = calculateDailyFlyabilitySummary(payload, takeoff, effectiveGlider, days);
     this._homeFlyCache[key] = summaries;
     return summaries;
   }
@@ -690,7 +926,8 @@ export class HomeDashboardViewController {
    * @returns {string}
    */
   renderDateBar(state) {
-    const activeDate = state.activeDate || formatDateIso(new Date());
+    const resolvedState = state || (this.store ? this.store.getState() : {});
+    const activeDate = resolvedState.activeDate || formatDateIso(new Date());
     const smartData = getSmartDatePresets(new Date(), activeDate);
 
     return `
@@ -729,14 +966,23 @@ export class HomeDashboardViewController {
           </svg>
         </button>
       </div>
-      ${smartData.activeHorizon && smartData.activeHorizon.isSynoptic ? `
-        <div class="gm-horizon-notice mb-1" role="status">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="gm-horizon-icon" aria-hidden="true">
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="12" y1="16" x2="12" y2="12"></line>
-            <line x1="12" y1="8" x2="12.01" y2="8"></line>
-          </svg>
-          <span><strong>Tendenza a lungo raggio:</strong> oltre 7 giorni le previsioni sono indicative.</span>
+      ${smartData.activeHorizon && smartData.activeHorizon.isSynoptic && this.dismissedHorizonDate !== activeDate ? `
+        <div class="gm-horizon-notice" role="status">
+          <div class="gm-horizon-notice-body">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="gm-horizon-icon" aria-hidden="true">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            <span><strong>Tendenza a lungo raggio:</strong> oltre 7 giorni le previsioni sono indicative.</span>
+          </div>
+          <button
+            type="button"
+            class="gm-warning-close-btn"
+            data-action="dismiss-horizon-notice"
+            aria-label="Chiudi avviso tendenza a lungo raggio"
+            title="Chiudi avviso"
+          >✕</button>
         </div>
       ` : ''}
     `;
@@ -825,25 +1071,117 @@ export class HomeDashboardViewController {
   }
 
   /**
-   * Renders an individual compact glanceable Comprensorio Card.
-   * Entire card is clickable to view forecast.
+   * Builds the list of expressive determinant factor pills for a comprensorio card ([NOTE-001]).
+   * @param {object} item
+   * @param {object} timeline
+   * @returns {Array<{ label: string, severityClass: string }>}
+   */
+  buildDeterminantReasonPills(item, timeline) {
+    if (!item || item.status === 'unavailable') {
+      return [{ label: 'Previsione non disponibile offline', severityClass: 'nd' }];
+    }
+
+    const pills = [];
+    const w = item.weatherSnapshot || {};
+    const windInd = item.indicators?.wind;
+    const dirInd = item.indicators?.direction;
+    const glideInd = item.indicators?.glide;
+
+    // 1. Best diurnal flyable window pill if any hours are flyable
+    if (timeline && Array.isArray(timeline.slots)) {
+      const flyHours = timeline.slots.filter(s => s.status === 'flyable').map(s => s.hour);
+      if (flyHours.length > 0) {
+        const firstH = String(flyHours[0]).padStart(2, '0');
+        const lastH = String(flyHours[flyHours.length - 1]).padStart(2, '0');
+        const winLabel = flyHours.length === 1 ? `Finestra ${firstH}:00` : `Finestra ${firstH}:00–${lastH}:00`;
+        pills.push({ label: winLabel, severityClass: 'flyable' });
+      }
+    }
+
+    // 2. Rain pill (if precipitation > 0)
+    if (typeof w.rain === 'number' && w.rain > 0) {
+      pills.push({
+        label: `Pioggia ${w.rain.toFixed(1)} mm`,
+        severityClass: w.rain >= 0.5 ? 'severe' : 'unflyable'
+      });
+    }
+
+    // 3. Wind & Gusts pill
+    if (windInd && w.windSpeed != null) {
+      const windSev = this.getSeverityClass(windInd.severity ?? 0);
+      const gustPart = (w.windGust != null && w.windGust > w.windSpeed) ? ` · raff. ${w.windGust} km/h` : '';
+      pills.push({
+        label: `${windInd.label}: ${w.windSpeed} km/h${gustPart}`,
+        severityClass: windSev
+      });
+    }
+
+    // 4. Direction / Exposure pill
+    if (dirInd && dirInd.hasExposure) {
+      const dirSev = this.getSeverityClass(dirInd.severity ?? 0);
+      pills.push({
+        label: `${dirInd.label} (${dirInd.cardinal} ${dirInd.degrees}°)`,
+        severityClass: dirSev
+      });
+    }
+
+    // 5. Turbulence / Instability pill when significant
+    if (typeof w.turbulence === 'number' && w.turbulence >= 0.22) {
+      pills.push({
+        label: `Turbolenza EDR ${w.turbulence.toFixed(2)}`,
+        severityClass: w.turbulence >= 0.35 ? 'unflyable' : 'caution'
+      });
+    }
+    if (typeof w.cape === 'number' && w.cape >= 800) {
+      pills.push({
+        label: `Instabilità CAPE ${Math.round(w.cape)} J/kg`,
+        severityClass: w.cape >= 1500 ? 'unflyable' : 'caution'
+      });
+    }
+
+    // 6. Glide / Landing cone pill
+    if (glideInd && glideInd.requiredGlideRatio && glideInd.requiredGlideRatio !== '-') {
+      const glideSev = this.getSeverityClass(glideInd.severity ?? 0);
+      pills.push({
+        label: `${glideInd.label} (1:${glideInd.requiredGlideRatio})`,
+        severityClass: glideSev
+      });
+    }
+
+    // 7. Pilot safety factor derating explanation
+    if (item.reason && item.reason.includes('Meteo favorevole per la vela')) {
+      pills.push({
+        label: item.reason,
+        severityClass: 'caution'
+      });
+    }
+
+    return pills;
+  }
+
+  /**
+   * Renders an individual compact glanceable Comprensorio Card (Option A: 2-Row Expressive Timeline).
+   * Row 1: Spot Name + Province (+ contextual search match if searching sub-spot) | Flyability Badge (tap to expand reason pills) + Chevron
+   * Row 2: Diurnal Flyability Timeline (Sunrise -> Sunset) with 1-tap hour deep-linking.
+   * Row 3 (Expandable on badge tap): Determinant Factor Pills ([NOTE-001]).
    * @param {object} item - Evaluated comprensorio
    * @returns {string}
    */
   renderComprensorioCard(item) {
     const takeoff = item.takeoff || item.bestTakeoff || {};
     const landing = item.landing || item.safeLanding || {};
-    const glide = item.glideMetrics || { requiredGlideRatio: '-', isSafe: true };
-    const weather = item.weatherSnapshot || {};
-
     const rawTakeoffName = takeoff.name || 'Decollo';
     const takeoffName = rawTakeoffName.replace(/^Decollo\s*/i, '').replace(/Col Campeggia\s*\/\s*/i, '');
     const landingName = (landing.name || 'Atterraggio').replace(/^Atterraggio\s*/i, '');
-    const takeoffAlt = takeoff.altitude ? `${takeoff.altitude}m` : '-';
-    const landingAlt = landing.altitude ? `${landing.altitude}m` : '-';
     const isUnavailable = item.status === 'unavailable';
-    const windSpeedStr = (!isUnavailable && weather.windSpeed != null) ? `${weather.windSpeed} km/h` : '-- km/h';
-    const windDirStr = (!isUnavailable && weather.windDir != null) ? `${getCardinalDirection(weather.windDir)} (${weather.windDir}°)` : '';
+    const timeline = item.diurnalTimeline || this.buildDiurnalTimeline(
+      item.comprensorio || { id: item.comprensorioId || item.id, name: item.name, takeoffs: [takeoff], landings: [landing] },
+      null,
+      this.getEffectiveGlider(),
+      this.store ? this.store.getState().activeDate : null
+    );
+    const reasonPills = this.buildDeterminantReasonPills(item, timeline);
+    const isReasonsExpanded = Boolean(this.expandedReasonSpotIds && this.expandedReasonSpotIds.has(item.comprensorioId));
 
     let badgeClass = 'gm-badge-flyable';
     let badgeIcon = '✓';
@@ -865,60 +1203,79 @@ export class HomeDashboardViewController {
 
     return `
       <article 
-        class="gm-spot-card ${isUnavailable ? 'gm-spot-card-unavailable' : ''}" 
+        class="gm-spot-card gm-spot-card-timeline ${isUnavailable ? 'gm-spot-card-unavailable' : ''} ${isReasonsExpanded ? 'is-reasons-expanded' : ''}" 
         data-comprensorio-id="${escapeHtml(item.comprensorioId)}"
+        data-takeoff-name="${escapeHtml(takeoffName)}"
+        data-landing-name="${escapeHtml(landingName)}"
+        ${item.searchMatch?.takeoffId ? `data-matched-takeoff-id="${escapeHtml(item.searchMatch.takeoffId)}"` : ''}
         data-action="view-forecast"
         data-id="${escapeHtml(item.comprensorioId)}"
         role="button"
         tabindex="0"
-        aria-label="${escapeHtml(item.name)}, stato ${escapeHtml(badgeTitle)}"
+        aria-label="${escapeHtml(item.name)}, stato ${escapeHtml(badgeTitle)}, decollo ${escapeHtml(takeoffName)}, atterraggio ${escapeHtml(landingName)}"
       >
-        <!-- Line 1: Spot Name + Province + Live Flyability Badge + Navigation Affordance -->
+        <!-- Line 1: Spot Name + Province (+ Sub-spot Search Match) + Flyability Badge Toggle + Chevron -->
         <div class="gm-spot-header">
           <div class="gm-spot-title-group">
             <span class="gm-spot-name">${escapeHtml(item.name)}</span>
             ${item.province ? `<span class="gm-spot-prov">${escapeHtml(item.province)}</span>` : ''}
+            ${item.searchMatch ? `
+              <span class="gm-spot-search-match" data-match-type="${escapeHtml(item.searchMatch.type)}" title="Trovato per: ${escapeHtml(item.searchMatch.label)}">
+                ${escapeHtml(item.searchMatch.label)}
+              </span>
+            ` : ''}
           </div>
-          <div class="flex items-center gap-2">
-            <span class="gm-badge gm-badge-pill ${badgeClass}" title="${escapeHtml(badgeTitle)}" aria-label="${escapeHtml(badgeTitle)}">
+          <div class="gm-spot-header-right">
+            <button
+              type="button"
+              class="gm-badge gm-badge-pill ${badgeClass} gm-spot-badge-toggle"
+              data-action="toggle-spot-reasons"
+              data-id="${escapeHtml(item.comprensorioId)}"
+              aria-expanded="${isReasonsExpanded ? 'true' : 'false'}"
+              title="${escapeHtml(badgeTitle)}: ${escapeHtml(item.reason || 'Tocca per mostrare i fattori determinanti')}"
+              aria-label="Stato ${escapeHtml(badgeTitle)}. Tocca per dettagli sui fattori determinanti"
+            >
               <span aria-hidden="true">${badgeIcon}</span>
               <span class="gm-badge-text font-bold">${escapeHtml(badgeTitle)}</span>
-            </span>
+              <span class="gm-badge-expand-caret" aria-hidden="true">${isReasonsExpanded ? '▴' : '▾'}</span>
+            </button>
             <svg class="gm-spot-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
               <polyline points="9 18 15 12 9 6"></polyline>
             </svg>
           </div>
         </div>
 
-        <!-- Line 2: Dual Launch & Landing Rows -->
-        <div class="gm-spot-flight-row">
-          <div class="gm-flight-stat-row">
-            <div class="gm-flight-label">
-              <span class="gm-flight-icon">↗</span>
-              <span class="gm-flight-target">${escapeHtml(takeoffName)}</span>
-              <span class="gm-flight-alt">(${takeoffAlt})</span>
-            </div>
-            <div class="gm-flight-data">
-              ${this.renderWindIndicator(item)}
-            </div>
-          </div>
-
-          <div class="gm-flight-stat-row">
-            <div class="gm-flight-label">
-              <span class="gm-flight-icon">↘</span>
-              <span class="gm-flight-target">${escapeHtml(landingName)}</span>
-              <span class="gm-flight-alt">(${landingAlt})</span>
-            </div>
-            <div class="gm-flight-data">
-              ${this.renderGlideIndicator(item)}
-            </div>
-          </div>
+        <!-- Line 2: Diurnal Flyability Timeline (Sunrise -> Sunset) -->
+        <div 
+          class="gm-home-timeline" 
+          role="group" 
+          aria-label="Timeline volabilità diurna da ${escapeHtml(timeline.sunriseStr)} a ${escapeHtml(timeline.sunsetStr)}"
+        >
+          ${timeline.slots.map(slot => `
+            <button
+              type="button"
+              class="gm-home-timeline-slot status-${escapeHtml(slot.status)}"
+              data-action="view-forecast-hour"
+              data-id="${escapeHtml(item.comprensorioId)}"
+              data-hour="${slot.hour}"
+              title="${String(slot.hour).padStart(2, '0')}:00 — ${escapeHtml(slot.badge)}${slot.windSpeed != null ? ` (${slot.windSpeed} km/h)` : ''}${slot.reason ? `: ${escapeHtml(slot.reason)}` : ''}"
+              aria-label="Ore ${String(slot.hour).padStart(2, '0')}:00, ${escapeHtml(slot.badge)}"
+            >
+              <span class="gm-home-timeline-hour">${String(slot.hour).padStart(2, '0')}</span>
+              <span class="gm-home-timeline-bar"></span>
+            </button>
+          `).join('')}
         </div>
 
-        <!-- Line 3: Explainability String (Direct physical reason) -->
-        <div class="gm-spot-explain ${isUnavailable ? 'text-[var(--gm-text-muted)]' : ''}">
-          <span class="gm-explain-bullet">${isUnavailable ? '○' : '●'}</span>
-          <span>${escapeHtml(item.reason)}</span>
+        <!-- Line 3 (Expandable on Badge Tap): Determinant Factor Pills ([NOTE-001]) -->
+        <div 
+          class="gm-spot-reasons-drawer gm-spot-explain gm-spot-micro-reason ${isReasonsExpanded ? 'is-expanded' : 'hidden'}"
+          role="region"
+          aria-label="Fattori determinanti di volabilità per ${escapeHtml(item.name)}"
+        >
+          ${reasonPills.map(pill => `
+            <span class="gm-reason-pill pill-${escapeHtml(pill.severityClass)}">${escapeHtml(pill.label)}</span>
+          `).join('')}
         </div>
       </article>
     `;
@@ -1367,19 +1724,59 @@ export class HomeDashboardViewController {
   }
 
   /**
-   * Opens the accessible bottom sheet to select the active glider / wing brand and model.
+   * Opens the accessible bottom sheet to select the active glider / wing brand and model,
+   * and configure the optional Pilot Currency & Experience safety factor.
    */
   openGliderSheet() {
     const state = this.store ? this.store.getState() : {};
     const currentGlider = state.activeGlider || state.glider || DEFAULT_GLIDER;
     const currentCategory = currentGlider.category || 'EN-A';
     const classes = Object.values(GLIDER_CLASSES);
+    const flights = state.flights || DEFAULT_SEED_FLIGHTS;
+    const activeDate = state.activeDate || formatDateIso(new Date());
+    const usePilotFactor = Boolean(state.usePilotCurrencyFactor);
+    const safetyFactor = calculatePilotSafetyFactor({
+      flights,
+      referenceDate: activeDate,
+      enabled: usePilotFactor
+    });
+    const deratingPct = safetyFactor.rawMultiplier < 1.0
+      ? `-${Math.round((1 - safetyFactor.rawMultiplier) * 100)}%`
+      : '100% (Standard)';
 
     const contentHtml = `
       <div class="gm-glider-sheet flex flex-col gap-3">
         <p class="text-xs text-[var(--gm-text-muted)] leading-relaxed">
           Seleziona la tua vela per marca e modello o per classe di omologazione. Le velocità di trim, accelerata e l'efficienza limite di rientro verso l'atterraggio sicuro vengono personalizzate per il tuo inviluppo di volo.
         </p>
+
+        <!-- Optional Pilot Currency & Experience Factor Toggle -->
+        <button
+          type="button"
+          id="glider-sheet-currency-factor-card"
+          class="gm-glider-option-card ${usePilotFactor ? 'active' : ''}"
+          data-action="toggle-pilot-currency-factor"
+          role="switch"
+          aria-checked="${usePilotFactor ? 'true' : 'false'}"
+        >
+          <div class="flex items-center justify-between w-full gap-3">
+            <div class="flex flex-col text-left">
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-sm text-[var(--gm-text)]">Adatta prudenza a continuità e storico voli</span>
+                <span class="gm-badge ${usePilotFactor ? 'gm-badge-flyable' : 'gm-badge-nd'} text-[0.65rem] px-1.5 py-0.5">
+                  ${usePilotFactor ? 'Attivo' : 'Opzionale'}
+                </span>
+              </div>
+              <span class="text-xs text-[var(--gm-text-secondary)] mt-0.5">
+                Stato: ${escapeHtml(safetyFactor.currencyLabel)} (${safetyFactor.totalFlights} voli nel Logbook) • Soglie pilotaggio: <strong>${deratingPct}</strong>
+              </span>
+              <span class="text-[0.68rem] text-[var(--gm-text-muted)] mt-0.5 leading-snug">
+                Riduce in modo conservativo i margini su raffiche, turbolenza e vento traverso senza alterare velocità di trim o efficienza planata della vela.
+              </span>
+            </div>
+            <span class="gm-glider-check ${usePilotFactor ? 'selected' : ''}" aria-hidden="true">${usePilotFactor ? '✓' : '○'}</span>
+          </div>
+        </button>
 
         <!-- Brand & Model Fast Search -->
         <div class="gm-glider-search-wrap">
@@ -1515,6 +1912,7 @@ export class HomeDashboardViewController {
 
   /**
    * Opens the accessible bottom sheet to select any date within the forecast horizon (up to 14 days).
+   * Symmetric with ForecastView: includes 14-day flyability status badges and semantic 4-color legend.
    */
   openDatePickerSheet() {
     const state = this.store ? this.store.getState() : {};
@@ -1522,7 +1920,8 @@ export class HomeDashboardViewController {
     const today = new Date();
     const minDate = formatDateIso(today);
     const maxDate = formatDateIso(new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000));
-    const availableDates = getAvailableCalendarDates(today, 14, null);
+    const flySummaries = this.getMultiDayFlyability(null, 14);
+    const availableDates = getAvailableCalendarDates(today, 14, flySummaries);
 
     const renderContent = () => `
       <div class="gm-date-picker-sheet flex flex-col gap-4">
@@ -1537,20 +1936,33 @@ export class HomeDashboardViewController {
               return `
                 <button 
                   type="button" 
-                  class="gm-date-grid-item ${isSelected ? 'active' : ''} ${d.isWeekend ? 'weekend' : ''}"
+                  class="gm-date-grid-item ${isSelected ? 'active' : ''} ${d.isWeekend ? 'weekend' : ''} fly-${d.flyability.status}"
                   data-action="pick-calendar-date"
                   data-date="${d.isoDate}"
                   aria-selected="${isSelected ? 'true' : 'false'}"
-                  title="${d.dayName} ${d.formatted} (${d.horizon.label})"
+                  title="${d.dayName} ${d.formatted} (${d.horizon.label}) - ${d.flyability.label}: ${d.flyability.limitingFactor || ''}"
                 >
                   <span class="grid-day-name">${escapeHtml(d.dayName)}</span>
                   <span class="grid-day-number">${d.dayNumber}</span>
                   <span class="grid-month">${escapeHtml(d.formatted.split(' ')[1])}</span>
 
+                  <span class="grid-fly-status ${d.flyability.badgeClass}" title="${escapeHtml(d.flyability.label)}">
+                    <span class="grid-fly-icon" aria-hidden="true">${d.flyability.icon}</span>
+                    <span class="grid-fly-label">${escapeHtml(d.flyability.label)}</span>
+                  </span>
+
                   ${d.horizon.isSynoptic ? `<span class="grid-synoptic-dot" title="Tendenza sinottica (attendibilità indicativa)">●</span>` : ''}
                 </button>
               `;
             }).join('')}
+          </div>
+
+          <!-- 4-Color Semantic Legend -->
+          <div class="gm-date-sheet-legend flex items-center justify-between text-[0.68rem] px-1 pt-3 text-[var(--gm-text-muted)] border-t border-[var(--gm-border)] mt-3">
+            <span class="flex items-center gap-1"><span class="text-[var(--gm-status-flyable)]">●</span> Volabile</span>
+            <span class="flex items-center gap-1"><span class="text-[var(--gm-status-caution)]">▲</span> Cautela</span>
+            <span class="flex items-center gap-1"><span class="text-[var(--gm-status-unflyable)]">✕</span> Non Volabile</span>
+            <span class="flex items-center gap-1"><span class="text-[#f87171]">⚡</span> Severo</span>
           </div>
         </div>
 
@@ -1668,6 +2080,14 @@ export class HomeDashboardViewController {
       if (clearBtn && typeof clearBtn.classList?.add === 'function') {
         clearBtn.classList.add('hidden');
       }
+      const toolbar = this.containerEl.querySelector('#home-symbiotic-toolbar');
+      if (toolbar && typeof toolbar.classList?.remove === 'function') {
+        toolbar.classList.remove('is-searching');
+      }
+      const flyToggleBtn = this.containerEl.querySelector('#btn-home-fly-filter-toggle');
+      if (flyToggleBtn && typeof flyToggleBtn.classList?.remove === 'function') {
+        flyToggleBtn.classList.remove('hidden');
+      }
       const listContainer = this.containerEl.querySelector('section[aria-labelledby="heading-comprensori"]');
       if (listContainer) {
         const evaluatedList = this.getEvaluatedComprensori();
@@ -1701,10 +2121,11 @@ export class HomeDashboardViewController {
 
     if (action === 'clear-search') {
       this.clearSearch();
-    } else if (action === 'set-fly-filter') {
-      const filter = actionEl.getAttribute('data-filter') || 'all';
-      if (this.flyabilityFilter !== filter) {
-        this.flyabilityFilter = filter;
+    } else if (action === 'toggle-fly-filter' || action === 'set-fly-filter') {
+      const explicitFilter = actionEl.getAttribute('data-filter');
+      const nextFilter = explicitFilter || (this.flyabilityFilter === 'flyable' ? 'all' : 'flyable');
+      if (this.flyabilityFilter !== nextFilter) {
+        this.flyabilityFilter = nextFilter;
         this.render();
       }
     } else if (action === 'toggle-theme-menu') {
@@ -1726,6 +2147,17 @@ export class HomeDashboardViewController {
           this.render();
         }
       }
+    } else if (action === 'dismiss-horizon-notice') {
+      const st = this.store ? this.store.getState() : {};
+      this.dismissedHorizonDate = st.activeDate || formatDateIso(new Date());
+      if (this.containerEl && typeof this.containerEl.querySelector === 'function') {
+        const noticeEl = this.containerEl.querySelector('.gm-horizon-notice');
+        if (noticeEl && typeof noticeEl.remove === 'function') {
+          noticeEl.remove();
+          return;
+        }
+      }
+      this.render();
     } else if (action === 'select-date') {
       const dateAttr = actionEl.getAttribute('data-date');
       if (dateAttr && this.store) {
@@ -1770,6 +2202,18 @@ export class HomeDashboardViewController {
       this.openAddFlightSheet();
     } else if (action === 'open-glider-sheet') {
       this.openGliderSheet();
+    } else if (action === 'toggle-pilot-currency-factor') {
+      if (this.store) {
+        const nextVal = !Boolean(this.store.getState().usePilotCurrencyFactor);
+        this.store.setState({ usePilotCurrencyFactor: nextVal });
+        if (typeof document !== 'undefined') {
+          const switchCard = document.getElementById('glider-sheet-currency-factor-card');
+          if (switchCard) {
+            this.openGliderSheet();
+          }
+        }
+        this.render();
+      }
     } else if (action === 'filter-glider-brand') {
       const brand = actionEl.getAttribute('data-brand') || '';
       this.gliderSelectedBrand = brand;
@@ -1828,12 +2272,42 @@ export class HomeDashboardViewController {
       }
       closeSheet();
       this.render();
+    } else if (action === 'toggle-spot-reasons') {
+      if (!this.expandedReasonSpotIds) {
+        this.expandedReasonSpotIds = new Set();
+      }
+      if (id) {
+        if (this.expandedReasonSpotIds.has(id)) {
+          this.expandedReasonSpotIds.delete(id);
+        } else {
+          this.expandedReasonSpotIds.add(id);
+        }
+        this.render();
+      }
     } else if (action === 'go-to-forecast') {
       this.navigateTo('forecast');
+    } else if (action === 'view-forecast-hour') {
+      const hourVal = parseInt(actionEl.getAttribute('data-hour'), 10);
+      const cardEl = typeof actionEl.closest === 'function' ? actionEl.closest('.gm-spot-card') : null;
+      const matchedTakeoffId = cardEl ? cardEl.getAttribute('data-matched-takeoff-id') : null;
+      const comprensorio = this.comprensoriCatalog.find(c => c.id === id || (c.name && id && c.name.toLowerCase() === id.toLowerCase()));
+      if (this.store) {
+        const nextState = {};
+        if (comprensorio) nextState.selectedSpot = comprensorio;
+        if (matchedTakeoffId) nextState.activeTakeoffId = matchedTakeoffId;
+        if (!isNaN(hourVal) && hourVal >= 0 && hourVal <= 23) nextState.selectedHour = hourVal;
+        if (Object.keys(nextState).length > 0) {
+          this.store.setState(nextState);
+        }
+      }
+      this.navigateTo('forecast');
     } else if (action === 'view-forecast') {
+      const matchedTakeoffId = actionEl.getAttribute('data-matched-takeoff-id');
       const comprensorio = this.comprensoriCatalog.find(c => c.id === id || (c.name && id && c.name.toLowerCase() === id.toLowerCase()));
       if (this.store && comprensorio) {
-        this.store.setState({ selectedSpot: comprensorio });
+        const nextState = { selectedSpot: comprensorio };
+        if (matchedTakeoffId) nextState.activeTakeoffId = matchedTakeoffId;
+        this.store.setState(nextState);
       }
       this.navigateTo('forecast');
     } else if (action === 'upload-igc') {
@@ -1866,11 +2340,20 @@ export class HomeDashboardViewController {
     const input = evt.target;
     if (input) {
       this.searchQuery = input.value || '';
+      const hasSearch = Boolean(this.searchQuery && this.searchQuery.trim().length > 0);
       
       if (this.containerEl) {
         const clearBtn = this.containerEl.querySelector('#home-search-clear-btn');
         if (clearBtn && typeof clearBtn.classList?.toggle === 'function') {
           clearBtn.classList.toggle('hidden', !this.searchQuery);
+        }
+        const toolbar = this.containerEl.querySelector('#home-symbiotic-toolbar');
+        if (toolbar && typeof toolbar.classList?.toggle === 'function') {
+          toolbar.classList.toggle('is-searching', hasSearch);
+        }
+        const flyToggleBtn = this.containerEl.querySelector('#btn-home-fly-filter-toggle');
+        if (flyToggleBtn && typeof flyToggleBtn.classList?.toggle === 'function') {
+          flyToggleBtn.classList.toggle('hidden', hasSearch);
         }
       }
 

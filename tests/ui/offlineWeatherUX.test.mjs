@@ -32,16 +32,13 @@ describe('Offline & Unavailable Weather Data UX Governance', () => {
     const controller = new HomeDashboardViewController({ store: mockStore });
     const html = controller.renderHtml();
 
-    // Verify spot cards reflect unavailable state
+    // Verify spot cards reflect unavailable state with 2-row diurnal timeline
     assert.ok(html.includes('gm-badge-nd'), 'Must render neutral N/D badge');
     assert.ok(html.includes('Dati N/D'), 'Must display Dati N/D text');
-    assert.ok(html.includes('-- km/h'), 'Must display dash placeholder for wind speed');
+    assert.ok(html.includes('status-unavailable'), 'Must render unavailable status on diurnal timeline slots');
     assert.ok(!html.includes('da SW (212°)'), 'Must not display fake wind direction');
-    assert.ok(html.includes('Previsione non disponibile offline'), 'Must show explainability message');
-
-    // Verify geometric orography is still present
-    assert.ok(html.includes('gm-glide-label">Efficienza</span>'), 'Geometric glide ratio label must exist');
-    assert.ok(/1:\d+\.\d+/.test(html), 'Geometric glide ratio must be preserved');
+    assert.ok(html.includes('Previsione non disponibile offline'), 'Must show explainability message in title attribute');
+    assert.ok(html.includes('gm-spot-micro-reason'), 'Must show compact micro-reason element in header');
   });
 
   it('should safely terminate loading state and transition to offline if batch weather fetch fails', async () => {
@@ -104,7 +101,7 @@ describe('Offline & Unavailable Weather Data UX Governance', () => {
     assert.equal(evaluatedSpot.weatherSnapshot.windDir, 180);
   });
 
-  it('should render 4-state semantic indicator pills with subordinate micro-data in Home spot cards', () => {
+  it('should render 2-row diurnal flyability timeline with subordinate hourly tooltips in Home spot cards', () => {
     const spot = DEFAULT_COMPRENSORI[0];
     const mockStore = createStore({
       activeDate: '2026-10-10',
@@ -130,16 +127,14 @@ describe('Offline & Unavailable Weather Data UX Governance', () => {
 
     const html = controller.renderHtml();
 
-    // Verify presence of indicator pills with dot, semantic label, and micro-data
-    assert.ok(html.includes('gm-ind-pill'), 'Must render semantic indicator pills');
-    assert.ok(html.includes('gm-ind-dot'), 'Must render semantic status dots');
-    assert.ok(html.includes('gm-ind-flyable') || html.includes('gm-ind-caution'), 'Must assign severity class');
-    assert.ok(html.includes('gm-ind-micro'), 'Must render subordinate micro-data container');
-    assert.ok(html.includes('12 km/h'), 'Must render wind speed in micro-data');
-    assert.ok(html.includes('gm-glide-label">Efficienza</span>'), 'Must retain Efficienza label');
+    // Verify presence of diurnal timeline slots and hourly wind speed in slot tooltip
+    assert.ok(html.includes('gm-home-timeline'), 'Must render diurnal flyability timeline container');
+    assert.ok(html.includes('gm-home-timeline-slot'), 'Must render hourly timeline slots');
+    assert.ok(html.includes('status-flyable') || html.includes('status-caution'), 'Must assign hourly status class');
+    assert.ok(html.includes('12 km/h'), 'Must render wind speed in hourly slot tooltip');
   });
 
-  it('should recalculate indicator severity classes when active glider is changed in store', () => {
+  it('should recalculate timeline and badge severity classes when active glider is changed in store', () => {
     const spot = DEFAULT_COMPRENSORI[0];
     // Sustained wind 24 km/h with gusts 30 km/h:
     // For EN-A (vTrim 36): windRed=23, gustRed=29 -> SEVERITY 2 (Unflyable/Red, warn_heavy_gusts)
@@ -169,7 +164,7 @@ describe('Offline & Unavailable Weather Data UX Governance', () => {
     const htmlEnA = controllerEnA.renderHtml();
 
     // Must be red (unflyable) for EN-A
-    assert.ok(htmlEnA.includes('gm-ind-unflyable') || htmlEnA.includes('gm-ind-severe'), 'Must be red or severe for beginner EN-A');
+    assert.ok(htmlEnA.includes('gm-badge-unflyable') || htmlEnA.includes('status-unflyable'), 'Must be red or severe for beginner EN-A');
 
     // 2. With EN-D competition glider
     const storeEnD = createStore({
@@ -182,7 +177,7 @@ describe('Offline & Unavailable Weather Data UX Governance', () => {
     const htmlEnD = controllerEnD.renderHtml();
 
     // Must be caution (yellow) for EN-D
-    assert.ok(htmlEnD.includes('gm-ind-caution'), 'Must be caution (yellow) for high-performance EN-D glider');
+    assert.ok(htmlEnD.includes('gm-badge-caution') && htmlEnD.includes('status-caution'), 'Must be caution (yellow) for high-performance EN-D glider');
   });
 
   it('should enforce traffic-light indicator design tokens and zero-truncation layout rules in theme.css (Laws of UX & Prägnanz)', () => {

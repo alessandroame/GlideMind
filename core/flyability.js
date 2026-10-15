@@ -247,28 +247,47 @@ export function calculateThermalLift(solarRadiation = 0, boundaryLayerHeight = 0
 }
 
 /**
+/**
+ * Resolves the conservative pilot safety multiplier [0.5, 1.0] when optional currency/experience derating is enabled.
+ * Never exceeds 1.0 (never grants a bonus over physical glider limits).
+ *
+ * @param {object|null} [glider=null]
+ * @param {object|null} [pilotSafetyFactor=null]
+ * @returns {number}
+ */
+export function resolvePilotSafetyMultiplier(glider = null, pilotSafetyFactor = null) {
+    const pf = pilotSafetyFactor || glider?.pilotSafetyFactor || null;
+    if (!pf || !pf.enabled || typeof pf.multiplier !== 'number' || isNaN(pf.multiplier)) {
+        return 1.0;
+    }
+    return Math.min(1.0, Math.max(0.5, pf.multiplier));
+}
+
+/**
  * Evaluates wind speed, gusts, and gust delta against the glider's operational trim speed.
  * 
  * @param {number} wind Sustained wind at 10m in km/h
  * @param {number} gust Wind gusts at 10m in km/h
- * @param {object} [glider] Glider specifications (vTrim)
+ * @param {object} [glider] Glider specifications (vTrim, optional pilotSafetyFactor)
  * @param {Function} [translator] Optional translation function
  * @returns {{ name: string, text: string, color: string, bg: string, severity: number, desc: string }}
  */
 export function evaluateWindFlyability(wind, gust, glider = null, translator = null) {
     const vTrim = glider?.vTrim || DEFAULT_GLIDER.vTrim;
+    const m = resolvePilotSafetyMultiplier(glider);
 
-    const windYellow = Math.round(vTrim * 0.45);
-    const gustYellow = Math.round(vTrim * 0.60);
-    const deltaYellow = Math.round(vTrim * 0.22);
+    const windYellow = Math.round(vTrim * 0.45 * m);
+    const gustYellow = Math.round(vTrim * 0.60 * m);
+    const deltaYellow = Math.max(4, Math.round(vTrim * 0.22 * m));
 
+    // Pure sustained wind penetration limits (windRed / windNoFly) remain strictly tied to vTrim
     const windRed = Math.round(vTrim * 0.65);
-    const gustRed = Math.round(vTrim * 0.80);
-    const deltaRed = Math.round(vTrim * 0.35);
+    const deltaRed = Math.max(6, Math.round(vTrim * 0.35 * m));
+    const gustRed = Math.max(windRed + 4, Math.round(vTrim * 0.80 * m));
 
     const windNoFly = Math.round(vTrim * 0.85);
-    const gustNoFly = Math.round(vTrim * 1.00);
-    const deltaNoFly = Math.round(vTrim * 0.50);
+    const deltaNoFly = Math.max(10, Math.round(vTrim * 0.50 * m));
+    const gustNoFly = Math.max(windNoFly + 4, Math.round(vTrim * 1.00 * m));
 
     const delta = gust - wind;
 
@@ -327,15 +346,16 @@ export function evaluateWindFlyability(wind, gust, glider = null, translator = n
  * Evaluates synthetic EDR atmospheric turbulence against glider aspect ratio.
  * 
  * @param {number} turbulence Normalized EDR index [0, 1]
- * @param {object} [glider] Glider specifications (ar)
+ * @param {object} [glider] Glider specifications (ar, optional pilotSafetyFactor)
  * @param {Function} [translator] Optional translation function
  * @returns {{ name: string, text: string, color: string, bg: string, severity: number, desc: string }}
  */
 export function evaluateTurbulenceFlyability(turbulence, glider = null, translator = null) {
     const ar = glider?.ar || DEFAULT_GLIDER.ar;
-    const turbYellow = Math.max(0.22, 0.32 - (ar - 4.8) * 0.02);
-    const turbRed = Math.max(0.42, 0.52 - (ar - 4.8) * 0.025);
-    const turbNoFly = Math.max(0.65, 0.76 - (ar - 4.8) * 0.03);
+    const m = resolvePilotSafetyMultiplier(glider);
+    const turbYellow = Number((Math.max(0.22, 0.32 - (ar - 4.8) * 0.02) * m).toFixed(2));
+    const turbRed = Number((Math.max(0.42, 0.52 - (ar - 4.8) * 0.025) * m).toFixed(2));
+    const turbNoFly = Number((Math.max(0.65, 0.76 - (ar - 4.8) * 0.03) * m).toFixed(2));
 
     let text = resolveTranslation('fly.stable_air', null, translator);
     let color = "text-emerald-500";
@@ -378,9 +398,14 @@ export function evaluateTurbulenceFlyability(turbulence, glider = null, translat
  * 
  * @param {number} cape Convective energy in J/kg
  * @param {Function} [translator] Optional translation function
+ * @param {object|null} [glider=null] Optional glider/pilot safety context
  * @returns {{ name: string, text: string, color: string, bg: string, severity: number, desc: string }}
  */
-export function evaluateCapeFlyability(cape, translator = null) {
+export function evaluateCapeFlyability(cape, translator = null, glider = null) {
+    const m = resolvePilotSafetyMultiplier(glider);
+    const capeYellow = Math.round(400 * m);
+    const capeRed = Math.round(1000 * m);
+
     let text = resolveTranslation('fly.regular_thermals', null, translator);
     let color = "text-emerald-500";
     let bg = "bg-emerald-500";
@@ -393,13 +418,13 @@ export function evaluateCapeFlyability(cape, translator = null) {
         bg = NO_FLY_BG;
         severity = 3;
         desc = `CAPE estremo (${cape} J/kg). Energia convettiva esplosiva con rischio critico di cumulonembi (CB), temporali severi, colpi di vento e risucchio di nube.`;
-    } else if (cape > 1000) {
+    } else if (cape > capeRed) {
         text = resolveTranslation('fly.warn_thermals', null, translator);
         color = "text-red-500";
         bg = "bg-red-500";
         severity = 2;
         desc = `CAPE elevato (${cape} J/kg). Forte instabilità verticale con rischio di overdevelopment, rapido addensamento nuvoloso e ascendenze violente. Riservato a piloti esperti.`;
-    } else if (cape >= 400) {
+    } else if (cape >= capeYellow) {
         text = resolveTranslation('fly.mod_thermals', null, translator);
         color = "text-amber-400";
         bg = "bg-amber-400";
@@ -504,10 +529,14 @@ export function isTakeoffSite(targetLocation, weatherMeta) {
  * @param {Function} [translator] Optional translation function
  * @returns {object|null}
  */
-export function evaluateDirectionFlyability(wind, windDir = 0, takeoffAzimuth = null, isTakeoff = true, translator = null) {
+export function evaluateDirectionFlyability(wind, windDir = 0, takeoffAzimuth = null, isTakeoff = true, translator = null, glider = null) {
     if (!isTakeoff || takeoffAzimuth == null || isNaN(Number(takeoffAzimuth))) {
         return null;
     }
+
+    const m = resolvePilotSafetyMultiplier(glider);
+    const frontalConeDeg = Math.round(45 * m);
+    const crosswindRedKmh = Math.round(14 * m);
 
     const az = Number(takeoffAzimuth);
     let diffFromFront = Math.abs(windDir - az);
@@ -537,7 +566,7 @@ export function evaluateDirectionFlyability(wind, windDir = 0, takeoffAzimuth = 
             desc = `Vento debole o calmo (${wind} km/h). La direzione del vento in quota ha influenza trascurabile ed è dominata dalle brezzoline locali di decollo.`;
         }
     } else {
-        if (diffFromFront <= 45) {
+        if (diffFromFront <= frontalConeDeg) {
             isLeeSide = false;
             text = resolveTranslation('fly.exposure_ok', null, translator);
             color = "text-emerald-500";
@@ -546,7 +575,7 @@ export function evaluateDirectionFlyability(wind, windDir = 0, takeoffAzimuth = 
             desc = `Vento orientato nel cono frontale di decollo (scostamento ${diffFromFront}° rispetto all'azimut ${az}°). Flusso favorevole per la corsa e il decollo.`;
         } else if (diffFromFront <= 90) {
             isLeeSide = false;
-            if (wind > 14) {
+            if (wind > crosswindRedKmh) {
                 text = resolveTranslation('fly.warn_crosswind', null, translator);
                 color = "text-red-500";
                 bg = "bg-red-500";
@@ -687,9 +716,9 @@ export function getFlyabilityScore(
     const activeGlider = glider || DEFAULT_GLIDER;
     const rainEval = evaluateRainFlyability(rain, translator);
     const turbEval = evaluateTurbulenceFlyability(turbulence, activeGlider, translator);
-    const dirEval = evaluateDirectionFlyability(wind, windDir, takeoffAzimuth, isTakeoff, translator);
+    const dirEval = evaluateDirectionFlyability(wind, windDir, takeoffAzimuth, isTakeoff, translator, activeGlider);
     const windEval = evaluateWindFlyability(wind, gust, activeGlider, translator);
-    const capeEval = evaluateCapeFlyability(cape, translator);
+    const capeEval = evaluateCapeFlyability(cape, translator, activeGlider);
     const thermEval = thermalLift ? evaluateThermalQuality(thermalLift, translator) : null;
 
     const evals = [

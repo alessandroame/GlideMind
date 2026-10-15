@@ -3041,6 +3041,92 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
 
       controller.unmount();
     });
+
+    it('should render landing marker on mini-map as compact symbol without landing altitude text', async () => {
+      const { LeafletMapEngine } = await import('../../ui/map/mapEngineAdapter.js');
+      const capturedDivIcons = [];
+      const mockLayers = [];
+      const mockLayerGroup = {
+        clearLayers() { mockLayers.length = 0; },
+        addLayer(layer) { mockLayers.push(layer); },
+        getLayers() { return mockLayers; },
+        addTo() { return mockLayerGroup; }
+      };
+      const mockMap = {
+        getZoom: () => 14,
+        setView() {},
+        fitBounds() {},
+        invalidateSize() {},
+        on() {},
+        off() {},
+        addLayer() {},
+        removeLayer() {},
+        remove() {}
+      };
+      const originalWindow = globalThis.window;
+      globalThis.window = {
+        L: {
+          map: () => mockMap,
+          tileLayer: () => ({ addTo: () => {} }),
+          layerGroup: () => mockLayerGroup,
+          latLngBounds: (pts) => pts,
+          polyline: (pts, opts) => ({ pts, opts }),
+          marker: (coords, opts) => ({ coords, ...opts, on() {} }),
+          divIcon: (opts) => {
+            capturedDivIcons.push(opts);
+            return opts;
+          }
+        }
+      };
+
+      try {
+        const spot = DEFAULT_COMPRENSORI[0];
+        const engine = new LeafletMapEngine({}, { isMiniMap: true });
+        engine.renderSpotMiniMap({}, {
+          comprensorio: spot,
+          takeoff: spot.takeoffs[0],
+          landing: spot.landings[0],
+          takeoffWeather: { windSpeed: 12, windDirection: 180 },
+          landingWeather: { windSpeed: 10, windDirection: 180 }
+        });
+
+        const takeoffSectorIcon = capturedDivIcons.find(ic => ic.html && ic.html.includes('gm-takeoff-sector-svg'));
+        assert.ok(takeoffSectorIcon, 'Must create divIcon for takeoff sector');
+        assert.ok(!takeoffSectorIcon.html.includes(`${spot.takeoffs[0].altitude}m`), 'Must NOT include takeoff altitude text inside mini-map takeoff sector SVG');
+
+        const landingPinIcon = capturedDivIcons.find(ic => ic.html && ic.html.includes('gm-mini-pin-landing'));
+        assert.ok(landingPinIcon, 'Must create divIcon for .gm-mini-pin-landing');
+        assert.ok(landingPinIcon.html.includes('gm-mini-pin-glyph">⏚</span>'), 'Must render landing glyph ⏚');
+        assert.ok(!landingPinIcon.html.includes('gm-mini-pin-alt'), 'Must NOT render .gm-mini-pin-alt inside mini-map landing marker');
+        assert.ok(!landingPinIcon.html.includes(`${spot.landings[0].altitude}m`), 'Must NOT include landing altitude in mini-map landing marker');
+        assert.deepEqual(landingPinIcon.iconSize, [22, 22], 'Landing pin iconSize must be compact 22x22 circle');
+
+        const glideBalloonIcon = capturedDivIcons.find(ic => ic.html && ic.html.includes('gm-glide-balloon'));
+        assert.ok(glideBalloonIcon, 'Must create 2-line glide balloon divIcon at midpoint');
+        const expectedDelta = Math.abs(spot.takeoffs[0].altitude - spot.landings[0].altitude);
+        assert.ok(glideBalloonIcon.html.includes(`Δ ${expectedDelta}m`), 'First row of balloon must display elevation drop Δ');
+        assert.ok(glideBalloonIcon.html.includes('gm-glide-balloon-dist">↔ '), 'Second row of balloon must display straight-line distance');
+        assert.ok(glideBalloonIcon.html.includes('gm-glide-tether-svg'), 'Must render SVG elastic tether connecting midpoint origin to balloon');
+        assert.ok(glideBalloonIcon.html.includes('gm-glide-tether-line'), 'Must render elastic tether line in SVG');
+
+        const { resolveGlideBalloonPlacement, computeGlideBalloonEquilibrium } = await import('../../ui/map/mapEngineAdapter.js');
+        const tCoord = { lat: 46.02, lon: 11.82 };
+        const lCoord = { lat: 46.03, lon: 11.84 };
+        // North wind (0°) makes windsocks hang South (180°, downward): balloon must choose 'top' (above midpoint)
+        assert.equal(resolveGlideBalloonPlacement(tCoord, lCoord, 0, 0, 135), 'top');
+        // South wind (180°) makes windsocks blow North (0°, upward): balloon must flip to 'bottom' (below midpoint)
+        assert.equal(resolveGlideBalloonPlacement(tCoord, lCoord, 180, 180, 0), 'bottom');
+
+        // Overdamped magneto-elastic zoom response:
+        // When zoomed out (zoom 12), Takeoff & Landing are close in screen pixels -> strong magnetic repulsion pushes balloon farther from origin
+        // When zoomed in (zoom 16), Takeoff & Landing are far apart in pixels -> elastic tether pulls balloon closer to origin
+        const eqZoomOut = computeGlideBalloonEquilibrium(tCoord, lCoord, { zoom: 12, tWindDir: 0, lWindDir: 0, tHeading: 135 });
+        const eqZoomIn = computeGlideBalloonEquilibrium(tCoord, lCoord, { zoom: 16, tWindDir: 0, lWindDir: 0, tHeading: 135 });
+        assert.ok(eqZoomOut.distancePx > eqZoomIn.distancePx, `Zoomed-out magnetic repulsion (${eqZoomOut.distancePx}px) must push balloon farther than zoomed-in elastic equilibrium (${eqZoomIn.distancePx}px)`);
+      } finally {
+        globalThis.window = originalWindow;
+      }
+    });
   });
 });
 

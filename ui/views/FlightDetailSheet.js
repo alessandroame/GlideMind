@@ -928,6 +928,21 @@ export function renderFlightDetailHtml(bundle, options = {}) {
             </svg>
             <span class="hidden sm:inline">Setup Traccia</span>
           </button>
+          <button
+            type="button"
+            id="btn-delete-from-detail"
+            class="gm-btn gm-btn-secondary gm-flight-detail-delete-btn"
+            data-action="delete-flight"
+            data-flight-id="${escapeHtml(flightId)}"
+            aria-label="Elimina volo ${escapeHtml(siteTitle)}"
+            title="Elimina volo dal Flight Log"
+          >
+            <svg width="15" height="15" class="flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+            <span class="hidden sm:inline">Elimina</span>
+          </button>
         </div>
       </header>
 
@@ -2555,13 +2570,37 @@ export async function openFlightDetailView(flightId, options = {}) {
       openTrackSetupView(flightId, {
         store: targetStore,
         onClose: () => {
-          openFlightDetailView(flightId, { store: targetStore });
+          openFlightDetailView(flightId, { store: targetStore, onDelete: options.onDelete });
         }
       });
     });
   });
 
-  // 8. Focus first interactive element for keyboard accessibility
+  // 8. Delete Flight Handler (delegates to LogbookView 5s Undo Grace Window or direct DB deletion)
+  const deleteBtn = overlayEl.querySelector('#btn-delete-from-detail');
+  if (deleteBtn) {
+    deleteBtn.addEventListener('click', async (e) => {
+      if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+      closeFlightDetailView();
+      if (typeof options.onDelete === 'function') {
+        options.onDelete(flightId);
+      } else {
+        try {
+          await logbookManager.deleteFlight(flightId);
+          if (targetStore && typeof targetStore.getState === 'function' && typeof targetStore.setState === 'function') {
+            const currentFlights = targetStore.getState().flights || [];
+            targetStore.setState({
+              flights: currentFlights.filter((f) => f && String(f.id || f.flightId) !== String(flightId))
+            });
+          }
+        } catch (err) {
+          console.error('[FlightDetailView] Errore durante eliminazione volo:', err);
+        }
+      }
+    });
+  }
+
+  // 9. Focus first interactive element for keyboard accessibility
   if (backBtn && typeof backBtn.focus === 'function') {
     backBtn.focus();
   }

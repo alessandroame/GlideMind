@@ -8,6 +8,8 @@
 import { store } from '../../core/store.js';
 import { APP_VERSION, APP_BUILD } from '../../core/version.js';
 import { applyTheme } from '../app.js';
+import { homeDashboardView } from './HomeDashboardView.js';
+import { calculatePilotSafetyFactor, DEFAULT_SEED_FLIGHTS } from '../../core/logbook.js';
 
 /**
  * Cartographic layer options available across the application.
@@ -190,7 +192,8 @@ export class SettingsViewController {
         altitude: 'm',
         temperature: 'C',
         vario: 'm/s'
-      }
+      },
+      usePilotCurrencyFactor: false
     });
     applyTheme('dark');
   }
@@ -227,6 +230,13 @@ export class SettingsViewController {
     } else if (action === 'set-vario-unit') {
       const val = actionEl.getAttribute('data-value');
       if (val) this.setUnit('vario', val);
+    } else if (action === 'open-glider-sheet') {
+      if (homeDashboardView && typeof homeDashboardView.openGliderSheet === 'function') {
+        homeDashboardView.openGliderSheet();
+      }
+    } else if (action === 'toggle-pilot-currency-factor') {
+      const current = Boolean(this.store.getState().usePilotCurrencyFactor);
+      this.store.setState({ usePilotCurrencyFactor: !current });
     } else if (action === 'reset-preferences') {
       this.resetPreferences();
     }
@@ -237,10 +247,17 @@ export class SettingsViewController {
    * @returns {string}
    */
   renderHtml() {
+    const state = this.store ? this.store.getState() : {};
     const activeLayer = this.getActiveMapLayer();
     const activeTheme = this.getActiveTheme();
     const units = this.getActiveUnits();
     const glider = this.getActiveGlider();
+    const usePilotFactor = Boolean(state.usePilotCurrencyFactor);
+    const safetyFactor = calculatePilotSafetyFactor({
+      flights: state.flights || DEFAULT_SEED_FLIGHTS,
+      referenceDate: state.activeDate || new Date().toISOString().split('T')[0],
+      enabled: usePilotFactor
+    });
 
     return `
       <section class="gm-settings-view" aria-label="Impostazioni applicazione">
@@ -451,9 +468,32 @@ export class SettingsViewController {
                 Categoria: ${escapeHtml(glider?.category || 'EN-A')} · VTrim: ${escapeHtml(glider?.vTrim || 38)} km/h · Efficienza: ${escapeHtml(glider?.glideRatio || 8.2)}
               </div>
             </div>
-            <a href="#home" class="gm-text-btn" aria-label="Cambia vela nella Home">
-              Cambia nella Home ›
-            </a>
+            <button
+              type="button"
+              class="gm-text-btn"
+              data-action="open-glider-sheet"
+              aria-label="Cambia vela attiva"
+            >
+              Cambia Vela ›
+            </button>
+          </div>
+
+          <div class="gm-settings-row mt-3 pt-3 border-t border-[var(--gm-border)]">
+            <div class="pr-3">
+              <div class="font-semibold text-sm text-[var(--gm-text-primary)]">Fattore Continuità & Esperienza (Logbook)</div>
+              <div class="text-xs text-[var(--gm-text-secondary)]">
+                Adatta in modo conservativo i margini su raffiche, turbolenza e vento traverso in base all'allenamento (${escapeHtml(safetyFactor.currencyLabel)}, ${safetyFactor.totalFlights} voli)
+              </div>
+            </div>
+            <button
+              type="button"
+              class="gm-toggle-btn ${usePilotFactor ? 'active' : ''}"
+              data-action="toggle-pilot-currency-factor"
+              role="switch"
+              aria-checked="${usePilotFactor ? 'true' : 'false'}"
+            >
+              ${usePilotFactor ? 'Attivo' : 'Disattivato'}
+            </button>
           </div>
         </article>
 

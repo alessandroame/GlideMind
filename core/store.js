@@ -98,6 +98,7 @@ export const DEFAULT_INITIAL_STATE = Object.freeze({
   recentSpotIds: Object.freeze([]),
   flights: DEFAULT_SEED_FLIGHTS,
   pilotPeriod: 'month',
+  usePilotCurrencyFactor: false,
   units: Object.freeze({
     speed: 'km/h',
     altitude: 'm',
@@ -148,7 +149,7 @@ function deepClone(obj) {
  */
 export function createStore(initialStateOverrides = {}, customStorageAdapter = null) {
   let storageAdapter = customStorageAdapter || createInMemoryStorageAdapter();
-  let persistedKeys = new Set(['pinnedSpots', 'pinnedSpotIds', 'recentSpotIds', 'units', 'selectedSpot', 'activeTakeoffId', 'activeLandingId', 'flights', 'pilotPeriod', 'activeGlider', 'glider', 'ui']);
+  let persistedKeys = new Set(['pinnedSpots', 'pinnedSpotIds', 'recentSpotIds', 'units', 'selectedSpot', 'activeTakeoffId', 'activeLandingId', 'flights', 'pilotPeriod', 'usePilotCurrencyFactor', 'activeGlider', 'glider', 'ui']);
   const STORAGE_PREFIX = 'glidemind_store_';
 
   // Deep clone defaults and apply overrides

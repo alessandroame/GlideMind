@@ -481,31 +481,35 @@ describe('LogbookView to FlightDetailSheet Interaction (Headless Integration)', 
     assert.equal(overlay.getAttribute('data-flight-id'), 'fl-1');
   });
 
-  it('should NOT open FlightDetailSheet when tapping the delete button on the card', async () => {
+  it('should delete flight from inside FlightDetailSheet (#btn-delete-from-detail), close overlay, and activate 5s Undo banner in LogbookView', async () => {
     await controller.mount(logbookContainer);
 
     const flightCard = logbookContainer.querySelector('[data-flight-id="fl-1"]');
-    const deleteBtn = flightCard.querySelector('[data-action="delete-flight"]');
-    assert.ok(deleteBtn);
+    assert.ok(flightCard);
+    assert.equal(flightCard.querySelector('[data-action="delete-flight"]'), null, 'Card must not have inline delete button');
 
-    let stopPropagationCalled = false;
-    const deleteClickEvent = {
+    // Open detail sheet first
+    await controller.handleOpenFlightDetail('fl-1');
+    const overlay = mockDocument.getElementById('flight-detail-overlay');
+    assert.ok(overlay, 'Detail overlay must be open');
+
+    const deleteBtn = overlay.querySelector('#btn-delete-from-detail');
+    assert.ok(deleteBtn, 'Detail sheet must contain #btn-delete-from-detail button');
+
+    // Click delete inside detail sheet
+    deleteBtn.dispatchEvent({
       type: 'click',
-      target: deleteBtn,
       bubbles: true,
-      stopPropagation() { stopPropagationCalled = true; },
+      stopPropagation() {},
       preventDefault() {}
-    };
+    });
 
-    await controller.handleClick(deleteClickEvent);
-
-    // Detail overlay must NOT open
+    // Detail overlay must close immediately
     assert.equal(mockDocument.getElementById('flight-detail-overlay'), null);
-    assert.equal(stopPropagationCalled, true);
 
-    // Undo banner must appear
+    // Undo banner must appear in LogbookView
     const undoBanner = logbookContainer.querySelector('.gm-logbook-undo-banner');
-    assert.ok(undoBanner, 'Undo banner should be active instead of detail overlay');
+    assert.ok(undoBanner, 'Undo banner should be active in LogbookView after deleting from detail sheet');
   });
 
   it('should open FlightDetailSheet on keyboard Enter and Space (WCAG 2.1 AA)', async () => {

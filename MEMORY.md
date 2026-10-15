@@ -2428,3 +2428,67 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
      Nel carosello dei filtri del logbook, includere i chip `Con traccia` (`with-track`) e `Senza traccia` (`no-track`) gestiti dal controller `filterFlights`, consentendo all'utente di isolare istantaneamente i voli analizzabili in 2D/3D.
   4. **Coerenza Semantica nel Dettaglio Volo (`FlightDetailSheet.js`)**:
      Allineare i badge di testata (`.gm-status-pill-emerald` *"Traccia GPS"* vs `.gm-status-pill-slate` *"Traccia Non Registrata"*), garantendo un lessico coerente in tutta l'applicazione.
+
+---
+
+## 169. Gerarchia Above-the-Fold 100% Meteo-Centrica nella Home, Pillola Vela a Costo Verticale Zero e Fattore Opzionale di Prudenza "Allenamento & Esperienza Pilota"
+- **Problema**:
+  1. Posizionare un blocco a 4 righe `Attività Pilota` (`.gm-pilot-card`, ~165px) prima della sezione `Volabilità` nella Home sottrae il 35% del viewport mobile Above-the-Fold (360-390px) proprio quando il 90% delle aperture dell'app ha come obiettivo esclusivo il triage meteorologico immediato dei comprensori.
+  2. In `HomeDashboardView.js`, il selettore calendario a 14 giorni invocava `getAvailableCalendarDates(today, 14, null)` omettendo le sintesi di volabilità (`flySummaries`), perdendo la simmetria a 4 stati presente in `ForecastView.js`.
+  3. Lo stato di allenamento del pilota (freschezza / giorni dall'ultimo volo) e l'esperienza complessiva (numero di voli a libretto) sono fattori reali di sicurezza nel volo libero, ma a differenza della vela non alterano i limiti aerodinamici fisici ($V_{\text{trim}}$ o efficienza di planata $L/D$).
+- **Causa Radice**:
+  1. Accorpamento improprio nella Home di KPI storici da diario di volo (`30 Giorni | Anno`, ore, dislivello, ultimo volo) che appartengono al tab `Flight Log`.
+  2. Mancato passaggio di `this.getMultiDayFlyability(null, 14)` al bottom sheet calendario della Home.
+  3. Assenza di una separazione matematica tra limiti fisici dell'ala (penetrazione al vento e cono di planata) e soglie di gestione attiva del pilota (raffiche, turbolenza EDR, CAPE, vento traverso).
+- **Pattern Vincolante**:
+  1. **Home Above-the-Fold 100% Meteo-Centrica (`HomeDashboardView.js`)**:
+     - Vietato collocare card statistiche di carriera o blocchi multipiano del pilota sopra o dentro la Home. La sezione `Volabilità` deve iniziare immediatamente sotto l'header.
+     - **Barra Simbiotica a Riga Singola (`#home-symbiotic-toolbar` / `.gm-symbiotic-toolbar`)**: la casella di ricerca (`.gm-symbiotic-search`), l'unico toggle di filtro volabilità (`#btn-home-fly-filter-toggle`, che commuta a mutua esclusione tra `Tutti (N)` e `Volabili (M)`) e la pillola della vela attiva (`#btn-home-select-glider`) condividono **un'unica riga orizzontale** (`flex-wrap: nowrap`). Quando l'utente avvia una ricerca (`:focus-within` o `.is-searching`), il toggle di filtro volabilità sparisce automaticamente per cedere tutto lo spazio orizzontale all'input di ricerca.
+     - **Avviso di Continuità Condizionale (Opzione B)**: quando il pilota è in stato ottimale (`active`, $\le 35\text{gg}$), non mostrare alcun badge di stato in Home (`0px`); mostrare `#home-pilot-currency-alert` accanto alla pillola della vela esclusivamente in stato `reentry` ($36\text{–}90\text{gg}$), `lapsed` ($> 90\text{gg}$) o `no_flights`.
+     - Il toggle `30 Giorni | Anno` risiede nella card `"Valuta & Continuità Pilota"` di `LogbookStatsView.js`, e l'unico bottone primario del `Flight Log` apre `ImportFlightSheet.js` che unifica il caricamento `.IGC/.JSON` e il form collassabile `"Registra Volo Manualmente (Senza Traccia)"`.
+  2. **Simmetria Calendario 14 Giorni Cross-View**:
+     - Sia `HomeDashboardView.js` sia `ForecastView.js` devono passare `getMultiDayFlyability(null, 14)` a `getAvailableCalendarDates(today, 14, flySummaries)` e renderizzare i 4 stati semantici (`flyable`, `caution`, `unflyable`, `severe`) con legenda `.gm-date-sheet-legend`.
+  3. **Fattore Opzionale di Prudenza "Allenamento & Esperienza Pilota" (`usePilotCurrencyFactor`)**:
+     - Opzione esplicita opt-in (`usePilotCurrencyFactor: false` di default in `core/store.js`), attivabile dallo sheet di selezione vela e da `SettingsView.js`.
+     - **Derating Monodirezionale Conservativo (`calculatePilotSafetyFactor` in `core/logbook.js`)**: il moltiplicatore non può **mai superare `1.0x`** (`1.0x` se $\le 35\text{gg}$ e $\ge 15\text{ voli}$; `0.85x` (`-15%`) se in `reentry` $36\text{–}90\text{gg}$ o $< 15\text{ voli}$; `0.75x` (`-25%`) se `lapsed` $> 90\text{gg}$).
+     - **Invarianza dei Limiti Aerodinamici Fisici (`core/flyability.js` & `core/comprensorio.js`)**: il moltiplicatore riduce esclusivamente le soglie di pilotaggio attivo ($\Delta\text{Gust}$, brezza gialla di lancio, turbolenza EDR, CAPE convettivo, cono di vento traverso), lasciando **strettamente invariati** i limiti fisici di penetrazione al vento (`windRed`, `windNoFly` ancorati a $V_{\text{trim}}$, con `gustRed >= windRed + 4` e `gustNoFly >= windNoFly + 4`) e il cono di planata verso l'atterraggio (`safeLimit`).
+     - **Explainability Trasparente**: quando un comprensorio viene declassato per effetto del fattore pilota (`flyScore.severity > pureScore.severity`), la stringa `reason` dichiara esplicitamente: `"Meteo favorevole per la vela • [reasonTag]"`.
+
+---
+
+## 170. Marker Circolare Pulito dell'Atterraggio sulla Mini-Mappa (Zero Quota sovrapposta alla Manica a Vento)
+- **Problema**:
+  Sulla mini-mappa cartografica (`#forecast-mini-map`), il marker dell'atterraggio (`.gm-mini-pin-landing`) mostrava la quota altimetrica accanto al simbolo (`⏚ 700m`), allargando il pin a pillola (`54x22px`) e causando la collisione visiva con la manica a vento vettoriale ancorata sulle medesime coordinate, oltre a duplicare inutilmente un dato già esposto nella riga testuale dell'atterraggio e nel badge dislivello (`Δ 855m`).
+- **Causa Radice**:
+  Inclusione di `<span class="gm-mini-pin-alt">${lAlt}m</span>` nel template HTML di `L.divIcon` per l'atterraggio in `ui/map/mapEngineAdapter.js`.
+- **Pattern Vincolante**:
+  - **Hub Circolare `22x22px` Simmetrico (`.gm-mini-pin-landing`)**: Nella mini-mappa (`renderSpotMiniMap`) e nella mappa d'analisi comprensorio (`renderComprensorioFlightMap`), il marker di atterraggio deve renderizzare esclusivamente il simbolo aeronautico `<span class="gm-mini-pin-glyph">⏚</span>` all'interno di un hub circolare `22x22px` (`iconSize: [22, 22]`, `iconAnchor: [11, 11]`, `border-radius: 50%`), speculare all'anello pivot `r="11"` del decollo e privo di testo altimetrico (`gm-mini-pin-alt`).
+
+---
+
+## 171. Pannelli di Warning Floating Ancorati in Basso con Pulsante Chiudi (Zero Cumulative Layout Shift)
+- **Problema**:
+  I pannelli di avviso contestuali (in particolare `.gm-horizon-notice` *"Tendenza a lungo raggio: oltre 7 giorni le previsioni sono indicative"* in `HomeDashboardView`, `ForecastView` e `SpotMapView`, nonché `.gm-storage-warning-banner`, `.gm-logbook-undo-banner` e `.gm-import-summary-banner` in `LogbookView`) erano inseriti nel flusso statico del documento sotto la barra delle date o in testa alla vista. Quando venivano mostrati, spingevano verso il basso le card sottostanti causando un fastidioso scatto verticale del layout (Cumulative Layout Shift, CLS) e non potevano essere chiusi dall'utente una volta letti.
+- **Causa Radice**:
+  Posizionamento statico (`display: flex` in-flow con margini verticali) e assenza di un controllo esplicito di chiusura (`✕`) con stato di dismissione per la data/sessione attiva.
+- **Pattern Vincolante**:
+  1. **Ancoraggio Floating in Basso sopra la Barra Inferiore (`position: fixed`, Zero CLS)**:
+     - Tutti i pannelli di warning/avviso devono essere estratti dal flusso del documento (`position: fixed; left: 50%; transform: translateX(-50%); width: calc(100% - 24px); max-width: 520px; z-index: 950;`) e ancorati in basso sopra la barra di navigazione (`bottom: calc(var(--gm-nav-height-mobile, 64px) + env(safe-area-inset-bottom, 0px) + 12px)` su mobile, `bottom: 20px` su desktop).
+     - Nelle viste dotate di timeline scrubber dockata in basso (`.gm-forecast-view .gm-horizon-notice`, `.gm-spot-map-view .gm-horizon-notice`, `#gm-map-date-bar .gm-horizon-notice`), l'offset inferiore sale automaticamente sopra lo scrubber (`+ 104px` mobile / `108px` desktop) per non coprire mai le barre orarie.
+  2. **Pulsante di Chiusura Obbligatorio (`.gm-warning-close-btn`, Fitts $\ge 48 \times 48\text{px}$)**:
+     - Ogni pannello di warning (`.gm-horizon-notice`, `.gm-flight-safety-warning-banner`, `.gm-storage-warning-banner`, `.gm-import-summary-banner`) deve esporre all'estremità destra un pulsante di chiusura esplicito `✕` (`.gm-warning-close-btn` con area di tocco espansa tramite `::before` a `48x48px`) che consente all'utente di chiudere immediatamente l'avviso (`data-action="dismiss-horizon-notice"`, `dismiss-safety-warning`, `dismiss-storage-warning`, `dismiss-import-summary`).
+
+
+---
+
+## 172. Card Comprensorio a 2 Righe con Timeline Diurna di Volabilità e 1-Tap Hour Deep-Linking (Opzione A — Recognition over Recall)
+- **Problema**:
+  La precedente card comprensorio a 4 righe in `HomeDashboardView.js` (titolo + sottotitolo binomio `▲ Decollo · ⏚ Atterraggio` + 3 pillole testuali `Brezza ottimale · Dir. Allineata · Planata Sicura` + riga di spiegazione testuale) richiedeva la lettura seriale di ~18 parole per ogni sito ma fotografava un unico istante statico della giornata, senza mostrare **quando** si apre o si chiude la finestra di volo.
+- **Causa Radice**:
+  Sovraccarico verbale per-card (lettura sequenziale lenta) a scapito della scansione visiva pre-attentiva dell'evoluzione diurna (`Alba -> Tramonto`).
+- **Pattern Vincolante**:
+  1. **Layout Espressivo a 2 Righe (`.gm-spot-card.gm-spot-card-timeline`)**:
+     - **Riga 1 (`.gm-spot-header`)**: a sinistra Nome Comprensorio + Provincia (`.gm-spot-title-group`); a destra (`.gm-spot-header-right`) micro-causa sintetica (`.gm-spot-explain.gm-spot-micro-reason`, es. `Raffiche mod. · Rientro` o `Vento ottimale`), badge semantico pieno (`.gm-badge-pill`) e chevron (`›`). Il contratto *Unico Binomio* è preservato negli attributi `data-takeoff-name`, `data-landing-name` e `aria-label`.
+     - **Riga 2 (`.gm-home-timeline`)**: striscia oraria diurna dall'alba al tramonto (`resolveDaylightHours` da `core/daylight.js`, tipicamente `08`..`18`), composta da slot `.gm-home-timeline-slot` con ora a 2 cifre (`.gm-home-timeline-hour`) e barra cromatica a 4 stati (`.gm-home-timeline-bar`: `status-flyable`, `status-caution`, `status-unflyable`, `status-severe`, oppure `status-unavailable` in assenza di dati offline).
+  2. **Deep-Linking Orario a 1-Tap (`data-action="view-forecast-hour"`)**:
+     - Toccare uno slot orario specifico (`data-hour="11"`) imposta `{ selectedSpot, selectedHour: 11 }` nello store e naviga direttamente a `ForecastView` posizionata su quell'ora esatta.

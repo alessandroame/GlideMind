@@ -1842,3 +1842,74 @@ Questo giornale registra la cronologia degli interventi architetturali e operati
   - Implementate suite di test dedicate in [`tests/core/logbook.test.mjs`](file:///tests/core/logbook.test.mjs) e [`tests/ui/logbookView.test.mjs`](file:///tests/ui/logbookView.test.mjs).
   - Suite di test globale al 100% verde: 789 test nativi (133 suite) in Node.js puro, 0 fallimenti, 0 regressioni.
   - Registrata la Lezione Appresa #168 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-15 - Fase 3/4/6/8-bis: Home Above-the-Fold Meteo-Centrica, Simmetria Calendario 14gg, Sheet Unificato Flight Log e Fattore Opzionale Allenamento/Esperienza Pilota
+- **Tipo**: Refactoring UX Above-the-Fold / Dominio Volabilità / Headless Core / Ergonomia Outdoor
+- **Dettagli**: [.agents/worklog.d/2026-10-15_home_audit_and_pilot_currency_factor.md](file:///.agents/worklog.d/2026-10-15_home_audit_and_pilot_currency_factor.md)
+- **Sintesi**:
+  - Rimossa la card a 4 righe `Attività Pilota` (`.gm-pilot-card`) da [`ui/views/HomeDashboardView.js`](file:///ui/views/HomeDashboardView.js) liberando ~165px Above-the-Fold a beneficio immediato del triage meteorologico (`Volabilità`).
+  - Integrata la pillola compatta della vela attiva (`#btn-home-select-glider`) sulla destra della barra dei chip di filtro rapido (`.gm-filter-chips-right`) a costo verticale `0px`, affiancata dall'indicatore di continuità condizionale (`#home-pilot-currency-alert`, Opzione B: visibile esclusivamente in stato `reentry`, `lapsed` o `no_flights`).
+  - Spostato il toggle `30 Giorni | Anno` (`data-action="set-pilot-period"`) nella card `"Valuta & Continuità Pilota"` di [`ui/views/LogbookStatsView.js`](file:///ui/views/LogbookStatsView.js) (gestito da [`ui/views/LogbookView.js`](file:///ui/views/LogbookView.js)).
+  - Mantenuto l'unico pulsante primario nell'header del `Flight Log`, arricchendo [`ui/views/ImportFlightSheet.js`](file:///ui/views/ImportFlightSheet.js) con il form collassabile `"Registra Volo Manualmente (Senza Traccia)"` (`#gm-manual-flight-details` / `#gm-manual-flight-form`) accanto alla dropzone `.IGC / .JSON`.
+  - Ripristinata la simmetria del calendario a 14 giorni in [`ui/views/HomeDashboardView.js`](file:///ui/views/HomeDashboardView.js) passando `this.getMultiDayFlyability(null, 14)` a `getAvailableCalendarDates(today, 14, flySummaries)` con badge a 4 stati e legenda `.gm-date-sheet-legend`.
+  - Implementato il **Fattore Opzionale di Prudenza "Allenamento & Esperienza Pilota"** (`usePilotCurrencyFactor: false` di default in [`core/store.js`](file:///core/store.js), attivabile in `openGliderSheet()` e in [`ui/views/SettingsView.js`](file:///ui/views/SettingsView.js)):
+    - Calcolo headless `calculatePilotSafetyFactor` in [`core/logbook.js`](file:///core/logbook.js) con moltiplicatore conservativo (`1.0x` se $\le 35\text{gg}$ e $\ge 15\text{ voli}$; `0.85x` se $36\text{–}90\text{gg}$ o $< 15\text{ voli}$; `0.75x` se $> 90\text{gg}$).
+    - Scalatura selettiva in [`core/flyability.js`](file:///core/flyability.js) sulle sole soglie di pilotaggio attivo ($\Delta\text{Gust}$, EDR, CAPE, cono di vento traverso) preservando invariati i limiti fisici di penetrazione al vento (`windNoFly` legato a $V_{\text{trim}}$) e l'efficienza di planata verso l'atterraggio (`safeLimit`).
+    - Explainability esplicita in [`core/comprensorio.js`](file:///core/comprensorio.js) (`"Meteo favorevole per la vela • [reasonTag]"`).
+  - Registrata la Lezione Appresa #169 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-15 - Fase 4/5-bis: Rimozione Quota dal Marker Atterraggio nella Mini-Mappa
+- **Tipo**: Cartografia UI / Outdoor HMI / Anti-Clutter
+- **Sintesi**:
+  - Rimossa l'indicazione dell'altezza dell'atterraggio (`<span class="gm-mini-pin-alt">${lAlt}m</span>`) dal marker `.gm-mini-pin-landing` nella mini-mappa ([`ui/map/mapEngineAdapter.js`](file:///ui/map/mapEngineAdapter.js)), eliminando la sovrapposizione con la manica a vento dell'atterraggio e la ridondanza rispetto alla scheda testuale e al badge dislivello (`Δ`).
+  - Riconfigurato `.gm-mini-pin-landing` in [`css/theme.css`](file:///css/theme.css) come hub circolare `22x22px` (`iconSize: [22, 22]`, `iconAnchor: [11, 11]`, `border-radius: 50%`) con il solo glifo `⏚`.
+  - Aggiunto test di regressione comportamentale in [`tests/ui/forecastView.test.mjs`](file:///tests/ui/forecastView.test.mjs) (114/114 test UI superati).
+  - Registrata la Lezione Appresa #170 in [MEMORY.md](file:///MEMORY.md).
+
+---
+
+## 2026-10-15 - Fase 3/4/5/6: Pannelli di Warning Floating Ancorati in Basso con Pulsante Chiudi (Zero CLS)
+- **Tipo**: Refactoring UX / Outdoor HMI / Zero Cumulative Layout Shift
+- **Dettagli**: [.agents/worklog.d/2026-10-15_home_audit_and_pilot_currency_factor.md](file:///.agents/worklog.d/2026-10-15_home_audit_and_pilot_currency_factor.md)
+- **Sintesi**:
+  - Convertiti tutti i pannelli di warning/avviso dell'applicazione (`.gm-horizon-notice` in `HomeDashboardView.js`, `ForecastView.js` e `SpotMapView.js`, `.gm-storage-warning-banner`, `.gm-logbook-undo-banner` e `.gm-import-summary-banner` in `LogbookView.js`, e `.gm-flight-safety-warning-banner` in `ForecastView.js`) in pannelli floating ancorati in basso sopra la bottom bar (e sopra la timeline scrubber dockata in `ForecastView` e `SpotMapView`), azzerando il Cumulative Layout Shift (CLS) al cambio data.
+  - Introdotto il pulsante di chiusura `.gm-warning-close-btn` (`✕`) con area di tocco Fitts $\ge 48 \times 48\text{px}$ (`::before`) e stato di chiusura per data attiva (`this.dismissedHorizonDate`) su tutte le viste.
+  - Registrata la Lezione Appresa #171 in [MEMORY.md](file:///MEMORY.md).
+
+
+
+## 2026-10-15 — Mini-Map 2-Line Glide Callout Balloon & Anti-Collision Flip
+- **Files Modified**: `ui/map/mapEngineAdapter.js`, `css/theme.css`, `tests/ui/forecastView.test.mjs`
+- **Changes**:
+  - Removed takeoff altitude `<text>` from `generateTakeoffSectorSvg` in `ui/map/mapEngineAdapter.js`.
+  - Upgraded the midpoint glide badge (`.gm-glide-delta-badge`) into a 2-line callout balloon (`.gm-glide-balloon`) displaying both elevation drop (`Δ ${deltaH}m`) and horizontal straight-line distance (`↔ ${distLabel}` via `computeDistanceKm`).
+  - Implemented `computeGlideBalloonEquilibrium` and `resolveGlideBalloonPlacement` in [`ui/map/mapEngineAdapter.js`](file:///c:/github/GlideMind/ui/map/mapEngineAdapter.js) using a 2D overdamped magneto-elastic model (`F_spring = -k * r` toward midpoint origin + magnetic repulsion from Takeoff, Landing, Windsocks, and Takeoff Sector Cone + axial magnetic cradle + viscous Stokes damping `cubic-bezier(0.16, 1, 0.3, 1)`), complete with an SVG elastic tether (`.gm-glide-tether-svg`, `.gm-glide-tether-line`) that dynamically stretches on `zoomOut` and retracts toward the midpoint on `zoomIn` or wind changes.
+
+---
+
+## 2026-10-15 - Fase 3: Card Comprensorio a 2 Righe con Timeline Diurna e Barra Simbiotica (Opzione A)
+- **Tipo**: Refactoring UX / Outdoor HMI / Expressive Diurnal Triage
+- **Dettagli**: [.agents/worklog.d/2026-10-15_home_audit_and_pilot_currency_factor.md](file:///.agents/worklog.d/2026-10-15_home_audit_and_pilot_currency_factor.md)
+- **Sintesi**:
+  - Riprogettata la card del comprensorio in [`ui/views/HomeDashboardView.js`](file:///ui/views/HomeDashboardView.js) secondo l'**Opzione A (2 Righe con Timeline Diurna)**:
+    - **Riga 1 (`.gm-spot-header`)**: Nome Comprensorio + Provincia a sinistra; micro-causa sintetica (`.gm-spot-explain.gm-spot-micro-reason` tramite `formatCompactCardReason`), badge di stato pieno e chevron a destra.
+    - **Riga 2 (`.gm-home-timeline`)**: Timeline diurna della volabilità dall'alba al tramonto (`buildDiurnalTimeline` + `resolveDaylightHours` da [`core/daylight.js`](file:///core/daylight.js)) con slot orari `.gm-home-timeline-slot` (`08`..`18`), barre cromatiche semantiche e **deep-linking orario a 1-tap** (`data-action="view-forecast-hour"`, che apre `ForecastView` direttamente sull'ora toccata).
+  - Unificata la barra di ricerca e filtro volabilità in una singola riga simbiotica (`#home-symbiotic-toolbar`), con toggle singolo a mutua esclusione (`#btn-home-fly-filter-toggle`) che sparisce automaticamente quando si avvia una ricerca.
+  - Aggiornati gli stili in [`css/theme.css`](file:///css/theme.css) e le suite di test [`tests/ui/homeDashboardView.test.mjs`](file:///tests/ui/homeDashboardView.test.mjs), [`tests/ui/offlineWeatherUX.test.mjs`](file:///tests/ui/offlineWeatherUX.test.mjs) e [`tests/ui/uiIntegrityAudit.test.mjs`](file:///tests/ui/uiIntegrityAudit.test.mjs) (49/49 test verdi).
+  - Registrata la Lezione Appresa #172 in [MEMORY.md](file:///MEMORY.md).
+
+
+---
+
+## 2026-10-15 - Refactoring Card Flight Log: Layout Compatto (~74px), Griglia 4-KPI (Termiche), Micro-Badge Traccia e Spostamento Elimina nella Scheda Volo
+- **Tipo**: UI Layout / Ergonomia Mobile / Laws of UX / Flight Logbook
+- **Dettagli**: [.agents/worklog.d/2026-10-15_compact-flight-card-4kpi.md](file:///.agents/worklog.d/2026-10-15_compact-flight-card-4kpi.md)
+- **Sintesi**:
+  - Rimosso il pulsante inline `×` dalle card del Flight Log e integrato il pulsante `#btn-delete-from-detail` (`>= 48px`) nella topbar di [`ui/views/FlightDetailSheet.js`](file:///ui/views/FlightDetailSheet.js), collegato tramite callback `onDelete` al banner di annullamento 5s (`startPendingDeletion`) di [`ui/views/LogbookView.js`](file:///ui/views/LogbookView.js).
+  - Compattato `.gm-track-badge` a icona SVG (`24x20px`) con testo `.sr-only`, liberando `+102px` orizzontali per l'espansione del titolo `Decollo → Atterraggio` sulla prima riga.
+  - Compressa verticalmente `.gm-flight-card` (`padding: 8px 12px; gap: 4px;`, deduplicata in [`css/theme.css`](file:///css/theme.css)) ed estesa la griglia KPI a 4 colonne (`Tempo`, `Quota MSL`, `Guadagno` con supporto esplicito a `+0 m`, e `Termiche` con conteggio `thermalsCount`).
+  - Aggiornati e validati i test in [`tests/ui/logbookView.test.mjs`](file:///tests/ui/logbookView.test.mjs) e [`tests/ui/logbookFlightDetailInteraction.test.mjs`](file:///tests/ui/logbookFlightDetailInteraction.test.mjs) (77/77 test logbook/detail/governance superati).

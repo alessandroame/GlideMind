@@ -20,8 +20,11 @@ import {
     calculateTimelineScores,
     calculateWeekOverview,
     calculateDailyFlyabilitySummary,
-    resolveTranslation
+    resolveTranslation,
+    resolvePilotSafetyMultiplier
 } from '../../core/flyability.js';
+import { calculatePilotSafetyFactor } from '../../core/logbook.js';
+import { evaluateComprensorio, DEFAULT_COMPRENSORI } from '../../core/comprensorio.js';
 
 describe('Flyability Engine - Atmospheric Physics & Turbulence Math', () => {
 
@@ -507,6 +510,140 @@ describe('Flyability Engine - Waterfall Synthesis & Tie-Breaking', () => {
             const summary = calculateDailyFlyabilitySummary(payloadNoHeading, { type: 'takeoff', heading: null }, null, 1);
             assert.equal(summary.length, 1);
             assert.equal(summary[0].status, 'flyable');
+        });
+    });
+
+    describe('Optional Pilot Currency & Experience Safety Factor (Conservative Active-Piloting Scaling)', () => {
+        it('should return multiplier 1.0 when disabled or when pilot is current (<=35d) and experienced (>=15 flights)', () => {
+            const flights = Array.from({ length: 16 }, (_, i) => ({
+                id: `f-${i}`,
+                date: '2026-10-01',
+                durationMinutes: 45
+            }));
+
+            const disabledFactor = calculatePilotSafetyFactor({
+                flights: [],
+                referenceDate: '2026-10-10',
+                enabled: false
+            });
+            assert.equal(disabledFactor.enabled, false);
+            assert.equal(disabledFactor.multiplier, 1.0);
+            assert.equal(disabledFactor.reasonTag, null);
+
+            const optimalFactor = calculatePilotSafetyFactor({
+                flights,
+                referenceDate: '2026-10-10',
+                enabled: true
+            });
+            assert.equal(optimalFactor.enabled, true);
+            assert.equal(optimalFactor.multiplier, 1.0);
+            assert.equal(optimalFactor.currencyStatus, 'active');
+            assert.equal(optimalFactor.tier, 'optimal');
+            assert.equal(optimalFactor.reasonTag, null);
+        });
+
+        it('should apply -15% (0.85x) for reentry (36-90d) or low experience (<15 flights) and -25% (0.75x) for lapsed (>90d)', () => {
+            const reentryFactor = calculatePilotSafetyFactor({
+                flights: Array.from({ length: 20 }, (_, i) => ({
+                    id: `f-${i}`,
+                    date: '2026-08-15',
+                    durationMinutes: 40
+                })),
+                referenceDate: '2026-10-10', // 56 days ago
+                enabled: true
+            });
+            assert.equal(reentryFactor.multiplier, 0.85);
+            assert.equal(reentryFactor.currencyStatus, 'reentry');
+            assert.equal(reentryFactor.tier, 'reentry');
+            assert.ok(reentryFactor.reasonTag.includes('56gg'));
+
+            const noviceFactor = calculatePilotSafetyFactor({
+                flights: [
+                    { id: 'f-1', date: '2026-10-05', durationMinutes: 30 },
+                    { id: 'f-2', date: '2026-10-06', durationMinutes: 35 }
+                ],
+                referenceDate: '2026-10-10',
+                enabled: true
+            });
+            assert.equal(noviceFactor.multiplier, 0.85);
+            assert.equal(noviceFactor.tier, 'low_experience');
+            assert.ok(noviceFactor.reasonTag.includes('2 voli a libretto'));
+
+            const lapsedFactor = calculatePilotSafetyFactor({
+                flights: [{ id: 'f-old', date: '2026-05-01', durationMinutes: 60 }],
+                referenceDate: '2026-10-10',
+                enabled: true
+            });
+            assert.equal(lapsedFactor.multiplier, 0.75);
+            assert.equal(lapsedFactor.currencyStatus, 'lapsed');
+            assert.equal(lapsedFactor.tier, 'lapsed');
+            assert.ok(lapsedFactor.reasonTag.includes('Cautela per ripresa'));
+        });
+
+        it('should derate active-piloting thresholds (gust spread, EDR, CAPE, crosswind) while preserving physical wind penetration (windNoFly)', () => {
+            const lapsedGlider = {
+                ...DEFAULT_GLIDER,
+                pilotSafetyFactor: {
+                    enabled: true,
+                    multiplier: 0.75,
+                    reasonTag: 'Cautela per ripresa dopo 162gg di stop'
+                }
+            };
+
+            assert.equal(resolvePilotSafetyMultiplier(lapsedGlider), 0.75);
+
+            // 1. Gust spread: 7 km/h (12 -> 19 km/h) is optimal (<= 8) for pure EN-A, but caution (> 6) with 0.75x pilot derating
+            const pureWind = evaluateWindFlyability(12, 19, DEFAULT_GLIDER);
+            const deratedWind = evaluateWindFlyability(12, 19, lapsedGlider);
+            assert.equal(pureWind.severity, 0);
+            assert.equal(deratedWind.severity, 1);
+
+            // 2. Physical wind penetration limit (windNoFly = 31 km/h for EN-A vTrim 36) MUST NOT be altered by pilot factor:
+            // At 29 km/h with minimal gust spread (29 -> 32 km/h), both pure and derated stay at severity 2 (Vento Forte), NOT severity 3 (NO FLY > 31)
+            const pureStrong = evaluateWindFlyability(29, 32, DEFAULT_GLIDER);
+            const deratedStrong = evaluateWindFlyability(29, 32, lapsedGlider);
+            assert.equal(pureStrong.severity, 2);
+            assert.equal(deratedStrong.severity, 2, 'Physical penetration limit windNoFly must remain invariant');
+
+            // 3. Turbulence EDR: 0.28 is laminar (<= 0.32) for pure EN-A, but moderate (> 0.24) with 0.75x pilot derating
+            assert.equal(evaluateTurbulenceFlyability(0.28, DEFAULT_GLIDER).severity, 0);
+            assert.equal(evaluateTurbulenceFlyability(0.28, lapsedGlider).severity, 1);
+
+            // 4. Crosswind cone: 38° off-axis at 10 km/h is frontal (<= 45°) for pure EN-A, but crosswind (> 34°) with 0.75x derating
+            assert.equal(evaluateDirectionFlyability(10, 142, 180, true, null, DEFAULT_GLIDER).severity, 0);
+            assert.equal(evaluateDirectionFlyability(10, 142, 180, true, null, lapsedGlider).severity, 1);
+
+            // 5. Comprensorio explainability when downgraded by pilot safety factor
+            const chialamberto = DEFAULT_COMPRENSORI.find(c => c.name === 'Chialamberto');
+            const weatherData = {
+                hourly: {
+                    time: ['2026-10-10T14:00'],
+                    wind_speed_10m: [12],
+                    wind_gusts_10m: [19],
+                    wind_direction_10m: [180],
+                    precipitation: [0],
+                    cape: [100],
+                    turbulence_edr: [0.10],
+                    temperature_2m: [20]
+                }
+            };
+            const evalPure = evaluateComprensorio({
+                comprensorio: chialamberto,
+                weatherData,
+                glider: DEFAULT_GLIDER,
+                targetDate: '2026-10-10'
+            });
+            const evalDerated = evaluateComprensorio({
+                comprensorio: chialamberto,
+                weatherData,
+                glider: lapsedGlider,
+                pilotSafetyFactor: lapsedGlider.pilotSafetyFactor,
+                targetDate: '2026-10-10'
+            });
+            assert.equal(evalPure.status, 'flyable');
+            assert.equal(evalDerated.status, 'caution');
+            assert.ok(evalDerated.reason.includes('Meteo favorevole per la vela'));
+            assert.ok(evalDerated.reason.includes('Cautela per ripresa'));
         });
     });
 });

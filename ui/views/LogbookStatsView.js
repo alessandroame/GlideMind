@@ -450,11 +450,13 @@ export function renderMonthlyActivityChartHtml(monthlyActivity) {
 export function renderLogbookStatsHtml(flights = [], options = {}) {
   const safeFlights = Array.isArray(flights) ? flights : [];
   const metric = (options && options.metric === 'flights') ? 'flights' : 'hours';
+  const period = (options && options.period === 'year') ? 'year' : 'month';
   const referenceDate = (options && options.referenceDate) || new Date();
 
   // Compute period metrics via headless core
   const periodMetrics = calculatePilotPeriodMetrics({
     flights: safeFlights,
+    period,
     referenceDate
   });
 
@@ -515,12 +517,14 @@ export function renderLogbookStatsHtml(flights = [], options = {}) {
     currencyBadgeClass = 'gm-currency-lapsed';
   }
 
+  const periodWindowSuffix = period === 'year' ? '(ultimo anno)' : '(ultimi 30 gg)';
+
   return `
     <div class="gm-stats-container" role="region" aria-label="Statistiche di Carriera e Valuta Pilota">
       <!-- Pilot Currency Card -->
       <section class="gm-currency-card" aria-labelledby="heading-pilot-currency">
         <div class="gm-currency-card-header">
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2 flex-wrap">
             <h3 id="heading-pilot-currency" class="font-bold text-sm text-[var(--gm-text-primary)]">
               Valuta &amp; Continuità Pilota
             </h3>
@@ -528,9 +532,27 @@ export function renderLogbookStatsHtml(flights = [], options = {}) {
               ${escapeHtml(periodMetrics.currencyLabel)}
             </span>
           </div>
-          <span class="text-xs text-[var(--gm-text-muted)] font-mono">
-            ${periodMetrics.daysSinceLastFlight != null ? `${periodMetrics.daysSinceLastFlight} gg fa` : '--'}
-          </span>
+          <div class="flex items-center gap-2">
+            <div class="gm-period-toggle" role="group" aria-label="Periodo statistiche continuità">
+              <button
+                type="button"
+                class="gm-period-btn ${period === 'month' ? 'active' : ''}"
+                data-action="set-pilot-period"
+                data-period="month"
+                aria-pressed="${period === 'month'}"
+              >30 Giorni</button>
+              <button
+                type="button"
+                class="gm-period-btn ${period === 'year' ? 'active' : ''}"
+                data-action="set-pilot-period"
+                data-period="year"
+                aria-pressed="${period === 'year'}"
+              >Anno</button>
+            </div>
+            <span class="text-xs text-[var(--gm-text-muted)] font-mono">
+              ${periodMetrics.daysSinceLastFlight != null ? `${periodMetrics.daysSinceLastFlight} gg fa` : '--'}
+            </span>
+          </div>
         </div>
 
         <p class="gm-currency-desc text-xs text-[var(--gm-text-secondary)]">
@@ -540,11 +562,11 @@ export function renderLogbookStatsHtml(flights = [], options = {}) {
         <div class="gm-currency-period-grid">
           <div class="gm-currency-period-item">
             <span class="gm-currency-period-num">${escapeHtml(periodMetrics.totalSessions)}</span>
-            <span class="gm-currency-period-label">Voli (ultimi 30 gg)</span>
+            <span class="gm-currency-period-label">Voli ${periodWindowSuffix}</span>
           </div>
           <div class="gm-currency-period-item">
             <span class="gm-currency-period-num">${escapeHtml(periodMetrics.formattedHours)}</span>
-            <span class="gm-currency-period-label">Ore (ultimi 30 gg)</span>
+            <span class="gm-currency-period-label">Ore ${periodWindowSuffix}</span>
           </div>
           <div class="gm-currency-period-item">
             <span class="gm-currency-period-num">${escapeHtml(periodMetrics.thermalSessions)}</span>
