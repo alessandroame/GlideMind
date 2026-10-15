@@ -2537,21 +2537,18 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
 
 ---
 
-## 175. Timeline Diurna Leggera (`.gm-home-timeline-bar` a `3.5px`), Gerarchia d'Opacità (Von Restorff) e Asse Orario Condiviso Diradato (`.gm-home-time-axis`) senza Ripetizione delle Ore sulle Card
+## 175. Timeline Diurna Leggera (`.gm-home-timeline-bar` a `3.5px`), Gerarchia d'Opacità (Von Restorff) e Assenza di Numeri Orari o Selezione Visibile nelle Card Home
 - **Problema**:
   1. Nella Home Dashboard (`HomeDashboardView.js`), le barre orarie `.gm-home-timeline-bar` avevano spessore `8px` e opacità `100%` uniforme per tutti gli stati, trasformando 13 slot per card in mattoncini pesanti in cui il rosso `Non Volabile` dominava visivamente rispetto alle finestre volabili.
-  2. La sequenza completa dei numeri delle ore (`07 08 09 10 11 12 13 14 15 16 17 18 19`) veniva stampata sopra ogni singolo slot e ripetuta identicamente su ogni card comprensorio della lista, generando affaticamento visivo e ridondanza (violazione del Data-Ink Ratio e di Prägnanz).
+  2. La presenza dei numeri delle ore (`.gm-home-timeline-hour`) e del riquadro di selezione sull'ora attiva (`.is-selected-hour`) nelle timeline delle card Home introduceva ripetizione numerica e rumore visivo superfluo in una vista di triage rapido.
   3. I token `--gm-bg-surface-alt`, `--gm-border-subtle` e `--gm-surface-2` erano usati nei selettori Home ma non definiti in `:root` / `[data-theme="light"]`, rendendo invisibili le barre `status-unavailable` offline.
 - **Causa Radice**:
-  Ripetizione dell'asse temporale X dentro ogni elemento ripetuto della lista anziché fattorizzarlo in testa alla lista, assenza di gerarchia di opacità tra stati attivi (`flyable`) e stati chiusi (`unflyable`), e mancata dichiarazione dei token secondari di superficie/bordo in `:root`.
+  Trattare la micro-timeline delle card Home come uno scrubber numerico completo anziché come un indicatore visivo sintetico a colpo d'occhio, assenza di gerarchia di opacità tra stati attivi (`flyable`) e stati chiusi (`unflyable`), e mancata dichiarazione dei token secondari di superficie/bordo in `:root`.
 - **Pattern Vincolante**:
-  1. **Asse Orario Unico e Diradato in Testa alla Lista (`.gm-home-time-axis`)**:
-     - Renderizzare la scala oraria diurna **una sola volta** sopra le card comprensorio (`renderSharedTimelineAxis` in `#home-spots-list`), allineata alla griglia di `.gm-home-timeline` (`padding: 0 12px`).
-     - Mostrare il numero dell'ora (`.is-major`) solo sui riferimenti chiave (prima ora, multipli di 3 ore ad almeno 2 slot dagli estremi, ultima ora — es. `07 · 09 · · 12 · · 15 · · · 19`), indicando le ore intermedie con un punto discreto `·` (`.is-minor`).
-  2. **Occultamento a Riposo dei Numeri Orari nelle Card (`.gm-home-timeline-hour`)**:
-     - Nelle singole card comprensorio, `.gm-home-timeline-hour` è posizionato come micro-badge flottante nascosto a riposo (`opacity: 0; position: absolute; top: -15px; pointer-events: none;`) e diventa visibile (`opacity: 1`) esclusivamente su `:hover`, `:focus-visible` o `.is-selected-hour`.
-  3. **Indicatori Sottili (`3.5px`) con De-Enfasi delle Ore Non Volabili**:
+  1. **Assenza di Numeri delle Ore e di Selezione Visibile nelle Timeline Home**:
+     - Nelle timeline della Home (`.gm-home-timeline`), ogni `.gm-home-timeline-slot` renderizza esclusivamente `<span class="gm-home-timeline-bar"></span>` (senza `.gm-home-timeline-hour`, senza asse numerico e senza classe/riquadro `.is-selected-hour`). Il contesto orario e anemometrico resta accessibile tramite `title` e `aria-label`.
+  2. **Indicatori Sottili (`3.5px`) con De-Enfasi delle Ore Non Volabili**:
      - `.gm-home-timeline-bar` adotta `height: 3.5px; border-radius: var(--gm-radius-full);` (con touch floor garantito da `.gm-home-timeline-slot::before { inset: -8px 0; }`).
      - Opacità differenziata per risalto immediato delle finestre utili: `status-flyable` (`opacity: 0.85`), `status-caution` (`opacity: 0.68`), `status-unflyable` (`opacity: 0.28`), `status-unavailable` (`opacity: 0.32`).
-  4. **Chevron Verticale Standard da Accordion (`.gm-spot-accordion-trigger` + `.gm-spot-chevron`)**:
+  3. **Chevron Verticale Standard da Accordion (`.gm-spot-accordion-trigger` + `.gm-spot-chevron`)**:
      - Nella testata destra della card (`.gm-spot-header-right`), evitare la doppia freccia conflittuale (`▾` dentro il badge + `›` orizzontale accanto). Racchiudere badge e freccia in un unico bottone `.gm-spot-accordion-trigger` (`data-action="toggle-spot-reasons"`) con `.gm-spot-chevron` orientato verticalmente verso il basso (`points="6 9 12 15 18 9"`) che ruota di `180deg` (`transform: rotate(180deg)`) quando `.is-reasons-expanded` è attivo.

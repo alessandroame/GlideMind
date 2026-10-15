@@ -1724,37 +1724,7 @@ button, input, select, textarea {
   opacity: 0.7;
 }
 
-/* Shared Sparse Diurnal Time Axis (rendered once above comprensori list to avoid repeating hour numbers on every card) */
-.gm-home-time-axis {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(18px, 1fr));
-  gap: 3px;
-  width: 100%;
-  padding: 0 12px;
-  margin-bottom: -3px;
-  user-select: none;
-  pointer-events: none;
-}
-
-.gm-home-time-axis-tick {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--gm-font-mono);
-  font-size: 0.58rem;
-  font-weight: 500;
-  line-height: 1;
-  color: var(--gm-text-muted);
-  opacity: 0.65;
-  letter-spacing: -0.02em;
-}
-
-.gm-home-time-axis-tick.is-minor {
-  opacity: 0.28;
-  font-size: 0.52rem;
-}
-
-/* Row 2: Visually Lightweight Diurnal Flyability Timeline Strip (Sunrise -> Sunset) */
+/* Row 2: Visually Lightweight Diurnal Flyability Timeline Strip (Sunrise -> Sunset, pure bars without hour numbers or selection box) */
 .gm-home-timeline {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(18px, 1fr));
@@ -1768,17 +1738,14 @@ button, input, select, textarea {
   position: relative;
   appearance: none;
   background: transparent;
-  border: 1px solid transparent;
+  border: none;
   border-radius: 4px;
   padding: 4px 1px;
-  min-height: 14px;
+  min-height: 12px;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: border-color 0.12s ease, background-color 0.12s ease;
-  color: var(--gm-text-secondary);
 }
 
 .gm-home-timeline-slot::before {
@@ -1787,45 +1754,8 @@ button, input, select, textarea {
   inset: -8px 0;
 }
 
-.gm-home-timeline-slot:hover,
 .gm-home-timeline-slot:focus-visible {
-  background: var(--gm-bg-surface-alt);
-  border-color: rgba(245, 158, 11, 0.45);
   outline: none;
-}
-
-.gm-home-timeline-slot.is-selected-hour {
-  border-color: var(--gm-accent);
-  background: var(--gm-bg-elevated);
-}
-
-/* Per-slot hour label is hidden at rest to eliminate repetitive number rows across cards; shown only on hover/focus/selection */
-.gm-home-timeline-hour {
-  position: absolute;
-  top: -15px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-family: var(--gm-font-mono);
-  font-size: 0.58rem;
-  font-weight: 600;
-  line-height: 1;
-  padding: 1px 4px;
-  border-radius: 3px;
-  background: var(--gm-bg-elevated);
-  border: 1px solid var(--gm-border-strong);
-  color: var(--gm-text-primary);
-  letter-spacing: -0.02em;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.12s ease;
-  z-index: 2;
-  white-space: nowrap;
-}
-
-.gm-home-timeline-slot:hover .gm-home-timeline-hour,
-.gm-home-timeline-slot:focus-visible .gm-home-timeline-hour,
-.gm-home-timeline-slot.is-selected-hour .gm-home-timeline-hour {
-  opacity: 1;
 }
 
 .gm-home-timeline-bar {
@@ -1833,7 +1763,7 @@ button, input, select, textarea {
   height: 3.5px;
   border-radius: var(--gm-radius-full);
   background: var(--gm-border);
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  transition: opacity 0.15s ease;
 }
 
 .gm-home-timeline-slot.status-flyable .gm-home-timeline-bar {
@@ -1860,13 +1790,6 @@ button, input, select, textarea {
 .gm-home-timeline-slot.status-unavailable .gm-home-timeline-bar {
   background: var(--gm-border-strong);
   opacity: 0.32;
-}
-
-.gm-home-timeline-slot:hover .gm-home-timeline-bar,
-.gm-home-timeline-slot:focus-visible .gm-home-timeline-bar,
-.gm-home-timeline-slot.is-selected-hour .gm-home-timeline-bar {
-  opacity: 1;
-  transform: scaleY(1.35);
 }
 
 

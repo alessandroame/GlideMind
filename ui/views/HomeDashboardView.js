@@ -1014,40 +1014,6 @@ export class HomeDashboardViewController {
   }
 
   /**
-   * Renders a single shared, sparse diurnal time axis above the comprensori cards
-   * so hour numbers are not repeated on every card or crowded on every slot.
-   * @param {Array<object>} evaluatedList
-   * @returns {string}
-   */
-  renderSharedTimelineAxis(evaluatedList) {
-    if (!Array.isArray(evaluatedList) || evaluatedList.length === 0) return '';
-    const firstItem = evaluatedList[0];
-    const timeline = firstItem.diurnalTimeline || this.buildDiurnalTimeline(
-      firstItem.comprensorio || { id: firstItem.comprensorioId || firstItem.id, name: firstItem.name },
-      null,
-      this.getEffectiveGlider(),
-      this.store ? this.store.getState().activeDate : null
-    );
-    const slots = timeline?.slots || [];
-    if (slots.length === 0) return '';
-
-    const ticksHtml = slots.map((slot, idx) => {
-      const isFirst = idx === 0;
-      const isLast = idx === slots.length - 1;
-      const isIntermediateAnchor = idx >= 2 && idx <= slots.length - 3 && (slot.hour % 3 === 0);
-      const showHourNumber = isFirst || isLast || isIntermediateAnchor;
-      const label = showHourNumber ? String(slot.hour).padStart(2, '0') : '·';
-      return `<span class="gm-home-time-axis-tick ${showHourNumber ? 'is-major' : 'is-minor'}">${label}</span>`;
-    }).join('');
-
-    return `
-      <div class="gm-home-time-axis" aria-hidden="true">
-        ${ticksHtml}
-      </div>
-    `;
-  }
-
-  /**
    * Renders the list of comprensori or search empty state.
    * @param {Array<object>} evaluatedList
    * @returns {string}
@@ -1124,7 +1090,6 @@ export class HomeDashboardViewController {
 
     return `
       <div id="home-spots-list" class="flex flex-col gap-2">
-        ${this.renderSharedTimelineAxis(evaluatedList)}
         ${evaluatedList.map(item => this.renderComprensorioCard(item)).join('')}
       </div>
     `;
@@ -1229,8 +1194,6 @@ export class HomeDashboardViewController {
    */
   renderComprensorioCard(item) {
     const state = this.store ? this.store.getState() : {};
-    const selectedSpotId = state.selectedSpot?.id || state.selectedSpot?.comprensorioId || null;
-    const selectedHour = typeof state.selectedHour === 'number' ? state.selectedHour : null;
     const takeoff = item.takeoff || item.bestTakeoff || {};
     const landing = item.landing || item.safeLanding || {};
     const rawTakeoffName = takeoff.name || 'Decollo';
@@ -1309,29 +1272,25 @@ export class HomeDashboardViewController {
           </div>
         </div>
 
-        <!-- Line 2: Diurnal Flyability Timeline (Sunrise -> Sunset) -->
+        <!-- Line 2: Diurnal Flyability Timeline (Sunrise -> Sunset, pure lightweight bars without hour numbers or selection box) -->
         <div 
           class="gm-home-timeline" 
           role="group" 
           aria-label="Timeline volabilità diurna da ${escapeHtml(timeline.sunriseStr)} a ${escapeHtml(timeline.sunsetStr)}"
         >
-          ${timeline.slots.map(slot => {
-            const isSelectedSlot = selectedSpotId === item.comprensorioId && selectedHour === slot.hour;
-            return `
+          ${timeline.slots.map(slot => `
             <button
               type="button"
-              class="gm-home-timeline-slot status-${escapeHtml(slot.status)} ${isSelectedSlot ? 'is-selected-hour' : ''}"
+              class="gm-home-timeline-slot status-${escapeHtml(slot.status)}"
               data-action="view-forecast-hour"
               data-id="${escapeHtml(item.comprensorioId)}"
               data-hour="${slot.hour}"
               title="${String(slot.hour).padStart(2, '0')}:00 — ${escapeHtml(slot.badge)}${slot.windSpeed != null ? ` (${slot.windSpeed} km/h)` : ''}${slot.reason ? `: ${escapeHtml(slot.reason)}` : ''}"
               aria-label="Ore ${String(slot.hour).padStart(2, '0')}:00, ${escapeHtml(slot.badge)}"
             >
-              <span class="gm-home-timeline-hour">${String(slot.hour).padStart(2, '0')}</span>
               <span class="gm-home-timeline-bar"></span>
             </button>
-          `;
-          }).join('')}
+          `).join('')}
         </div>
 
         <!-- Line 3 (Expandable on Badge Tap): Determinant Factor Pills ([NOTE-001]) -->
