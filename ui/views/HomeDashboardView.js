@@ -1014,6 +1014,40 @@ export class HomeDashboardViewController {
   }
 
   /**
+   * Renders a single shared, sparse diurnal time axis above the comprensori cards
+   * so hour numbers are not repeated on every card or crowded on every slot.
+   * @param {Array<object>} evaluatedList
+   * @returns {string}
+   */
+  renderSharedTimelineAxis(evaluatedList) {
+    if (!Array.isArray(evaluatedList) || evaluatedList.length === 0) return '';
+    const firstItem = evaluatedList[0];
+    const timeline = firstItem.diurnalTimeline || this.buildDiurnalTimeline(
+      firstItem.comprensorio || { id: firstItem.comprensorioId || firstItem.id, name: firstItem.name },
+      null,
+      this.getEffectiveGlider(),
+      this.store ? this.store.getState().activeDate : null
+    );
+    const slots = timeline?.slots || [];
+    if (slots.length === 0) return '';
+
+    const ticksHtml = slots.map((slot, idx) => {
+      const isFirst = idx === 0;
+      const isLast = idx === slots.length - 1;
+      const isIntermediateAnchor = idx >= 2 && idx <= slots.length - 3 && (slot.hour % 3 === 0);
+      const showHourNumber = isFirst || isLast || isIntermediateAnchor;
+      const label = showHourNumber ? String(slot.hour).padStart(2, '0') : '·';
+      return `<span class="gm-home-time-axis-tick ${showHourNumber ? 'is-major' : 'is-minor'}">${label}</span>`;
+    }).join('');
+
+    return `
+      <div class="gm-home-time-axis" aria-hidden="true">
+        ${ticksHtml}
+      </div>
+    `;
+  }
+
+  /**
    * Renders the list of comprensori or search empty state.
    * @param {Array<object>} evaluatedList
    * @returns {string}
@@ -1022,9 +1056,9 @@ export class HomeDashboardViewController {
     if (this.isLoading) {
       return `
         <div id="home-spots-list" class="flex flex-col gap-2">
-          <div class="gm-skeleton" style="height: 72px;"></div>
-          <div class="gm-skeleton" style="height: 72px;"></div>
-          <div class="gm-skeleton" style="height: 72px;"></div>
+          <div class="gm-skeleton gm-skeleton-card"></div>
+          <div class="gm-skeleton gm-skeleton-card"></div>
+          <div class="gm-skeleton gm-skeleton-card"></div>
         </div>
       `;
     }
@@ -1090,6 +1124,7 @@ export class HomeDashboardViewController {
 
     return `
       <div id="home-spots-list" class="flex flex-col gap-2">
+        ${this.renderSharedTimelineAxis(evaluatedList)}
         ${evaluatedList.map(item => this.renderComprensorioCard(item)).join('')}
       </div>
     `;
@@ -1193,6 +1228,9 @@ export class HomeDashboardViewController {
    * @returns {string}
    */
   renderComprensorioCard(item) {
+    const state = this.store ? this.store.getState() : {};
+    const selectedSpotId = state.selectedSpot?.id || state.selectedSpot?.comprensorioId || null;
+    const selectedHour = typeof state.selectedHour === 'number' ? state.selectedHour : null;
     const takeoff = item.takeoff || item.bestTakeoff || {};
     const landing = item.landing || item.safeLanding || {};
     const rawTakeoffName = takeoff.name || 'Decollo';
@@ -1203,7 +1241,7 @@ export class HomeDashboardViewController {
       item.comprensorio || { id: item.comprensorioId || item.id, name: item.name, takeoffs: [takeoff], landings: [landing] },
       null,
       this.getEffectiveGlider(),
-      this.store ? this.store.getState().activeDate : null
+      state.activeDate || null
     );
     const reasonPills = this.buildDeterminantReasonPills(item, timeline);
     const isReasonsExpanded = Boolean(this.expandedReasonSpotIds && this.expandedReasonSpotIds.has(item.comprensorioId));
@@ -1253,20 +1291,21 @@ export class HomeDashboardViewController {
           <div class="gm-spot-header-right">
             <button
               type="button"
-              class="gm-badge gm-badge-pill ${badgeClass} gm-spot-badge-toggle"
+              class="gm-spot-accordion-trigger"
               data-action="toggle-spot-reasons"
               data-id="${escapeHtml(item.comprensorioId)}"
               aria-expanded="${isReasonsExpanded ? 'true' : 'false'}"
               title="${escapeHtml(badgeTitle)}: ${escapeHtml(item.reason || 'Tocca per mostrare i fattori determinanti')}"
-              aria-label="Stato ${escapeHtml(badgeTitle)}. Tocca per dettagli sui fattori determinanti"
+              aria-label="Stato ${escapeHtml(badgeTitle)}. Tocca per espandere o comprimere i dettagli del comprensorio"
             >
-              <span aria-hidden="true">${badgeIcon}</span>
-              <span class="gm-badge-text font-bold">${escapeHtml(badgeTitle)}</span>
-              <span class="gm-badge-expand-caret" aria-hidden="true">${isReasonsExpanded ? '▴' : '▾'}</span>
+              <span class="gm-badge gm-badge-pill ${badgeClass} gm-spot-badge-toggle">
+                <span aria-hidden="true">${badgeIcon}</span>
+                <span class="gm-badge-text font-bold">${escapeHtml(badgeTitle)}</span>
+              </span>
+              <svg class="gm-spot-chevron ${isReasonsExpanded ? 'is-expanded' : ''}" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
             </button>
-            <svg class="gm-spot-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
-              <polyline points="9 18 15 12 9 6"></polyline>
-            </svg>
           </div>
         </div>
 
@@ -1276,10 +1315,12 @@ export class HomeDashboardViewController {
           role="group" 
           aria-label="Timeline volabilità diurna da ${escapeHtml(timeline.sunriseStr)} a ${escapeHtml(timeline.sunsetStr)}"
         >
-          ${timeline.slots.map(slot => `
+          ${timeline.slots.map(slot => {
+            const isSelectedSlot = selectedSpotId === item.comprensorioId && selectedHour === slot.hour;
+            return `
             <button
               type="button"
-              class="gm-home-timeline-slot status-${escapeHtml(slot.status)}"
+              class="gm-home-timeline-slot status-${escapeHtml(slot.status)} ${isSelectedSlot ? 'is-selected-hour' : ''}"
               data-action="view-forecast-hour"
               data-id="${escapeHtml(item.comprensorioId)}"
               data-hour="${slot.hour}"
@@ -1289,7 +1330,8 @@ export class HomeDashboardViewController {
               <span class="gm-home-timeline-hour">${String(slot.hour).padStart(2, '0')}</span>
               <span class="gm-home-timeline-bar"></span>
             </button>
-          `).join('')}
+          `;
+          }).join('')}
         </div>
 
         <!-- Line 3 (Expandable on Badge Tap): Determinant Factor Pills ([NOTE-001]) -->
@@ -1737,7 +1779,7 @@ export class HomeDashboardViewController {
             <div class="flex items-center gap-3">
               <span class="gm-glider-badge ${catClass}">${escapeHtml(glider.category)}</span>
               <div class="flex flex-col text-left">
-                <span class="font-bold text-sm text-[var(--gm-text)]">${escapeHtml(glider.brand)} ${escapeHtml(glider.model)}</span>
+                <span class="font-bold text-sm text-[var(--gm-text-primary)]">${escapeHtml(glider.brand)} ${escapeHtml(glider.model)}</span>
                 <span class="text-xs text-[var(--gm-text-muted)]">Trim: ${glider.vTrim} km/h • Max: ${glider.vMax} km/h • Efficienza: 1:${glider.glideRatio} • AR: ${glider.ar}</span>
               </div>
             </div>
@@ -1787,7 +1829,7 @@ export class HomeDashboardViewController {
           <div class="flex items-center justify-between w-full gap-3">
             <div class="flex flex-col text-left">
               <div class="flex items-center gap-2">
-                <span class="font-bold text-sm text-[var(--gm-text)]">Adatta prudenza a continuità e storico voli</span>
+                <span class="font-bold text-sm text-[var(--gm-text-primary)]">Adatta prudenza a continuità e storico voli</span>
                 <span class="gm-badge ${usePilotFactor ? 'gm-badge-flyable' : 'gm-badge-nd'} text-[0.65rem] px-1.5 py-0.5">
                   ${usePilotFactor ? 'Attivo' : 'Opzionale'}
                 </span>
@@ -1863,7 +1905,7 @@ export class HomeDashboardViewController {
                   <div class="flex items-center gap-3">
                     <span class="gm-glider-badge ${cls.category.toLowerCase()}">${cls.category}</span>
                     <div class="flex flex-col text-left">
-                      <span class="font-bold text-sm text-[var(--gm-text)]">${escapeHtml(cls.name)}</span>
+                      <span class="font-bold text-sm text-[var(--gm-text-primary)]">${escapeHtml(cls.name)}</span>
                       <span class="text-xs text-[var(--gm-text-muted)]">Trim: ${cls.vTrim} km/h • Max: ${cls.vMax} km/h • Efficienza: 1:${cls.glideRatio}</span>
                     </div>
                   </div>
@@ -1990,7 +2032,7 @@ export class HomeDashboardViewController {
             <span class="flex items-center gap-1"><span class="text-[var(--gm-status-flyable)]">●</span> Volabile</span>
             <span class="flex items-center gap-1"><span class="text-[var(--gm-status-caution)]">▲</span> Cautela</span>
             <span class="flex items-center gap-1"><span class="text-[var(--gm-status-unflyable)]">✕</span> Non Volabile</span>
-            <span class="flex items-center gap-1"><span class="text-[#f87171]">⚡</span> Severo</span>
+            <span class="flex items-center gap-1"><span class="text-[var(--gm-status-severe-text)]">⚡</span> Severo</span>
           </div>
         </div>
       </div>

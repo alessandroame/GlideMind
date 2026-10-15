@@ -3345,5 +3345,99 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
       assert.notEqual(stripOverview, stripLanding0, 'Timeline strip HTML must react when switching from Panoramica to Atterraggio');
       assert.notEqual(stripTakeoff0, stripLanding0, 'Timeline strip HTML must react when switching from Decollo to Atterraggio');
     });
+
+    it('renders the spot descriptive section in Decollo and Atterraggio inside a collapsible Info element that starts collapsed by default', () => {
+      const cornizzolo = DEFAULT_COMPRENSORI[0];
+      const takeoff0 = cornizzolo.takeoffs[0];
+      const landing0 = cornizzolo.landings[0];
+
+      const mockStore = createStore({ selectedSpot: cornizzolo });
+      const controller = new ForecastViewController({ store: mockStore });
+
+      // 1. Switch to Takeoff view
+      controller.selectedSubSpot = takeoff0.id;
+      controller.activeTakeoffId = takeoff0.id;
+      assert.equal(controller.isSubSpotInfoOpen, false, 'Spot Info section must start collapsed by default');
+
+      let html = controller.renderHtml();
+      assert.ok(html.includes('<details class="gm-subspot-info-collapsible">'), 'Must render collapsible <details class="gm-subspot-info-collapsible"> without open attribute by default');
+      assert.ok(html.includes('data-action="toggle-subspot-info"'), 'Must render summary toggle with data-action="toggle-subspot-info"');
+      assert.ok(html.includes('aria-expanded="false"'), 'Must set aria-expanded="false" when collapsed');
+      assert.ok(html.includes('gm-subspot-info-badge">Info</span>'), 'Must render Info badge inside summary');
+      assert.ok(html.includes('Azimut Pendio:'), 'Must include Azimut Pendio inside collapsible body');
+
+      // 2. Toggle open via click action
+      controller.handleClick({
+        preventDefault() {},
+        target: {
+          closest: (sel) => (sel === '[data-action]' ? {
+            getAttribute: (attr) => (attr === 'data-action' ? 'toggle-subspot-info' : null),
+            closest: () => null
+          } : null)
+        }
+      });
+      assert.equal(controller.isSubSpotInfoOpen, true, 'Must expand Spot Info section on toggle click');
+
+      html = controller.renderHtml();
+      assert.ok(html.includes('<details class="gm-subspot-info-collapsible" open>'), 'Must render open attribute when expanded');
+      assert.ok(html.includes('aria-expanded="true"'), 'Must set aria-expanded="true" when expanded');
+
+      // 3. Switching to Landing via select-subspot resets Info section back to collapsed
+      controller.handleClick({
+        target: {
+          closest: (sel) => (sel === '[data-action]' ? {
+            getAttribute: (attr) => {
+              if (attr === 'data-action') return 'select-subspot';
+              if (attr === 'data-subspot-id') return landing0.id;
+              return null;
+            }
+          } : null)
+        }
+      });
+      assert.equal(controller.selectedSubSpot, landing0.id, 'Must switch to landing view');
+      assert.equal(controller.isSubSpotInfoOpen, false, 'Switching sub-spot must reset Spot Info section to collapsed');
+
+      html = controller.renderHtml();
+      assert.ok(html.includes('<details class="gm-subspot-info-collapsible">'), 'Landing Spot Info section must start collapsed');
+      assert.ok(html.includes('Classificazione:'), 'Must include Classificazione inside landing collapsible body');
+    });
+
+    it('eliminates phantom vertical flex gap below map card across Panoramica, Decollo, and Atterraggio modes', () => {
+      const cornizzolo = DEFAULT_COMPRENSORI[0];
+      const takeoff0 = cornizzolo.takeoffs[0];
+      const landing0 = cornizzolo.landings[0];
+
+      const mockStore = createStore({ selectedSpot: cornizzolo });
+      const controller = new ForecastViewController({ store: mockStore });
+
+      // 1. Panoramica mode: compact gap-2 scroll container and visible flight windows
+      controller.selectedSubSpot = 'overview';
+      const htmlOverview = controller.renderHtml();
+      assert.ok(
+        htmlOverview.includes('id="forecast-scroll-container" class="gm-forecast-scroll-container flex-1 min-h-0 overflow-y-auto flex flex-col gap-2'),
+        'Scroll container must use compact gap-2 vertical spacing'
+      );
+      assert.ok(
+        htmlOverview.includes('<div id="forecast-flight-windows-container">'),
+        'Flight windows container must be visible in Panoramica when flight windows are present'
+      );
+
+      // 2. Decollo mode: flight windows container must be display:none so it does not add a double flex gap
+      controller.selectedSubSpot = takeoff0.id;
+      const htmlTakeoff = controller.renderHtml();
+      assert.ok(
+        htmlTakeoff.includes('<div id="forecast-flight-windows-container" style="display:none;" aria-hidden="true"></div>'),
+        'Empty flight windows container must have display:none in Decollo mode to prevent phantom flex gap'
+      );
+
+      // 3. Atterraggio mode: flight windows container must also be display:none
+      controller.selectedSubSpot = landing0.id;
+      const htmlLanding = controller.renderHtml();
+      assert.ok(
+        htmlLanding.includes('<div id="forecast-flight-windows-container" style="display:none;" aria-hidden="true"></div>'),
+        'Empty flight windows container must have display:none in Atterraggio mode to prevent phantom flex gap'
+      );
+    });
   });
 });
+

@@ -1228,5 +1228,53 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     dateBarHtml = controller.renderDateBar();
     assert.equal(dateBarHtml.includes('gm-horizon-notice'), false, 'Must hide horizon notice after dismissal');
   });
+
+  it('should render visually lightweight timeline bars and a single sparse shared time axis without repeating hour numbers across cards', () => {
+    const css = fs.readFileSync(path.resolve('css/theme.css'), 'utf-8');
+    const mockStore = createStore({
+      selectedSpot: { id: 'chialamberto-valli-di-lanzo-to-to' },
+      selectedHour: 12
+    });
+    const controller = new HomeDashboardViewController({ store: mockStore });
+    const html = controller.renderHtml();
+
+    // 1. Single shared sparse time axis rendered ONCE for the entire comprensori list
+    const axisMatches = html.match(/class="gm-home-time-axis"/g);
+    assert.equal(axisMatches ? axisMatches.length : 0, 1, 'Must render exactly 1 shared diurnal time axis above the comprensori list');
+    assert.ok(html.includes('gm-home-time-axis-tick is-major'), 'Shared time axis must include sparse major hour anchors');
+    assert.ok(html.includes('gm-home-time-axis-tick is-minor'), 'Shared time axis must use subtle minor dots between anchor hours');
+
+    // 2. Per-card hour labels are hidden at rest (opacity: 0) and only revealed on hover/focus/selected
+    assert.ok(
+      /\.gm-home-timeline-hour\s*\{[^}]*opacity:\s*0/.test(css),
+      '.gm-home-timeline-hour must be hidden at rest (opacity: 0) to prevent repetitive hour rows on every card'
+    );
+    assert.ok(
+      css.includes('.gm-home-timeline-slot.is-selected-hour .gm-home-timeline-hour'),
+      'Selected timeline slot must reveal its hour micro-label'
+    );
+    assert.ok(html.includes('is-selected-hour'), 'Card matching selectedSpot and selectedHour must mark slot with is-selected-hour');
+
+    // 3. Slim timeline bar geometry (height: 3.5px) and calibrated status opacity (unflyable de-emphasized)
+    assert.ok(
+      /\.gm-home-timeline-bar\s*\{[^}]*height:\s*3\.5px/.test(css),
+      '.gm-home-timeline-bar must use slim 3.5px height instead of heavy 8px blocks'
+    );
+    assert.ok(
+      /\.gm-home-timeline-slot\.status-unflyable\s+\.gm-home-timeline-bar\s*\{[^}]*opacity:\s*0\.28/.test(css),
+      'Unflyable timeline bars must be visually de-emphasized (opacity: 0.28) to avoid visual noise'
+    );
+
+    // 4. CSS custom properties integrity and light-mode contrast
+    assert.ok(css.includes('--gm-bg-surface-alt:'), 'Must define --gm-bg-surface-alt in theme.css');
+    assert.ok(css.includes('--gm-border-subtle:'), 'Must define --gm-border-subtle in theme.css');
+    assert.ok(css.includes('#15803d'), 'Light mode EN-A glider badge must use high-contrast dark green (#15803d)');
+
+    // 5. Vertical accordion chevron (downward polyline 6 9 12 15 18 9 rotating 180deg when expanded)
+    assert.ok(html.includes('points="6 9 12 15 18 9"'), 'Comprensorio card chevron must be vertical (accordion style) pointing down when collapsed');
+    assert.equal(html.includes('points="9 18 15 12 9 6"'), false, 'Comprensorio card chevron must not use horizontal right-pointing arrow');
+    assert.ok(css.includes('transform: rotate(180deg)'), 'Vertical chevron must rotate 180deg when accordion drawer is expanded');
+  });
 });
+
 

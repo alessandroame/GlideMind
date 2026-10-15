@@ -362,6 +362,7 @@ export class ForecastViewController {
     this.activeTakeoffId = storeState.activeTakeoffId || null;
     this.activeLandingId = storeState.activeLandingId || null;
     this.isSubSpotMenuOpen = false;
+    this.isSubSpotInfoOpen = false; // Specific spot (Decollo/Atterraggio) descriptive Info section starts collapsed
     this.isFlightAnalysisAimMenuOpen = false;
     this.forecastMode = 'cards'; // 'cards' | 'charts'
     this.expandedCardId = null; // All parameter accordion cards start collapsed
@@ -1224,7 +1225,7 @@ export class ForecastViewController {
         ${this.renderStickyBar(spot, activeSubSpotObj)}
 
         <!-- Scrollable cards container (occupies only the usable height above the scrubber) -->
-        <div id="forecast-scroll-container" class="gm-forecast-scroll-container flex-1 min-h-0 overflow-y-auto flex flex-col gap-4 p-4 max-w-lg mx-auto w-full">
+        <div id="forecast-scroll-container" class="gm-forecast-scroll-container flex-1 min-h-0 overflow-y-auto flex flex-col gap-2 p-4 max-w-lg mx-auto w-full">
           <!-- 1. Header: Comprensorio Bar + Picker Trigger -->
           ${this.renderHeader(spot)}
 
@@ -1236,13 +1237,16 @@ export class ForecastViewController {
           </div>
 
           <!-- 2b. Flight Windows container (ONLY in Overview) -->
-          <div id="forecast-flight-windows-container">
-            ${this.selectedSubSpot === 'overview' ? this.renderFlightWindows(spot, weatherData, glider, activeSubSpotObj) : ''}
-          </div>
+          ${(() => {
+            const flightWindowsHtml = this.selectedSubSpot === 'overview'
+              ? this.renderFlightWindows(spot, weatherData, glider, activeSubSpotObj)
+              : '';
+            return `<div id="forecast-flight-windows-container"${!flightWindowsHtml ? ' style="display:none;" aria-hidden="true"' : ''}>${flightWindowsHtml}</div>`;
+          })()}
 
           <!-- Mode Toggle & Parameter Cards / Solo Grafici (ONLY in Sub-Spot) -->
           ${this.selectedSubSpot !== 'overview' ? `
-            <div class="gm-forecast-mode-bar flex items-center justify-between mt-1 mb-1">
+            <div class="gm-forecast-mode-bar flex items-center justify-between">
               <span class="text-xs font-semibold uppercase tracking-wider text-[var(--gm-text-muted)]">Aerologia ${activeSubSpotObj?.spotType === 'landing' ? 'Atterraggio' : 'Decollo'}</span>
               <div class="gm-view-toggle" role="group" aria-label="Modalità di visualizzazione aerologia">
                 <button 
@@ -1961,6 +1965,8 @@ export class ForecastViewController {
     const dirVal = weather.windDirection ?? weather.windDir;
     const windDirStr = dirVal != null ? `${getCardinalDirection(dirVal)} (${Math.round(dirVal)}°)` : '';
 
+    const isInfoOpen = Boolean(this.isSubSpotInfoOpen);
+
     return `
       ${this.renderQuickSubSpotSwitcher(spot, isTakeoff ? subSpot : evalData.takeoff, !isTakeoff ? subSpot : evalData.landing)}
       <div class="flex items-center justify-between border-b border-[var(--gm-border)] pb-2 mb-2">
@@ -1974,34 +1980,48 @@ export class ForecastViewController {
         </span>
       </div>
 
-      <div class="flex flex-col gap-1.5 text-xs text-[var(--gm-text-secondary)]">
-        ${isTakeoff ? `
+      <details class="gm-subspot-info-collapsible"${isInfoOpen ? ' open' : ''}>
+        <summary 
+          class="gm-subspot-info-summary" 
+          data-action="toggle-subspot-info" 
+          aria-expanded="${isInfoOpen ? 'true' : 'false'}"
+        >
+          <span class="gm-subspot-info-trigger-label">
+            <span class="gm-subspot-info-badge">Info</span>
+            <span class="gm-subspot-info-hint">${isTakeoff ? 'Dettagli e descrizione decollo' : 'Dettagli e descrizione atterraggio'}</span>
+          </span>
+          <span class="gm-subspot-info-chevron" aria-hidden="true">▾</span>
+        </summary>
+
+        <div class="gm-subspot-info-body flex flex-col gap-1.5 text-xs text-[var(--gm-text-secondary)]">
+          ${isTakeoff ? `
+            <div class="flex justify-between">
+              <span>Azimut Pendio:</span>
+              <span class="font-bold text-[var(--gm-text-primary)] font-mono">${subSpot.heading != null && !isNaN(Number(subSpot.heading)) ? `${subSpot.heading}° (${getCardinalDirection(subSpot.heading)})` : 'N/D'}</span>
+            </div>
+          ` : `
+            <div class="flex justify-between">
+              <span>Classificazione:</span>
+              <span class="font-bold text-[var(--gm-text-primary)]">${subSpot.isOfficial ? 'Ufficiale' : 'Alternativo / Emergenza'}</span>
+            </div>
+          `}
           <div class="flex justify-between">
-            <span>Azimut Pendio:</span>
-            <span class="font-bold text-[var(--gm-text-primary)] font-mono">${subSpot.heading != null && !isNaN(Number(subSpot.heading)) ? `${subSpot.heading}° (${getCardinalDirection(subSpot.heading)})` : 'N/D'}</span>
+            <span>Vento Stimato:</span>
+            <span class="font-bold text-[var(--gm-text-primary)] font-mono">${windSpeedStr} da ${windDirStr}</span>
           </div>
-        ` : `
-          <div class="flex justify-between">
-            <span>Classificazione:</span>
-            <span class="font-bold text-[var(--gm-text-primary)]">${subSpot.isOfficial ? 'Ufficiale' : 'Alternativo / Emergenza'}</span>
-          </div>
-        `}
-        <div class="flex justify-between">
-          <span>Vento Stimato:</span>
-          <span class="font-bold text-[var(--gm-text-primary)] font-mono">${windSpeedStr} da ${windDirStr}</span>
+          ${subSpot.coordinates ? `
+            <div class="flex justify-between">
+              <span>Coordinate GPS:</span>
+              <span class="font-mono text-[var(--gm-text-muted)]">${escapeHtml(subSpot.coordinates)}</span>
+            </div>
+          ` : ''}
+          ${subSpot.description ? `
+            <p class="mt-1 pt-1 border-t border-[var(--gm-border)] text-xs text-[var(--gm-text-muted)] leading-relaxed">
+              ${escapeHtml(subSpot.description)}
+            </p>
+          ` : ''}
         </div>
-        ${subSpot.coordinates ? `
-          <div class="flex justify-between">
-            <span>Coordinate GPS:</span>
-            <span class="font-mono text-[var(--gm-text-muted)]">${escapeHtml(subSpot.coordinates)}</span>
-          </div>
-        ` : ''}
-        ${subSpot.description ? `
-          <p class="mt-1 pt-1 border-t border-[var(--gm-border)] text-xs text-[var(--gm-text-muted)] leading-relaxed">
-            ${escapeHtml(subSpot.description)}
-          </p>
-        ` : ''}
-      </div>
+      </details>
     `;
   }
 
@@ -5251,6 +5271,26 @@ export class ForecastViewController {
         this.store.setState({ ui: { ...ui, mapLayer: newLayer } });
       }
       this.updateFlightAnalysisToggleUi(newLayer);
+    } else if (action === 'toggle-subspot-info') {
+      if (evt && typeof evt.preventDefault === 'function') {
+        evt.preventDefault();
+      }
+      this.isSubSpotInfoOpen = !this.isSubSpotInfoOpen;
+      const detailsEl = actionEl.closest ? actionEl.closest('.gm-subspot-info-collapsible') : null;
+      if (detailsEl) {
+        if (this.isSubSpotInfoOpen) {
+          if (typeof detailsEl.setAttribute === 'function') detailsEl.setAttribute('open', '');
+          detailsEl.open = true;
+        } else {
+          if (typeof detailsEl.removeAttribute === 'function') detailsEl.removeAttribute('open');
+          detailsEl.open = false;
+        }
+        if (typeof actionEl.setAttribute === 'function') {
+          actionEl.setAttribute('aria-expanded', this.isSubSpotInfoOpen ? 'true' : 'false');
+        }
+      } else {
+        this.render();
+      }
     } else if (action === 'toggle-subspot-menu') {
       this.isSubSpotMenuOpen = !this.isSubSpotMenuOpen;
       this.render();
@@ -5280,6 +5320,7 @@ export class ForecastViewController {
         }
       }
       this.selectedSubSpot = subSpotId || 'overview';
+      this.isSubSpotInfoOpen = false;
       this.isSubSpotMenuOpen = false;
       closeSheet();
       this.render();

@@ -9,6 +9,8 @@
   --gm-bg-card: #13161f;
   --gm-bg-elevated: #1b202c;
   --gm-bg-surface: #242a3a;
+  --gm-bg-surface-alt: rgba(255, 255, 255, 0.04);
+  --gm-surface-2: #1b202c;
   --gm-bg-hover: #2e3549;
 
   /* Typography Colors */
@@ -39,6 +41,7 @@
   --gm-status-alert-bg: rgba(249, 115, 22, 0.15);
 
   /* Borders & Dividers */
+  --gm-border-subtle: rgba(255, 255, 255, 0.06);
   --gm-border: rgba(255, 255, 255, 0.08);
   --gm-border-strong: rgba(255, 255, 255, 0.16);
   --gm-border-focus: #f59e0b;
@@ -79,6 +82,8 @@
   --gm-bg-card: #ffffff;
   --gm-bg-elevated: #f1f5f9;
   --gm-bg-surface: #e2e8f0;
+  --gm-bg-surface-alt: #f1f5f9;
+  --gm-surface-2: #f1f5f9;
   --gm-bg-hover: #cbd5e1;
 
   /* Typography Colors (High Contrast >= 7:1) */
@@ -109,6 +114,7 @@
   --gm-status-alert-bg: rgba(249, 115, 22, 0.15);
 
   /* Borders & Dividers */
+  --gm-border-subtle: rgba(0, 0, 0, 0.07);
   --gm-border: rgba(0, 0, 0, 0.1);
   --gm-border-strong: rgba(0, 0, 0, 0.2);
   --gm-border-focus: #d97706;
@@ -126,26 +132,26 @@
 
 [data-theme="light"] .gm-glider-pill-badge.en-a,
 [data-theme="light"] .gm-glider-badge.en-a {
-  background: rgba(34, 197, 94, 0.2);
-  color: #4ade80;
+  background: rgba(34, 197, 94, 0.16);
+  color: #15803d;
 }
 
 [data-theme="light"] .gm-glider-pill-badge.en-b,
 [data-theme="light"] .gm-glider-badge.en-b {
-  background: rgba(59, 130, 246, 0.2);
-  color: #60a5fa;
+  background: rgba(59, 130, 246, 0.16);
+  color: #1d4ed8;
 }
 
 [data-theme="light"] .gm-glider-pill-badge.en-c,
 [data-theme="light"] .gm-glider-badge.en-c {
-  background: rgba(245, 158, 11, 0.2);
-  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.18);
+  color: #b45309;
 }
 
 [data-theme="light"] .gm-glider-pill-badge.en-d,
 [data-theme="light"] .gm-glider-badge.en-d {
-  background: rgba(239, 68, 68, 0.2);
-  color: #f87171;
+  background: rgba(239, 68, 68, 0.16);
+  color: #b91c1c;
 }
 
 [data-theme="light"] .gm-glider-option-card.active {
@@ -1595,22 +1601,57 @@ button, input, select, textarea {
   text-overflow: ellipsis;
 }
 
+.gm-spot-accordion-trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--gm-text-secondary);
+}
+
+.gm-spot-accordion-trigger::before {
+  content: '';
+  position: absolute;
+  inset: -10px -4px;
+  min-height: 44px;
+}
+
+.gm-spot-accordion-trigger:hover .gm-spot-badge-toggle,
+.gm-spot-accordion-trigger:focus-visible .gm-spot-badge-toggle {
+  filter: brightness(1.08);
+}
+
+.gm-spot-accordion-trigger:focus-visible {
+  outline: 2px solid var(--gm-border-focus);
+  outline-offset: 2px;
+  border-radius: var(--gm-radius-full);
+}
+
 .gm-spot-badge-toggle {
+  position: relative;
   cursor: pointer;
   border: 1px solid transparent;
   transition: transform 0.12s ease, filter 0.12s ease;
 }
 
-.gm-spot-badge-toggle:hover,
-.gm-spot-badge-toggle:focus-visible {
-  filter: brightness(1.08);
-  outline: none;
+.gm-spot-chevron {
+  color: var(--gm-text-muted);
+  flex-shrink: 0;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), color 0.15s ease;
 }
 
-.gm-badge-expand-caret {
-  font-size: 0.65rem;
-  opacity: 0.85;
-  margin-left: 2px;
+.gm-spot-accordion-trigger:hover .gm-spot-chevron {
+  color: var(--gm-text-primary);
+}
+
+.gm-spot-card.is-reasons-expanded .gm-spot-chevron,
+.gm-spot-chevron.is-expanded {
+  transform: rotate(180deg);
+  color: var(--gm-accent);
 }
 
 .gm-spot-reasons-drawer {
@@ -1630,8 +1671,8 @@ button, input, select, textarea {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 0.68rem;
-  font-weight: 600;
+  font-size: 0.66rem;
+  font-weight: 500;
   padding: 2px 7px;
   border-radius: 999px;
   background: var(--gm-bg-surface-alt);
@@ -1642,23 +1683,39 @@ button, input, select, textarea {
 
 .gm-reason-pill.pill-flyable {
   color: var(--gm-status-flyable);
-  border-color: var(--gm-status-flyable);
+  border-color: rgba(34, 197, 94, 0.35);
 }
 
 .gm-reason-pill.pill-caution {
   color: var(--gm-status-caution);
-  border-color: var(--gm-status-caution);
+  border-color: rgba(234, 179, 8, 0.35);
 }
 
 .gm-reason-pill.pill-unflyable {
   color: var(--gm-status-unflyable);
-  border-color: var(--gm-status-unflyable);
+  border-color: rgba(239, 68, 68, 0.35);
 }
 
 .gm-reason-pill.pill-severe {
   color: var(--gm-status-severe-border);
-  border-color: var(--gm-status-severe-border);
-  font-weight: 700;
+  border-color: rgba(239, 68, 68, 0.55);
+  font-weight: 600;
+}
+
+[data-theme="light"] .gm-reason-pill.pill-flyable {
+  color: #15803d;
+  border-color: rgba(21, 128, 61, 0.3);
+}
+
+[data-theme="light"] .gm-reason-pill.pill-caution {
+  color: #b45309;
+  border-color: rgba(180, 83, 9, 0.3);
+}
+
+[data-theme="light"] .gm-reason-pill.pill-unflyable,
+[data-theme="light"] .gm-reason-pill.pill-severe {
+  color: #b91c1c;
+  border-color: rgba(185, 28, 28, 0.3);
 }
 
 .gm-explain-bullet {
@@ -1667,88 +1724,149 @@ button, input, select, textarea {
   opacity: 0.7;
 }
 
-/* Row 2: Diurnal Flyability Timeline Strip (Sunrise -> Sunset, continuous flow) */
+/* Shared Sparse Diurnal Time Axis (rendered once above comprensori list to avoid repeating hour numbers on every card) */
+.gm-home-time-axis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18px, 1fr));
+  gap: 3px;
+  width: 100%;
+  padding: 0 12px;
+  margin-bottom: -3px;
+  user-select: none;
+  pointer-events: none;
+}
+
+.gm-home-time-axis-tick {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--gm-font-mono);
+  font-size: 0.58rem;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--gm-text-muted);
+  opacity: 0.65;
+  letter-spacing: -0.02em;
+}
+
+.gm-home-time-axis-tick.is-minor {
+  opacity: 0.28;
+  font-size: 0.52rem;
+}
+
+/* Row 2: Visually Lightweight Diurnal Flyability Timeline Strip (Sunrise -> Sunset) */
 .gm-home-timeline {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(22px, 1fr));
-  gap: 4px;
+  grid-template-columns: repeat(auto-fit, minmax(18px, 1fr));
+  gap: 3px;
   width: 100%;
   padding-top: 2px;
   touch-action: manipulation;
 }
 
 .gm-home-timeline-slot {
+  position: relative;
   appearance: none;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 5px;
-  padding: 2px 1px 3px;
-  min-height: 30px;
+  border-radius: 4px;
+  padding: 4px 1px;
+  min-height: 14px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  gap: 4px;
+  justify-content: center;
   cursor: pointer;
-  transition: transform 0.12s ease, border-color 0.12s ease, background-color 0.12s ease;
+  transition: border-color 0.12s ease, background-color 0.12s ease;
   color: var(--gm-text-secondary);
+}
+
+.gm-home-timeline-slot::before {
+  content: '';
+  position: absolute;
+  inset: -8px 0;
 }
 
 .gm-home-timeline-slot:hover,
 .gm-home-timeline-slot:focus-visible {
   background: var(--gm-bg-surface-alt);
-  border-color: var(--gm-accent);
-  transform: translateY(-1px);
+  border-color: rgba(245, 158, 11, 0.45);
   outline: none;
 }
 
 .gm-home-timeline-slot.is-selected-hour {
   border-color: var(--gm-accent);
   background: var(--gm-bg-elevated);
-  box-shadow: 0 0 0 1px var(--gm-accent);
 }
 
+/* Per-slot hour label is hidden at rest to eliminate repetitive number rows across cards; shown only on hover/focus/selection */
 .gm-home-timeline-hour {
+  position: absolute;
+  top: -15px;
+  left: 50%;
+  transform: translateX(-50%);
   font-family: var(--gm-font-mono);
-  font-size: 0.68rem;
+  font-size: 0.58rem;
   font-weight: 600;
   line-height: 1;
-  color: var(--gm-text-secondary);
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--gm-bg-elevated);
+  border: 1px solid var(--gm-border-strong);
+  color: var(--gm-text-primary);
   letter-spacing: -0.02em;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+  z-index: 2;
+  white-space: nowrap;
 }
 
+.gm-home-timeline-slot:hover .gm-home-timeline-hour,
+.gm-home-timeline-slot:focus-visible .gm-home-timeline-hour,
 .gm-home-timeline-slot.is-selected-hour .gm-home-timeline-hour {
-  color: var(--gm-text-primary);
-  font-weight: 700;
+  opacity: 1;
 }
 
 .gm-home-timeline-bar {
   width: 100%;
-  height: 8px;
-  border-radius: 4px;
+  height: 3.5px;
+  border-radius: var(--gm-radius-full);
   background: var(--gm-border);
+  transition: opacity 0.15s ease, transform 0.15s ease;
 }
 
 .gm-home-timeline-slot.status-flyable .gm-home-timeline-bar {
   background: var(--gm-status-flyable);
+  opacity: 0.85;
 }
 
 .gm-home-timeline-slot.status-caution .gm-home-timeline-bar {
   background: var(--gm-status-caution);
+  opacity: 0.68;
 }
 
 .gm-home-timeline-slot.status-unflyable .gm-home-timeline-bar {
   background: var(--gm-status-unflyable);
+  opacity: 0.28;
 }
 
 .gm-home-timeline-slot.status-severe .gm-home-timeline-bar {
-  background: var(--gm-bg-base);
-  border: 1.5px solid var(--gm-status-severe-border);
+  background: rgba(239, 68, 68, 0.35);
+  border: 1px solid rgba(239, 68, 68, 0.65);
+  height: 4px;
 }
 
 .gm-home-timeline-slot.status-unavailable .gm-home-timeline-bar {
-  background: var(--gm-border-subtle);
-  opacity: 0.5;
+  background: var(--gm-border-strong);
+  opacity: 0.32;
+}
+
+.gm-home-timeline-slot:hover .gm-home-timeline-bar,
+.gm-home-timeline-slot:focus-visible .gm-home-timeline-bar,
+.gm-home-timeline-slot.is-selected-hour .gm-home-timeline-bar {
+  opacity: 1;
+  transform: scaleY(1.35);
 }
 
 
@@ -2237,6 +2355,10 @@ button, input, select, textarea {
   text-align: center;
 }
 
+.gm-skeleton-card {
+  height: 72px;
+}
+
 /* Glider Search & Brand Chips */
 .gm-glider-search-wrap {
   position: relative;
@@ -2249,7 +2371,7 @@ button, input, select, textarea {
   border-radius: var(--gm-radius-md);
   background: var(--gm-bg-surface);
   border: 1px solid var(--gm-border);
-  color: var(--gm-text);
+  color: var(--gm-text-primary);
   font-size: 0.85rem;
   outline: none;
   transition: border-color var(--gm-transition-fast);
@@ -2288,7 +2410,7 @@ button, input, select, textarea {
 
 .gm-glider-brand-chip:hover {
   border-color: var(--gm-border-strong);
-  color: var(--gm-text);
+  color: var(--gm-text-primary);
 }
 
 .gm-glider-brand-chip.active {
@@ -2714,9 +2836,9 @@ input.gm-input:focus {
 .gm-forecast-header {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   width: 100%;
-  margin-bottom: 2px;
+  margin-bottom: 0;
 }
 
 .gm-spot-select {
@@ -4674,7 +4796,27 @@ input.gm-input:focus {
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  padding: 4px 2px;
+  padding: 0 2px;
+}
+
+.gm-forecast-mode-bar .gm-view-toggle {
+  padding: 2px;
+  gap: 4px;
+}
+
+.gm-forecast-mode-bar .gm-view-toggle-btn {
+  position: relative;
+  min-height: 30px;
+  height: 30px;
+  padding: 4px 12px;
+  font-size: 0.74rem;
+}
+
+.gm-forecast-mode-bar .gm-view-toggle-btn::before {
+  content: '';
+  position: absolute;
+  inset: -9px 0;
+  min-height: var(--gm-touch-min, 48px);
 }
 
 .gm-param-card {
@@ -10477,16 +10619,21 @@ input.gm-input:focus {
 /* ==========================================================================
    Flight Windows & Daily Operational Evolution (Fase 4-ter)
    ========================================================================== */
+.gm-summary-section {
+  margin: 0;
+  padding: 0;
+}
+
 .gm-flight-windows-section {
   width: 100%;
-  margin-top: 4px;
+  margin-top: 0;
 }
 
 .gm-flight-windows-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .gm-flight-windows-title {
@@ -10763,3 +10910,113 @@ input.gm-input:focus {
   color: var(--gm-text-primary);
   border-color: var(--gm-border-strong);
 }
+
+/* Collapsible Spot Info Section in Decollo / Atterraggio */
+.gm-subspot-info-collapsible {
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-xs);
+  background-color: var(--gm-bg-elevated);
+  overflow: hidden;
+  transition: border-color var(--gm-transition-fast), background-color var(--gm-transition-fast);
+}
+
+.gm-subspot-info-collapsible[open] {
+  border-color: var(--gm-border-strong);
+}
+
+.gm-subspot-info-summary {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 34px;
+  padding: 6px 10px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  color: var(--gm-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  transition: background-color var(--gm-transition-fast), color var(--gm-transition-fast);
+}
+
+.gm-subspot-info-summary::-webkit-details-marker {
+  display: none;
+}
+
+.gm-subspot-info-summary::before {
+  content: "";
+  position: absolute;
+  inset: -6px 0;
+}
+
+.gm-subspot-info-summary:hover {
+  background-color: var(--gm-bg-hover);
+  color: var(--gm-text-primary);
+}
+
+.gm-subspot-info-summary:focus-visible {
+  outline: 2px solid var(--gm-accent);
+  outline-offset: -2px;
+}
+
+.gm-subspot-info-trigger-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.gm-subspot-info-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background-color: var(--gm-bg-card);
+  border: 1px solid var(--gm-border-strong);
+  color: var(--gm-text-primary);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.gm-subspot-info-hint {
+  color: var(--gm-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gm-subspot-info-chevron {
+  font-size: 0.80rem;
+  color: var(--gm-text-muted);
+  transition: transform var(--gm-transition-fast);
+  flex-shrink: 0;
+}
+
+.gm-subspot-info-collapsible[open] .gm-subspot-info-chevron {
+  transform: rotate(180deg);
+  color: var(--gm-accent);
+}
+
+.gm-subspot-info-body {
+  padding: 8px 10px 10px;
+  border-top: 1px solid var(--gm-border);
+  background-color: var(--gm-bg-card);
+}
+
+[data-theme="light"] .gm-subspot-info-collapsible {
+  background-color: var(--gm-bg-surface);
+}
+
+[data-theme="light"] .gm-subspot-info-badge {
+  background-color: var(--gm-bg-elevated);
+}
+
