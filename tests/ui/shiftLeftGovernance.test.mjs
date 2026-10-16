@@ -314,6 +314,15 @@ describe('Shift-Left Quality Gate & Architectural Governance', () => {
       worklogLines.length <= 300,
       `WORKLOG.md exceeds the 300-line rolling window ceiling (found ${worklogLines.length} lines). Archive older entries to .agents/archive/.`
     );
+
+    const desiderataPath = resolve('DESIDERATA.md');
+    const desiderataSrc = readFileSync(desiderataPath, 'utf-8');
+    const desiderataLines = desiderataSrc.split(/\r?\n/);
+
+    assert.ok(
+      desiderataLines.length <= 80 && Buffer.byteLength(desiderataSrc, 'utf-8') <= 8192,
+      `DESIDERATA.md exceeds compactness ceiling (${desiderataLines.length} lines, ${Buffer.byteLength(desiderataSrc, 'utf-8')} bytes; max 80 lines / 8 KB). Keep table cells concise (< 160 chars).`
+    );
   });
 });
 
