@@ -844,7 +844,10 @@ export function evaluateComprensorio({
     if (rawLGust && rawLGust[idx] != null) lWindGust = Number(rawLGust[idx]);
     const rawLDir = lh.winddirection_10m ?? lh.wind_direction_10m;
     if (rawLDir && rawLDir[idx] != null) lWindDir = Number(rawLDir[idx]);
-    if (lh.cape && lh.cape[idx] != null) lCape = Number(lh.cape[idx]);
+    if (lh.cape && lh.cape[idx] != null) {
+      lCape = Number(lh.cape[idx]);
+      cape = Math.max(cape, lCape);
+    }
     if (lh.turbulence_edr && lh.turbulence_edr[idx] != null) lTurbulence = Number(lh.turbulence_edr[idx]);
     if (lh.precipitation && lh.precipitation[idx] != null) lRain = Number(lh.precipitation[idx]);
     if (lh.temperature_2m && lh.temperature_2m[idx] != null) lTemp = Number(lh.temperature_2m[idx]);

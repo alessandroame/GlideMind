@@ -904,27 +904,36 @@ export class ForecastViewController {
       : null;
 
     const state = this.store ? this.store.getState() : {};
-    let payload = null;
+    const synthetic = generateSyntheticWeather(
+      coords,
+      {
+        targetDate: todayIso,
+        days,
+        elevation: takeoff.altitude || 1000,
+        takeoffAzimuth: takeoffHeading,
+        weatherModel: 'best_match'
+      }
+    );
+    const synthPayload = enrichWeatherData(synthetic, todayIso, Date.now(), {
+      customHeading: takeoffHeading
+    });
+    let summaries = calculateDailyFlyabilitySummary(synthPayload, takeoff, null, days);
 
-    if (state.weatherData && state.selectedSpot && state.selectedSpot.id === spot.id && state.weatherData.hourly?.time?.length >= 24 * days) {
-      payload = state.weatherData;
-    } else {
-      const synthetic = generateSyntheticWeather(
-        coords,
-        {
-          targetDate: todayIso,
-          days,
-          elevation: takeoff.altitude || 1000,
-          takeoffAzimuth: takeoffHeading,
-          weatherModel: 'best_match'
-        }
-      );
-      payload = enrichWeatherData(synthetic, todayIso, Date.now(), {
-        customHeading: takeoffHeading
-      });
+    if (
+      state.weatherData &&
+      !state.weatherData._isSynthetic &&
+      !state.weatherData.isSynthetic &&
+      state.selectedSpot &&
+      state.selectedSpot.id === spot.id &&
+      state.weatherData.hourly?.time?.length >= 24
+    ) {
+      const realSummaries = calculateDailyFlyabilitySummary(state.weatherData, takeoff, null, days);
+      if (realSummaries.length > 0) {
+        const realByDate = new Map(realSummaries.map(s => [s.dateStr, s]));
+        summaries = summaries.map(s => realByDate.get(s.dateStr) || s);
+      }
     }
 
-    const summaries = calculateDailyFlyabilitySummary(payload, takeoff, null, days);
     this.cachedWeatherMap.set(key, summaries);
     return summaries;
   }
@@ -2209,6 +2218,25 @@ export class ForecastViewController {
       : this.activeDate;
 
     const daylight = this.getDaylightWindow(spot, weatherData, this.activeDate);
+    const rawCapeSeries = hourlyData.cape;
+    const rawLandingCapeSeries = landingWeatherSource?.hourly?.cape;
+    const daylightRawCapes = [];
+    for (let h = daylight.sunriseHour; h <= daylight.sunsetHour; h++) {
+      const timePrefix = `${baseDate}T${String(h).padStart(2, '0')}:`;
+      const idx = times.findIndex(t => t.startsWith(timePrefix));
+      if (idx !== -1) {
+        const tc = (rawCapeSeries && rawCapeSeries[idx] != null) ? Number(rawCapeSeries[idx]) : 0;
+        const lc = (!isLanding && rawLandingCapeSeries && rawLandingCapeSeries[idx] != null)
+          ? Number(rawLandingCapeSeries[idx])
+          : 0;
+        daylightRawCapes.push(Math.max(tc, lc));
+      }
+    }
+    const minDaylightRawCape = daylightRawCapes.length > 0 ? Math.min(...daylightRawCapes) : 0;
+    const maxDaylightRawCape = daylightRawCapes.length > 0 ? Math.max(...daylightRawCapes) : 0;
+    const isRawCapeFlat = (maxDaylightRawCape - minDaylightRawCape) < 15;
+    const solarSpan = Math.max(1, daylight.sunsetHour - daylight.sunriseHour);
+
     const hourlyPoints = [];
     for (let h = daylight.sunriseHour; h <= daylight.sunsetHour; h++) {
       const timePrefix = `${baseDate}T${String(h).padStart(2, '0')}:`;
@@ -2243,6 +2271,9 @@ export class ForecastViewController {
         if (rawDew && rawDew[idx] != null) dew = Number(rawDew[idx]);
         if (rawHum && rawHum[idx] != null) humidity = Number(rawHum[idx]);
         if (rawCape && rawCape[idx] != null) cape = Number(rawCape[idx]);
+        if (!isLanding && rawLandingCapeSeries && rawLandingCapeSeries[idx] != null) {
+          cape = Math.max(cape, Number(rawLandingCapeSeries[idx]));
+        }
         if (rawCloud && rawCloud[idx] != null) cloudCover = Number(rawCloud[idx]);
         if (rawPrecip && rawPrecip[idx] != null) precip = Number(rawPrecip[idx]);
         if (rawPrecipProb && rawPrecipProb[idx] != null) precipProb = Number(rawPrecipProb[idx]);
@@ -2252,6 +2283,51 @@ export class ForecastViewController {
       const lcl = calculateLCL(temp, dew, takeoff.altitude);
       const lclMsl = lcl ? lcl.lclMsl : (takeoff.altitude + 800);
       const deltaWind = Math.max(0, gust - speed);
+
+      const solarPhase = Math.max(0, Math.sin(((h - daylight.sunriseHour) / solarSpan) * Math.PI));
+      const rawRad = hourlyData.shortwave_radiation_instant ?? hourlyData.shortwave_radiation;
+      const radVal = (idx !== -1 && rawRad && rawRad[idx] != null)
+        ? Number(rawRad[idx])
+        : Math.round(solarPhase * 480);
+      const rawBlh = hourlyData.boundary_layer_height;
+      const blhVal = (idx !== -1 && rawBlh && rawBlh[idx] != null)
+        ? Number(rawBlh[idx])
+        : Math.round(150 + solarPhase * 850);
+      const thermalSpread = Math.max(0, temp - dew);
+
+      // Diurnal boundary-layer convective potential when NWP surface CAPE is flat/zero at mountain elevation
+      const diurnalThermalCape = Math.round(
+        15 + solarPhase * (
+          35 +
+          Math.min(14, thermalSpread) * 5.5 +
+          Math.min(18, deltaWind) * 4.5 +
+          Math.min(1800, blhVal) * 0.03 +
+          Math.min(800, radVal) * 0.05
+        )
+      );
+
+      // Storm / convective shower instability when precipitation or high rain probability occurs
+      let stormInstabilityCape = 0;
+      if (precip > 0.5) {
+        stormInstabilityCape = Math.round(
+          340 + Math.min(4.0, precip) * 130 + precipProb * 2.2 + Math.min(25, deltaWind) * 10 + solarPhase * 90
+        );
+      } else if (precip >= 0.1 || precipProb >= 30) {
+        stormInstabilityCape = Math.round(
+          90 + precip * 320 + Math.max(0, precipProb - 20) * 3.8 + Math.min(20, deltaWind) * 7 + solarPhase * 70
+        );
+      }
+
+      if (isRawCapeFlat) {
+        const baseRefCape = idx === -1 ? cape : maxDaylightRawCape;
+        const modulatedBase = baseRefCape > 0
+          ? Math.round(baseRefCape * (0.25 + 0.85 * solarPhase))
+          : 0;
+        cape = Math.max(modulatedBase, diurnalThermalCape, stormInstabilityCape);
+      } else if (stormInstabilityCape > cape) {
+        cape = stormInstabilityCape;
+      }
+
       const angleDelta = hasTakeoffHeading
         ? Math.abs(calculateAngularDifference(takeoff.heading, dir))
         : null;
@@ -2538,6 +2614,19 @@ export class ForecastViewController {
       capeStatusLabel = 'Rischio Temporali';
     }
 
+    const maxCapeVal = Math.max(0, ...hourlyPoints.map(p => p.cape));
+    const capeChartMaxY = maxCapeVal < 260
+      ? 350
+      : maxCapeVal < 700
+        ? Math.max(450, Math.ceil((maxCapeVal * 1.2) / 50) * 50)
+        : Math.max(1000, Math.ceil((maxCapeVal * 1.15) / 100) * 100);
+    const capeThresholds = [
+      { value: 300, stroke: 'var(--gm-status-caution)', label: 'Attenzione (300)' }
+    ];
+    if (capeChartMaxY >= 800) {
+      capeThresholds.push({ value: 800, stroke: 'var(--gm-status-unflyable)', label: 'Rischio (800)' });
+    }
+
     const capeParam = {
       id: 'instabilita',
       title: 'Instabilità / Temporali (CAPE)',
@@ -2563,11 +2652,8 @@ export class ForecastViewController {
         title: 'Instabilità CAPE',
         unit: 'J/kg',
         minY: 0,
-        maxY: Math.max(1000, ...hourlyPoints.map(p => p.cape)),
-        thresholds: [
-          { value: 300, stroke: 'var(--gm-status-caution)', label: 'Attenzione (300)' },
-          { value: 800, stroke: 'var(--gm-status-unflyable)', label: 'Rischio (800)' }
-        ],
+        maxY: capeChartMaxY,
+        thresholds: capeThresholds,
         series: [
           {
             name: 'CAPE',
@@ -3281,6 +3367,18 @@ export class ForecastViewController {
     const activeSpeed = Math.round(activePoint.speed || 0);
     const activeGust = Math.round(activePoint.gust || activeSpeed);
     const activeDir = getCardinalDirection(activePoint.dir || 180);
+    const peakCapeValue = Math.max(0, ...hourlyPoints.map(p => p.cape || 0));
+    const capeChartMaxY = peakCapeValue >= 700
+      ? Math.max(1000, Math.ceil((peakCapeValue * 1.15) / 100) * 100)
+      : peakCapeValue >= 260
+        ? Math.max(450, Math.ceil((peakCapeValue * 1.2) / 50) * 50)
+        : 350;
+    const capeThresholds = [
+      { value: 300, stroke: 'var(--gm-status-caution)', strokeDasharray: '4,3' },
+      ...(capeChartMaxY >= 800
+        ? [{ value: 800, stroke: 'var(--gm-status-unflyable)', strokeDasharray: '4,3' }]
+        : [])
+    ];
 
     const chartCards = isLanding ? [
       {
@@ -3445,20 +3543,17 @@ export class ForecastViewController {
         label: 'Instabilità (CAPE)',
         val: `${Math.round(activePoint.cape || 0)}`,
         unit: 'J/kg',
-        subHtml: `<span class="gm-trend-sub-badge ${activePoint.cape > 800 ? 'status-alert' : activePoint.cape > 300 ? 'status-caution' : 'status-flyable'}">${activePoint.cape > 800 ? 'Rischio CB' : activePoint.cape > 300 ? 'Cumuli attivi' : 'Stabile'}</span>`,
+        subHtml: `<span class="gm-trend-sub-badge ${activePoint.cape >= 800 ? 'status-alert' : activePoint.cape >= 300 ? 'status-caution' : 'status-flyable'}">${activePoint.cape >= 800 ? 'Rischio CB' : activePoint.cape >= 300 ? 'Cumuli / Rovesci' : 'Stabile'}</span>`,
         chartHtml: this.renderSvgTrendChart({
           id: 'multi-cape',
           title: 'CAPE',
           unit: 'J/kg',
           minY: 0,
-          maxY: Math.max(1200, ...hourlyPoints.map(p => p.cape)),
+          maxY: capeChartMaxY,
           compact: true,
           hideTooltip: true,
           hideThresholdLabels: true,
-          thresholds: [
-            { value: 300, stroke: 'var(--gm-status-caution)', strokeDasharray: '4,3' },
-            { value: 800, stroke: 'var(--gm-status-unflyable)', strokeDasharray: '4,3' }
-          ],
+          thresholds: capeThresholds,
           series: [{
             name: 'CAPE',
             points: hourlyPoints.map(p => ({ hour: p.hour, value: p.cape })),

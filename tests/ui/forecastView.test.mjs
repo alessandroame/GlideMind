@@ -3571,6 +3571,120 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
       assert.ok(html.includes('aria-pressed="true"'), 'Pinned spot must have aria-pressed="true"');
       assert.ok(html.includes('<span aria-hidden="true">★</span>'), 'Pinned spot must display filled star icon ★');
     });
+
+    it('synthesizes non-flat CAPE curve and adaptive Y-axis scaling when NWP surface CAPE is zero at mountain elevation or during Sunday storm/rain at Chialamberto', () => {
+      const chialamberto = DEFAULT_COMPRENSORI.find(c => c.id === 'comp-chialamberto') || DEFAULT_COMPRENSORI[0];
+      const targetDate = '2026-10-18'; // Sunday
+      const hours = Array.from({ length: 24 }, (_, h) => `${targetDate}T${String(h).padStart(2, '0')}:00`);
+
+      // Scenario A: Dry mountain day where NWP surface CAPE at 1780m is flat 0 across all hours
+      const dryZeroCapeWeather = {
+        hourly: {
+          time: hours,
+          windspeed_10m: hours.map((_, h) => 8 + (h >= 11 && h <= 16 ? 6 : 0)),
+          winddirection_10m: hours.map(() => 135),
+          windgusts_10m: hours.map((_, h) => 12 + (h >= 11 && h <= 16 ? 10 : 0)),
+          temperature_2m: hours.map((_, h) => 8 + Math.max(0, Math.sin(((h - 7) / 11) * Math.PI) * 9)),
+          dewpoint_2m: hours.map(() => 4),
+          precipitation: hours.map(() => 0),
+          precipitation_probability: hours.map(() => 5),
+          cloudcover: hours.map(() => 20),
+          cape: hours.map(() => 0)
+        }
+      };
+
+      const mockStore = createStore({
+        selectedSpot: chialamberto,
+        activeDate: targetDate,
+        weatherData: dryZeroCapeWeather
+      });
+      const controller = new ForecastViewController({ store: mockStore });
+      controller.activeDate = targetDate;
+      controller.selectedHour = 14;
+
+      const evaluatedDry = {
+        takeoff: chialamberto.takeoffs[0],
+        landing: chialamberto.landings[0],
+        status: 'flyable'
+      };
+      const dryMetrics = controller.computeParamMetrics(evaluatedDry, dryZeroCapeWeather, chialamberto, controller.getActiveGlider(), null);
+      const dryCapeValues = dryMetrics.hourlyPoints.map(p => p.cape);
+      const minDryCape = Math.min(...dryCapeValues);
+      const maxDryCape = Math.max(...dryCapeValues);
+
+      assert.ok(maxDryCape > minDryCape + 50, `Dry mountain day with raw 0 CAPE must produce a diurnal CAPE curve (got min=${minDryCape}, max=${maxDryCape})`);
+      const dryCapeParam = dryMetrics.params.find(p => p.id === 'instabilita');
+      assert.ok(dryCapeParam, 'Must expose instabilita (CAPE) parameter in computeParamMetrics');
+      assert.equal(dryCapeParam.chartOptions.maxY, 350, 'Low/moderate diurnal CAPE must use adaptive 350 J/kg Y-axis ceiling instead of 1000 J/kg');
+      const multiHtmlDry = controller.renderMultiTrendCharts(evaluatedDry, dryZeroCapeWeather, chialamberto, controller.getActiveGlider(), null);
+      assert.ok(multiHtmlDry.includes('id="multi-chart-cape"'), 'Must render multi-chart-cape card');
+
+      // Scenario B: Chialamberto Sunday storm/rain risk where raw NWP surface CAPE is 0 but afternoon precipitation & probability are high
+      const sundayStormWeather = {
+        hourly: {
+          time: hours,
+          windspeed_10m: hours.map((_, h) => (h >= 13 && h <= 17 ? 18 : 10)),
+          winddirection_10m: hours.map(() => 140),
+          windgusts_10m: hours.map((_, h) => (h >= 13 && h <= 17 ? 32 : 14)),
+          temperature_2m: hours.map((_, h) => 9 + Math.max(0, Math.sin(((h - 7) / 11) * Math.PI) * 6)),
+          dewpoint_2m: hours.map(() => 7),
+          precipitation: hours.map((_, h) => (h >= 13 && h <= 17 ? 2.4 : 0)),
+          precipitation_probability: hours.map((_, h) => (h >= 12 && h <= 18 ? 80 : 15)),
+          cloudcover: hours.map((_, h) => (h >= 12 && h <= 18 ? 95 : 40)),
+          cape: hours.map(() => 0)
+        }
+      };
+
+      const evaluatedStorm = {
+        takeoff: chialamberto.takeoffs[0],
+        landing: chialamberto.landings[0],
+        status: 'unflyable'
+      };
+      const stormMetrics = controller.computeParamMetrics(evaluatedStorm, sundayStormWeather, chialamberto, controller.getActiveGlider(), null);
+      const morningCape = stormMetrics.hourlyPoints.find(p => p.hour === 8).cape;
+      const afternoonStormCape = stormMetrics.hourlyPoints.find(p => p.hour === 15).cape;
+
+      assert.ok(afternoonStormCape >= 300, `Stormy afternoon hour must reflect convective instability >= 300 J/kg even when raw surface CAPE is 0 (got ${afternoonStormCape})`);
+      assert.ok(afternoonStormCape > morningCape + 150, `Stormy day CAPE curve must rise significantly from morning (${morningCape}) to afternoon storm (${afternoonStormCape})`);
+
+      const stormCapeParam = stormMetrics.params.find(p => p.id === 'instabilita');
+      assert.ok(
+        stormCapeParam.statusLabel === 'Sovrasviluppi' ||
+        stormCapeParam.statusLabel === 'Rischio Temporali' ||
+        stormCapeParam.statusLabel === 'Temporali Severi',
+        `CAPE parameter card must display active convective/storm warning badge during Sunday storm risk (got ${stormCapeParam.statusLabel})`
+      );
+
+      // Verify getMultiDayFlyability merges 7-day live weatherData (168 hours < 336 hours) into 14-day horizon
+      const sevenDayHours = [];
+      for (let d = 0; d < 7; d++) {
+        const dateStr = `2026-10-${String(16 + d).padStart(2, '0')}`;
+        for (let h = 0; h < 24; h++) {
+          sevenDayHours.push(`${dateStr}T${String(h).padStart(2, '0')}:00`);
+        }
+      }
+      const sevenDayWeather = {
+        hourly: {
+          time: sevenDayHours,
+          windspeed_10m: sevenDayHours.map(() => 10),
+          winddirection_10m: sevenDayHours.map(() => 135),
+          windgusts_10m: sevenDayHours.map(() => 14),
+          temperature_2m: sevenDayHours.map(() => 14),
+          precipitation: sevenDayHours.map(t => (t.startsWith('2026-10-18') ? 3.5 : 0)),
+          cape: sevenDayHours.map(() => 0)
+        }
+      };
+      mockStore.setState({ weatherData: sevenDayWeather });
+      const multiDay = controller.getMultiDayFlyability(chialamberto, 14);
+      const sundaySummary = multiDay.find(d => d.dateStr === '2026-10-18');
+      if (sundaySummary) {
+        assert.ok(
+          sundaySummary.status === 'severe' || sundaySummary.status === 'unflyable',
+          `getMultiDayFlyability must merge 7-day live weatherData and mark rainy Sunday as severe/unflyable (got ${sundaySummary.status})`
+        );
+      }
+    });
   });
 });
+
 

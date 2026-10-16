@@ -1912,7 +1912,7 @@ export async function fetchBatchComprensoriWeather(comprensori, options = {}) {
         forecastDays = Math.max(3, Math.min(16, diffDays >= 0 ? diffDays + 1 : 3));
     }
     url.searchParams.append('forecast_days', String(forecastDays));
-    url.searchParams.append('hourly', 'temperature_2m,dewpoint_2m,windspeed_10m,winddirection_10m,windgusts_10m,cape,precipitation');
+    url.searchParams.append('hourly', 'temperature_2m,dewpoint_2m,windspeed_10m,winddirection_10m,windgusts_10m,cape,precipitation,precipitation_probability,cloudcover');
     url.searchParams.append('daily', 'sunrise,sunset');
 
     if (activeModel && activeModel !== 'best_match' && SUPPORTED_WEATHER_MODELS.includes(activeModel)) {
