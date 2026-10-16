@@ -1791,7 +1791,7 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.ok(src.includes('data-action="center-gps"'), 'Must define center-gps item');
   });
 
-  it('should render takeoff and landing selection chips in spot picker sheet when spot has multiple takeoffs or landings', () => {
+  it('should render simplified 1-tap comprensorio items in spot picker sheet without redundant subselection chips', () => {
     const multiSpot = {
       id: 'spot-multi-test',
       name: 'Monte Multiplo',
@@ -1830,27 +1830,17 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
 
     const pickerHtml = controller.renderPickerSections('');
 
-    // Multi-spot assertions
+    // Simplified 1-tap comprensorio item assertions
     assert.ok(pickerHtml.includes('data-spot-id="spot-multi-test"'), 'Must render multi-spot card');
-    assert.ok(pickerHtml.includes('2 decolli · 2 atterraggi'), 'Must render count badge for multi-subspots');
-    assert.ok(pickerHtml.includes('gm-picker-subselection'), 'Must render subselection container');
-    assert.ok(pickerHtml.includes('data-action="pick-spot-takeoff"'), 'Must render takeoff chips');
-    assert.ok(pickerHtml.includes('data-action="pick-spot-landing"'), 'Must render landing chips');
-    assert.ok(pickerHtml.includes('Decollo Alto'), 'Must render takeoff 1 name');
-    assert.ok(pickerHtml.includes('Decollo Basso'), 'Must render takeoff 2 name');
-    assert.ok(pickerHtml.includes('Atterraggio Prato'), 'Must render landing 1 name');
-    assert.ok(pickerHtml.includes('Atterraggio Lago'), 'Must render landing 2 name');
+    assert.ok(pickerHtml.includes('2 decolli · 2 atterraggi'), 'Must render concise count summary for multi-subspots');
+    assert.ok(!pickerHtml.includes('gm-picker-subselection'), 'Must NOT render inline subselection chip container inside picker items');
+    assert.ok(!pickerHtml.includes('gm-picker-current-spot-section'), 'Must NOT render redundant Punto di Volo Attivo section in picker sheet');
     assert.ok(!pickerHtml.includes('data-action="pick-spot-apply"'), 'Must not render visualizza previsioni apply button');
-    assert.ok(!pickerHtml.includes('Visualizza Previsioni'), 'Must not render visualizza previsioni text');
-    assert.ok(pickerHtml.includes('data-action="pick-spot"'), 'Must render pick-spot action on card for direct tap');
+    assert.ok(pickerHtml.includes('data-action="pick-spot"'), 'Must render pick-spot action on card for direct 1-tap selection');
 
     // Single-spot assertions
     assert.ok(pickerHtml.includes('data-spot-id="spot-single-test"'), 'Must render single-spot card');
-    const singleCardMatch = pickerHtml.match(/data-spot-id="spot-single-test"[\s\S]*?<\/div>\s*<\/article>/);
-    if (singleCardMatch) {
-      assert.ok(!singleCardMatch[0].includes('gm-picker-subselection'), 'Single spot must not render subselection container');
-      assert.ok(!singleCardMatch[0].includes('gm-picker-badge-count'), 'Single spot must not render count badge');
-    }
+    assert.ok(pickerHtml.includes('1 decollo · 1 atterraggio'), 'Single spot must display concise 1 decollo · 1 atterraggio summary');
   });
 
   it('should handle clicking takeoff and landing chips in picker sheet and applying selection', () => {
@@ -2006,18 +1996,17 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
       activeLandingId: 'ld-1'
     });
     const controller = new ForecastViewController({ store: mockStore });
+    controller.comprensoriCatalog = [multiSpot];
 
     const html = controller.renderHtml();
     assert.ok(!html.includes('gm-spot-subselection-container'), 'Header must not contain redundant subselection container');
     assert.ok(html.includes('gm-unified-spot-bar'), 'Header must contain unified spot bar');
+    assert.ok(!html.includes('gm-unified-subspot-badge'), 'Header must not contain redundant Panoramica/subspot pill');
 
-    // Verify sub-spots are organized in picker sheet sections
+    // Verify picker sheet renders clean comprensorio list without redundant subspot groups
     const pickerHtml = controller.renderPickerSections('');
-    assert.ok(pickerHtml.includes('gm-subspot-group'), 'Picker must render grouped subspots');
-    assert.ok(pickerHtml.includes('Decolli (2)'), 'Picker must group takeoffs');
-    assert.ok(pickerHtml.includes('Atterraggi (2)'), 'Picker must group landings');
-    assert.ok(pickerHtml.includes('data-subspot-id="to-2"'), 'Must render option for to-2');
-    assert.ok(pickerHtml.includes('data-subspot-id="ld-2"'), 'Must render option for ld-2');
+    assert.ok(!pickerHtml.includes('gm-subspot-group'), 'Picker must not render redundant grouped subspots');
+    assert.ok(pickerHtml.includes('Monte Multiplo (LC)'), 'Picker must list comprensorio name and province');
 
     let rendered = false;
     controller.render = () => { rendered = true; };
@@ -2108,10 +2097,8 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
     assert.ok(html.includes('1050m'));
     assert.ok(html.includes('Suello'));
 
-    // Render picker sections and verify chips are rendered
+    // Render picker sections and verify 1-tap comprensorio item is rendered
     const pickerHtml = controller.renderPickerSections();
-    assert.ok(pickerHtml.includes('data-action="pick-spot-takeoff"'));
-    assert.ok(pickerHtml.includes('data-action="pick-spot-landing"'));
     assert.ok(!pickerHtml.includes('data-action="pick-spot-apply"'));
     assert.ok(pickerHtml.includes('data-action="pick-spot"'));
 
@@ -2429,7 +2416,7 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
   });
 
   describe('Unified Comprensorio and Sub-Spot Control Architecture', () => {
-    it('should render unified spot bar compressing comprensorio and subspot into single control', () => {
+    it('should render clean single-row comprensorio bar without redundant Panoramica/subspot pill', () => {
       const mockStore = createStore({
         selectedSpot: DEFAULT_COMPRENSORI[0] // Monte Cornizzolo
       });
@@ -2439,34 +2426,27 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
       assert.ok(html.includes('gm-unified-spot-bar'), 'Must render .gm-unified-spot-bar');
       assert.ok(html.includes('data-action="open-picker-sheet"'), 'Must trigger open-picker-sheet on tap');
       assert.ok(html.includes('Monte Cornizzolo'), 'Must display active comprensorio name');
-      assert.ok(html.includes('gm-unified-subspot-badge'), 'Must display active sub-spot badge');
-      assert.ok(html.includes('Panoramica'), 'Must default to Panoramica in sub-spot badge');
-      // Verify sr-only compatibility select is rendered
-      assert.ok(html.includes('id="forecast-subspot-select"'), 'Must retain accessible select for compatibility');
+      assert.ok(!html.includes('gm-unified-subspot-badge'), 'Must NOT display redundant active sub-spot pill in top bar');
+      // Verify inline subspot select is rendered inside the forecast card
+      assert.ok(html.includes('id="forecast-subspot-select"'), 'Must retain inline subspot select inside forecast card');
     });
 
-    it('should render active sub-spots section in picker sheet for 1-tap switching', () => {
+    it('should render simplified 1-tap comprensorio list in picker sheet without redundant active sub-spots section', () => {
       const mockStore = createStore({
         selectedSpot: DEFAULT_COMPRENSORI[0]
       });
       const controller = new ForecastViewController({ store: mockStore });
       const sheetHtml = controller.renderPickerSections('');
 
-      assert.ok(sheetHtml.includes('gm-picker-current-spot-section'), 'Picker sheet must render current sub-spots section');
-      assert.ok(sheetHtml.includes('Punto di Volo Attivo'), 'Must have descriptive section title');
-      assert.ok(sheetHtml.includes('gm-subspot-group-overview'), 'Must divide into overview group');
-      assert.ok(sheetHtml.includes('gm-subspot-group-takeoffs'), 'Must divide into takeoffs group');
-      assert.ok(sheetHtml.includes('gm-subspot-group-landings'), 'Must divide into landings group');
-      assert.ok(sheetHtml.includes('Decolli ('), 'Must render Decolli header with count');
-      assert.ok(sheetHtml.includes('Atterraggi ('), 'Must render Atterraggi header with count');
-      assert.ok(sheetHtml.includes('data-action="select-subspot"'), 'Must have select-subspot buttons');
-      assert.ok(sheetHtml.includes('data-subspot-id="overview"'), 'Must include Panoramica option');
-      // Must include takeoffs from Cornizzolo
-      assert.ok(sheetHtml.includes('Risparmio') || sheetHtml.includes('Centrale'), 'Must list current takeoffs');
-      assert.ok(sheetHtml.includes('Suello'), 'Must list current landing');
+      assert.ok(!sheetHtml.includes('gm-picker-current-spot-section'), 'Picker sheet must NOT render redundant current sub-spots section');
+      assert.ok(!sheetHtml.includes('Punto di Volo Attivo'), 'Picker sheet must NOT render Punto di Volo Attivo title');
+      assert.ok(!sheetHtml.includes('gm-subspot-group-overview'), 'Picker sheet must NOT render redundant overview group');
+      assert.ok(!sheetHtml.includes('gm-picker-subselection'), 'Picker sheet must NOT render inline takeoff/landing chip rows');
+      assert.ok(sheetHtml.includes('Monte Cornizzolo (LC)'), 'Must render comprensorio item with name and province');
+      assert.ok(sheetHtml.includes('data-action="pick-spot"'), 'Must allow 1-tap comprensorio selection');
     });
 
-    it('should switch sub-spot when clicking sub-spot option in sheet and close sheet', () => {
+    it('should switch sub-spot when clicking sub-spot option programmatically and close sheet', () => {
       const spot = DEFAULT_COMPRENSORI[0];
       const takeoff = spot.takeoffs[0];
       const mockStore = createStore({
@@ -2858,12 +2838,11 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
       assert.ok(!htmlOverview.includes(' → '), 'Flight window takeoff tag must not append landing arrow and name');
       assert.ok(htmlOverview.includes('<span>Risparmio</span>') || htmlOverview.includes('<span>Centrale</span>'), 'Flight window tag must display concise takeoff name');
 
-      // 2. Specific Takeoff mode: header and specific spot card show clean name aligned to the right
+      // 2. Specific Takeoff mode: specific spot card shows clean name aligned to the right, and top bar has no redundant subspot badge
       controller.selectedSubSpot = spot.takeoffs[0].id;
       const htmlTakeoff = controller.renderHtml();
       assert.ok(htmlTakeoff.includes('gm-specific-spot-name-tag'), 'Specific spot card must render right-aligned spot name tag container');
-      assert.ok(htmlTakeoff.includes('<span class="gm-unified-subspot-badge truncate" title="Decollo Risparmio'), 'Unified subspot badge must preserve full detail in title attribute');
-      assert.ok(htmlTakeoff.includes('Risparmio\n                </span>'), 'Unified subspot badge visible text must be just the clean spot name');
+      assert.ok(!htmlTakeoff.includes('gm-unified-subspot-badge'), 'Top bar must not render redundant unified subspot badge');
 
       // 3. CSS right-alignment contract in theme.css
       const cssContent = fs.readFileSync(path.resolve('css/theme.css'), 'utf-8');
@@ -3545,6 +3524,51 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
       const slot12 = controller.evaluateTimelineSlot(chialamberto, afterFetchData, 12, controller.getActiveGlider(), null);
       assert.equal(slot08.status, 'unflyable', 'Timeline slot 08:00 must be unflyable due to 1.4 mm rain (not synthetic green)');
       assert.equal(slot12.status, 'unflyable', 'Timeline slot 12:00 must be unflyable due to 1.4 mm rain (not synthetic yellow)');
+    });
+
+    it('renders 1-tap toggle-pin-spot button in comprensorio header bar and toggles pinnedSpotIds without opening picker sheet', () => {
+      const targetSpot = DEFAULT_COMPRENSORI[0];
+      const mockStore = createStore({
+        selectedSpot: targetSpot,
+        pinnedSpotIds: []
+      });
+      const controller = new ForecastViewController({ store: mockStore });
+
+      // 1. Unpinned state: button shows "+ Home" and aria-pressed="false"
+      let html = controller.renderHtml();
+      assert.ok(html.includes('gm-forecast-pin-btn'), 'Header must render 1-tap .gm-forecast-pin-btn');
+      assert.ok(html.includes('data-action="toggle-pin-spot"'), 'Header pin button must bind toggle-pin-spot');
+      assert.ok(html.includes('aria-pressed="false"'), 'Unpinned spot must have aria-pressed="false"');
+      assert.ok(html.includes('+ Home'), 'Unpinned spot must show "+ Home" CTA');
+
+      // 2. Click toggle-pin-spot in header -> adds to pinnedSpotIds without opening picker sheet
+      let pickerOpened = false;
+      controller.openPickerSheet = () => { pickerOpened = true; };
+
+      controller.handleClick({
+        target: {
+          closest(sel) {
+            if (sel === '[data-action]') {
+              return {
+                getAttribute(attr) {
+                  if (attr === 'data-action') return 'toggle-pin-spot';
+                  if (attr === 'data-id') return targetSpot.id;
+                  return null;
+                },
+                closest() { return null; }
+              };
+            }
+            return null;
+          }
+        }
+      });
+
+      assert.equal(pickerOpened, false, 'Clicking header pin button must NOT open picker bottom sheet');
+      assert.ok(mockStore.getState().pinnedSpotIds.includes(targetSpot.id), 'Spot must be added to pinnedSpotIds');
+
+      html = controller.renderHtml();
+      assert.ok(html.includes('aria-pressed="true"'), 'Pinned spot must have aria-pressed="true"');
+      assert.ok(html.includes('In Home'), 'Pinned spot must display "In Home" status');
     });
   });
 });

@@ -17,7 +17,9 @@ import {
   DEFAULT_COMPRENSORI,
   evaluateComprensorio,
   parseCoordinates,
-  cleanUserText
+  cleanUserText,
+  isSpotPinned,
+  toggleSpotPin
 } from '../../core/comprensorio.js';
 import {
   MACRO_REGIONS,
@@ -1477,6 +1479,8 @@ export class SpotMapView {
     const lAlt = landing?.altitude ? `${landing.altitude}m slm` : 'N/D';
     const windSpeed = spotEval.weatherSnapshot?.windSpeed != null ? `${Math.round(spotEval.weatherSnapshot.windSpeed)} km/h` : 'N/D';
     const windDir = spotEval.weatherSnapshot?.direction?.cardinal || 'N/D';
+    const currentState = typeof store?.getState === 'function' ? store.getState() : {};
+    const isPinned = isSpotPinned(spot, currentState.pinnedSpotIds || []);
 
     const sheetContent = `
       <div class="gm-spot-detail-sheet">
@@ -1538,22 +1542,52 @@ export class SpotMapView {
           </div>
         ` : ''}
 
-        <!-- Primary CTA to Forecast View -->
-        <button type="button" id="gm-map-cta-forecast" class="gm-btn gm-btn-primary gm-spot-detail-cta">
-          Apri Previsioni Dettagliate
-        </button>
+        <!-- Actions Row: Pin to Home + Primary CTA to Forecast View -->
+        <div class="gm-spot-detail-actions">
+          <button
+            type="button"
+            id="gm-map-cta-pin-spot"
+            class="gm-btn gm-btn-secondary gm-map-pin-spot-btn ${isPinned ? 'active' : ''}"
+            data-spot-id="${escapeHtml(spot.id || '')}"
+            aria-pressed="${isPinned ? 'true' : 'false'}"
+          >
+            <span aria-hidden="true">${isPinned ? '★' : '☆'}</span>
+            <span id="gm-map-cta-pin-label">${isPinned ? 'In Home' : 'Aggiungi a Home'}</span>
+          </button>
+          <button type="button" id="gm-map-cta-forecast" class="gm-btn gm-btn-primary gm-spot-detail-cta">
+            Apri Previsioni Dettagliate
+          </button>
+        </div>
       </div>
     `;
 
     openSheet(spot.name || 'Scheda Comprensorio', sheetContent);
 
-    // Bind CTA click
+    // Bind CTA clicks
     setTimeout(() => {
+      if (typeof document === 'undefined') return;
       const ctaBtn = document.getElementById('gm-map-cta-forecast');
       if (ctaBtn) {
         ctaBtn.addEventListener('click', () => {
           closeSheet();
           this.handleOpenForecast(spot);
+        });
+      }
+      const pinBtn = document.getElementById('gm-map-cta-pin-spot');
+      if (pinBtn) {
+        pinBtn.addEventListener('click', () => {
+          if (typeof store?.getState === 'function' && typeof store?.setState === 'function') {
+            const st = store.getState();
+            const nextPinned = toggleSpotPin(spot, st.pinnedSpotIds || [], this.comprensoriCatalog);
+            store.setState({ pinnedSpotIds: nextPinned });
+            const nowPinned = isSpotPinned(spot, nextPinned);
+            pinBtn.classList.toggle('active', nowPinned);
+            pinBtn.setAttribute('aria-pressed', nowPinned ? 'true' : 'false');
+            pinBtn.innerHTML = `
+              <span aria-hidden="true">${nowPinned ? '★' : '☆'}</span>
+              <span id="gm-map-cta-pin-label">${nowPinned ? 'In Home' : 'Aggiungi a Home'}</span>
+            `;
+          }
         });
       }
     }, 50);

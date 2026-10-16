@@ -1296,6 +1296,88 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     assert.ok(item, 'Must evaluate Chialamberto comprensorio');
     assert.equal(item.status, 'flyable', 'Card verdict must align to flyable when daylight timeline has >= 2 flyable hours despite 14:00 spike');
   });
+
+  it('should render clear search filter indicator banner and distinguish pinned Home spots from catalog search results', () => {
+    const mockStore = createStore({
+      pinnedSpotIds: ['monte-cornizzolo-lc']
+    });
+    const controller = new HomeDashboardViewController({ store: mockStore });
+
+    // 1. Default Home mode (no search query): no search filter banner, no is-search-filtered class
+    let html = controller.renderHtml();
+    assert.equal(html.includes('id="home-search-filter-banner"'), false, 'Must NOT render search filter banner in default Home view');
+    assert.equal(html.includes('is-search-filtered'), false, 'List container must NOT have is-search-filtered class when not searching');
+    assert.ok(html.includes('id="home-spots-count" aria-live="polite">1 siti</span>'), 'Counter must show "1 siti" in normal Home view');
+
+    // 2. Active search query ("Monte") matching both pinned (Monte Cornizzolo) and unpinned catalog spots (e.g. Monte Cavallaria)
+    controller.searchQuery = 'Monte';
+    html = controller.renderHtml();
+
+    assert.ok(html.includes('id="home-search-filter-banner"'), 'Must render #home-search-filter-banner when search query is active');
+    assert.ok(html.includes('is-search-filtered'), 'Spots list container must have is-search-filtered class when searching');
+    assert.ok(html.includes('Filtro ricerca') && html.includes('Catalogo per'), 'Banner must explicitly state that list is filtered from full catalog');
+    assert.ok(html.includes('Torna a Home'), 'Banner must provide 1-tap exit button back to Home');
+    assert.ok(html.includes('Filtro: '), 'Counter badge must display "Filtro: X siti" during active search');
+
+    // 3. Individual cards must distinguish pinned Home items from unpinned catalog items
+    assert.ok(html.includes('is-pinned-home is-search-result'), 'Pinned spot in search results must have is-pinned-home is-search-result classes');
+    assert.ok(html.includes('is-unpinned-search is-search-result'), 'Unpinned spot in search results must have is-unpinned-search is-search-result classes');
+    assert.ok(html.includes('gm-spot-origin-badge is-in-home'), 'Pinned spot must display "✓ In Home" origin badge during search');
+    assert.ok(html.includes('gm-spot-origin-badge is-catalog-only'), 'Unpinned spot must display "Catalogo" origin badge during search');
+    assert.ok(html.includes('data-action="toggle-pin-spot"'), 'Cards must expose 1-tap toggle-pin-spot button');
+  });
+
+  it('should add and remove a comprensorio from Home via 1-tap toggle-pin-spot action', () => {
+    const mockStore = createStore({
+      pinnedSpotIds: ['monte-cornizzolo-lc']
+    });
+    const controller = new HomeDashboardViewController({ store: mockStore });
+
+    // 1. Add 'monte-cavallaria-to' to Home via toggle-pin-spot
+    controller.handleClick({
+      target: {
+        closest(sel) {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute(attr) {
+                if (attr === 'data-action') return 'toggle-pin-spot';
+                if (attr === 'data-id') return 'monte-cavallaria-to';
+                return null;
+              }
+            };
+          }
+          return null;
+        }
+      }
+    });
+
+    assert.ok(
+      mockStore.getState().pinnedSpotIds.includes('monte-cavallaria-to'),
+      'Toggling unpinned spot must add its ID to store pinnedSpotIds'
+    );
+
+    // 2. Remove 'monte-cavallaria-to' from Home via toggle-pin-spot
+    controller.handleClick({
+      target: {
+        closest(sel) {
+          if (sel === '[data-action]') {
+            return {
+              getAttribute(attr) {
+                if (attr === 'data-action') return 'toggle-pin-spot';
+                if (attr === 'data-id') return 'monte-cavallaria-to';
+                return null;
+              }
+            };
+          }
+          return null;
+        }
+      }
+    });
+
+    assert.equal(
+      mockStore.getState().pinnedSpotIds.includes('monte-cavallaria-to'),
+      false,
+      'Toggling pinned spot must remove its ID from store pinnedSpotIds'
+    );
+  });
 });
-
-

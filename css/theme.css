@@ -11101,3 +11101,305 @@ input.gm-input:focus {
 .gm-filter-option-chip {
   min-height: 40px;
 }
+
+/* ==========================================================================
+   Home Search Filter Indicator Banner & 1-Tap Comprensorio Pin Controls
+   ========================================================================== */
+
+#home-spots-list.is-search-filtered {
+  padding: 8px;
+  border-radius: var(--gm-radius-md, 10px);
+  border: 1px dashed var(--gm-accent);
+  background-color: rgba(56, 189, 248, 0.04);
+}
+
+.gm-search-filter-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--gm-radius-sm, 8px);
+  background-color: var(--gm-bg-elevated);
+  border: 1px solid var(--gm-accent);
+  color: var(--gm-text-primary);
+}
+
+.gm-search-filter-banner-info {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.gm-search-filter-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: var(--gm-radius-full, 9999px);
+  background-color: var(--gm-accent);
+  color: var(--gm-text-inverse, #0f172a);
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.gm-search-filter-summary {
+  font-size: 0.76rem;
+  color: var(--gm-text-secondary);
+  line-height: 1.3;
+}
+
+.gm-search-filter-summary strong {
+  color: var(--gm-text-primary);
+  font-weight: 700;
+}
+
+.gm-search-filter-reset-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  min-height: 32px;
+  border-radius: var(--gm-radius-sm, 6px);
+  background-color: var(--gm-bg-card);
+  border: 1px solid var(--gm-border-strong);
+  color: var(--gm-text-primary);
+  font-size: 0.73rem;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color var(--gm-transition-fast), background-color var(--gm-transition-fast);
+}
+
+.gm-search-filter-reset-btn::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  min-width: var(--gm-touch-min, 48px);
+  min-height: var(--gm-touch-min, 48px);
+  width: 100%;
+  height: 100%;
+}
+
+.gm-search-filter-reset-btn:hover,
+.gm-search-filter-reset-btn:focus-visible {
+  border-color: var(--gm-accent);
+  background-color: var(--gm-bg-hover);
+  outline: none;
+}
+
+/* Search result card visual differentiation: In Home vs External Catalog */
+.gm-spot-card.is-search-result.is-pinned-home {
+  border-left: 3px solid var(--gm-accent);
+}
+
+.gm-spot-card.is-search-result.is-unpinned-search {
+  border-style: dashed;
+  background-color: var(--gm-bg-surface);
+}
+
+.gm-spot-origin-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: var(--gm-radius-full, 9999px);
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+.gm-spot-origin-badge.is-in-home {
+  background-color: rgba(56, 189, 248, 0.14);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  color: var(--gm-accent);
+}
+
+.gm-spot-origin-badge.is-catalog-only {
+  background-color: var(--gm-bg-elevated);
+  border: 1px dashed var(--gm-border-strong);
+  color: var(--gm-text-muted);
+}
+
+/* 1-Tap Pin/Unpin buttons on Home search cards & drawer */
+.gm-home-pin-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 8px;
+  min-height: 28px;
+  border-radius: var(--gm-radius-full, 9999px);
+  font-size: 0.70rem;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color var(--gm-transition-fast), border-color var(--gm-transition-fast), color var(--gm-transition-fast);
+}
+
+.gm-home-pin-btn::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  min-width: var(--gm-touch-min, 48px);
+  min-height: var(--gm-touch-min, 48px);
+  width: 100%;
+  height: 100%;
+}
+
+.gm-home-pin-btn.is-unpinned {
+  background-color: rgba(56, 189, 248, 0.14);
+  border: 1px solid var(--gm-accent);
+  color: var(--gm-accent);
+}
+
+.gm-home-pin-btn.is-pinned {
+  background-color: var(--gm-bg-elevated);
+  border: 1px solid var(--gm-border-strong);
+  color: var(--gm-text-secondary);
+}
+
+.gm-home-pin-btn:hover,
+.gm-home-pin-btn:focus-visible {
+  border-color: var(--gm-accent);
+  color: var(--gm-text-primary);
+  outline: none;
+}
+
+.gm-home-drawer-pin-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 3px 9px;
+  min-height: 28px;
+  border-radius: var(--gm-radius-full, 9999px);
+  background-color: var(--gm-bg-elevated);
+  border: 1px solid var(--gm-border-strong);
+  color: var(--gm-text-secondary);
+  font-size: 0.68rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.gm-home-drawer-pin-btn.is-unpinned {
+  border-color: var(--gm-accent);
+  color: var(--gm-accent);
+}
+
+.gm-home-drawer-pin-btn:hover,
+.gm-home-drawer-pin-btn:focus-visible {
+  border-color: var(--gm-accent);
+  color: var(--gm-text-primary);
+  outline: none;
+}
+
+/* 1-Tap Pin button in ForecastView header & picker sheet */
+.gm-forecast-pin-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  min-height: 30px;
+  border-radius: var(--gm-radius-full, 9999px);
+  background-color: var(--gm-bg-elevated);
+  border: 1px solid var(--gm-border-strong);
+  color: var(--gm-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color var(--gm-transition-fast), border-color var(--gm-transition-fast), color var(--gm-transition-fast);
+}
+
+.gm-forecast-pin-btn::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  min-width: var(--gm-touch-min, 48px);
+  min-height: var(--gm-touch-min, 48px);
+  width: 100%;
+  height: 100%;
+}
+
+.gm-forecast-pin-btn.active {
+  background-color: rgba(245, 158, 11, 0.14);
+  border-color: rgba(245, 158, 11, 0.55);
+  color: var(--gm-status-caution);
+}
+
+.gm-forecast-pin-btn:hover,
+.gm-forecast-pin-btn:focus-visible {
+  border-color: var(--gm-accent);
+  color: var(--gm-text-primary);
+  outline: none;
+}
+
+/* SpotMapView detail sheet actions row */
+.gm-spot-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.gm-map-pin-spot-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--gm-touch-min, 48px);
+  padding: 0 14px;
+  flex-shrink: 0;
+}
+
+.gm-map-pin-spot-btn.active {
+  border-color: rgba(245, 158, 11, 0.55);
+  color: var(--gm-status-caution);
+}
+
+/* Sunlight Light Mode Overrides */
+[data-theme="light"] #home-spots-list.is-search-filtered {
+  background-color: rgba(2, 132, 199, 0.05);
+  border-color: var(--gm-accent);
+}
+
+[data-theme="light"] .gm-search-filter-banner {
+  background-color: var(--gm-bg-surface);
+  border-color: var(--gm-accent);
+}
+
+[data-theme="light"] .gm-search-filter-badge {
+  color: #ffffff;
+}
+
+[data-theme="light"] .gm-spot-origin-badge.is-in-home {
+  background-color: rgba(2, 132, 199, 0.12);
+  border-color: rgba(2, 132, 199, 0.45);
+  color: var(--gm-accent);
+}
+
+[data-theme="light"] .gm-home-pin-btn.is-unpinned {
+  background-color: rgba(2, 132, 199, 0.10);
+  border-color: var(--gm-accent);
+  color: var(--gm-accent);
+}
+
+[data-theme="light"] .gm-forecast-pin-btn.active {
+  background-color: rgba(217, 119, 6, 0.12);
+  border-color: rgba(217, 119, 6, 0.55);
+  color: #b45309;
+}
+

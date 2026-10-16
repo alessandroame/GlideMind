@@ -876,7 +876,7 @@ export class HomeDashboardViewController {
             <h2 id="heading-comprensori">Volabilità</h2>
             <div class="flex items-center gap-2">
               ${this.renderLiveWeatherBadge()}
-              <span id="home-spots-count" aria-live="polite">${evaluatedList.length} siti</span>
+              <span id="home-spots-count" aria-live="polite">${this.formatSpotsCountLabel(evaluatedList)}</span>
             </div>
           </div>
 
@@ -1101,6 +1101,44 @@ export class HomeDashboardViewController {
   }
 
   /**
+   * Renders the active search filter banner when a search query is filtering the catalog.
+   * Clearly distinguishes catalog search results from spots genuinely pinned in the Home.
+   * @param {Array<object>} evaluatedList
+   * @returns {string}
+   */
+  renderSearchFilterBanner(evaluatedList) {
+    const trimmedQuery = (this.searchQuery || '').trim();
+    if (!trimmedQuery) return '';
+
+    const state = this.store ? this.store.getState() : {};
+    const pinnedIds = state.pinnedSpotIds || [];
+    const pinnedInResults = evaluatedList.filter(item =>
+      isSpotPinned(item.comprensorio || { id: item.comprensorioId || item.id, name: item.name }, pinnedIds)
+    ).length;
+
+    return `
+      <div id="home-search-filter-banner" class="gm-search-filter-banner" role="status" aria-live="polite">
+        <div class="gm-search-filter-banner-info">
+          <span class="gm-search-filter-badge">Filtro ricerca</span>
+          <span class="gm-search-filter-summary">
+            Catalogo per «<strong>${escapeHtml(trimmedQuery)}</strong>» · ${evaluatedList.length} ${evaluatedList.length === 1 ? 'risultato' : 'risultati'} (${pinnedInResults} in Home)
+          </span>
+        </div>
+        <button
+          type="button"
+          class="gm-search-filter-reset-btn"
+          data-action="clear-search"
+          aria-label="Chiudi filtro ricerca e torna ai comprensori della Home"
+          title="Torna ai comprensori della Home"
+        >
+          <span>Torna a Home</span>
+          <span aria-hidden="true">✕</span>
+        </button>
+      </div>
+    `;
+  }
+
+  /**
    * Renders the list of comprensori or search empty state.
    * @param {Array<object>} evaluatedList
    * @returns {string}
@@ -1116,23 +1154,29 @@ export class HomeDashboardViewController {
       `;
     }
 
+    const hasSearch = Boolean(this.searchQuery && this.searchQuery.trim().length > 0);
+    const searchBannerHtml = hasSearch ? this.renderSearchFilterBanner(evaluatedList) : '';
+
     if (evaluatedList.length === 0) {
       if (this.searchQuery) {
         return `
-          <div id="home-spots-list" class="gm-spot-card text-center py-4 px-3 flex flex-col items-center gap-2">
-            <div class="text-xs font-semibold text-[var(--gm-text-primary)]">
-              Nessuna località trovata per "${escapeHtml(this.searchQuery)}"
+          <div id="home-spots-list" class="flex flex-col gap-2 is-search-filtered">
+            ${searchBannerHtml}
+            <div class="gm-spot-card text-center py-4 px-3 flex flex-col items-center gap-2">
+              <div class="text-xs font-semibold text-[var(--gm-text-primary)]">
+                Nessuna località trovata per "${escapeHtml(this.searchQuery)}"
+              </div>
+              <p class="text-xs text-[var(--gm-text-muted)] max-w-xs">
+                Verifica i termini digitati o ripristina la visualizzazione dei comprensori nella Home.
+              </p>
+              <button 
+                type="button" 
+                class="gm-btn-compact-accent mt-1" 
+                data-action="clear-search"
+              >
+                Azzera ricerca
+              </button>
             </div>
-            <p class="text-xs text-[var(--gm-text-muted)] max-w-xs">
-              Verifica i termini digitati o ripristina la visualizzazione completa.
-            </p>
-            <button 
-              type="button" 
-              class="gm-btn-compact-accent mt-1" 
-              data-action="clear-search"
-            >
-              Azzera ricerca
-            </button>
           </div>
         `;
       }
@@ -1162,21 +1206,31 @@ export class HomeDashboardViewController {
             Nessuna località tra i preferiti
           </div>
           <p class="text-xs text-[var(--gm-text-muted)] max-w-xs">
-            Aggiungi le tue località dai dettagli in Previsioni per visualizzarle rapidamente nella panoramica.
+            Cerca un comprensorio nella barra qui sopra e tocca «+ Home», oppure aggiungilo da Previsioni.
           </p>
-          <button 
-            type="button" 
-            class="gm-btn-compact-primary mt-1" 
-            data-action="go-to-forecast"
-          >
-            Vai a Previsioni
-          </button>
+          <div class="flex items-center gap-2 mt-1">
+            <button 
+              type="button" 
+              class="gm-btn-compact-accent" 
+              data-action="focus-home-search"
+            >
+              Cerca nel Catalogo
+            </button>
+            <button 
+              type="button" 
+              class="gm-btn-compact-primary" 
+              data-action="go-to-forecast"
+            >
+              Vai a Previsioni
+            </button>
+          </div>
         </div>
       `;
     }
 
     return `
-      <div id="home-spots-list" class="flex flex-col gap-2">
+      <div id="home-spots-list" class="flex flex-col gap-2 ${hasSearch ? 'is-search-filtered' : ''}">
+        ${searchBannerHtml}
         ${evaluatedList.map(item => this.renderComprensorioCard(item)).join('')}
       </div>
     `;
@@ -1275,7 +1329,7 @@ export class HomeDashboardViewController {
    * Renders an individual compact glanceable Comprensorio Card (Option A: 2-Row Expressive Timeline).
    * Row 1: Spot Name + Province (+ contextual search match if searching sub-spot) | Flyability Badge (tap to expand reason pills) + Chevron
    * Row 2: Diurnal Flyability Timeline (Sunrise -> Sunset) with 1-tap hour deep-linking.
-   * Row 3 (Expandable on badge tap): Determinant Factor Pills ([NOTE-001]).
+   * Row 3 (Expandable on badge tap): Determinant Factor Pills ([NOTE-001]) + Home Pin management.
    * @param {object} item - Evaluated comprensorio
    * @returns {string}
    */
@@ -1295,6 +1349,11 @@ export class HomeDashboardViewController {
     );
     const reasonPills = this.buildDeterminantReasonPills(item, timeline);
     const isReasonsExpanded = Boolean(this.expandedReasonSpotIds && this.expandedReasonSpotIds.has(item.comprensorioId));
+    const isPinned = isSpotPinned(
+      item.comprensorio || { id: item.comprensorioId || item.id, name: item.name },
+      state.pinnedSpotIds || []
+    );
+    const hasSearch = Boolean(this.searchQuery && this.searchQuery.trim().length > 0);
 
     let badgeClass = 'gm-badge-flyable';
     let badgeIcon = '✓';
@@ -1316,10 +1375,11 @@ export class HomeDashboardViewController {
 
     return `
       <article 
-        class="gm-spot-card gm-spot-card-timeline ${isUnavailable ? 'gm-spot-card-unavailable' : ''} ${isReasonsExpanded ? 'is-reasons-expanded' : ''}" 
+        class="gm-spot-card gm-spot-card-timeline ${isUnavailable ? 'gm-spot-card-unavailable' : ''} ${isReasonsExpanded ? 'is-reasons-expanded' : ''} ${isPinned ? 'is-pinned-home' : 'is-unpinned-search'} ${hasSearch ? 'is-search-result' : ''}" 
         data-comprensorio-id="${escapeHtml(item.comprensorioId)}"
         data-takeoff-name="${escapeHtml(takeoffName)}"
         data-landing-name="${escapeHtml(landingName)}"
+        data-pinned="${isPinned ? 'true' : 'false'}"
         ${item.searchMatch?.takeoffId ? `data-matched-takeoff-id="${escapeHtml(item.searchMatch.takeoffId)}"` : ''}
         data-action="view-forecast"
         data-id="${escapeHtml(item.comprensorioId)}"
@@ -1332,6 +1392,11 @@ export class HomeDashboardViewController {
           <div class="gm-spot-title-group">
             <span class="gm-spot-name">${escapeHtml(item.name)}</span>
             ${item.province ? `<span class="gm-spot-prov">${escapeHtml(item.province)}</span>` : ''}
+            ${hasSearch ? `
+              <span class="gm-spot-origin-badge ${isPinned ? 'is-in-home' : 'is-catalog-only'}" title="${isPinned ? 'Comprensorio presente nella tua Home' : 'Risultato del filtro ricerca non presente nella Home'}">
+                ${isPinned ? '✓ In Home' : 'Catalogo'}
+              </span>
+            ` : ''}
             ${item.searchMatch ? `
               <span class="gm-spot-search-match" data-match-type="${escapeHtml(item.searchMatch.type)}" title="Trovato per: ${escapeHtml(item.searchMatch.label)}">
                 ${escapeHtml(item.searchMatch.label)}
@@ -1339,6 +1404,20 @@ export class HomeDashboardViewController {
             ` : ''}
           </div>
           <div class="gm-spot-header-right">
+            ${hasSearch ? `
+              <button
+                type="button"
+                class="gm-home-pin-btn ${isPinned ? 'is-pinned' : 'is-unpinned'}"
+                data-action="toggle-pin-spot"
+                data-spot-id="${escapeHtml(item.comprensorioId)}"
+                aria-pressed="${isPinned ? 'true' : 'false'}"
+                title="${isPinned ? 'Presente nella Home. Tocca per rimuovere dalla Home' : 'Non nella Home. Tocca per aggiungere alla Home'}"
+                aria-label="${isPinned ? `Rimuovi ${escapeHtml(item.name)} dalla Home` : `Aggiungi ${escapeHtml(item.name)} alla Home`}"
+              >
+                <span aria-hidden="true">${isPinned ? '✓' : '+'}</span>
+                <span>${isPinned ? 'Home' : 'Home'}</span>
+              </button>
+            ` : ''}
             <button
               type="button"
               class="gm-spot-accordion-trigger"
@@ -1380,7 +1459,7 @@ export class HomeDashboardViewController {
           `).join('')}
         </div>
 
-        <!-- Line 3 (Expandable on Badge Tap): Determinant Factor Pills ([NOTE-001]) -->
+        <!-- Line 3 (Expandable on Badge Tap): Determinant Factor Pills ([NOTE-001]) + Home Pin Toggle -->
         <div 
           class="gm-spot-reasons-drawer gm-spot-explain gm-spot-micro-reason ${isReasonsExpanded ? 'is-expanded' : 'hidden'}"
           role="region"
@@ -1389,6 +1468,17 @@ export class HomeDashboardViewController {
           ${reasonPills.map(pill => `
             <span class="gm-reason-pill pill-${escapeHtml(pill.severityClass)}">${escapeHtml(pill.label)}</span>
           `).join('')}
+          <button
+            type="button"
+            class="gm-home-drawer-pin-btn ${isPinned ? 'is-pinned' : 'is-unpinned'}"
+            data-action="toggle-pin-spot"
+            data-spot-id="${escapeHtml(item.comprensorioId)}"
+            aria-pressed="${isPinned ? 'true' : 'false'}"
+            title="${isPinned ? 'Rimuovi questo comprensorio dalla Home' : 'Aggiungi questo comprensorio alla Home'}"
+            aria-label="${isPinned ? `Rimuovi ${escapeHtml(item.name)} dalla Home` : `Aggiungi ${escapeHtml(item.name)} alla Home`}"
+          >
+            ${isPinned ? '✕ Rimuovi da Home' : '+ Aggiungi a Home'}
+          </button>
         </div>
       </article>
     `;
@@ -2165,15 +2255,7 @@ export class HomeDashboardViewController {
       if (flyToggleBtn && typeof flyToggleBtn.classList?.remove === 'function') {
         flyToggleBtn.classList.remove('hidden');
       }
-      const listContainer = this.containerEl.querySelector('section[aria-labelledby="heading-comprensori"]');
-      if (listContainer) {
-        const evaluatedList = this.getEvaluatedComprensori();
-        const countBadge = listContainer.querySelector('#home-spots-count') || listContainer.querySelector('.flex.items-center.justify-between.text-xs span:last-child');
-        if (countBadge) countBadge.textContent = `${evaluatedList.length} siti`;
-        const existingList = listContainer.querySelector('#home-spots-list') || listContainer.querySelector('.flex.flex-col.gap-2');
-        if (existingList) {
-          existingList.outerHTML = this.renderComprensoriList(evaluatedList);
-        }
+      if (this.updateSpotsListSectionInDom()) {
         return;
       }
     }
@@ -2198,6 +2280,24 @@ export class HomeDashboardViewController {
 
     if (action === 'clear-search') {
       this.clearSearch();
+    } else if (action === 'focus-home-search') {
+      const searchInput = this.containerEl ? this.containerEl.querySelector('#home-spot-search') : null;
+      if (searchInput && typeof searchInput.focus === 'function') {
+        searchInput.focus();
+      }
+    } else if (action === 'toggle-pin-spot') {
+      if (typeof evt.stopPropagation === 'function') evt.stopPropagation();
+      const spotId = actionEl.getAttribute('data-spot-id') || id;
+      if (this.store && spotId) {
+        const state = this.store.getState();
+        const spot = this.comprensoriCatalog.find(c => c.id === spotId) || { id: spotId };
+        const nextPinned = toggleSpotPin(spot, state.pinnedSpotIds || [], this.comprensoriCatalog);
+        this.store.setState({ pinnedSpotIds: nextPinned });
+        if (!this.storeUnsubscribe) {
+          this.updateSpotsListSectionInDom();
+          this.fetchBatchWeatherAsync();
+        }
+      }
     } else if (action === 'toggle-fly-filter' || action === 'set-fly-filter') {
       const explicitFilter = actionEl.getAttribute('data-filter');
       const nextFilter = explicitFilter || (this.flyabilityFilter === 'flyable' ? 'all' : 'flyable');
@@ -2427,19 +2527,7 @@ export class HomeDashboardViewController {
         }
       }
 
-      const listContainer = this.containerEl ? this.containerEl.querySelector('section[aria-labelledby="heading-comprensori"]') : null;
-      if (listContainer) {
-        const evaluatedList = this.getEvaluatedComprensori();
-        const countBadge = listContainer.querySelector('#home-spots-count') || listContainer.querySelector('.flex.items-center.justify-between.text-xs span:last-child');
-        if (countBadge) countBadge.textContent = `${evaluatedList.length} siti`;
-        
-        const existingList = listContainer.querySelector('#home-spots-list') || listContainer.querySelector('.flex.flex-col.gap-2');
-        if (existingList) {
-          existingList.outerHTML = this.renderComprensoriList(evaluatedList);
-        }
-      } else {
-        this.render();
-      }
+      this.updateSpotsListSectionInDom();
     }
   }
 

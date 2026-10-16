@@ -27,7 +27,8 @@ import {
   evaluateComprensorio,
   slugifyComprensorio,
   parseCoordinates,
-  isSpotPinned
+  isSpotPinned,
+  toggleSpotPin
 } from '../../core/comprensorio.js';
 import {
   DEFAULT_GLIDER,
@@ -1462,78 +1463,52 @@ export class ForecastViewController {
     const landings = currentSpot.landings || [];
     const activeTakeoff = this.resolveActiveTakeoff(currentSpot);
     const activeLanding = this.resolveActiveLanding(currentSpot);
-
-    // Resolve active sub-spot label and monochrome vector SVG icon
-    let activeSubSpotLabel = 'Panoramica';
-    let activeSubSpotAria = (activeTakeoff && activeLanding)
-      ? `Panoramica (${activeTakeoff.name} • ${activeLanding.name})`
-      : 'Panoramica (Decollo Primario + Atterraggio)';
-    let activeSubSpotIcon = `
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-        <polyline points="2 17 12 22 22 17"></polyline>
-        <polyline points="2 12 12 17 22 12"></polyline>
-      </svg>
-    `;
-
-    const activeSub = this.resolveActiveSubSpot(currentSpot);
-    if (activeSub) {
-      activeSubSpotLabel = this.formatCleanSpotName(activeSub.name, activeSub.spotType);
-      if (activeSub.spotType === 'takeoff') {
-        const headingPart = activeSub.heading != null && !isNaN(Number(activeSub.heading))
-          ? ` · ${activeSub.heading}° ${getCardinalDirection(activeSub.heading)}`
-          : '';
-        activeSubSpotAria = `${activeSub.name} (${activeSub.altitude}m${headingPart})`;
-        activeSubSpotIcon = `
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="m8 3 4 8 5-5 5 15H2L8 3z"></path>
-          </svg>
-        `;
-      } else if (activeSub.spotType === 'landing') {
-        activeSubSpotAria = `${activeSub.name} (${activeSub.altitude}m${activeSub.isOfficial ? ' · Ufficiale' : ''})`;
-        activeSubSpotIcon = `
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="12" cy="12" r="10"></circle>
-            <circle cx="12" cy="12" r="6"></circle>
-            <circle cx="12" cy="12" r="2"></circle>
-          </svg>
-        `;
-      }
-    }
+    const state = this.store ? this.store.getState() : {};
+    const isPinned = this.isSpotPinned(currentSpot, state.pinnedSpotIds || []);
 
     return `
       <header class="gm-forecast-header">
-        <!-- Unified Comprensorio & Spot Bar (Level 1 + Level 2 Unified, 48px Touch Target) -->
+        <!-- Comprensorio Header Bar (Single-Row 48px Touch Target) -->
         <div 
           class="gm-comprensorio-bar gm-unified-spot-bar" 
           data-action="open-picker-sheet" 
           role="button" 
           tabindex="0" 
-          aria-label="Località attiva: ${escapeHtml(currentSpot.name)}, ${escapeHtml(activeSubSpotAria)}. Tocca per cambiare comprensorio o punto di volo."
-          title="Tocca per cambiare comprensorio o punto di volo"
+          aria-label="Comprensorio attivo: ${escapeHtml(currentSpot.name)}. Tocca per cambiare comprensorio."
+          title="Tocca per cambiare comprensorio"
         >
           <div class="gm-comprensorio-bar-info">
             <span class="gm-comprensorio-pin" aria-hidden="true">
-              ${activeSubSpotIcon}
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path>
+                <circle cx="12" cy="10" r="3"></circle>
+              </svg>
             </span>
-            <div class="gm-comprensorio-text min-w-0">
-              <div class="gm-comprensorio-title-row flex items-center justify-between gap-2">
-                <span class="gm-comprensorio-name truncate">
-                  ${escapeHtml(currentSpot.name)}
-                </span>
-                ${this.renderLiveWeatherBadge()}
-              </div>
-              <div class="gm-comprensorio-subspot-row flex items-center gap-1.5 mt-0.5 min-w-0">
-                <span class="gm-unified-subspot-badge truncate" title="${escapeHtml(activeSubSpotAria)}">
-                  ${escapeHtml(activeSubSpotLabel)}
-                </span>
-                <span class="gm-comprensorio-action-hint text-xs text-[var(--gm-text-muted)] flex-shrink-0">
-                  · Cambia
-                </span>
-              </div>
+            <div class="gm-comprensorio-title-row flex items-center gap-2 min-w-0 flex-1">
+              <span class="gm-comprensorio-name truncate">
+                ${escapeHtml(currentSpot.name)}
+              </span>
+              ${this.renderLiveWeatherBadge()}
             </div>
           </div>
-          <span class="gm-comprensorio-chevron flex-shrink-0" aria-hidden="true">›</span>
+          <div class="flex items-center gap-1.5 flex-shrink-0">
+            <button
+              type="button"
+              class="gm-forecast-pin-btn ${isPinned ? 'active' : ''}"
+              data-action="toggle-pin-spot"
+              data-spot-id="${escapeHtml(currentSpot.id)}"
+              aria-pressed="${isPinned ? 'true' : 'false'}"
+              aria-label="${isPinned ? `Rimuovi ${escapeHtml(currentSpot.name)} dalla Home` : `Aggiungi ${escapeHtml(currentSpot.name)} alla Home`}"
+              title="${isPinned ? 'Presente nella Home. Tocca per rimuovere dalla Home' : 'Aggiungi comprensorio alla Home'}"
+            >
+              <span aria-hidden="true">${isPinned ? '★' : '☆'}</span>
+              <span class="gm-forecast-pin-label">${isPinned ? 'In Home' : '+ Home'}</span>
+            </button>
+            <span class="gm-comprensorio-action-hint text-xs text-[var(--gm-text-muted)]">
+              Cambia
+            </span>
+            <span class="gm-comprensorio-chevron flex-shrink-0" aria-hidden="true">›</span>
+          </div>
         </div>
 
         <!-- Semantic SR-Only Select for Screen Readers and Programmatic Automation -->
@@ -4568,6 +4543,7 @@ export class ForecastViewController {
 
       const activeTId = isActive ? (this.activeTakeoffId || takeoffs.find(t => t.isPrimary)?.id || takeoffs[0]?.id) : (takeoffs.find(t => t.isPrimary)?.id || takeoffs[0]?.id);
       const activeLId = isActive ? (this.activeLandingId || landings.find(l => l.isPrimary || l.isOfficial)?.id || landings[0]?.id) : (landings.find(l => l.isPrimary || l.isOfficial)?.id || landings[0]?.id);
+      const countSummary = `${takeoffs.length} ${takeoffs.length === 1 ? 'decollo' : 'decolli'} · ${landings.length} ${landings.length === 1 ? 'atterraggio' : 'atterraggi'}`;
 
       return `
         <div 
@@ -4582,69 +4558,14 @@ export class ForecastViewController {
             <div class="gm-picker-item-main" data-action="pick-spot" data-spot-id="${escapeHtml(s.id)}" data-takeoff-id="${escapeHtml(activeTId || '')}" data-landing-id="${escapeHtml(activeLId || '')}">
               <div class="flex items-center justify-between gap-2">
                 <div class="text-sm font-bold text-[var(--gm-text-primary)] truncate">${escapeHtml(s.name)} (${escapeHtml(s.province)})</div>
-                ${(hasMultiTakeoffs || hasMultiLandings) ? `
+                ${isActive ? '<span class="gm-subspot-item-check flex-shrink-0" aria-hidden="true">✓</span>' : ((hasMultiTakeoffs || hasMultiLandings) ? `
                   <span class="gm-picker-badge-count flex-shrink-0">
-                    ${hasMultiTakeoffs ? `${takeoffs.length} decolli` : '1 decollo'} · ${hasMultiLandings ? `${landings.length} atterraggi` : '1 atterraggio'}
+                    ${countSummary}
                   </span>
-                ` : ''}
+                ` : '')}
               </div>
-              <div class="text-xs text-[var(--gm-text-muted)]">${escapeHtml(s.region)}</div>
+              <div class="text-xs text-[var(--gm-text-muted)]">${escapeHtml(s.region)} · ${countSummary}</div>
             </div>
-
-            ${(hasMultiTakeoffs || hasMultiLandings) ? `
-              <div class="gm-picker-subselection mt-2 pt-2 border-t border-[var(--gm-border)] flex flex-col gap-2">
-                ${hasMultiTakeoffs ? `
-                  <div class="gm-picker-subgroup" role="radiogroup" aria-label="Seleziona decollo per ${escapeHtml(s.name)}">
-                    <span class="gm-picker-subgroup-label">Decollo:</span>
-                    <div class="gm-picker-chips-row flex flex-wrap gap-1">
-                      ${takeoffs.map(t => {
-                        const isSel = activeTId === t.id;
-                        const headingPart = t.heading != null && !isNaN(Number(t.heading)) ? ` · ${t.heading}°` : '';
-                        return `
-                          <button
-                            type="button"
-                            class="gm-picker-chip ${isSel ? 'active' : ''}"
-                            data-action="pick-spot-takeoff"
-                            data-spot-id="${escapeHtml(s.id)}"
-                            data-takeoff-id="${escapeHtml(t.id)}"
-                            aria-checked="${isSel ? 'true' : 'false'}"
-                            role="radio"
-                            title="${escapeHtml(t.name)} (${t.altitude}m${headingPart})"
-                          >
-                            ▲ ${escapeHtml(t.name)} (${t.altitude}m)
-                          </button>
-                        `;
-                      }).join('')}
-                    </div>
-                  </div>
-                ` : ''}
-
-                ${hasMultiLandings ? `
-                  <div class="gm-picker-subgroup" role="radiogroup" aria-label="Seleziona atterraggio per ${escapeHtml(s.name)}">
-                    <span class="gm-picker-subgroup-label">Atterraggio:</span>
-                    <div class="gm-picker-chips-row flex flex-wrap gap-1">
-                      ${landings.map(l => {
-                        const isSel = activeLId === l.id;
-                        return `
-                          <button
-                            type="button"
-                            class="gm-picker-chip ${isSel ? 'active' : ''}"
-                            data-action="pick-spot-landing"
-                            data-spot-id="${escapeHtml(s.id)}"
-                            data-landing-id="${escapeHtml(l.id)}"
-                            aria-checked="${isSel ? 'true' : 'false'}"
-                            role="radio"
-                            title="${escapeHtml(l.name)} (${l.altitude}m)"
-                          >
-                            ⏚ ${escapeHtml(l.name)} (${l.altitude}m)
-                          </button>
-                        `;
-                      }).join('')}
-                    </div>
-                  </div>
-                ` : ''}
-              </div>
-            ` : ''}
           </div>
           <button 
             type="button" 
@@ -4673,147 +4594,6 @@ export class ForecastViewController {
       `;
     }
 
-    const renderCurrentSubspots = () => {
-      if (!currentSpot) return '';
-      const takeoffs = currentSpot.takeoffs || [];
-      const landings = currentSpot.landings || [];
-      const activeTakeoff = this.resolveActiveTakeoff(currentSpot);
-      const activeLanding = this.resolveActiveLanding(currentSpot);
-
-      return `
-        <div class="gm-picker-section gm-picker-current-spot-section">
-          <div class="flex items-center justify-between gap-2 mb-2">
-            <span class="gm-picker-section-title font-bold text-xs uppercase tracking-wider text-[var(--gm-text-muted)]">
-              Punto di Volo Attivo
-            </span>
-            <span class="gm-badge gm-badge-sm ml-auto text-right ${this.selectedSubSpot === 'overview' ? 'gm-badge-flyable' : ''}">
-              ${escapeHtml(this.selectedSubSpot === 'overview' ? 'Panoramica' : this.formatCleanSpotName(this.resolveActiveSubSpot(currentSpot)?.name, this.resolveActiveSubSpot(currentSpot)?.spotType))}
-            </span>
-          </div>
-          <div class="gm-current-subspots-list flex flex-col gap-1.5 p-1.5 bg-[var(--gm-bg-surface)] rounded-[var(--gm-radius-md)] border border-[var(--gm-border)]">
-            <!-- Gruppo 1: Overview / Panoramica -->
-            <div class="gm-subspot-group gm-subspot-group-overview">
-              <div class="gm-subspot-group-header">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-                  <polyline points="2 17 12 22 22 17"></polyline>
-                  <polyline points="2 12 12 17 22 12"></polyline>
-                </svg>
-                <span>Panoramica</span>
-              </div>
-              <button
-                type="button"
-                class="gm-subspot-item ${this.selectedSubSpot === 'overview' ? 'active' : ''}"
-                data-action="select-subspot"
-                data-subspot-id="overview"
-                role="option"
-                aria-selected="${this.selectedSubSpot === 'overview' ? 'true' : 'false'}"
-              >
-                <div class="gm-subspot-item-left">
-                  <span class="gm-subspot-item-icon text-[var(--gm-accent)]" aria-hidden="true">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                      <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-                      <polyline points="2 17 12 22 22 17"></polyline>
-                      <polyline points="2 12 12 17 22 12"></polyline>
-                    </svg>
-                  </span>
-                  <span class="gm-subspot-item-name font-semibold">
-                    ${activeTakeoff && activeLanding ? `Panoramica (${escapeHtml(this.formatCleanSpotName(activeTakeoff.name, 'takeoff'))} • ${escapeHtml(this.formatCleanSpotName(activeLanding.name, 'landing'))})` : 'Panoramica'}
-                  </span>
-                </div>
-                ${this.selectedSubSpot === 'overview' ? '<span class="gm-subspot-item-check" aria-hidden="true">✓</span>' : ''}
-              </button>
-            </div>
-
-            <!-- Gruppo 2: Decolli -->
-            ${takeoffs.length > 0 ? `
-              <div class="gm-subspot-group gm-subspot-group-takeoffs">
-                <div class="gm-subspot-group-header">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="m8 3 4 8 5-5 5 15H2L8 3z"></path>
-                  </svg>
-                  <span>Decolli (${takeoffs.length})</span>
-                </div>
-                <div class="gm-subspot-group-items flex flex-col gap-1">
-                  ${takeoffs.map(t => {
-                    const isSel = this.selectedSubSpot === t.id;
-                    const headingPart = t.heading != null && !isNaN(Number(t.heading)) ? ` · ${t.heading}° ${getCardinalDirection(t.heading)}` : '';
-                    return `
-                      <button
-                        type="button"
-                        class="gm-subspot-item ${isSel ? 'active' : ''}"
-                        data-action="select-subspot"
-                        data-subspot-id="${escapeHtml(t.id)}"
-                        role="option"
-                        aria-selected="${isSel ? 'true' : 'false'}"
-                      >
-                        <div class="gm-subspot-item-left">
-                          <span class="gm-subspot-item-icon text-[var(--gm-accent)]" aria-hidden="true">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                              <path d="m8 3 4 8 5-5 5 15H2L8 3z"></path>
-                            </svg>
-                          </span>
-                          <div class="gm-subspot-item-text-group">
-                            <span class="gm-subspot-item-name font-semibold">${escapeHtml(t.name)}</span>
-                            <span class="gm-subspot-item-badge">${t.altitude}m${headingPart}</span>
-                          </div>
-                        </div>
-                        ${isSel ? '<span class="gm-subspot-item-check" aria-hidden="true">✓</span>' : ''}
-                      </button>
-                    `;
-                  }).join('')}
-                </div>
-              </div>
-            ` : ''}
-
-            <!-- Gruppo 3: Atterraggi -->
-            ${landings.length > 0 ? `
-              <div class="gm-subspot-group gm-subspot-group-landings">
-                <div class="gm-subspot-group-header">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <circle cx="12" cy="12" r="6"></circle>
-                    <circle cx="12" cy="12" r="2"></circle>
-                  </svg>
-                  <span>Atterraggi (${landings.length})</span>
-                </div>
-                <div class="gm-subspot-group-items flex flex-col gap-1">
-                  ${landings.map(l => {
-                    const isSel = this.selectedSubSpot === l.id;
-                    return `
-                      <button
-                        type="button"
-                        class="gm-subspot-item ${isSel ? 'active' : ''}"
-                        data-action="select-subspot"
-                        data-subspot-id="${escapeHtml(l.id)}"
-                        role="option"
-                        aria-selected="${isSel ? 'true' : 'false'}"
-                      >
-                        <div class="gm-subspot-item-left">
-                          <span class="gm-subspot-item-icon text-[var(--gm-accent)]" aria-hidden="true">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                              <circle cx="12" cy="12" r="10"></circle>
-                              <circle cx="12" cy="12" r="6"></circle>
-                              <circle cx="12" cy="12" r="2"></circle>
-                            </svg>
-                          </span>
-                          <div class="gm-subspot-item-text-group">
-                            <span class="gm-subspot-item-name font-semibold">${escapeHtml(l.name)}</span>
-                            <span class="gm-subspot-item-badge">${l.altitude}m${l.isOfficial ? ' · Ufficiale' : ''}</span>
-                          </div>
-                        </div>
-                        ${isSel ? '<span class="gm-subspot-item-check" aria-hidden="true">✓</span>' : ''}
-                      </button>
-                    `;
-                  }).join('')}
-                </div>
-              </div>
-            ` : ''}
-          </div>
-        </div>
-      `;
-    };
-
     const pinnedSpots = allSpots.filter(s => this.isSpotPinned(s, pinnedIds));
     const recentSpots = recentIds
       .map(id => allSpots.find(s => s.id === id))
@@ -4822,7 +4602,6 @@ export class ForecastViewController {
     const otherSpots = allSpots.filter(s => !this.isSpotPinned(s, pinnedIds) && !recentSpots.some(r => r.id === s.id));
 
     return `
-      ${renderCurrentSubspots()}
       ${pinnedSpots.length > 0 ? `
         <div class="gm-picker-section">
           <span class="gm-picker-section-title">Preferiti (${pinnedSpots.length})</span>
@@ -5669,49 +5448,23 @@ export class ForecastViewController {
         this.fetchWeatherDataAsync(spot, this.activeDate);
       }
     } else if (action === 'toggle-pin-spot') {
-      const spotId = actionEl.getAttribute('data-spot-id');
+      if (typeof evt.stopPropagation === 'function') evt.stopPropagation();
+      const spotId = actionEl.getAttribute('data-spot-id') || actionEl.getAttribute('data-id');
       if (this.store && spotId) {
         const state = this.store.getState();
-        const pinned = new Set(state.pinnedSpotIds || []);
-        
-        const spot = this.comprensoriCatalog.find(c => c.id === spotId);
-        const isPinned = this.isSpotPinned(spot || { id: spotId }, pinned);
+        const spot = this.comprensoriCatalog.find(c => c.id === spotId) || { id: spotId };
+        const nextPinned = toggleSpotPin(spot, state.pinnedSpotIds || [], this.comprensoriCatalog);
+        this.store.setState({ pinnedSpotIds: nextPinned });
 
-        if (isPinned) {
-          pinned.delete(spotId);
-          if (spot) {
-            const nameLower = (spot.name || '').toLowerCase();
-            const idLower = (spot.id || '').toLowerCase();
-            for (const pid of Array.from(pinned)) {
-              const p = pid.toLowerCase();
-              if (
-                p === idLower ||
-                (idLower.includes('chialamberto') && p.includes('chialamberto')) ||
-                (idLower.includes('martiniana') && p.includes('martiniana')) ||
-                (idLower.includes('cavallaria') && p.includes('cavallaria')) ||
-                (idLower.includes('cornizzolo') && p.includes('cornizzolo')) ||
-                (idLower.includes('grappa') && p.includes('grappa')) ||
-                (idLower.includes('meduno') && p.includes('meduno')) ||
-                (idLower.includes('calascio') && p.includes('calascio'))
-              ) {
-                pinned.delete(pid);
-              }
-            }
+        if (typeof document !== 'undefined') {
+          const searchInput = document.getElementById('picker-search-input');
+          const currentQuery = searchInput ? searchInput.value : '';
+          const container = document.getElementById('picker-sections-container');
+          if (container) {
+            container.innerHTML = this.renderPickerSections(currentQuery);
           }
-        } else {
-          pinned.add(spotId);
         }
-
-        this.store.setState({ pinnedSpotIds: Array.from(pinned) });
-
-        const searchInput = document.getElementById('picker-search-input');
-        const currentQuery = searchInput ? searchInput.value : '';
-        const container = document.getElementById('picker-sections-container');
-        if (container) {
-          container.innerHTML = this.renderPickerSections(currentQuery);
-        } else {
-          this.openPickerSheet(currentQuery);
-        }
+        this.render();
       }
     }
   }
