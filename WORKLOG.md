@@ -90,3 +90,13 @@ Giornale a finestra mobile (rolling window, max **300 righe** / **ultimi 15 inte
 - **Sintesi**:
   - **Core, Persistenza & UI (P0–P3)**: riordinato il bootstrap in [`ui/app.js`](file:///ui/app.js) dando precedenza a IndexedDB; esclusi gli array GPS densi da `localStorage` in [`core/store.js`](file:///core/store.js); cablato `logbookManager.saveFlight()` per i voli manuali; implementato [`core/units.js`](file:///core/units.js); completato il cleanup dei listener DOM e di `sheetManager` sui cambi rotta; deduplicati i selettori in [`css/theme.css`](file:///css/theme.css) e registrato il Service Worker [`sw.js`](file:///sw.js) (801/801 test superati).
   - **Compattazione `MEMORY.md` e `WORKLOG.md`**: archiviati gli storici integrali in [`.agents/archive/MEMORY_v1_archive.md`](file:///.agents/archive/MEMORY_v1_archive.md) e [`.agents/archive/WORKLOG_v1_archive.md`](file:///.agents/archive/WORKLOG_v1_archive.md); distillato [MEMORY.md](file:///MEMORY.md) a `124 righe` (`-97%`) e [WORKLOG.md](file:///WORKLOG.md) a `< 120 righe` (`-95%`), con presidio automatico in [`tests/ui/shiftLeftGovernance.test.mjs`](file:///tests/ui/shiftLeftGovernance.test.mjs).
+
+---
+
+## 2026-10-16 - Fase 3 & 4: Sincronizzazione Cache Multi-Chiave e Allineamento Timeline tra Home e Previsioni
+- **Tipo**: Bugfix Critico / Coerenza Meteo & Timeline (`ForecastView.js`, `HomeDashboardView.js`, `openMeteoApi.js`)
+- **Dettagli**: [.agents/worklog.d/2026-10-16_forecast-home-timeline-cache-sync.md](file:///.agents/worklog.d/2026-10-16_forecast-home-timeline-cache-sync.md)
+- **Sintesi**:
+  - Risolto in [`ui/views/ForecastView.js`](file:///ui/views/ForecastView.js) il disallineamento per cui la `Timeline Volabilità` restava bloccata sul meteo sintetico iniziale (`compositeKey` non aggiornata al termine di `fetchWeatherDataAsync`) mentre il pallino data e il verdetto leggevano il meteo reale, ed eliminata l'iniezione di `landingWeather` sintetico (`26 km/h` raffiche) dentro payload Open-Meteo reali.
+  - Allineato [`ui/views/HomeDashboardView.js`](file:///ui/views/HomeDashboardView.js) (`windspeed_10m ?? wind_speed_10m`, `takeoffId: activeTakeoffId`, popolamento cache multi-day e fallback `getCachedWeatherData`) e [`core/openMeteoApi.js`](file:///core/openMeteoApi.js) (`forecastDays` in ora locale con popolamento multi-data).
+

@@ -1263,6 +1263,38 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     assert.equal(html.includes('points="9 18 15 12 9 6"'), false, 'Comprensorio card chevron must not use horizontal right-pointing arrow');
     assert.ok(css.includes('transform: rotate(180deg)'), 'Vertical chevron must rotate 180deg when accordion drawer is expanded');
   });
+
+  it('aligns Home card verdict with diurnal timeline when Open-Meteo payload uses windspeed_10m and shares multi-day batch cache', async () => {
+    const targetDate = '2026-10-18';
+    const mockStore = createStore({
+      activeDate: targetDate
+    });
+    const controller = new HomeDashboardViewController({ store: mockStore });
+    const chialamberto = controller.comprensoriCatalog.find(c => c.id.includes('chialamberto')) || controller.comprensoriCatalog[0];
+    mockStore.setState({ pinnedSpotIds: [chialamberto.id] });
+
+    const hours = Array.from({ length: 24 }, (_, h) => `${targetDate}T${String(h).padStart(2, '0')}:00`);
+    const windspeed_10m = hours.map((_, h) => (h === 14 ? 26 : 10));
+    const windgusts_10m = hours.map((_, h) => (h === 14 ? 36 : 13));
+    const heading = chialamberto.takeoffs?.[0]?.heading ?? 135;
+
+    controller.cachedWeatherMap.set(`${chialamberto.id}_${targetDate}`, {
+      hourly: {
+        time: hours,
+        windspeed_10m,
+        windgusts_10m,
+        winddirection_10m: Array(24).fill(heading),
+        temperature_2m: Array(24).fill(18),
+        cape: Array(24).fill(120),
+        precipitation: Array(24).fill(0)
+      }
+    });
+
+    const evaluated = controller.getEvaluatedComprensori(false);
+    const item = evaluated.find(e => e.id === chialamberto.id);
+    assert.ok(item, 'Must evaluate Chialamberto comprensorio');
+    assert.equal(item.status, 'flyable', 'Card verdict must align to flyable when daylight timeline has >= 2 flyable hours despite 14:00 spike');
+  });
 });
 
 

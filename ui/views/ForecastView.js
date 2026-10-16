@@ -596,7 +596,7 @@ export class ForecastViewController {
 
     if (!forceRefresh && this.cachedWeatherMap.has(key)) {
       const existing = this.cachedWeatherMap.get(key);
-      if (existing && !existing._isSynthetic && !existing.isStale && existing.landingWeather) {
+      if (existing && !existing._isSynthetic && !existing.isSynthetic && !existing.isStale && existing.landingWeather) {
         this.networkStatus = 'live';
         this.updateLiveStatusBadgeInDom();
         return existing;
@@ -612,8 +612,9 @@ export class ForecastViewController {
     this.networkStatus = 'loading';
     this.updateLiveStatusBadgeInDom();
 
-    const takeoff = this.resolveActiveTakeoff(spot) || (spot.takeoffs && spot.takeoffs[0]) || { altitude: 1000, heading: null };
+    const takeoff = this.resolveActiveTakeoff(spot) || (spot.takeoffs && spot.takeoffs[0]) || { id: 't0', altitude: 1000, heading: null };
     const landing = this.resolveActiveLanding(spot) || (spot.landings && spot.landings[0]) || null;
+    const compositeKey = `${spot.id}_${takeoff.id || 't0'}_${landing?.id || 'l0'}_${dateStr}`;
     const tCoords = parseCoordinates(takeoff.coordinates) || { lat: 45.833, lon: 9.302 };
     const lCoords = landing ? parseCoordinates(landing.coordinates) : null;
 
@@ -648,11 +649,22 @@ export class ForecastViewController {
             this._rateLimited = false;
           } else {
             enriched._isSynthetic = false;
+            enriched.isSynthetic = false;
             this.networkStatus = 'live';
             this._networkFailed = false;
             this._rateLimited = false;
           }
+          enriched._takeoffId = takeoff.id || null;
+          enriched._landingId = landing?.id || null;
+
+          // Purge any stale or synthetic entries for this spot and date across all sub-spot combinations
+          for (const existingKey of Array.from(this.cachedWeatherMap.keys())) {
+            if (existingKey.startsWith(`${spot.id}_`) && existingKey.endsWith(`_${dateStr}`)) {
+              this.cachedWeatherMap.delete(existingKey);
+            }
+          }
           this.cachedWeatherMap.set(key, enriched);
+          this.cachedWeatherMap.set(compositeKey, enriched);
 
           // Clear multi-day summary cache so it recalculates with real weather
           const todayIso = formatDateIso(new Date());
@@ -716,6 +728,13 @@ export class ForecastViewController {
     const baseKey = `${spot.id}_${dateStr}`;
     const key = `${spot.id}_${takeoff.id || 't0'}_${landing?.id || 'l0'}_${dateStr}`;
 
+    const coversTargetDate = (payload) => {
+      if (!payload || !payload.hourly || !Array.isArray(payload.hourly.time)) return false;
+      if (!dateStr) return true;
+      if (payload.hourly.time.some(t => typeof t === 'string' && t.startsWith(`${dateStr}T`))) return true;
+      return payload.hourly.time.length <= 24 && (!payload.targetDate || payload.targetDate === dateStr);
+    };
+
     const ensureLandingWeather = (weatherPayload) => {
       if (!weatherPayload) return weatherPayload;
       if (weatherPayload.landingWeather && (!landing || !weatherPayload._landingId || weatherPayload._landingId === landing.id)) {
@@ -728,7 +747,8 @@ export class ForecastViewController {
           if (lCached && !lCached.isStale) {
             weatherPayload.landingWeather = lCached;
             weatherPayload.points = [weatherPayload, lCached];
-          } else {
+            weatherPayload._landingId = landing.id || null;
+          } else if (weatherPayload._isSynthetic || weatherPayload.isSynthetic) {
             const landingSynthetic = generateSyntheticWeather(
               lCoords,
               {
@@ -742,52 +762,61 @@ export class ForecastViewController {
             const enrichedLanding = enrichWeatherData(landingSynthetic, dateStr, Date.now(), {});
             weatherPayload.landingWeather = enrichedLanding;
             weatherPayload.points = [weatherPayload, enrichedLanding];
+            weatherPayload._landingId = landing.id || null;
           }
-          weatherPayload._landingId = landing.id || null;
         }
       }
       return weatherPayload;
     };
 
-    if (this.cachedWeatherMap.has(key)) {
-      const data = ensureLandingWeather(this.cachedWeatherMap.get(key));
-      if (data && !data._isSynthetic && !data.isStaleOfflineFallback && !this._networkFailed) {
-        this.networkStatus = 'live';
-      }
-      return data;
-    }
-
+    // Prefer non-synthetic cached entry in baseKey or composite key first
     if (this.cachedWeatherMap.has(baseKey)) {
       const baseEntry = this.cachedWeatherMap.get(baseKey);
-      if (!baseEntry._takeoffId || baseEntry._takeoffId === takeoff.id) {
+      if (baseEntry && !baseEntry._isSynthetic && !baseEntry.isSynthetic && (!baseEntry._takeoffId || baseEntry._takeoffId === takeoff.id) && coversTargetDate(baseEntry)) {
         const data = ensureLandingWeather(baseEntry);
-        if (data && !data._isSynthetic && !data.isStaleOfflineFallback && !this._networkFailed) {
+        this.cachedWeatherMap.set(key, data);
+        if (!data.isStaleOfflineFallback && !this._networkFailed) {
           this.networkStatus = 'live';
         }
         return data;
       }
     }
 
-    // Check store global weatherData if matching spot and takeoff
+    if (this.cachedWeatherMap.has(key)) {
+      const keyEntry = this.cachedWeatherMap.get(key);
+      if (keyEntry && !keyEntry._isSynthetic && !keyEntry.isSynthetic && coversTargetDate(keyEntry)) {
+        const data = ensureLandingWeather(keyEntry);
+        if (!data.isStaleOfflineFallback && !this._networkFailed) {
+          this.networkStatus = 'live';
+        }
+        return data;
+      }
+    }
+
+    // Check store global weatherData if matching spot, takeoff, and target date
     const state = this.store ? this.store.getState() : {};
     if (
       state.weatherData &&
+      !state.weatherData._isSynthetic &&
+      !state.weatherData.isSynthetic &&
       state.selectedSpot &&
       state.selectedSpot.id === spot.id &&
-      (!state.weatherData._takeoffId || state.weatherData._takeoffId === takeoff.id)
+      (!state.weatherData._takeoffId || state.weatherData._takeoffId === takeoff.id) &&
+      coversTargetDate(state.weatherData)
     ) {
       const data = ensureLandingWeather(state.weatherData);
       this.cachedWeatherMap.set(key, data);
-      if (!data._isSynthetic && !data.isStaleOfflineFallback && !this._networkFailed) {
+      this.cachedWeatherMap.set(baseKey, data);
+      if (!data.isStaleOfflineFallback && !this._networkFailed) {
         this.networkStatus = 'live';
       }
       return data;
     }
 
-    // Check defaultWeatherCache
+    // Check defaultWeatherCache (includes real payloads fetched in HomeDashboardView batch requests)
     const coords = parseCoordinates(takeoff.coordinates) || { lat: 45.833, lon: 9.302 };
     const cached = getCachedWeatherData(coords, dateStr, { weatherModel: 'best_match' });
-    if (cached && !cached.isStale) {
+    if (cached && !cached.isStale && coversTargetDate(cached)) {
       cached._takeoffId = takeoff.id || null;
       const data = ensureLandingWeather(cached);
       this.cachedWeatherMap.set(key, data);
@@ -796,6 +825,11 @@ export class ForecastViewController {
         this.networkStatus = 'live';
       }
       return data;
+    }
+
+    // Fallback to cached synthetic entry if already computed for this key
+    if (this.cachedWeatherMap.has(key)) {
+      return ensureLandingWeather(this.cachedWeatherMap.get(key));
     }
 
     // Generate deterministic synthetic day for immediate 0ms offline rendering

@@ -1899,14 +1899,17 @@ export async function fetchBatchComprensoriWeather(comprensori, options = {}) {
     url.searchParams.append('longitude', lons);
     url.searchParams.append('timezone', 'auto');
 
-    let forecastDays = 2;
-    if (targetDate) {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const target = new Date(targetDate);
-        target.setHours(0, 0, 0, 0);
-        const diffDays = Math.round((target.getTime() - today.getTime()) / (24 * 3600 * 1000));
-        forecastDays = Math.max(2, Math.min(16, diffDays >= 0 ? diffDays + 1 : 2));
+    let forecastDays = 3;
+    if (targetDate && typeof targetDate === 'string') {
+        const now = new Date();
+        const todayLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const parts = targetDate.split('-').map(Number);
+        const targetLocal = (parts.length === 3 && !parts.some(isNaN))
+            ? new Date(parts[0], parts[1] - 1, parts[2])
+            : new Date(targetDate);
+        targetLocal.setHours(0, 0, 0, 0);
+        const diffDays = Math.round((targetLocal.getTime() - todayLocal.getTime()) / (24 * 3600 * 1000));
+        forecastDays = Math.max(3, Math.min(16, diffDays >= 0 ? diffDays + 1 : 3));
     }
     url.searchParams.append('forecast_days', String(forecastDays));
     url.searchParams.append('hourly', 'temperature_2m,dewpoint_2m,windspeed_10m,winddirection_10m,windgusts_10m,cape,precipitation');
@@ -1934,8 +1937,18 @@ export async function fetchBatchComprensoriWeather(comprensori, options = {}) {
                     : null;
                 rawPayload._isSynthetic = false;
 
-                const cacheKey = generateWeatherCacheKey(item.coords.lat, item.coords.lon, targetDate, activeModel);
-                cache.set(cacheKey, rawPayload);
+                const availableDates = new Set([targetDate]);
+                if (rawPayload.hourly && Array.isArray(rawPayload.hourly.time)) {
+                    rawPayload.hourly.time.forEach(t => {
+                        if (typeof t === 'string' && t.length >= 10) {
+                            availableDates.add(t.substring(0, 10));
+                        }
+                    });
+                }
+                availableDates.forEach(dateKey => {
+                    const cacheKey = generateWeatherCacheKey(item.coords.lat, item.coords.lon, dateKey, activeModel);
+                    cache.set(cacheKey, rawPayload);
+                });
                 resultMap.set(item.spot.id, rawPayload);
             });
         }

@@ -35,7 +35,8 @@ import {
 import {
   generateSyntheticWeather,
   enrichWeatherData,
-  fetchBatchComprensoriWeather
+  fetchBatchComprensoriWeather,
+  getCachedWeatherData
 } from '../../core/openMeteoApi.js';
 import {
   calculatePilotPeriodMetrics,
@@ -255,6 +256,16 @@ export class HomeDashboardViewController {
         for (const [id, payload] of batchMap.entries()) {
           this.cachedWeatherMap.set(`${id}_${targetDate}`, payload);
           this.cachedWeatherMap.set(id, payload);
+          if (Array.isArray(payload?.hourly?.time)) {
+            const dates = new Set(
+              payload.hourly.time
+                .filter(t => typeof t === 'string' && t.length >= 10)
+                .map(t => t.slice(0, 10))
+            );
+            for (const d of dates) {
+              this.cachedWeatherMap.set(`${id}_${d}`, payload);
+            }
+          }
         }
         const hasStale = Array.from(batchMap.values()).some(v => v.isStaleOfflineFallback);
         this.networkStatus = hasStale ? 'offline' : 'live';
@@ -450,16 +461,43 @@ export class HomeDashboardViewController {
     for (const comprensorio of sourceComprensori) {
       let spotWeather = null;
       const dateKey = targetDate ? `${comprensorio.id}_${targetDate}` : null;
-      if (dateKey && this.cachedWeatherMap.has(dateKey)) {
-        spotWeather = this.cachedWeatherMap.get(dateKey);
-      } else if (this.cachedWeatherMap.has(comprensorio.id)) {
-        const candidate = this.cachedWeatherMap.get(comprensorio.id);
-        if (!targetDate || !candidate.hourly?.time || candidate.hourly.time.some(t => typeof t === 'string' && t.startsWith(`${targetDate}T`))) {
+      if (
+        weatherData &&
+        !weatherData._isSynthetic &&
+        !weatherData.isSynthetic &&
+        state.selectedSpot &&
+        state.selectedSpot.id === comprensorio.id &&
+        (!targetDate || !weatherData.hourly?.time || weatherData.hourly.time.some(t => typeof t === 'string' && t.startsWith(`${targetDate}T`)))
+      ) {
+        spotWeather = weatherData;
+      } else if (dateKey && this.cachedWeatherMap.has(dateKey)) {
+        const candidate = this.cachedWeatherMap.get(dateKey);
+        if (!targetDate || !candidate.hourly?.time || candidate.hourly.time.some(t => typeof t === 'string' && t.startsWith(`${targetDate}T`)) || candidate.hourly.time.length <= 24) {
           spotWeather = candidate;
         }
-      } else if (weatherData && (!state.selectedSpot || state.selectedSpot.id === comprensorio.id)) {
+      }
+      if (!spotWeather && this.cachedWeatherMap.has(comprensorio.id)) {
+        const candidate = this.cachedWeatherMap.get(comprensorio.id);
+        if (!targetDate || !candidate.hourly?.time || candidate.hourly.time.some(t => typeof t === 'string' && t.startsWith(`${targetDate}T`)) || candidate.hourly.time.length <= 24) {
+          spotWeather = candidate;
+        }
+      }
+      if (!spotWeather && weatherData && (!state.selectedSpot || state.selectedSpot.id === comprensorio.id)) {
         if (!targetDate || !weatherData.hourly?.time || weatherData.hourly.time.some(t => typeof t === 'string' && t.startsWith(`${targetDate}T`)) || weatherData.hourly?.time?.length <= 24) {
           spotWeather = weatherData;
+        }
+      }
+      if (!spotWeather && targetDate) {
+        const primaryTakeoff = (comprensorio.takeoffs && comprensorio.takeoffs.find(t => t.isPrimary))
+          || (comprensorio.takeoffs && comprensorio.takeoffs[0])
+          || null;
+        const tCoords = primaryTakeoff ? parseCoordinates(primaryTakeoff.coordinates) : null;
+        if (tCoords) {
+          const cached = getCachedWeatherData(tCoords, targetDate, { weatherModel: 'best_match' });
+          if (cached && !cached.isStale) {
+            spotWeather = cached;
+            if (dateKey) this.cachedWeatherMap.set(dateKey, cached);
+          }
         }
       }
 
@@ -471,6 +509,7 @@ export class HomeDashboardViewController {
         weatherData: spotWeather,
         glider: activeGlider,
         pilotSafetyFactor: activeGlider.pilotSafetyFactor || null,
+        takeoffId: activeTakeoffId,
         activeTakeoffId,
         targetDate,
         allowSynthetic: false
@@ -479,8 +518,9 @@ export class HomeDashboardViewController {
       const diurnalTimeline = this.buildDiurnalTimeline(comprensorio, spotWeather, activeGlider, targetDate, activeTakeoffId);
 
       // Align daily card verdict with the diurnal timeline when multi-hour weather is present:
-      // if a spot has >= 2 flyable hours during daylight, do not penalize the whole card because 14:00 alone is yellow.
-      if (spotWeather && Array.isArray(spotWeather.hourly?.wind_speed_10m) && spotWeather.hourly.wind_speed_10m.length > 1) {
+      // if a spot has >= 2 flyable hours during daylight, do not penalize the whole card because 14:00 alone is yellow/red.
+      const windSpeedSeries = spotWeather?.hourly?.windspeed_10m ?? spotWeather?.hourly?.wind_speed_10m;
+      if (spotWeather && Array.isArray(windSpeedSeries) && windSpeedSeries.length > 1) {
         const flyableSlots = diurnalTimeline.slots.filter(s => s.status === 'flyable');
         const cautionSlots = diurnalTimeline.slots.filter(s => s.status === 'caution');
         if (flyableSlots.length >= 2 && result.status !== 'flyable') {
@@ -491,6 +531,7 @@ export class HomeDashboardViewController {
             hourIndex: repHour,
             glider: activeGlider,
             pilotSafetyFactor: activeGlider.pilotSafetyFactor || null,
+            takeoffId: activeTakeoffId,
             activeTakeoffId,
             targetDate,
             allowSynthetic: false
@@ -503,6 +544,7 @@ export class HomeDashboardViewController {
             hourIndex: repHour,
             glider: activeGlider,
             pilotSafetyFactor: activeGlider.pilotSafetyFactor || null,
+            takeoffId: activeTakeoffId,
             activeTakeoffId,
             targetDate,
             allowSynthetic: false
@@ -590,8 +632,10 @@ export class HomeDashboardViewController {
     }
     const dateIso = targetDate || (this.store ? this.store.getState().activeDate : null) || formatDateIso(new Date());
     const gliderKey = `${activeGlider?.id || activeGlider?.category || 'EN-A'}_${activeGlider?.pilotSafetyFactor?.multiplier || 1}_${activeTakeoffId || ''}`;
+    const windArr = spotWeather?.hourly?.windspeed_10m ?? spotWeather?.hourly?.wind_speed_10m;
+    const gustArr = spotWeather?.hourly?.windgusts_10m ?? spotWeather?.hourly?.wind_gusts_10m;
     const weatherTag = spotWeather
-      ? `${spotWeather.hourly?.time?.[0] || 'w'}_${spotWeather.hourly?.wind_speed_10m?.[0] ?? ''}_${spotWeather.hourly?.wind_gusts_10m?.[0] ?? ''}`
+      ? `${spotWeather.hourly?.time?.[0] || 'w'}_${spotWeather.fetchTimestamp || ''}_${windArr?.[0] ?? ''}_${gustArr?.[0] ?? ''}`
       : 'offline';
     const cacheKey = `${comprensorio.id}_${dateIso}_${gliderKey}_${weatherTag}`;
 
@@ -611,14 +655,14 @@ export class HomeDashboardViewController {
           windSpeed: null
         };
       }
-      const windArr = spotWeather.hourly?.wind_speed_10m;
-      const effectiveHourIdx = Array.isArray(windArr) && windArr[hour] === undefined && windArr.length > 0 ? 0 : hour;
+      const effectiveHourIdx = Array.isArray(windArr) && windArr.length <= 24 && windArr[hour] === undefined && windArr.length > 0 ? 0 : hour;
       const hourEval = evaluateComprensorio({
         comprensorio,
         weatherData: spotWeather,
         hourIndex: effectiveHourIdx,
         glider: activeGlider,
         pilotSafetyFactor: activeGlider?.pilotSafetyFactor || null,
+        takeoffId: activeTakeoffId,
         activeTakeoffId,
         targetDate: dateIso,
         allowSynthetic: false

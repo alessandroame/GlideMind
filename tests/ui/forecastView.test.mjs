@@ -3438,6 +3438,72 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
         'Empty flight windows container must have display:none in Atterraggio mode to prevent phantom flex gap'
       );
     });
+
+    it('replaces initial 0ms synthetic composite cache entry when fetchWeatherDataAsync resolves so timeline matches live weather', async () => {
+      const chialamberto = DEFAULT_COMPRENSORI.find(c => c.id.includes('chialamberto')) || DEFAULT_COMPRENSORI[0];
+      const targetDate = '2026-10-18';
+      const mockStore = createStore({
+        selectedSpot: chialamberto,
+        activeDate: targetDate
+      });
+
+      const hours = Array.from({ length: 24 }, (_, h) => `${targetDate}T${String(h).padStart(2, '0')}:00`);
+      const makeRainyPayload = (lat, lon, elev) => ({
+        latitude: lat,
+        longitude: lon,
+        elevation: elev,
+        daily: {
+          time: [targetDate],
+          sunrise: [`${targetDate}T07:30`],
+          sunset: [`${targetDate}T18:30`]
+        },
+        hourly: {
+          time: hours,
+          temperature_2m: Array(24).fill(12),
+          dewpoint_2m: Array(24).fill(11),
+          windspeed_10m: Array(24).fill(6),
+          windgusts_10m: Array(24).fill(13),
+          winddirection_10m: Array(24).fill(118),
+          cape: Array(24).fill(50),
+          precipitation: Array(24).fill(1.4),
+          shortwave_radiation_instant: Array(24).fill(80),
+          boundary_layer_height: Array(24).fill(400)
+        }
+      });
+
+      const customFetch = async () => ({
+        ok: true,
+        status: 200,
+        json: async () => [
+          makeRainyPayload(45.374, 7.342, 1780),
+          makeRainyPayload(45.362, 7.353, 800)
+        ]
+      });
+
+      const controller = new ForecastViewController({
+        store: mockStore,
+        fetchFn: customFetch
+      });
+
+      // 1. Trigger 0ms initial render BEFORE async fetch resolves (populates composite key with synthetic weather)
+      const initialData = controller.getWeatherData(chialamberto, targetDate);
+      assert.equal(Boolean(initialData._isSynthetic), true, 'Initial 0ms fallback must be synthetic before fetch completes');
+
+      // 2. Resolve async Open-Meteo fetch
+      const liveData = await controller.fetchWeatherDataAsync(chialamberto, targetDate, true);
+      assert.ok(liveData, 'fetchWeatherDataAsync must return enriched live weather');
+      assert.equal(Boolean(liveData._isSynthetic), false, 'Live weather must not be flagged as synthetic');
+
+      // 3. Subsequent getWeatherData and timeline slot evaluation must use live rainy data, NOT stale synthetic composite cache
+      const afterFetchData = controller.getWeatherData(chialamberto, targetDate);
+      assert.equal(Boolean(afterFetchData._isSynthetic), false, 'getWeatherData must return live weather after fetch completes');
+      assert.equal(afterFetchData.hourly.precipitation[14], 1.4, 'Must expose real 1.4 mm precipitation from Open-Meteo');
+
+      const slot08 = controller.evaluateTimelineSlot(chialamberto, afterFetchData, 8, controller.getActiveGlider(), null);
+      const slot12 = controller.evaluateTimelineSlot(chialamberto, afterFetchData, 12, controller.getActiveGlider(), null);
+      assert.equal(slot08.status, 'unflyable', 'Timeline slot 08:00 must be unflyable due to 1.4 mm rain (not synthetic green)');
+      assert.equal(slot12.status, 'unflyable', 'Timeline slot 12:00 must be unflyable due to 1.4 mm rain (not synthetic yellow)');
+    });
   });
 });
 
