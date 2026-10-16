@@ -28,13 +28,17 @@
 
   /* Flyability Status Codes */
   --gm-status-flyable: #22c55e;
+  --gm-status-flyable-text: #4ade80;
   --gm-status-flyable-bg: rgba(34, 197, 94, 0.15);
   --gm-status-caution: #eab308;
+  --gm-status-caution-text: #fde047;
   --gm-status-caution-bg: rgba(234, 179, 8, 0.15);
   --gm-status-unflyable: #ef4444;
-  --gm-status-unflyable-bg: rgba(239, 68, 68, 0.15);
+  --gm-status-unflyable-text: #fca5a5;
+  --gm-status-unflyable-bg: rgba(239, 68, 68, 0.18);
+  --gm-status-unflyable-border: rgba(248, 113, 113, 0.45);
   --gm-status-severe: #09090b;
-  --gm-status-severe-text: #f87171;
+  --gm-status-severe-text: #fecaca;
   --gm-status-severe-bg: rgba(15, 23, 42, 0.95);
   --gm-status-severe-border: #ef4444;
   --gm-status-alert: #f97316;
@@ -101,13 +105,17 @@
 
   /* Flyability Status Codes (Aligned with dark mode vibrant colors per user specification) */
   --gm-status-flyable: #22c55e;
+  --gm-status-flyable-text: #15803d;
   --gm-status-flyable-bg: rgba(34, 197, 94, 0.15);
   --gm-status-caution: #eab308;
+  --gm-status-caution-text: #b45309;
   --gm-status-caution-bg: rgba(234, 179, 8, 0.15);
   --gm-status-unflyable: #ef4444;
+  --gm-status-unflyable-text: #b91c1c;
   --gm-status-unflyable-bg: rgba(239, 68, 68, 0.15);
+  --gm-status-unflyable-border: rgba(185, 28, 28, 0.35);
   --gm-status-severe: #09090b;
-  --gm-status-severe-text: #f87171;
+  --gm-status-severe-text: #fecaca;
   --gm-status-severe-bg: rgba(15, 23, 42, 0.95);
   --gm-status-severe-border: #ef4444;
   --gm-status-alert: #f97316;
@@ -593,8 +601,8 @@ button, input, select, textarea {
 
 .gm-badge-unflyable {
   background-color: var(--gm-status-unflyable-bg);
-  color: var(--gm-status-unflyable);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: var(--gm-status-unflyable-text, #fca5a5);
+  border: 1px solid var(--gm-status-unflyable-border, rgba(248, 113, 113, 0.45));
 }
 
 .gm-badge-alert {
@@ -1686,14 +1694,17 @@ button, input, select, textarea {
 }
 
 .gm-reason-pill.pill-unflyable {
-  color: var(--gm-status-unflyable);
-  border-color: rgba(239, 68, 68, 0.35);
+  background: var(--gm-status-unflyable-bg);
+  color: var(--gm-status-unflyable-text, #fca5a5);
+  border-color: var(--gm-status-unflyable-border, rgba(248, 113, 113, 0.45));
+  font-weight: 600;
 }
 
 .gm-reason-pill.pill-severe {
-  color: var(--gm-status-severe-border);
-  border-color: rgba(239, 68, 68, 0.55);
-  font-weight: 600;
+  background: rgba(153, 27, 27, 0.32);
+  color: var(--gm-status-severe-text, #fecaca);
+  border-color: rgba(248, 113, 113, 0.55);
+  font-weight: 700;
 }
 
 [data-theme="light"] .gm-reason-pill.pill-flyable {
@@ -1708,8 +1719,9 @@ button, input, select, textarea {
 
 [data-theme="light"] .gm-reason-pill.pill-unflyable,
 [data-theme="light"] .gm-reason-pill.pill-severe {
+  background: rgba(239, 68, 68, 0.14);
   color: #b91c1c;
-  border-color: rgba(185, 28, 28, 0.3);
+  border-color: rgba(185, 28, 28, 0.35);
 }
 
 .gm-explain-bullet {
@@ -4850,15 +4862,15 @@ input.gm-input:focus {
 }
 
 .gm-param-status-badge.unflyable {
-  background-color: rgba(239, 68, 68, 0.15);
-  color: var(--gm-status-unflyable);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  background-color: var(--gm-status-unflyable-bg);
+  color: var(--gm-status-unflyable-text, #fca5a5);
+  border: 1px solid var(--gm-status-unflyable-border, rgba(248, 113, 113, 0.45));
 }
 
 .gm-param-status-badge.severe {
-  background-color: rgba(153, 27, 27, 0.3);
-  color: #f87171;
-  border: 1px solid rgba(239, 68, 68, 0.4);
+  background-color: rgba(153, 27, 27, 0.35);
+  color: var(--gm-status-severe-text, #fecaca);
+  border: 1px solid rgba(248, 113, 113, 0.55);
 }
 
 .gm-param-sub-row {
@@ -5074,6 +5086,12 @@ input.gm-input:focus {
   border: 1px solid var(--gm-border);
 }
 
+.gm-trend-sub-badge.status-unflyable {
+  background-color: var(--gm-status-unflyable-bg);
+  color: var(--gm-status-unflyable-text, #fca5a5);
+  border-color: var(--gm-status-unflyable-border, rgba(248, 113, 113, 0.45));
+}
+
 .gm-trend-sub-badge.status-alert {
   color: var(--gm-status-alert);
   border-color: rgba(239, 68, 68, 0.3);
@@ -5145,26 +5163,26 @@ input.gm-input:focus {
 
 [data-theme="light"] .gm-param-status-badge.flyable {
   background-color: rgba(34, 197, 94, 0.15);
-  color: var(--gm-status-flyable);
-  border-color: rgba(34, 197, 94, 0.3);
+  color: var(--gm-status-flyable-text, #15803d);
+  border-color: rgba(34, 197, 94, 0.35);
 }
 
 [data-theme="light"] .gm-param-status-badge.caution {
   background-color: rgba(234, 179, 8, 0.15);
-  color: var(--gm-status-caution);
-  border-color: rgba(234, 179, 8, 0.3);
+  color: var(--gm-status-caution-text, #b45309);
+  border-color: rgba(234, 179, 8, 0.35);
 }
 
 [data-theme="light"] .gm-param-status-badge.unflyable {
-  background-color: rgba(239, 68, 68, 0.15);
-  color: var(--gm-status-unflyable);
-  border-color: rgba(239, 68, 68, 0.3);
+  background-color: var(--gm-status-unflyable-bg);
+  color: var(--gm-status-unflyable-text, #b91c1c);
+  border-color: var(--gm-status-unflyable-border, rgba(185, 28, 28, 0.35));
 }
 
 [data-theme="light"] .gm-param-status-badge.severe {
-  background-color: rgba(153, 27, 27, 0.2);
-  color: #f87171;
-  border-color: rgba(239, 68, 68, 0.4);
+  background-color: rgba(185, 28, 28, 0.18);
+  color: #991b1b;
+  border-color: rgba(185, 28, 28, 0.45);
 }
 
 /* ==========================================================================
@@ -5372,16 +5390,35 @@ input.gm-input:focus {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 1px 8px;
+  padding: 2px 8px;
   border-radius: var(--gm-radius-full);
   background: var(--gm-bg-elevated);
+  border: 1px solid var(--gm-border);
   font-size: 0.70rem;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--gm-text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 170px;
+}
+
+.gm-map-scrubber-spot-pill.status-unflyable {
+  background: var(--gm-status-unflyable-bg);
+  color: var(--gm-status-unflyable-text, #fca5a5) !important;
+  border-color: var(--gm-status-unflyable-border, rgba(248, 113, 113, 0.45));
+}
+
+.gm-map-scrubber-spot-pill.status-caution {
+  background: var(--gm-status-caution-bg);
+  color: var(--gm-status-caution-text, #fde047) !important;
+  border-color: rgba(234, 179, 8, 0.35);
+}
+
+.gm-map-scrubber-spot-pill.status-flyable {
+  background: var(--gm-status-flyable-bg);
+  color: var(--gm-status-flyable-text, #4ade80) !important;
+  border-color: rgba(34, 197, 94, 0.35);
 }
 
 .gm-map-scrubber-hour-display {
@@ -10651,8 +10688,8 @@ input.gm-input:focus {
 
 .gm-flight-window-badge-unflyable {
   background-color: var(--gm-status-unflyable-bg);
-  color: var(--gm-status-unflyable);
-  border: 1px solid var(--gm-status-unflyable);
+  color: var(--gm-status-unflyable-text, #fca5a5);
+  border: 1px solid var(--gm-status-unflyable-border, rgba(248, 113, 113, 0.45));
 }
 
 .gm-flight-window-card-title {
@@ -10701,12 +10738,12 @@ input.gm-input:focus {
 
 .gm-flight-window-hazard-chip {
   font-size: 0.70rem;
-  font-weight: 600;
-  padding: 1px 6px;
+  font-weight: 700;
+  padding: 2px 7px;
   border-radius: var(--gm-radius-xs);
-  background-color: rgba(239, 68, 68, 0.12);
-  color: var(--gm-status-unflyable);
-  border: 1px solid rgba(239, 68, 68, 0.25);
+  background-color: var(--gm-status-unflyable-bg);
+  color: var(--gm-status-unflyable-text, #fca5a5);
+  border: 1px solid var(--gm-status-unflyable-border, rgba(248, 113, 113, 0.45));
 }
 
 [data-theme="light"] .gm-flight-window-card {

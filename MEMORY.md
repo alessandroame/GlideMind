@@ -47,9 +47,9 @@ Registro distillato per dominio dei vincoli architetturali e delle insidie di ru
 
 ## 3. Architettura UI, Ergonomia Outdoor & Design System
 
-- **Governance CSS, Dual Theme Sunlight e Touch Floor ($\ge 48\text{px}$)**:
-  - *Insidia*: Selettori CSS top-level duplicati causano override silenziosi; lo shorthand `background:` su `<select>` ripete l'icona SVG; target $< 48\text{px}$ falliscono con i guanti.
-  - *Regola*: Zero stili inline statici, zero selettori duplicati in `css/theme.css`, `background-repeat: no-repeat !important` sui `<select>` multi-layer e touch target $\ge 48\text{px}$ (estesi via `::before` sui controlli compatti).
+- **Governance CSS, Dual Theme Sunlight, Contrasto Pill (`--gm-status-unflyable-text`) e Touch Floor ($\ge 48\text{px}$)**:
+  - *Insidia*: Selettori CSS top-level duplicati causano override silenziosi; usare `#ef4444` (`--gm-status-unflyable`) come testo su fondo rosso semitrasparente scuro abbatte il contrasto a `3.44:1` (cromostereopsi); target $< 48\text{px}$ falliscono con i guanti.
+  - *Regola*: Zero stili inline statici, zero selettori duplicati in `css/theme.css`, touch target $\ge 48\text{px}$ e separazione tra token grafico (`--gm-status-unflyable: #ef4444`) e token tipografico dei pill (`--gm-status-unflyable-text: #fca5a5` su dark `7.8:1 AAA`, `#b91c1c` su light `6.4:1`).
 - **Home Dashboard 100% Meteo-Centrica e Timeline Sottile (`HomeDashboardView.js`)**:
   - *Insidia*: Card statistiche pilota in Home rubano il 35% dell'Above-the-Fold; barre orarie spesse `8px` con numeri ripetuti creano rumore visivo.
   - *Regola*: Nessun blocco statistiche pilota in Home (mostrare `#home-pilot-currency-alert` solo se `reentry`/`lapsed`). Barra simbiotica monoriga (`#home-symbiotic-toolbar`), card a 2 righe con `.gm-home-timeline-bar` alta `3.5px` senza numeri orari né `.is-selected-hour`, opacità differenziata (`flyable: 0.85`, `unflyable: 0.28`) e singolo bottone `.gm-spot-accordion-trigger` con chevron verticale.

@@ -1784,8 +1784,8 @@ export class ForecastViewController {
           </span>
         </div>
         <span 
-          class="px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider rounded-full border border-current"
-          style="color: ${evalData.badgeColor}; background-color: ${evalData.badgeBg};"
+          class="px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider rounded-full border border-current gm-badge-${escapeHtml(evalData.status || 'unavailable')}"
+          style="color: ${evalData.status === 'unflyable' ? 'var(--gm-status-unflyable-text)' : evalData.badgeColor}; background-color: ${evalData.badgeBg};"
         >
           ${evalData.badge}
         </span>
@@ -4466,7 +4466,10 @@ export class ForecastViewController {
   renderStickyScrubber(spot, weatherData, glider) {
     const activeSub = this.resolveActiveSubSpot(spot);
     const evalCurrent = this.evaluateTimelineSlot(spot, weatherData, this.selectedHour, glider, activeSub);
-    const statusColor = (STATUS_COLORS && STATUS_COLORS[evalCurrent?.status]?.fill) || 'var(--gm-text-secondary)';
+    const pillStatus = evalCurrent?.status || 'unavailable';
+    const statusColor = pillStatus === 'unflyable'
+      ? 'var(--gm-status-unflyable-text)'
+      : ((STATUS_COLORS && STATUS_COLORS[pillStatus]?.fill) || 'var(--gm-text-secondary)');
     const pillReason = evalCurrent?.shortReason || evalCurrent?.badge || 'N/D';
 
     return `
@@ -4478,7 +4481,7 @@ export class ForecastViewController {
         <div class="gm-map-scrubber-header">
           <div class="gm-map-scrubber-title-group">
             <span class="gm-map-scrubber-title">Timeline Volabilità</span>
-            <span id="forecast-scrubber-spot-pill" class="gm-map-scrubber-spot-pill" title="${escapeHtml(evalCurrent?.reason || pillReason)}" style="color: ${statusColor};">
+            <span id="forecast-scrubber-spot-pill" class="gm-map-scrubber-spot-pill status-${escapeHtml(pillStatus)}" title="${escapeHtml(evalCurrent?.reason || pillReason)}" style="color: ${statusColor};">
               ${escapeHtml(pillReason)}
             </span>
           </div>
@@ -4877,6 +4880,10 @@ export class ForecastViewController {
 
     // 6. Update scrubber header labels in place if present
     const slotEval = this.evaluateTimelineSlot(spot, weatherData, hour, glider, activeSubSpotObj);
+    const pillStatus = slotEval?.status || 'unavailable';
+    const pillColor = pillStatus === 'unflyable'
+      ? 'var(--gm-status-unflyable-text)'
+      : ((STATUS_COLORS && STATUS_COLORS[pillStatus]?.fill) || 'var(--gm-text-secondary)');
     const pillShortReason = slotEval?.shortReason || slotEval?.badge || 'Ottimale';
     const pillFullReason = slotEval?.reason || pillShortReason;
     const forecastHourLabel = this.containerEl?.querySelector('#forecast-active-hour-label');
@@ -4887,7 +4894,8 @@ export class ForecastViewController {
     if (forecastSpotPill) {
       forecastSpotPill.textContent = pillShortReason;
       forecastSpotPill.setAttribute('title', pillFullReason);
-      forecastSpotPill.style.color = (STATUS_COLORS && STATUS_COLORS[slotEval.status]?.fill) || 'var(--gm-text-secondary)';
+      forecastSpotPill.className = `gm-map-scrubber-spot-pill status-${pillStatus}`;
+      forecastSpotPill.style.color = pillColor;
     }
 
     const faHourLabel = this.flightAnalysisOverlayEl?.querySelector('#flight-analysis-active-hour-label');
@@ -4898,7 +4906,8 @@ export class ForecastViewController {
     if (faSpotPill) {
       faSpotPill.textContent = pillShortReason;
       faSpotPill.setAttribute('title', pillFullReason);
-      faSpotPill.style.color = (STATUS_COLORS && STATUS_COLORS[slotEval.status]?.fill) || 'var(--gm-text-secondary)';
+      faSpotPill.className = `gm-map-scrubber-spot-pill status-${pillStatus}`;
+      faSpotPill.style.color = pillColor;
     }
 
     // 7. Update Flight Analysis Overlay if open
@@ -5799,10 +5808,12 @@ export class ForecastViewController {
                 ${(() => {
                   const slotEval = this.evaluateTimelineSlot(spot, weatherData, this.selectedHour, glider, activeSub);
                   const pillStatus = slotEval?.status || (circuitData.isSafetyWarning ? 'caution' : 'flyable');
-                  const pillColor = (STATUS_COLORS && STATUS_COLORS[pillStatus]?.fill) || 'var(--gm-text-secondary)';
+                  const pillColor = pillStatus === 'unflyable'
+                    ? 'var(--gm-status-unflyable-text)'
+                    : ((STATUS_COLORS && STATUS_COLORS[pillStatus]?.fill) || 'var(--gm-text-secondary)');
                   const pillShort = slotEval?.shortReason || slotEval?.badge || (circuitData.isSafetyWarning ? 'Attenzione' : 'Volabile');
                   const pillFull = slotEval?.reason || pillShort;
-                  return `<span id="flight-analysis-scrubber-spot-pill" class="gm-map-scrubber-spot-pill" style="color: ${pillColor};" title="${escapeHtml(pillFull)}">${escapeHtml(pillShort)}</span>`;
+                  return `<span id="flight-analysis-scrubber-spot-pill" class="gm-map-scrubber-spot-pill status-${escapeHtml(pillStatus)}" style="color: ${pillColor};" title="${escapeHtml(pillFull)}">${escapeHtml(pillShort)}</span>`;
                 })()}
               </div>
               <div class="gm-map-scrubber-hour-display">
@@ -6110,9 +6121,13 @@ export class ForecastViewController {
         const pillShort = slotEval?.shortReason || slotEval?.badge || (circuitData.isSafetyWarning ? 'Attenzione' : 'Volabile');
         const pillFull = slotEval?.reason || pillShort;
         const pillStatus = slotEval?.status || (circuitData.isSafetyWarning ? 'caution' : (evaluated?.status || 'flyable'));
+        const pillColor = pillStatus === 'unflyable'
+          ? 'var(--gm-status-unflyable-text)'
+          : ((STATUS_COLORS && STATUS_COLORS[pillStatus]?.fill) || 'var(--gm-text-secondary)');
         faSpotPill.textContent = pillShort;
         faSpotPill.setAttribute('title', pillFull);
-        faSpotPill.style.color = (STATUS_COLORS && STATUS_COLORS[pillStatus]?.fill) || 'var(--gm-text-secondary)';
+        faSpotPill.className = `gm-map-scrubber-spot-pill status-${pillStatus}`;
+        faSpotPill.style.color = pillColor;
       }
 
       const scrubberSlots = this.flightAnalysisOverlayEl.querySelectorAll('.gm-timeline-col-compact, .gm-flight-analysis-slot');

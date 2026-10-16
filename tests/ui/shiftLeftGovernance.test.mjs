@@ -324,6 +324,27 @@ describe('Shift-Left Quality Gate & Architectural Governance', () => {
       `DESIDERATA.md exceeds compactness ceiling (${desiderataLines.length} lines, ${Buffer.byteLength(desiderataSrc, 'utf-8')} bytes; max 80 lines / 8 KB). Keep table cells concise (< 160 chars).`
     );
   });
+
+  it('Gate 4 (WCAG AAA Unflyable Pill Contrast): verifies high-luminance red text token on dark and light themes', () => {
+    const themeSrc = readFileSync(cssFile, 'utf-8');
+    assert.ok(
+      themeSrc.includes('--gm-status-unflyable-text: #fca5a5;'),
+      'theme.css must define high-luminance --gm-status-unflyable-text: #fca5a5 for dark mode pills'
+    );
+    assert.ok(
+      themeSrc.includes('--gm-status-unflyable-text: #b91c1c;'),
+      'theme.css must define high-contrast --gm-status-unflyable-text: #b91c1c for light mode pills'
+    );
+    assert.ok(
+      themeSrc.includes('.gm-trend-sub-badge.status-unflyable'),
+      'theme.css must define .gm-trend-sub-badge.status-unflyable for trend side-panel badges'
+    );
+    assert.ok(
+      themeSrc.includes('.gm-map-scrubber-spot-pill.status-unflyable'),
+      'theme.css must define .gm-map-scrubber-spot-pill.status-unflyable for timeline scrubber reason pill'
+    );
+  });
 });
+
 
 

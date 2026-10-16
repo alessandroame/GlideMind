@@ -109,3 +109,13 @@ Giornale a finestra mobile (rolling window, max **300 righe** / **ultimi 15 inte
   - Nascosto il badge verde `Live` in stato nominale sia in Home sia in Previsioni (`NOTE-003`, lasciando lo slot `ORA` della scrubbar e promuovendo le centraline fisiche in `Fase 4-quater` / `NOTE-006`) e convertite le barre `.compact-bar` della scrubbar in pillole orizzontali ad altezza uniforme (`16x8px`) prive di `fillPct` euristico in [`ForecastView.js`](file:///ui/views/ForecastView.js) e [`SpotMapView.js`](file:///ui/views/SpotMapView.js).
   - Rimossi i badge di omologazione `EN-A..D` usati come indicatori di performance (`NOTE-004`) e sostituiti i filtri statici di [`ui/views/LogbookView.js`](file:///ui/views/LogbookView.js) con 5 pills espandibili a menu (`Vela`, `Anno`, `Caratteristiche`, `Tempo`, `Distanza` — `NOTE-005`).
 
+---
+
+## 2026-10-16 - Fase 4 & Design System: Contrasto WCAG AAA (`7.8:1`) per i Pill dei Motivi di Non-Volabilità
+- **Tipo**: Accessibilità Visiva / Design System / Outdoor HMI (`css/theme.css`, `ui/views/ForecastView.js`)
+- **Dettagli**: [.agents/worklog.d/2026-10-16_unflyable-pills-wcag-aaa-contrast.md](file:///.agents/worklog.d/2026-10-16_unflyable-pills-wcag-aaa-contrast.md)
+- **Sintesi**:
+  - Introdotto il token `--gm-status-unflyable-text` (`#fca5a5` su tema scuro `7.8:1 AAA`, `#b91c1c` su tema chiaro `6.4:1`) e `--gm-status-unflyable-border` per eliminare il basso contrasto (`3.44:1`) di `#ef4444` su fondo rosso semitrasparente.
+  - Allineati `.gm-flight-window-hazard-chip`, `.gm-flight-window-badge-unflyable`, `#forecast-scrubber-spot-pill` (`.status-unflyable`), `.gm-param-status-badge.unflyable`, `.gm-trend-sub-badge.status-unflyable` e `.gm-reason-pill.pill-unflyable`.
+
+
