@@ -7,7 +7,7 @@
  *    and elevation caching to core/openMeteoApi.js and core/terrainEngine.js) and external map tiles.
  */
 
-const CACHE_NAME = 'glidemind-shell-v1';
+const CACHE_NAME = 'glidemind-shell-v2';
 
 const APP_SHELL_ASSETS = [
   './',
@@ -22,12 +22,9 @@ const APP_SHELL_ASSETS = [
   './core/comprensorio.js',
   './core/flyabilityEngine.js',
   './core/openMeteoApi.js',
+  './core/gliderCatalog.js',
   './core/logbookDb.js',
-  './data/locations.json',
-  './data/gliders.json',
-  './assets/icons/glidemind-wing.svg',
-  './assets/icons/icon-192.png',
-  './assets/icons/icon-512.png'
+  './data/locations.json'
 ];
 
 const PASS_THROUGH_HOSTS = [
@@ -46,7 +43,9 @@ const PASS_THROUGH_HOSTS = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(APP_SHELL_ASSETS))
+      .then((cache) => Promise.allSettled(
+        APP_SHELL_ASSETS.map((assetUrl) => cache.add(assetUrl).catch(() => null))
+      ))
       .then(() => self.skipWaiting())
   );
 });

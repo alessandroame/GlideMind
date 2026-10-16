@@ -668,6 +668,57 @@ describe('Open-Meteo Client - Fetch Simulation, Retry & Cache Fallback', () => {
         resetRateLimitCooldown();
         assert.equal(getRateLimitStatus().isRateLimited, false);
     });
+
+    it('should fall back to surface-only query or synthetic weather on HTTP 503 Service Unavailable without throwing', async () => {
+        const requestedUrls = [];
+        const testCache = new InMemoryCache();
+
+        // Case A: Heavy sounding query returns 503, lightweight surface-only query succeeds (200)
+        const fallback503Fetch = async (urlStr) => {
+            requestedUrls.push(urlStr);
+            if (urlStr.includes('1000hPa')) {
+                return { ok: false, status: 503 };
+            }
+            const toPayload = generateSyntheticWeather([45.1819, 7.0888, 2200], { targetDate: '2026-10-16', isLanding: false });
+            const ldPayload = generateSyntheticWeather([45.1375, 7.0458, 500], { targetDate: '2026-10-16', isLanding: true });
+            return {
+                ok: true,
+                status: 200,
+                json: async () => [toPayload, ldPayload]
+            };
+        };
+
+        const coords = [
+            { lat: 45.1819, lon: 7.0888, elev: 2200, role: 'takeoff' },
+            { lat: 45.1375, lon: 7.0458, elev: 500, role: 'landing' }
+        ];
+
+        const resA = await fetchWeatherData(coords, {
+            targetDate: '2026-10-16',
+            includeSounding: true,
+            cache: testCache,
+            fetchFn: fallback503Fetch,
+            maxRetries: 0
+        });
+        assert.equal(requestedUrls.length, 2, 'Must retry immediately with lightweight surface-only URL on HTTP 503');
+        assert.ok(!requestedUrls[1].includes('1000hPa'), 'Fallback URL must omit heavy isobaric sounding variables');
+        assert.equal(resA.isFromCache, false);
+
+        // Case B: Persistent HTTP 503 returns synthetic fallback gracefully
+        resetRateLimitCooldown();
+        const emptyCache = new InMemoryCache();
+        const always503Fetch = async () => ({ ok: false, status: 503 });
+        const resB = await fetchWeatherData(coords, {
+            targetDate: '2026-10-16',
+            includeSounding: false,
+            cache: emptyCache,
+            fetchFn: always503Fetch,
+            maxRetries: 0
+        });
+        assert.ok(resB, 'Must return synthetic fallback on persistent HTTP 503 rather than throwing');
+        assert.equal(resB.isSynthetic, true);
+        resetRateLimitCooldown();
+    });
 });
 
 describe('Open-Meteo Client - Week Overview Multi-Day Summary', () => {

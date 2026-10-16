@@ -1272,6 +1272,31 @@ export async function fetchMultiLocationWeatherData(normList, options = {}) {
                     break;
                 }
 
+                // Handle HTTP 5xx (e.g. 503 Service Unavailable on heavy multi-point sounding queries):
+                // First try lightweight surface-only query (includeSounding: false), then retry/cooldown
+                if (!resp.ok && resp.status >= 500) {
+                    if (options.includeSounding !== false) {
+                        const lightUrl = buildForecastUrl(normList, {
+                            targetDate,
+                            weatherModel: activeModel,
+                            includeSounding: false
+                        });
+                        resp = await fetchWithTimeout(lightUrl, {}, timeoutMs, fetchFn);
+                        if (resp && resp.ok) {
+                            break;
+                        }
+                    }
+                    if (attempt < maxRetries) {
+                        const backoffMs = Math.min(3000, 400 * Math.pow(2, attempt));
+                        await sleep(backoffMs);
+                        attempt++;
+                        continue;
+                    }
+                    rateLimitCooldownUntil = Date.now() + 30000;
+                    rateLimitReason = `HTTP ${resp.status}: Open-Meteo service temporarily unavailable. Cooldown active for 30s.`;
+                    break;
+                }
+
                 // Regional Model Fallback: fallback to best_match if model returns HTTP 400
                 if (!resp.ok && resp.status === 400 && activeModel !== 'best_match') {
                     const fallbackUrl = buildForecastUrl(normList, {
@@ -1315,14 +1340,15 @@ export async function fetchMultiLocationWeatherData(normList, options = {}) {
             combined.takeoffWeather = staleCached[0];
             combined.landingWeather = staleCached[1] || staleCached[0];
             combined.isStaleOfflineFallback = true;
-            if (response && response.status === 429) {
-                combined.isRateLimited = true;
+            if (response && (response.status === 429 || response.status >= 500)) {
+                combined.isRateLimited = response.status === 429;
                 combined.rateLimitRemainingMs = Math.max(0, rateLimitCooldownUntil - Date.now());
             }
             return combined;
         }
 
-        if (response && response.status === 429) {
+        if (response && (response.status === 429 || response.status >= 500)) {
+            const isRateLim = response.status === 429;
             const syntheticList = normList.map((coords, idx) => {
                 const isLanding = coords.role === 'landing' || idx > 0;
                 const syn = generateSyntheticWeather(coords, {
@@ -1336,7 +1362,7 @@ export async function fetchMultiLocationWeatherData(normList, options = {}) {
                     customHeading: isLanding ? null : options.customHeading
                 });
                 enriched.isSynthetic = true;
-                enriched.isRateLimited = true;
+                enriched.isRateLimited = isRateLim;
                 return enriched;
             });
             const combined = { ...syntheticList[0] };
@@ -1344,7 +1370,7 @@ export async function fetchMultiLocationWeatherData(normList, options = {}) {
             combined.takeoffWeather = syntheticList[0];
             combined.landingWeather = syntheticList[1] || syntheticList[0];
             combined.isSynthetic = true;
-            combined.isRateLimited = true;
+            combined.isRateLimited = isRateLim;
             combined.rateLimitRemainingMs = Math.max(0, rateLimitCooldownUntil - Date.now());
             return combined;
         }
@@ -1525,6 +1551,30 @@ export async function fetchWeatherData(coords, options = {}) {
                     break;
                 }
 
+                // Handle HTTP 5xx (e.g. 503 Service Unavailable)
+                if (!resp.ok && resp.status >= 500) {
+                    if (options.includeSounding !== false) {
+                        const lightUrl = buildForecastUrl({ lat, lon }, {
+                            targetDate,
+                            weatherModel: activeModel,
+                            includeSounding: false
+                        });
+                        resp = await fetchWithTimeout(lightUrl, {}, timeoutMs, fetchFn);
+                        if (resp && resp.ok) {
+                            break;
+                        }
+                    }
+                    if (attempt < maxRetries) {
+                        const backoffMs = Math.min(3000, 400 * Math.pow(2, attempt));
+                        await sleep(backoffMs);
+                        attempt++;
+                        continue;
+                    }
+                    rateLimitCooldownUntil = Date.now() + 30000;
+                    rateLimitReason = `HTTP ${resp.status}: Open-Meteo service temporarily unavailable. Cooldown active for 30s.`;
+                    break;
+                }
+
                 // Regional Model Fallback: if a specific model returns HTTP 400 (e.g. out of domain or horizon),
                 // automatically fall back to best_match
                 if (!resp.ok && resp.status === 400 && activeModel !== 'best_match') {
@@ -1565,14 +1615,14 @@ export async function fetchWeatherData(coords, options = {}) {
         });
         if (staleCached) {
             staleCached.isStaleOfflineFallback = true;
-            if (response && response.status === 429) {
-                staleCached.isRateLimited = true;
+            if (response && (response.status === 429 || response.status >= 500)) {
+                staleCached.isRateLimited = response.status === 429;
                 staleCached.rateLimitRemainingMs = Math.max(0, rateLimitCooldownUntil - Date.now());
             }
             return staleCached;
         }
 
-        if (response && response.status === 429) {
+        if (response && (response.status === 429 || response.status >= 500)) {
             const synthetic = generateSyntheticWeather({ lat, lon, elevation: elev }, {
                 targetDate,
                 weatherModel: activeModel,
@@ -1580,7 +1630,7 @@ export async function fetchWeatherData(coords, options = {}) {
             });
             const enriched = enrichWeatherData(synthetic, targetDate, Date.now(), options);
             enriched.isSynthetic = true;
-            enriched.isRateLimited = true;
+            enriched.isRateLimited = response.status === 429;
             enriched.rateLimitRemainingMs = Math.max(0, rateLimitCooldownUntil - Date.now());
             enriched.isFromCache = false;
             return enriched;

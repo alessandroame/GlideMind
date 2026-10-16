@@ -22,21 +22,28 @@ Ogni riga di serie temporale (`.gm-trend-card.gm-trend-card-side-by-side`) adott
 ```
 
 ### Specifiche di Dettaglio delle Colonne:
-1. **Colonna Sinistra (Display Metrica Statico)**:
-   - **Larghezza**: fissa `85px` - `100px` con bordo separatore sottile a destra (`border-r: 1px solid var(--gm-border)`).
-   - **Etichetta Superiore**: maiuscola, grassetto, corpo `0.70rem`, colore di accento semantico (`var(--gm-accent)` o colore di categoria).
-   - **Valore Primario**: evidenziato ad alta leggibilità outdoor (font-size `1.25rem` - `1.5rem`, `font-weight: 800`, colore ad alto contrasto `var(--gm-text-primary)`).
-   - **Unità di Misura**: affiancata o immediatamente sotto il valore (`km/h`, `m slm`, `J/kg`, `EDR`).
-   - **Sub-badge / Metrica Secondaria**: icona funzionale + grandezza correlata (es. `14 S` per raffiche e direzione del vento, `AGL +817m` per la base nubi, o classe di stabilità).
+1. **Colonna Sinistra (Display Metrica Statico + Corrispondenza 1:1 Serie/LED)**:
+   - **Larghezza**: fissa `98px` - `108px` con bordo separatore sottile a destra (`border-r: 1px solid var(--gm-border)`).
+   - **Etichetta Superiore + Chevron Espansione**: maiuscola, grassetto, corpo `0.62rem`, colore di accento semantico (`var(--gm-accent)`), affiancata dall'indicatore direzionale `.gm-trend-expand-icon` per segnalare l'espansione verticale al tocco.
+   - **Corrispondenza 1:1 Serie e Indicatori LED (`.gm-series-led`)**:
+     - Ogni serie rappresentata nel grafico SVG (curva primaria, curva secondaria tratteggiata o istogramma a barre) DEVE esporre nel pannello di sinistra il proprio valore corrispondente all'istante selezionato (`selectedHour`).
+     - Ogni valore nel pannello di sinistra DEVE essere preceduto da un indicatore visivo "LED" (`.gm-series-led`, `.gm-series-led-dashed`, `.gm-series-led-bar`) dello stesso colore della linea/barra corrispondente nel grafico.
+   - **Valore Primario**: evidenziato ad alta leggibilità outdoor (font-size `1.25rem` - `1.35rem`, `font-weight: 800`, colore ad alto contrasto `var(--gm-text-primary)`).
+   - **Unità di Misura**: affiancata o immediatamente sotto il valore (`km/h`, `m slm`, `J/kg`, `EDR`, `E`, `%`).
+   - **Sub-badge / Serie Secondaria**: LED della seconda serie + grandezza correlata per l'ora attiva (es. raffica + direzione del vento, quota max termica + AGL per la base cumulo, salita termica `m/s` per la turbolenza, accumulo `mm/h` per le precipitazioni).
    - **Sincronizzazione Reattiva**: si aggiorna in tempo reale (`< 50ms`) al trascinamento dello scrubber orario.
 
-2. **Colonna Destra (Canvas Grafico SVG Puro)**:
-   - **Sfondo**: trasparente, poggia direttamente sulla superficie della card (nessun contenitore interno `.gm-chart-box` con bordi aggiuntivi).
-   - **Tracciato**: curve continue cubiche Monotone Bézier / Catmull-Rom (`buildSmoothPath`), spessore linea $\ge 2.2\text{px}$, linecap `round`.
-   - **Campitura Sfumata**: area sottostante la curva con gradiente semitrasparente (`opacity: 0.12 - 0.20`) per immediata percezione del volume.
-   - **Asse Y**: posizionato sul bordo sinistro a filo del separatore, con soli valori numerici essenziali (0, 10, 20, 30).
-   - **Asse X**: marcatori orari discreti (08, 11, 14, 17, 20).
-   - **Marker Ora Attiva**: linea verticale tratteggiata sottile e pallino pieno centrato sulla curva.
+2. **Colonna Destra (Canvas Grafico SVG Puro, Soglie e Sezionamento Volabilità)**:
+   - **Altezza Ibrida & Tap-to-Expand (`toggle-trend-chart`)**:
+     - Altezza base compatta maggiorata (`H = 108` unità SVG, `114` con heatmap) per garantire un'escursione verticale leggibile delle curve lungo la giornata.
+     - Al tap sulla card (`.gm-trend-card-side-by-side`), il grafico si espande verticalmente in-place (`H = 176` unità SVG, classe `.expanded`), mostrando griglia Y aggiuntiva e le etichette numeriche delle soglie a margine destro.
+   - **Scala Y con Zero Fisso (`minY = 0`) e Tetto Adattivo (`maxY`)**:
+     - Mantiene `minY = 0` ancorato alla base per preservare la percezione del valore assoluto, calcolando `maxY` in modo adattivo appena sopra la soglia rossa di non-volabilità e il picco giornaliero (`Math.max(redLimit * 1.15, peakDayValue * 1.15)`), evitando spazio morto sopra le curve.
+   - **Doppia Linea di Soglia Obbligatoria (Gialla + Rossa Tratteggiata)**:
+     - Ogni grafico DEVE sempre tracciare sia la riga tratteggiata gialla (`var(--gm-status-caution)`) sia la riga tratteggiata rossa (`var(--gm-status-unflyable)`) rappresentanti le soglie operative di volabilità.
+   - **Sezionamento Orizzontale/Orario di Sfondo (`.gm-chart-zone-band`)**:
+     - Gli slot orari in cui il parametro supera la soglia gialla o rossa (o scende sotto i minimi di sicurezza per la Base Cumulo) sono evidenziati sullo sfondo da una tendina verticale semitrasparente (`<path class="gm-chart-zone-band gm-chart-zone-caution|unflyable">`, `opacity: 0.08–0.09`).
+   - **Marker Ora Attiva**: linea verticale tratteggiata sottile e pallini centrati sia sulla curva primaria sia sulle curve secondarie.
 
 ---
 
@@ -46,12 +53,12 @@ Per preservare il rapporto dati-inchiostro e azzerare l'affaticamento visivo:
 
 1. **Divieto di Tripla Duplicazione (No Echo Effect)**:
    - È vietato ripetere lo stesso valore sia nel titolo della card, sia nel tooltip fluttuante dello scrubber, sia nella riga descrittiva in calce.
-   - Il display a sinistra è l'**Unica Sorgente di Verità Visiva (Single Source of Truth)** per il valore dell'ora attiva.
-2. **Divieto di Testo Ostruente dentro il Canvas SVG**:
-   - È vietato disegnare etichette testuali fluttuanti (es. `<text>4 km/h</text>`, `<text>Base: 1817m</text>`) che coprono la curva nel punto attivo.
-   - È vietato stampare stringhe descrittive (es. `"Rischio (800)"`, `"Attenzione (300)"`) a metà del grafico che tagliano o collidono con le linee dei dati. Le soglie di sicurezza sono linee tratteggiate discrete.
+   - Il display a sinistra è l'**Unica Sorgente di Verità Visiva (Single Source of Truth)** per i valori dell'ora attiva.
+2. **Divieto di Tooltip Fluttuanti Ostruenti dentro il Canvas SVG**:
+   - È vietato disegnare rettangoli/etichette testuali fluttuanti (es. `<rect>` + `<text>4 km/h</text>`) che coprono la curva nel punto attivo nella vista Side-by-Side.
+   - Le etichette numeriche delle soglie (es. `18 km/h`, `26 km/h`) restano nascoste nella vista compatta e compaiono ordinatamente al margine destro solo quando la card viene espansa verticalmente al tap.
 3. **Divieto di Over-Boxing (Max 1 Livello di Contenimento)**:
    - Una card grafica possiede un unico bordo perimetrale (`.gm-trend-card`).
-   - È vietato inserire box scuri annidati (`.gm-chart-box`) dentro la card.
+   - È vietato inserire box scuri annidati (`.gm-chart-box` con sfondo/bordo visibile) dentro la card.
 4. **Divieto di Footer Descrittivi Verbosi**:
    - Non inserire righe di testo descrittive in calce al grafico (es. `"Ore 20:00: 4 km/h (raffica 6 km/h)"`), che sottraggono spazio verticale utile al viewport mobile.

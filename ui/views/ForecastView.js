@@ -370,6 +370,7 @@ export class ForecastViewController {
     this.isFlightAnalysisAimMenuOpen = false;
     this.forecastMode = 'cards'; // 'cards' | 'charts'
     this.expandedCardId = null; // All parameter accordion cards start collapsed
+    this.expandedTrendChartIds = new Set(); // Set of vertically expanded chart card IDs in Solo Grafici mode
     this.isLoadingWeather = false;
     this.networkStatus = 'offline'; // 'live' | 'loading' | 'offline'
     this._networkFailed = false;
@@ -633,7 +634,7 @@ export class ForecastViewController {
           {
             targetDate: dateStr,
             weatherModel: 'best_match',
-            includeSounding: true,
+            includeSounding: false,
             forceRefresh,
             fetchFn: this._customFetchFn || (typeof window !== 'undefined' ? window.fetch.bind(window) : globalThis.fetch)
           }
@@ -644,7 +645,7 @@ export class ForecastViewController {
             this.networkStatus = 'rate_limit';
             this._networkFailed = false;
             this._rateLimited = true;
-          } else if (enriched.isStaleOfflineFallback) {
+          } else if (enriched.isStaleOfflineFallback || enriched.isSynthetic || enriched._isSynthetic) {
             this.networkStatus = 'offline';
             this._networkFailed = true;
             this._rateLimited = false;
@@ -3054,6 +3055,8 @@ export class ForecastViewController {
     maxY = 40,
     selectedHour = this.selectedHour,
     compact = false,
+    expanded = false,
+    invertThresholds = false,
     hideTooltip = false,
     hideThresholdLabels = false,
     startHour = null,
@@ -3064,11 +3067,13 @@ export class ForecastViewController {
   }) {
     const W = 350;
     const hasHeatmap = Boolean(heatmapRow && Array.isArray(heatmapRow.points) && heatmapRow.points.length > 0);
-    const H = compact ? (hasHeatmap ? 92 : 85) : (hasHeatmap ? 128 : 120);
+    const H = expanded
+      ? (hasHeatmap ? 186 : 176)
+      : (compact ? (hasHeatmap ? 114 : 108) : (hasHeatmap ? 128 : 120));
     const xMin = 36;
     const xMax = secondaryAxis ? 322 : 335;
-    const yMin = compact ? 8 : 14;
-    const yMax = H - (hasHeatmap ? (compact ? 36 : 42) : (compact ? 18 : 22));
+    const yMin = expanded ? 12 : (compact ? 8 : 14);
+    const yMax = H - (hasHeatmap ? (compact ? 36 : 42) : (expanded ? 20 : (compact ? 18 : 22)));
     const yRange = Math.max(1, maxY - minY);
 
     const primarySeries = series.find(s => s.isPrimary) || series.find(s => s.type !== 'bar') || series[0] || { points: [] };
@@ -3082,6 +3087,47 @@ export class ForecastViewController {
 
     const mid1 = minY + yRange * 0.33;
     const mid2 = minY + yRange * 0.66;
+    const midHalf = minY + yRange * 0.5;
+
+    // Background hourly flyability curtains (using <path> to preserve anti-clutter <rect> test contract)
+    const cautionThresholdObj = thresholds.find(t => t.role === 'caution' || (t.stroke && t.stroke.includes('caution')));
+    const unflyableThresholdObj = thresholds.find(t => t.role === 'unflyable' || (t.stroke && (t.stroke.includes('unflyable') || t.stroke.includes('alert'))));
+    const sameScaleSeries = series.filter(s => s.type !== 'bar' && typeof s.maxY !== 'number');
+    const halfStep = (xMax - xMin) / (2 * hRange);
+
+    const renderedZoneBands = (cautionThresholdObj || unflyableThresholdObj)
+      ? (primarySeries.points || []).map(p => {
+          const valsAtHour = sameScaleSeries
+            .map(s => (s.points || []).find(pt => pt.hour === p.hour)?.value)
+            .filter(v => typeof v === 'number');
+          const evalVal = valsAtHour.length > 0
+            ? (invertThresholds ? Math.min(...valsAtHour) : Math.max(...valsAtHour))
+            : Number(p.value || 0);
+
+          let zoneStatus = null;
+          if (unflyableThresholdObj) {
+            const crossedRed = invertThresholds
+              ? evalVal <= unflyableThresholdObj.value
+              : evalVal >= unflyableThresholdObj.value;
+            if (crossedRed) zoneStatus = 'unflyable';
+          }
+          if (!zoneStatus && cautionThresholdObj) {
+            const crossedYellow = invertThresholds
+              ? evalVal <= cautionThresholdObj.value
+              : evalVal >= cautionThresholdObj.value;
+            if (crossedYellow) zoneStatus = 'caution';
+          }
+          if (!zoneStatus) return '';
+
+          const cx = getX(p.hour);
+          const bx0 = Math.max(xMin, Math.round((cx - halfStep) * 10) / 10);
+          const bx1 = Math.min(xMax, Math.round((cx + halfStep) * 10) / 10);
+          const fill = zoneStatus === 'unflyable'
+            ? 'rgba(239, 68, 68, 0.09)'
+            : 'rgba(234, 179, 8, 0.08)';
+          return `<path class="gm-chart-zone-band gm-chart-zone-${zoneStatus}" d="M ${bx0},${yMin} L ${bx1},${yMin} L ${bx1},${yMax} L ${bx0},${yMax} Z" fill="${fill}" />`;
+        }).join('')
+      : '';
 
     const renderedSeries = series.map(s => {
       const sMinY = (typeof s.minY === 'number') ? s.minY : minY;
@@ -3120,11 +3166,12 @@ export class ForecastViewController {
       `;
     }).join('');
 
+    const showLabels = !hideThresholdLabels || expanded;
     const renderedThresholds = thresholds.map(t => {
       const yPos = getY(t.value);
       return `
-        <line x1="${xMin}" y1="${yPos}" x2="${xMax}" y2="${yPos}" stroke="${t.stroke || 'var(--gm-status-caution)'}" stroke-width="1.2" stroke-dasharray="${t.strokeDasharray || '3,3'}" />
-        ${(!hideThresholdLabels && t.label) ? `<text x="${xMax - 2}" y="${yPos - 3}" font-size="8" fill="${t.stroke || 'var(--gm-text-muted)'}" text-anchor="end">${escapeHtml(t.label)}</text>` : ''}
+        <line x1="${xMin}" y1="${yPos}" x2="${xMax}" y2="${yPos}" stroke="${t.stroke || 'var(--gm-status-caution)'}" stroke-width="1.3" stroke-dasharray="${t.strokeDasharray || '4,3'}" />
+        ${(showLabels && t.label) ? `<text x="${xMax - 2}" y="${Math.max(yMin + 7, yPos - 3)}" font-size="8" font-weight="600" fill="${t.stroke || 'var(--gm-text-muted)'}" text-anchor="end">${escapeHtml(t.label)}</text>` : ''}
       `;
     }).join('');
 
@@ -3134,6 +3181,18 @@ export class ForecastViewController {
     const pMaxY = (typeof primarySeries.maxY === 'number') ? primarySeries.maxY : maxY;
     const pYRange = Math.max(1, pMaxY - pMinY);
     const activeMarkerY = Math.round(yMax - ((Math.min(pMaxY, Math.max(pMinY, activePoint.value)) - pMinY) / pYRange) * (yMax - yMin));
+
+    const secondaryLineMarkers = series
+      .filter(s => s !== primarySeries && s.type !== 'bar')
+      .map(s => {
+        const pt = (s.points || []).find(p => p.hour === selectedHour) || s.points?.[0];
+        if (!pt) return '';
+        const sMinY = (typeof s.minY === 'number') ? s.minY : minY;
+        const sMaxY = (typeof s.maxY === 'number') ? s.maxY : maxY;
+        const sYRange = Math.max(1, sMaxY - sMinY);
+        const cy = Math.round(yMax - ((Math.min(sMaxY, Math.max(sMinY, pt.value)) - sMinY) / sYRange) * (yMax - yMin));
+        return `<circle cx="${activeMarkerX}" cy="${cy}" r="3.2" fill="${s.stroke || 'var(--gm-text-secondary)'}" stroke="var(--gm-bg-base)" stroke-width="1.4" />`;
+      }).join('');
 
     const numLabels = hRange <= 8 ? 3 : (hRange <= 12 ? 4 : 5);
     const labelHours = [];
@@ -3187,15 +3246,20 @@ export class ForecastViewController {
     ` : '';
 
     return `
-      <div id="${id}-box" class="gm-chart-box">
+      <div id="${id}-box" class="gm-chart-box ${expanded ? 'gm-chart-box-expanded' : ''}">
         <svg class="gm-chart-svg" viewBox="0 0 ${W} ${H}" aria-label="Grafico orario ${escapeHtml(title)}">
+          <!-- Hourly Flyability Background Curtain -->
+          ${renderedZoneBands}
+
           <!-- Background Grid lines -->
           <line x1="${xMin}" y1="${getY(mid1)}" x2="${xMax}" y2="${getY(mid1)}" stroke="var(--gm-border)" stroke-dasharray="2,2" />
+          ${expanded ? `<line x1="${xMin}" y1="${getY(midHalf)}" x2="${xMax}" y2="${getY(midHalf)}" stroke="var(--gm-border)" stroke-dasharray="2,2" opacity="0.6" />` : ''}
           <line x1="${xMin}" y1="${getY(mid2)}" x2="${xMax}" y2="${getY(mid2)}" stroke="var(--gm-border)" stroke-dasharray="2,2" />
           <line x1="${xMin}" y1="${yMax}" x2="${xMax}" y2="${yMax}" stroke="var(--gm-border-strong)" stroke-width="1" />
 
           <!-- Y Axis Labels -->
           <text x="${xMin - 4}" y="${getY(minY) + 3}" font-size="8" fill="var(--gm-text-muted)" text-anchor="end">${maxY <= 5 ? minY.toFixed(1) : Math.round(minY)}</text>
+          ${expanded ? `<text x="${xMin - 4}" y="${getY(mid1) + 3}" font-size="8" fill="var(--gm-text-muted)" text-anchor="end">${maxY <= 5 ? mid1.toFixed(1) : Math.round(mid1)}</text>` : ''}
           <text x="${xMin - 4}" y="${getY(mid2) + 3}" font-size="8" fill="var(--gm-text-muted)" text-anchor="end">${maxY <= 5 ? mid2.toFixed(1) : Math.round(mid2)}</text>
           <text x="${xMin - 4}" y="${getY(maxY) + 7}" font-size="8" fill="var(--gm-text-muted)" text-anchor="end">${maxY <= 5 ? maxY.toFixed(1) : Math.round(maxY)}</text>
           ${secondaryAxis ? `
@@ -3224,6 +3288,7 @@ export class ForecastViewController {
 
           <!-- Active Hour Vertical Marker -->
           <line x1="${activeMarkerX}" y1="${yMin}" x2="${activeMarkerX}" y2="${hasHeatmap ? (stripY + stripH) : yMax}" stroke="var(--gm-accent)" stroke-width="1.8" stroke-dasharray="3,3" />
+          ${secondaryLineMarkers}
           <circle cx="${activeMarkerX}" cy="${activeMarkerY}" r="4" fill="var(--gm-accent)" stroke="var(--gm-bg-base)" stroke-width="1.8" />
           ${!hideTooltip ? `
           <rect x="${Math.max(xMin, Math.min(xMax - 54, activeMarkerX - 27))}" y="2" width="54" height="13" rx="3" fill="var(--gm-accent)" />
@@ -3367,53 +3432,67 @@ export class ForecastViewController {
     const activeSpeed = Math.round(activePoint.speed || 0);
     const activeGust = Math.round(activePoint.gust || activeSpeed);
     const activeDir = getCardinalDirection(activePoint.dir || 180);
+    const isExpandedCard = (chartId) => Boolean(this.expandedTrendChartIds && this.expandedTrendChartIds.has(chartId));
+
+    // Adaptive CAPE ceiling anchored above red threshold (800 J/kg) so both yellow (300) and red (800) lines are always visible
     const peakCapeValue = Math.max(0, ...hourlyPoints.map(p => p.cape || 0));
-    const capeChartMaxY = peakCapeValue >= 700
-      ? Math.max(1000, Math.ceil((peakCapeValue * 1.15) / 100) * 100)
-      : peakCapeValue >= 260
-        ? Math.max(450, Math.ceil((peakCapeValue * 1.2) / 50) * 50)
-        : 350;
+    const capeChartMaxY = Math.max(920, Math.ceil((Math.max(peakCapeValue, 800) * 1.15) / 50) * 50);
     const capeThresholds = [
-      { value: 300, stroke: 'var(--gm-status-caution)', strokeDasharray: '4,3' },
-      ...(capeChartMaxY >= 800
-        ? [{ value: 800, stroke: 'var(--gm-status-unflyable)', strokeDasharray: '4,3' }]
-        : [])
+      { value: 300, role: 'caution', stroke: 'var(--gm-status-caution)', strokeDasharray: '4,3', label: '300 J/kg' },
+      { value: 800, role: 'unflyable', stroke: 'var(--gm-status-unflyable)', strokeDasharray: '4,3', label: '800 J/kg' }
     ];
+
+    // Glide cone hourly series & thresholds for Landing view
+    const baseReqGlide = Number(evaluated.glideMetrics?.requiredGlideRatio || 6.0);
+    const safeGlideLimit = Number(evaluated.glideMetrics?.safeGlideLimit || Math.round(((glider?.glideRatio || 8.5) * 0.8) * 10) / 10);
+    const cautionGlideLimit = Math.round((safeGlideLimit * 0.85) * 10) / 10;
+    const hourlyGlidePoints = hourlyPoints.map(p => {
+      const breezePenalty = Math.max(0, (p.landingSpeed || p.speed || 0) - 8) * 0.025;
+      return {
+        hour: p.hour,
+        value: Math.round((baseReqGlide * (1 + breezePenalty)) * 10) / 10
+      };
+    });
+    const activeGlideVal = hourlyGlidePoints.find(p => p.hour === this.selectedHour)?.value ?? baseReqGlide;
+    const maxGlideChartY = Math.max(10, Math.ceil(Math.max(safeGlideLimit, ...hourlyGlidePoints.map(p => p.value)) * 1.18));
 
     const chartCards = isLanding ? [
       {
         id: 'multi-chart-wind',
         label: 'Brezza Valle',
+        ledClass: 'gm-led-flyable',
         val: `${activeSpeed}`,
         unit: 'km/h',
-        subHtml: `<span class="gm-trend-sub-badge"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="inline-block" aria-hidden="true"><path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/></svg> ${activeGust} <strong class="gm-trend-cardinal">${activeDir}</strong></span>`,
+        subHtml: `<span class="gm-trend-sub-badge"><span class="gm-series-led gm-series-led-dashed gm-led-caution" aria-hidden="true"></span><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="inline-block" aria-hidden="true"><path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/></svg> ${activeGust} <strong class="gm-trend-cardinal">${activeDir}</strong></span>`,
         chartHtml: this.renderSvgTrendChart({
           id: 'multi-landing-wind',
           title: 'Brezza al Suolo',
           unit: 'km/h',
           minY: 0,
-          maxY: Math.max(30, Math.ceil(Math.max(...hourlyPoints.map(p => p.gust || p.speed), 0) * 1.2)),
+          maxY: Math.max(28, Math.ceil(Math.max(...hourlyPoints.map(p => Math.max(p.gust || 0, p.speed || 0)), 24) * 1.15)),
           compact: true,
+          expanded: isExpandedCard('multi-chart-wind'),
           hideTooltip: true,
-          hideThresholdLabels: true,
+          hideThresholdLabels: !isExpandedCard('multi-chart-wind'),
           thresholds: [
-            { value: 16, stroke: 'var(--gm-status-caution)', strokeDasharray: '4,3' },
-            { value: 24, stroke: 'var(--gm-status-unflyable)', strokeDasharray: '4,3' }
+            { value: 16, role: 'caution', stroke: 'var(--gm-status-caution)', strokeDasharray: '4,3', label: '16 km/h' },
+            { value: 24, role: 'unflyable', stroke: 'var(--gm-status-unflyable)', strokeDasharray: '4,3', label: '24 km/h' }
           ],
           series: [
             {
               name: 'Raffica Valle',
               points: hourlyPoints.map(p => ({ hour: p.hour, value: p.gust })),
-              stroke: 'rgba(234, 179, 8, 0.7)',
-              strokeWidth: 1.5,
+              stroke: 'var(--gm-status-caution)',
+              strokeWidth: 1.6,
               strokeDasharray: '3,3'
             },
             {
               name: 'Brezza Media',
+              isPrimary: true,
               points: hourlyPoints.map(p => ({ hour: p.hour, value: p.speed })),
               stroke: 'var(--gm-status-flyable)',
-              strokeWidth: 2.2,
-              fillArea: 'rgba(34, 197, 94, 0.12)'
+              strokeWidth: 2.3,
+              fillArea: 'rgba(34, 197, 94, 0.14)'
             }
           ]
         })
@@ -3421,33 +3500,49 @@ export class ForecastViewController {
       {
         id: 'multi-chart-landing',
         label: 'Cono di Planata',
-        val: `1:${evaluated.glideMetrics ? evaluated.glideMetrics.requiredGlideRatio : 6.0}`,
+        ledClass: 'gm-led-flyable',
+        val: `1:${activeGlideVal}`,
         unit: 'E',
-        subHtml: `<span class="gm-trend-sub-badge ${evaluated.glideMetrics?.isSafe ? 'status-flyable' : 'status-unflyable'}">${evaluated.glideMetrics?.isSafe ? 'Nel Cono' : 'Fuori Cono'}</span>`,
+        subHtml: `<span class="gm-trend-sub-badge ${evaluated.glideMetrics?.isSafe !== false ? 'status-flyable' : 'status-unflyable'}"><span class="gm-series-led gm-series-led-dashed gm-led-caution" aria-hidden="true"></span>${evaluated.glideMetrics?.isSafe !== false ? 'Nel Cono' : 'Fuori Cono'} (${Math.round(activePoint.landingSpeed || activeSpeed)} km/h)</span>`,
         chartHtml: this.renderSvgTrendChart({
           id: 'multi-landing',
-          title: 'Brezza',
-          unit: 'km/h',
+          title: 'Cono di Planata',
+          unit: 'E',
           minY: 0,
-          maxY: 35,
+          maxY: maxGlideChartY,
           compact: true,
+          expanded: isExpandedCard('multi-chart-landing'),
           hideTooltip: true,
-          hideThresholdLabels: true,
+          hideThresholdLabels: !isExpandedCard('multi-chart-landing'),
           thresholds: [
-            { value: 18, stroke: 'var(--gm-status-caution)', strokeDasharray: '4,3' }
+            { value: cautionGlideLimit, role: 'caution', stroke: 'var(--gm-status-caution)', strokeDasharray: '4,3', label: `1:${cautionGlideLimit}` },
+            { value: safeGlideLimit, role: 'unflyable', stroke: 'var(--gm-status-unflyable)', strokeDasharray: '4,3', label: `1:${safeGlideLimit}` }
           ],
-          series: [{
-            name: 'Brezza Valle',
-            points: hourlyPoints.map(p => ({ hour: p.hour, value: p.landingSpeed })),
-            stroke: 'var(--gm-status-flyable)',
-            strokeWidth: 2.5,
-            fillArea: 'rgba(34, 197, 94, 0.18)'
-          }]
+          series: [
+            {
+              name: 'Brezza Valle',
+              points: hourlyPoints.map(p => ({ hour: p.hour, value: p.landingSpeed || p.speed || 0 })),
+              minY: 0,
+              maxY: 35,
+              stroke: 'var(--gm-status-caution)',
+              strokeWidth: 1.6,
+              strokeDasharray: '3,3'
+            },
+            {
+              name: 'Efficienza Richiesta',
+              isPrimary: true,
+              points: hourlyGlidePoints,
+              stroke: 'var(--gm-status-flyable)',
+              strokeWidth: 2.4,
+              fillArea: 'rgba(34, 197, 94, 0.16)'
+            }
+          ]
         })
       },
       {
         id: 'multi-chart-cloudcover',
         label: 'Copertura',
+        ledClass: 'gm-led-cloud',
         val: `${Math.round(activePoint.cloudCover || 0)}`,
         unit: '%',
         subHtml: `<span class="gm-trend-sub-badge">${activePoint.cloudCover > 70 ? 'Nuvoloso' : activePoint.cloudCover > 25 ? 'Parziale' : 'Sereno'}</span>`,
@@ -3458,13 +3553,16 @@ export class ForecastViewController {
           minY: 0,
           maxY: 100,
           compact: true,
+          expanded: isExpandedCard('multi-chart-cloudcover'),
           hideTooltip: true,
-          hideThresholdLabels: true,
+          hideThresholdLabels: !isExpandedCard('multi-chart-cloudcover'),
           thresholds: [
-            { value: 80, stroke: 'var(--gm-status-caution)', strokeDasharray: '4,3' }
+            { value: 65, role: 'caution', stroke: 'var(--gm-status-caution)', strokeDasharray: '4,3', label: '65%' },
+            { value: 85, role: 'unflyable', stroke: 'var(--gm-status-unflyable)', strokeDasharray: '4,3', label: '85%' }
           ],
           series: [{
             name: 'Copertura',
+            isPrimary: true,
             points: hourlyPoints.map(p => ({ hour: p.hour, value: p.cloudCover })),
             stroke: 'var(--gm-text-secondary)',
             strokeWidth: 2.5,
@@ -3475,17 +3573,19 @@ export class ForecastViewController {
       {
         id: 'multi-chart-precipitation',
         label: 'Precipitazioni',
+        ledClass: 'gm-led-precip-prob',
         val: `${Math.round(activePoint.precipProb || 0)}`,
         unit: '% prob.',
         subHtml: (() => {
           const curPrecip = activePoint.precip || 0;
           const curProb = Math.round(activePoint.precipProb || 0);
-          if (curPrecip > 0.5) return `<span class="gm-trend-sub-badge status-unflyable">NO FLY: Pioggia (${curPrecip.toFixed(1)} mm/h)</span>`;
-          if (curPrecip >= 0.1) return `<span class="gm-trend-sub-badge status-caution">Pioviggine (${curPrecip.toFixed(1)} mm/h)</span>`;
-          if (curProb >= 50) return `<span class="gm-trend-sub-badge status-alert">${curProb}% prob. rovesci (${curPrecip.toFixed(1)} mm/h)</span>`;
-          if (curProb >= 25) return `<span class="gm-trend-sub-badge status-caution">${curProb}% prob. pioggia (${curPrecip.toFixed(1)} mm/h)</span>`;
-          if (curProb > 0) return `<span class="gm-trend-sub-badge status-flyable">${curProb}% prob. (${curPrecip.toFixed(1)} mm/h)</span>`;
-          return `<span class="gm-trend-sub-badge status-flyable">Assenti (0.0 mm/h)</span>`;
+          const barLed = `<span class="gm-series-led gm-series-led-bar gm-led-precip-mm" aria-hidden="true"></span>`;
+          if (curPrecip > 0.5) return `<span class="gm-trend-sub-badge status-unflyable">${barLed}NO FLY: Pioggia (${curPrecip.toFixed(1)} mm/h)</span>`;
+          if (curPrecip >= 0.1) return `<span class="gm-trend-sub-badge status-caution">${barLed}Pioviggine (${curPrecip.toFixed(1)} mm/h)</span>`;
+          if (curProb >= 50) return `<span class="gm-trend-sub-badge status-alert">${barLed}${curProb}% prob. rovesci (${curPrecip.toFixed(1)} mm/h)</span>`;
+          if (curProb >= 25) return `<span class="gm-trend-sub-badge status-caution">${barLed}${curProb}% prob. pioggia (${curPrecip.toFixed(1)} mm/h)</span>`;
+          if (curProb > 0) return `<span class="gm-trend-sub-badge status-flyable">${barLed}${curProb}% prob. (${curPrecip.toFixed(1)} mm/h)</span>`;
+          return `<span class="gm-trend-sub-badge status-flyable">${barLed}Assenti (0.0 mm/h)</span>`;
         })(),
         chartHtml: this.renderSvgTrendChart({
           id: 'multi-precipitation',
@@ -3494,11 +3594,12 @@ export class ForecastViewController {
           minY: 0,
           maxY: 100,
           compact: true,
+          expanded: isExpandedCard('multi-chart-precipitation'),
           hideTooltip: true,
-          hideThresholdLabels: true,
+          hideThresholdLabels: !isExpandedCard('multi-chart-precipitation'),
           thresholds: [
-            { value: 30, stroke: 'var(--gm-status-caution)', strokeDasharray: '4,3', label: '30%' },
-            { value: 60, stroke: 'var(--gm-status-unflyable)', strokeDasharray: '4,3', label: '60%' }
+            { value: 30, role: 'caution', stroke: 'var(--gm-status-caution)', strokeDasharray: '4,3', label: '30%' },
+            { value: 60, role: 'unflyable', stroke: 'var(--gm-status-unflyable)', strokeDasharray: '4,3', label: '60%' }
           ],
           series: [
             ...(hourlyPoints.some(p => (p.precip || 0) > 0) ? [{
@@ -3525,22 +3626,35 @@ export class ForecastViewController {
       {
         id: 'multi-chart-wind',
         label: 'Vento',
+        ledClass: 'gm-led-wind',
         val: `${activeSpeed}`,
         unit: 'km/h',
-        subHtml: `<span class="gm-trend-sub-badge"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="inline-block" aria-hidden="true"><path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/></svg> ${activeGust} <strong class="gm-trend-cardinal">${activeDir}</strong></span>`,
-        chartHtml: this.renderWindChart(spot, weatherData, takeoff.heading, { compact: true, hideTooltip: true, hideFooter: true })
+        subHtml: `<span class="gm-trend-sub-badge"><span class="gm-series-led gm-series-led-dashed gm-led-gust" aria-hidden="true"></span><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="inline-block" aria-hidden="true"><path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/></svg> ${activeGust} <strong class="gm-trend-cardinal">${activeDir}</strong></span>`,
+        chartHtml: this.renderWindChart(spot, weatherData, takeoff.heading, {
+          compact: true,
+          expanded: isExpandedCard('multi-chart-wind'),
+          hideTooltip: true,
+          hideFooter: true
+        })
       },
       {
         id: 'multi-chart-sounding',
         label: 'Base Cumulo',
+        ledClass: 'gm-led-lcl',
         val: `${Math.round(activePoint.lclMsl || 0)}`,
         unit: 'm slm',
-        subHtml: `<span class="gm-trend-sub-badge">AGL +${Math.round(Math.max(0, (activePoint.lclMsl || 0) - (takeoff.altitude || 1000)))}m</span>`,
-        chartHtml: this.renderSoundingChart(spot, weatherData, takeoff.altitude, { compact: true, hideTooltip: true, hideFooter: true })
+        subHtml: `<span class="gm-trend-sub-badge"><span class="gm-series-led gm-led-ceiling" aria-hidden="true"></span>Max ${Math.round((activePoint.lclMsl || 0) + 250)}m · AGL +${Math.round(Math.max(0, (activePoint.lclMsl || 0) - (takeoff.altitude || 1000)))}m</span>`,
+        chartHtml: this.renderSoundingChart(spot, weatherData, takeoff.altitude, {
+          compact: true,
+          expanded: isExpandedCard('multi-chart-sounding'),
+          hideTooltip: true,
+          hideFooter: true
+        })
       },
       {
         id: 'multi-chart-cape',
         label: 'Instabilità (CAPE)',
+        ledClass: 'gm-led-cape',
         val: `${Math.round(activePoint.cape || 0)}`,
         unit: 'J/kg',
         subHtml: `<span class="gm-trend-sub-badge ${activePoint.cape >= 800 ? 'status-alert' : activePoint.cape >= 300 ? 'status-caution' : 'status-flyable'}">${activePoint.cape >= 800 ? 'Rischio CB' : activePoint.cape >= 300 ? 'Cumuli / Rovesci' : 'Stabile'}</span>`,
@@ -3551,11 +3665,13 @@ export class ForecastViewController {
           minY: 0,
           maxY: capeChartMaxY,
           compact: true,
+          expanded: isExpandedCard('multi-chart-cape'),
           hideTooltip: true,
-          hideThresholdLabels: true,
+          hideThresholdLabels: !isExpandedCard('multi-chart-cape'),
           thresholds: capeThresholds,
           series: [{
             name: 'CAPE',
+            isPrimary: true,
             points: hourlyPoints.map(p => ({ hour: p.hour, value: p.cape })),
             stroke: '#a855f7',
             strokeWidth: 2.5,
@@ -3566,33 +3682,47 @@ export class ForecastViewController {
       {
         id: 'multi-chart-turbulence',
         label: 'Turbolenza',
+        ledClass: 'gm-led-edr',
         val: `${(activePoint.edr || 0).toFixed(2)}`,
         unit: 'EDR',
-        subHtml: `<span class="gm-trend-sub-badge">+${(activePoint.updraft || 0).toFixed(1)} m/s salita</span>`,
+        subHtml: `<span class="gm-trend-sub-badge"><span class="gm-series-led gm-series-led-dashed gm-led-updraft" aria-hidden="true"></span>+${(activePoint.updraft || 0).toFixed(1)} m/s salita</span>`,
         chartHtml: this.renderSvgTrendChart({
           id: 'multi-turbulence',
-          title: 'Salita',
-          unit: 'm/s',
+          title: 'Turbolenza & Salita',
+          unit: 'EDR',
           minY: 0,
-          maxY: 5,
+          maxY: Math.max(4.5, Math.ceil(Math.max(...hourlyPoints.map(p => Math.max(p.edr || 0, p.updraft || 0)), 3.2) * 1.15 * 2) / 2),
           compact: true,
+          expanded: isExpandedCard('multi-chart-turbulence'),
           hideTooltip: true,
-          hideThresholdLabels: true,
+          hideThresholdLabels: !isExpandedCard('multi-chart-turbulence'),
           thresholds: [
-            { value: 2.5, stroke: 'var(--gm-status-caution)', strokeDasharray: '4,3' }
+            { value: 2.0, role: 'caution', stroke: 'var(--gm-status-caution)', strokeDasharray: '4,3', label: '2.0' },
+            { value: 3.2, role: 'unflyable', stroke: 'var(--gm-status-unflyable)', strokeDasharray: '4,3', label: '3.2' }
           ],
-          series: [{
-            name: 'Updraft',
-            points: hourlyPoints.map(p => ({ hour: p.hour, value: p.updraft })),
-            stroke: 'var(--gm-status-caution)',
-            strokeWidth: 2.5,
-            fillArea: 'rgba(234, 179, 8, 0.18)'
-          }]
+          series: [
+            {
+              name: 'Updraft',
+              points: hourlyPoints.map(p => ({ hour: p.hour, value: p.updraft })),
+              stroke: 'var(--gm-status-caution)',
+              strokeWidth: 2.0,
+              strokeDasharray: '4,2',
+              fillArea: 'rgba(234, 179, 8, 0.14)'
+            },
+            {
+              name: 'EDR',
+              isPrimary: true,
+              points: hourlyPoints.map(p => ({ hour: p.hour, value: p.edr })),
+              stroke: 'var(--gm-accent-sky, #0ea5e9)',
+              strokeWidth: 2.4
+            }
+          ]
         })
       },
       {
         id: 'multi-chart-cloudcover',
         label: 'Copertura',
+        ledClass: 'gm-led-cloud',
         val: `${Math.round(activePoint.cloudCover || 0)}`,
         unit: '%',
         subHtml: `<span class="gm-trend-sub-badge">${activePoint.cloudCover > 70 ? 'Nuvoloso' : activePoint.cloudCover > 25 ? 'Parziale' : 'Sereno'}</span>`,
@@ -3603,13 +3733,16 @@ export class ForecastViewController {
           minY: 0,
           maxY: 100,
           compact: true,
+          expanded: isExpandedCard('multi-chart-cloudcover'),
           hideTooltip: true,
-          hideThresholdLabels: true,
+          hideThresholdLabels: !isExpandedCard('multi-chart-cloudcover'),
           thresholds: [
-            { value: 80, stroke: 'var(--gm-status-caution)', strokeDasharray: '4,3' }
+            { value: 65, role: 'caution', stroke: 'var(--gm-status-caution)', strokeDasharray: '4,3', label: '65%' },
+            { value: 85, role: 'unflyable', stroke: 'var(--gm-status-unflyable)', strokeDasharray: '4,3', label: '85%' }
           ],
           series: [{
             name: 'Copertura',
+            isPrimary: true,
             points: hourlyPoints.map(p => ({ hour: p.hour, value: p.cloudCover })),
             stroke: 'var(--gm-text-secondary)',
             strokeWidth: 2.5,
@@ -3620,27 +3753,29 @@ export class ForecastViewController {
       {
         id: 'multi-chart-precipitation',
         label: 'Precipitazioni',
+        ledClass: 'gm-led-precip-prob',
         val: `${Math.round(activePoint.precipProb || 0)}`,
         unit: '% prob.',
         subHtml: (() => {
           const curPrecip = activePoint.precip || 0;
           const curProb = Math.round(activePoint.precipProb || 0);
+          const barLed = `<span class="gm-series-led gm-series-led-bar gm-led-precip-mm" aria-hidden="true"></span>`;
           if (curPrecip > 0.5) {
-            return `<span class="gm-trend-sub-badge status-unflyable">NO FLY: Pioggia (${curPrecip.toFixed(1)} mm/h)</span>`;
+            return `<span class="gm-trend-sub-badge status-unflyable">${barLed}NO FLY: Pioggia (${curPrecip.toFixed(1)} mm/h)</span>`;
           }
           if (curPrecip >= 0.1) {
-            return `<span class="gm-trend-sub-badge status-caution">Pioviggine (${curPrecip.toFixed(1)} mm/h)</span>`;
+            return `<span class="gm-trend-sub-badge status-caution">${barLed}Pioviggine (${curPrecip.toFixed(1)} mm/h)</span>`;
           }
           if (curProb >= 50) {
-            return `<span class="gm-trend-sub-badge status-alert">${curProb}% prob. rovesci (${curPrecip.toFixed(1)} mm/h)</span>`;
+            return `<span class="gm-trend-sub-badge status-alert">${barLed}${curProb}% prob. rovesci (${curPrecip.toFixed(1)} mm/h)</span>`;
           }
           if (curProb >= 25) {
-            return `<span class="gm-trend-sub-badge status-caution">${curProb}% prob. pioggia (${curPrecip.toFixed(1)} mm/h)</span>`;
+            return `<span class="gm-trend-sub-badge status-caution">${barLed}${curProb}% prob. pioggia (${curPrecip.toFixed(1)} mm/h)</span>`;
           }
           if (curProb > 0) {
-            return `<span class="gm-trend-sub-badge status-flyable">${curProb}% prob. (${curPrecip.toFixed(1)} mm/h)</span>`;
+            return `<span class="gm-trend-sub-badge status-flyable">${barLed}${curProb}% prob. (${curPrecip.toFixed(1)} mm/h)</span>`;
           }
-          return `<span class="gm-trend-sub-badge status-flyable">Assenti (0.0 mm/h)</span>`;
+          return `<span class="gm-trend-sub-badge status-flyable">${barLed}Assenti (0.0 mm/h)</span>`;
         })(),
         chartHtml: this.renderSvgTrendChart({
           id: 'multi-precipitation',
@@ -3649,11 +3784,12 @@ export class ForecastViewController {
           minY: 0,
           maxY: 100,
           compact: true,
+          expanded: isExpandedCard('multi-chart-precipitation'),
           hideTooltip: true,
-          hideThresholdLabels: true,
+          hideThresholdLabels: !isExpandedCard('multi-chart-precipitation'),
           thresholds: [
-            { value: 30, stroke: 'var(--gm-status-caution)', strokeDasharray: '4,3', label: '30%' },
-            { value: 60, stroke: 'var(--gm-status-unflyable)', strokeDasharray: '4,3', label: '60%' }
+            { value: 30, role: 'caution', stroke: 'var(--gm-status-caution)', strokeDasharray: '4,3', label: '30%' },
+            { value: 60, role: 'unflyable', stroke: 'var(--gm-status-unflyable)', strokeDasharray: '4,3', label: '60%' }
           ],
           series: [
             ...(hourlyPoints.some(p => (p.precip || 0) > 0) ? [{
@@ -3680,21 +3816,41 @@ export class ForecastViewController {
 
     return `
       <div class="gm-multi-charts-container">
-        ${chartCards.map(c => `
-          <div class="gm-trend-card gm-trend-card-side-by-side" id="${c.id}">
-            <div class="gm-trend-side-panel">
-              <span class="gm-trend-side-label">${escapeHtml(c.label)}</span>
-              <div class="gm-trend-side-val-group">
-                <span class="gm-trend-side-val">${escapeHtml(c.val)}</span>
-                <span class="gm-trend-side-unit">${escapeHtml(c.unit)}</span>
+        ${chartCards.map(c => {
+          const isExp = isExpandedCard(c.id);
+          return `
+            <div 
+              class="gm-trend-card gm-trend-card-side-by-side ${isExp ? 'expanded' : ''}" 
+              id="${c.id}"
+              data-action="toggle-trend-chart"
+              data-chart-id="${c.id}"
+              role="button"
+              tabindex="0"
+              aria-expanded="${isExp ? 'true' : 'false'}"
+              title="${isExp ? 'Tocca per ridurre altezza grafico' : 'Tocca per ingrandire verticalmente il grafico'}"
+            >
+              <div class="gm-trend-side-panel">
+                <div class="gm-trend-side-header">
+                  <span class="gm-trend-side-label">${escapeHtml(c.label)}</span>
+                  <span class="gm-trend-expand-icon ${isExp ? 'rotate-180' : ''}" aria-hidden="true">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                  </span>
+                </div>
+                <div class="gm-trend-side-val-group">
+                  <span class="gm-series-led ${c.ledClass || 'gm-led-accent'}" aria-hidden="true"></span>
+                  <span class="gm-trend-side-val">${escapeHtml(c.val)}</span>
+                  <span class="gm-trend-side-unit">${escapeHtml(c.unit)}</span>
+                </div>
+                <div class="gm-trend-side-sub">${c.subHtml}</div>
               </div>
-              <div class="gm-trend-side-sub">${c.subHtml}</div>
+              <div class="gm-trend-chart-panel">
+                ${c.chartHtml}
+              </div>
             </div>
-            <div class="gm-trend-chart-panel">
-              ${c.chartHtml}
-            </div>
-          </div>
-        `).join('')}
+          `;
+        }).join('')}
       </div>
     `;
   }
@@ -3880,6 +4036,7 @@ export class ForecastViewController {
    */
   renderWindChart(spot, weatherData, takeoffAzimuth, options = {}) {
     const compact = Boolean(options.compact);
+    const expanded = Boolean(options.expanded);
     const hideTooltip = Boolean(options.hideTooltip);
     const hideFooter = Boolean(options.hideFooter);
 
@@ -3911,15 +4068,38 @@ export class ForecastViewController {
     }
 
     const W = 350;
-    const H = compact ? 85 : 120;
+    const H = expanded ? 176 : (compact ? 108 : 120);
     const xMin = 30;
     const xMax = 335;
-    const yMin = compact ? 8 : 15;
-    const yMax = H - (compact ? 18 : 25);
-    const maxVal = 40; // Max Y axis 40 km/h
+    const yMin = expanded ? 12 : (compact ? 8 : 15);
+    const yMax = H - (expanded ? 20 : (compact ? 18 : 25));
+
+    const yellowLimit = 18; // Caution threshold (km/h)
+    const redLimit = 26;    // Unflyable threshold (km/h)
+    const peakWind = Math.max(...hours.map(p => Math.max(p.speed || 0, p.gust || 0)), 0);
+    const maxVal = Math.max(30, Math.ceil(Math.max(redLimit * 1.15, peakWind * 1.15) / 5) * 5);
 
     const getX = (h) => Math.round(xMin + ((h - sH) / hRange) * (xMax - xMin));
     const getY = (val) => Math.round(yMax - (Math.min(maxVal, Math.max(0, val)) / maxVal) * (yMax - yMin));
+
+    // Hourly background flyability curtains (using <path> to preserve anti-clutter <rect> test contract)
+    const halfStep = (xMax - xMin) / (2 * hRange);
+    const renderedZoneBands = hours.map(p => {
+      let zoneStatus = null;
+      if (p.speed >= redLimit || p.gust >= redLimit) {
+        zoneStatus = 'unflyable';
+      } else if (p.speed >= yellowLimit || p.gust >= yellowLimit + 4) {
+        zoneStatus = 'caution';
+      }
+      if (!zoneStatus) return '';
+      const cx = getX(p.hour);
+      const bx0 = Math.max(xMin, Math.round((cx - halfStep) * 10) / 10);
+      const bx1 = Math.min(xMax, Math.round((cx + halfStep) * 10) / 10);
+      const fill = zoneStatus === 'unflyable'
+        ? 'rgba(239, 68, 68, 0.09)'
+        : 'rgba(234, 179, 8, 0.08)';
+      return `<path class="gm-chart-zone-band gm-chart-zone-${zoneStatus}" d="M ${bx0},${yMin} L ${bx1},${yMin} L ${bx1},${yMax} L ${bx0},${yMax} Z" fill="${fill}" />`;
+    }).join('');
 
     // Smooth curves for speed & gust
     const speedCoords = hours.map(p => ({ x: getX(p.hour), y: getY(p.speed) }));
@@ -3932,6 +4112,7 @@ export class ForecastViewController {
     const activeMarkerX = getX(this.selectedHour);
     const activeData = hours.find(h => h.hour === this.selectedHour) || hours[0];
     const activeMarkerY = getY(activeData.speed);
+    const activeGustY = getY(activeData.gust);
 
     const numLabels = hRange <= 8 ? 3 : (hRange <= 12 ? 4 : 5);
     const labelHours = [];
@@ -3941,8 +4122,11 @@ export class ForecastViewController {
     }
 
     return `
-      <div id="forecast-wind-chart-box" class="gm-chart-box">
+      <div id="forecast-wind-chart-box" class="gm-chart-box ${expanded ? 'gm-chart-box-expanded' : ''}">
         <svg class="gm-chart-svg" viewBox="0 0 ${W} ${H}" aria-label="Grafico orario vento e raffiche">
+          <!-- Hourly Flyability Background Curtain -->
+          ${renderedZoneBands}
+
           <!-- Background Grid lines -->
           <line x1="${xMin}" y1="${getY(10)}" x2="${xMax}" y2="${getY(10)}" stroke="var(--gm-border)" stroke-dasharray="2,2" />
           <line x1="${xMin}" y1="${getY(20)}" x2="${xMax}" y2="${getY(20)}" stroke="var(--gm-border)" stroke-dasharray="2,2" />
@@ -3950,12 +4134,18 @@ export class ForecastViewController {
           <line x1="${xMin}" y1="${yMax}" x2="${xMax}" y2="${yMax}" stroke="var(--gm-border-strong)" stroke-width="1" />
 
           <!-- Y Axis Labels -->
+          <text x="${xMin - 4}" y="${getY(0) + 3}" font-size="8" fill="var(--gm-text-muted)" text-anchor="end">0</text>
           <text x="${xMin - 4}" y="${getY(10) + 3}" font-size="8" fill="var(--gm-text-muted)" text-anchor="end">10</text>
           <text x="${xMin - 4}" y="${getY(20) + 3}" font-size="8" fill="var(--gm-text-muted)" text-anchor="end">20</text>
           <text x="${xMin - 4}" y="${getY(30) + 3}" font-size="8" fill="var(--gm-text-muted)" text-anchor="end">30</text>
 
-          <!-- EN-A Glider Limit (18 km/h) -->
-          <line x1="${xMin}" y1="${getY(18)}" x2="${xMax}" y2="${getY(18)}" stroke="var(--gm-status-caution)" stroke-width="1.2" stroke-dasharray="4,3" />
+          <!-- Flyability Thresholds: Yellow (18 km/h) & Red (26 km/h) -->
+          <line x1="${xMin}" y1="${getY(yellowLimit)}" x2="${xMax}" y2="${getY(yellowLimit)}" stroke="var(--gm-status-caution)" stroke-width="1.3" stroke-dasharray="4,3" />
+          <line x1="${xMin}" y1="${getY(redLimit)}" x2="${xMax}" y2="${getY(redLimit)}" stroke="var(--gm-status-unflyable)" stroke-width="1.3" stroke-dasharray="4,3" />
+          ${expanded ? `
+          <text x="${xMax - 2}" y="${getY(yellowLimit) - 3}" font-size="8" font-weight="600" fill="var(--gm-status-caution)" text-anchor="end">${yellowLimit} km/h</text>
+          <text x="${xMax - 2}" y="${Math.max(yMin + 7, getY(redLimit) - 3)}" font-size="8" font-weight="600" fill="var(--gm-status-unflyable)" text-anchor="end">${redLimit} km/h</text>
+          ` : ''}
 
           <!-- Shaded Speed Area (Parameteo Style) -->
           <path d="${speedAreaPath}" fill="rgba(59, 130, 246, 0.18)" />
@@ -3973,6 +4163,7 @@ export class ForecastViewController {
 
           <!-- ACTIVE HOUR VERTICAL MARKER -->
           <line x1="${activeMarkerX}" y1="${yMin}" x2="${activeMarkerX}" y2="${yMax}" stroke="var(--gm-accent)" stroke-width="1.8" stroke-dasharray="3,3" />
+          <circle cx="${activeMarkerX}" cy="${activeGustY}" r="3.2" fill="#94a3b8" stroke="var(--gm-bg-base)" stroke-width="1.4" />
           <circle cx="${activeMarkerX}" cy="${activeMarkerY}" r="4" fill="var(--gm-accent)" stroke="var(--gm-bg-base)" stroke-width="1.8" />
           ${!hideTooltip ? `
           <rect x="${activeMarkerX - 22}" y="2" width="44" height="14" rx="3" fill="var(--gm-accent)" />
@@ -4101,6 +4292,7 @@ export class ForecastViewController {
    */
   renderSoundingChart(spot, weatherData, takeoffAlt, options = {}) {
     const compact = Boolean(options.compact);
+    const expanded = Boolean(options.expanded);
     const hideTooltip = Boolean(options.hideTooltip);
     const hideFooter = Boolean(options.hideFooter);
 
@@ -4133,15 +4325,38 @@ export class ForecastViewController {
     }
 
     const W = 350;
-    const H = compact ? 85 : 120;
+    const H = expanded ? 176 : (compact ? 108 : 120);
     const xMin = 36;
     const xMax = 335;
-    const yMin = compact ? 8 : 15;
-    const yMax = H - (compact ? 18 : 25);
-    const maxAlt = 3000; // Max altitude 3000m MSL
+    const yMin = expanded ? 12 : (compact ? 8 : 15);
+    const yMax = H - (expanded ? 20 : (compact ? 18 : 25));
+
+    const redAltLimit = Math.round((takeoffAlt || 1000) + 200);
+    const yellowAltLimit = Math.round((takeoffAlt || 1000) + 500);
+    const peakCeiling = Math.max(...hours.map(p => p.ceiling || 0), yellowAltLimit + 400);
+    const maxAlt = Math.max(2200, Math.ceil((peakCeiling * 1.12) / 200) * 200);
 
     const getX = (h) => Math.round(xMin + ((h - sH) / hRange) * (xMax - xMin));
     const getY = (alt) => Math.round(yMax - (Math.min(maxAlt, Math.max(0, alt)) / maxAlt) * (yMax - yMin));
+
+    // Hourly background flyability curtains (low cloud base relative to takeoff)
+    const halfStep = (xMax - xMin) / (2 * hRange);
+    const renderedZoneBands = hours.map(p => {
+      let zoneStatus = null;
+      if (p.lclMsl <= redAltLimit) {
+        zoneStatus = 'unflyable';
+      } else if (p.lclMsl <= yellowAltLimit) {
+        zoneStatus = 'caution';
+      }
+      if (!zoneStatus) return '';
+      const cx = getX(p.hour);
+      const bx0 = Math.max(xMin, Math.round((cx - halfStep) * 10) / 10);
+      const bx1 = Math.min(xMax, Math.round((cx + halfStep) * 10) / 10);
+      const fill = zoneStatus === 'unflyable'
+        ? 'rgba(239, 68, 68, 0.09)'
+        : 'rgba(234, 179, 8, 0.08)';
+      return `<path class="gm-chart-zone-band gm-chart-zone-${zoneStatus}" d="M ${bx0},${yMin} L ${bx1},${yMin} L ${bx1},${yMax} L ${bx0},${yMax} Z" fill="${fill}" />`;
+    }).join('');
 
     const lclCoords = hours.map(p => ({ x: getX(p.hour), y: getY(p.lclMsl) }));
     const ceilingCoords = hours.map(p => ({ x: getX(p.hour), y: getY(p.ceiling) }));
@@ -4152,6 +4367,7 @@ export class ForecastViewController {
     const activeMarkerX = getX(this.selectedHour);
     const activeData = hours.find(h => h.hour === this.selectedHour) || hours[0];
     const activeLclY = getY(activeData.lclMsl);
+    const activeCeilingY = getY(activeData.ceiling);
 
     const numLabels = hRange <= 8 ? 3 : (hRange <= 12 ? 4 : 5);
     const labelHours = [];
@@ -4161,19 +4377,31 @@ export class ForecastViewController {
     }
 
     return `
-      <div id="forecast-sounding-chart-box" class="gm-chart-box">
+      <div id="forecast-sounding-chart-box" class="gm-chart-box ${expanded ? 'gm-chart-box-expanded' : ''}">
         <svg class="gm-chart-svg" viewBox="0 0 ${W} ${H}" aria-label="Grafico orario radiosondaggi e quote termiche">
+          <!-- Hourly Flyability Background Curtain -->
+          ${renderedZoneBands}
+
           <!-- Background Grid lines -->
           <line x1="${xMin}" y1="${getY(1000)}" x2="${xMax}" y2="${getY(1000)}" stroke="var(--gm-border)" stroke-dasharray="2,2" />
           <line x1="${xMin}" y1="${getY(2000)}" x2="${xMax}" y2="${getY(2000)}" stroke="var(--gm-border)" stroke-dasharray="2,2" />
           <line x1="${xMin}" y1="${yMax}" x2="${xMax}" y2="${yMax}" stroke="var(--gm-border-strong)" stroke-width="1" />
 
           <!-- Y Axis Labels -->
+          <text x="${xMin - 4}" y="${getY(0) + 3}" font-size="8" fill="var(--gm-text-muted)" text-anchor="end">0m</text>
           <text x="${xMin - 4}" y="${getY(1000) + 3}" font-size="8" fill="var(--gm-text-muted)" text-anchor="end">1000m</text>
           <text x="${xMin - 4}" y="${getY(2000) + 3}" font-size="8" fill="var(--gm-text-muted)" text-anchor="end">2000m</text>
 
           <!-- Takeoff Elevation Reference Line -->
           <line x1="${xMin}" y1="${getY(takeoffAlt)}" x2="${xMax}" y2="${getY(takeoffAlt)}" stroke="var(--gm-border-strong)" stroke-width="1.2" stroke-dasharray="3,3" />
+
+          <!-- Flyability Thresholds: Yellow (low margin) & Red (cloud on takeoff) -->
+          <line x1="${xMin}" y1="${getY(yellowAltLimit)}" x2="${xMax}" y2="${getY(yellowAltLimit)}" stroke="var(--gm-status-caution)" stroke-width="1.3" stroke-dasharray="4,3" />
+          <line x1="${xMin}" y1="${getY(redAltLimit)}" x2="${xMax}" y2="${getY(redAltLimit)}" stroke="var(--gm-status-unflyable)" stroke-width="1.3" stroke-dasharray="4,3" />
+          ${expanded ? `
+          <text x="${xMax - 2}" y="${getY(yellowAltLimit) - 3}" font-size="8" font-weight="600" fill="var(--gm-status-caution)" text-anchor="end">${yellowAltLimit}m</text>
+          <text x="${xMax - 2}" y="${getY(redAltLimit) - 3}" font-size="8" font-weight="600" fill="var(--gm-status-unflyable)" text-anchor="end">${redAltLimit}m</text>
+          ` : ''}
 
           <!-- Shaded LCL Area -->
           <path d="${lclAreaPath}" fill="rgba(56, 189, 248, 0.12)" />
@@ -4191,6 +4419,7 @@ export class ForecastViewController {
 
           <!-- ACTIVE HOUR VERTICAL MARKER -->
           <line x1="${activeMarkerX}" y1="${yMin}" x2="${activeMarkerX}" y2="${yMax}" stroke="var(--gm-accent)" stroke-width="1.8" stroke-dasharray="3,3" />
+          <circle cx="${activeMarkerX}" cy="${activeCeilingY}" r="3.2" fill="var(--gm-status-flyable)" stroke="var(--gm-bg-base)" stroke-width="1.4" />
           <circle cx="${activeMarkerX}" cy="${activeLclY}" r="4" fill="var(--gm-accent)" stroke="var(--gm-bg-base)" stroke-width="1.8" />
           ${!hideTooltip ? `
           <rect x="${activeMarkerX - 28}" y="2" width="56" height="14" rx="3" fill="var(--gm-accent)" />
@@ -5439,6 +5668,39 @@ export class ForecastViewController {
             landingId: effectiveLandingId
           });
           paramsContainer.innerHTML = this.renderParameterCards(evaluated, weatherData, spot, glider, activeSubSpotObj);
+        } else {
+          this.render();
+        }
+      }
+    } else if (action === 'toggle-trend-chart') {
+      const chartId = actionEl.getAttribute('data-chart-id');
+      if (chartId) {
+        if (!this.expandedTrendChartIds) {
+          this.expandedTrendChartIds = new Set();
+        }
+        if (this.expandedTrendChartIds.has(chartId)) {
+          this.expandedTrendChartIds.delete(chartId);
+        } else {
+          this.expandedTrendChartIds.add(chartId);
+        }
+        const paramsContainer = this.containerEl ? this.containerEl.querySelector('#forecast-params-container') : null;
+        if (paramsContainer && this.forecastMode === 'charts') {
+          const spot = this.getCurrentSpot();
+          const glider = this.getActiveGlider();
+          const weatherData = this.getWeatherData(spot, this.activeDate);
+          const activeSubSpotObj = this.resolveActiveSubSpot(spot);
+          const effectiveTakeoffId = (activeSubSpotObj && activeSubSpotObj.spotType === 'takeoff') ? activeSubSpotObj.id : this.activeTakeoffId;
+          const effectiveLandingId = (activeSubSpotObj && activeSubSpotObj.spotType === 'landing') ? activeSubSpotObj.id : this.activeLandingId;
+          const evaluated = evaluateComprensorio({
+            comprensorio: spot,
+            weatherData,
+            hourIndex: this.selectedHour,
+            glider,
+            targetDate: this.activeDate,
+            takeoffId: effectiveTakeoffId,
+            landingId: effectiveLandingId
+          });
+          paramsContainer.innerHTML = this.renderMultiTrendCharts(evaluated, weatherData, spot, glider, activeSubSpotObj);
         } else {
           this.render();
         }

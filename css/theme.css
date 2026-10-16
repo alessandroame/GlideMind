@@ -5017,13 +5017,20 @@ input.gm-input:focus {
   background-color: var(--gm-bg-card);
   border: 1px solid var(--gm-border);
   border-radius: var(--gm-radius-md);
+  cursor: pointer;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.gm-trend-card.gm-trend-card-side-by-side.expanded {
+  border-color: var(--gm-accent);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.16);
 }
 
 .gm-trend-side-panel {
-  width: 98px;
-  min-width: 98px;
-  max-width: 98px;
-  padding: 10px 6px 8px 8px;
+  width: 106px;
+  min-width: 106px;
+  max-width: 106px;
+  padding: 8px 6px 8px 8px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -5033,18 +5040,39 @@ input.gm-input:focus {
   box-sizing: border-box;
 }
 
+.gm-trend-side-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 2px;
+  margin-bottom: 2px;
+}
+
 .gm-trend-side-label {
   font-size: 0.62rem;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.02em;
   color: var(--gm-accent);
-  margin-bottom: 2px;
   line-height: 1.1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 100%;
+}
+
+.gm-trend-expand-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gm-text-muted);
+  flex-shrink: 0;
+  transition: transform 150ms ease, color 150ms ease;
+}
+
+.gm-trend-card.gm-trend-card-side-by-side.expanded .gm-trend-expand-icon {
+  color: var(--gm-accent);
 }
 
 .gm-trend-side-val-group {
@@ -5054,8 +5082,67 @@ input.gm-input:focus {
   flex-wrap: wrap;
 }
 
+.gm-series-led {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  align-self: center;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+
+.gm-series-led.gm-series-led-dashed {
+  width: 8px;
+  height: 4px;
+  border-radius: 2px;
+}
+
+.gm-series-led.gm-series-led-bar {
+  width: 5px;
+  height: 9px;
+  border-radius: 1.5px;
+}
+
+.gm-series-led.gm-led-wind {
+  background-color: #3b82f6;
+}
+
+.gm-series-led.gm-led-gust {
+  background-color: #94a3b8;
+}
+
+.gm-series-led.gm-led-lcl,
+.gm-series-led.gm-led-accent {
+  background-color: var(--gm-accent);
+}
+
+.gm-series-led.gm-led-ceiling,
+.gm-series-led.gm-led-flyable {
+  background-color: var(--gm-status-flyable);
+}
+
+.gm-series-led.gm-led-cape {
+  background-color: #a855f7;
+}
+
+.gm-series-led.gm-led-edr,
+.gm-series-led.gm-led-precip-prob,
+.gm-series-led.gm-led-precip-mm {
+  background-color: var(--gm-accent-sky, #0ea5e9);
+}
+
+.gm-series-led.gm-led-updraft,
+.gm-series-led.gm-led-caution {
+  background-color: var(--gm-status-caution);
+}
+
+.gm-series-led.gm-led-cloud {
+  background-color: var(--gm-text-secondary);
+}
+
 .gm-trend-side-val {
-  font-size: 1.35rem;
+  font-size: 1.3rem;
   font-weight: 800;
   font-family: var(--gm-font-mono, monospace);
   color: var(--gm-text-primary);
@@ -5070,7 +5157,8 @@ input.gm-input:focus {
 
 .gm-trend-side-sub {
   margin-top: 4px;
-  font-size: 0.70rem;
+  font-size: 0.68rem;
+  max-width: 100%;
 }
 
 .gm-trend-sub-badge {
@@ -5081,9 +5169,11 @@ input.gm-input:focus {
   border-radius: 4px;
   background-color: var(--gm-bg-elevated);
   color: var(--gm-text-secondary);
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   font-weight: 600;
   border: 1px solid var(--gm-border);
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .gm-trend-sub-badge.status-unflyable {

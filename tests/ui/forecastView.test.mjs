@@ -3685,6 +3685,103 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
       }
     });
   });
+
+  describe('Solo Grafici Readability, 1:1 Series LEDs, Dual Thresholds & Tap-to-Expand', () => {
+    it('renders taller base SVG height (108), 1:1 series LEDs in left panel, mandatory yellow/red threshold lines, and hourly background curtains', () => {
+      const mockStore = createStore({ selectedSpot: DEFAULT_COMPRENSORI[0] });
+      const controller = new ForecastViewController({ store: mockStore });
+      controller.forecastMode = 'charts';
+      controller.selectedHour = 14;
+
+      const weatherData = {
+        hourly: {
+          time: Array.from({ length: 13 }, (_, i) => `2026-10-10T${String(i + 8).padStart(2, '0')}:00`),
+          windspeed_10m: [8, 10, 12, 15, 19, 22, 27, 24, 18, 14, 10, 8, 6],
+          winddirection_10m: Array(13).fill(180),
+          windgusts_10m: [12, 14, 18, 21, 25, 29, 34, 30, 23, 18, 14, 10, 8],
+          temperature_2m: Array(13).fill(21),
+          dewpoint_2m: Array(13).fill(12),
+          cape: [50, 80, 150, 240, 350, 520, 860, 620, 310, 180, 90, 40, 20],
+          cloudcover: [15, 20, 30, 45, 68, 75, 88, 70, 50, 30, 20, 15, 10],
+          precipitation: [0, 0, 0, 0, 0.2, 0.4, 1.4, 0.6, 0, 0, 0, 0, 0],
+          precipitation_probability: [5, 10, 15, 25, 35, 50, 85, 65, 25, 10, 5, 0, 0]
+        }
+      };
+
+      const takeoffHtml = controller.renderMultiTrendCharts(
+        { takeoff: DEFAULT_COMPRENSORI[0].takeoffs[0], landing: DEFAULT_COMPRENSORI[0].landings[0], status: 'unflyable' },
+        weatherData,
+        DEFAULT_COMPRENSORI[0],
+        GLIDER_CLASSES.EN_A,
+        DEFAULT_COMPRENSORI[0].takeoffs[0]
+      );
+
+      // 1. Base compact height must be raised to 108 SVG units
+      assert.ok(takeoffHtml.includes('viewBox="0 0 350 108"'), 'Compact multi-trend charts must use raised 108 SVG height');
+
+      // 2. Every takeoff chart card must have both yellow (caution) and red (unflyable) dashed threshold lines
+      const takeoffCardIds = [
+        'multi-chart-wind',
+        'multi-chart-sounding',
+        'multi-chart-cape',
+        'multi-chart-turbulence',
+        'multi-chart-cloudcover',
+        'multi-chart-precipitation'
+      ];
+      for (let i = 0; i < takeoffCardIds.length; i++) {
+        const startIdx = takeoffHtml.indexOf(`id="${takeoffCardIds[i]}"`);
+        const endIdx = i + 1 < takeoffCardIds.length
+          ? takeoffHtml.indexOf(`id="${takeoffCardIds[i + 1]}"`)
+          : takeoffHtml.length;
+        assert.ok(startIdx !== -1, `Must render card ${takeoffCardIds[i]}`);
+        const cardSlice = takeoffHtml.slice(startIdx, endIdx);
+        assert.ok(cardSlice.includes('stroke="var(--gm-status-caution)"'), `Card ${takeoffCardIds[i]} must include yellow caution dashed threshold line`);
+        assert.ok(cardSlice.includes('stroke="var(--gm-status-unflyable)"'), `Card ${takeoffCardIds[i]} must include red unflyable dashed threshold line`);
+        assert.ok(cardSlice.includes('gm-series-led'), `Card ${takeoffCardIds[i]} must include colored LED indicator in left panel`);
+      }
+
+      // 3. Multi-series cards must display both series LEDs and values in left panel
+      assert.ok(takeoffHtml.includes('gm-led-wind') && takeoffHtml.includes('gm-led-gust'), 'Wind card must show both wind and gust LEDs');
+      assert.ok(takeoffHtml.includes('gm-led-lcl') && takeoffHtml.includes('gm-led-ceiling'), 'Sounding card must show both LCL base and Ceiling LEDs');
+      assert.ok(takeoffHtml.includes('Max ') && takeoffHtml.includes('AGL +'), 'Sounding card must display both Ceiling Max altitude and AGL margin');
+      assert.ok(takeoffHtml.includes('gm-led-edr') && takeoffHtml.includes('gm-led-updraft'), 'Turbulence card must show both EDR and Updraft LEDs');
+      assert.ok(takeoffHtml.includes('gm-led-precip-prob') && takeoffHtml.includes('gm-led-precip-mm'), 'Precipitation card must show both probability and mm/h bar LEDs');
+
+      // 4. Hourly background flyability curtains must render on hours crossing caution/unflyable thresholds
+      assert.ok(takeoffHtml.includes('gm-chart-zone-band gm-chart-zone-caution'), 'Must render yellow caution hourly background curtain');
+      assert.ok(takeoffHtml.includes('gm-chart-zone-band gm-chart-zone-unflyable'), 'Must render red unflyable hourly background curtain');
+
+      // 5. Tap-to-expand vertical mode via toggle-trend-chart action
+      controller.handleClick({
+        target: {
+          closest: (sel) => sel === '[data-action]' ? {
+            getAttribute: (attr) => {
+              if (attr === 'data-action') return 'toggle-trend-chart';
+              if (attr === 'data-chart-id') return 'multi-chart-wind';
+              return null;
+            }
+          } : null
+        }
+      });
+      assert.ok(controller.expandedTrendChartIds.has('multi-chart-wind'), 'Clicking trend card must toggle chartId in expandedTrendChartIds');
+
+      const expandedHtml = controller.renderMultiTrendCharts(
+        { takeoff: DEFAULT_COMPRENSORI[0].takeoffs[0], landing: DEFAULT_COMPRENSORI[0].landings[0], status: 'unflyable' },
+        weatherData,
+        DEFAULT_COMPRENSORI[0],
+        GLIDER_CLASSES.EN_A,
+        DEFAULT_COMPRENSORI[0].takeoffs[0]
+      );
+      const expWindSlice = expandedHtml.slice(
+        expandedHtml.indexOf('id="multi-chart-wind"'),
+        expandedHtml.indexOf('id="multi-chart-sounding"')
+      );
+      assert.ok(expWindSlice.includes('viewBox="0 0 350 176"'), 'Expanded trend chart must render taller 176 SVG viewBox');
+      assert.ok(expWindSlice.includes('aria-expanded="true"'), 'Expanded trend chart card must set aria-expanded="true"');
+      assert.ok(expWindSlice.includes('18 km/h') && expWindSlice.includes('26 km/h'), 'Expanded wind chart must display threshold labels');
+    });
+  });
 });
+
 
 
