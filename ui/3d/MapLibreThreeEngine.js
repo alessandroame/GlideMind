@@ -1487,9 +1487,7 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     const hhHead = Math.min(0.02, hh * 0.15);
 
     // Compute contained scale and backward offset towards harness tail cone
-    const cameraDistMeters = (this.cameraMode !== 'free' && this._cameraState?.chaseDistanceMeters > 0)
-      ? this._cameraState.chaseDistanceMeters
-      : Math.max(20, 5000000 / Math.pow(2, currentZoom));
+    const cameraDistMeters = Math.max(20, 5000000 / Math.pow(2, currentZoom));
     const avatarScale = calculateAvatarMinScale(cameraDistMeters, 60, 800, 22, 13.2, 6.5);
     const tailOffset = 0.85 * avatarScale;
     const attachX = cp.x - Math.sin(headingRad) * tailOffset;
@@ -1757,10 +1755,11 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     this._updateCameraForFrame(pt, dtSeconds);
 
     if (this.map) {
-      const zoom = (typeof this.map.getZoom === 'function') ? this.map.getZoom() : 14;
-      const cameraDistMeters = (this.cameraMode !== 'free' && this._cameraState?.chaseDistanceMeters > 0)
-        ? this._cameraState.chaseDistanceMeters
-        : Math.max(20, 5000000 / Math.pow(2, zoom));
+      const rawMapZoom = (typeof this.map.getZoom === 'function') ? this.map.getZoom() : 14;
+      const uncompensatedZoom = (this.cameraMode !== 'free' && this._cameraState?.zoom)
+        ? this._cameraState.zoom
+        : rawMapZoom;
+      const cameraDistMeters = Math.max(20, 5000000 / Math.pow(2, uncompensatedZoom));
       const scale = calculateAvatarMinScale(cameraDistMeters, 60, 800, 22, 13.2, 6.5);
 
       if (this.avatarGroup) {

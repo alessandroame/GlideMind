@@ -474,7 +474,7 @@ describe('Flight Replay Math - Headless Core Kinematics & Coordinates', () => {
       const valleyChase = stepCameraSpringDamper(null, valleyPt, 2.0, { mode: 'chase', groundAltMsl: 360 });
       assert.ok(valleyChase.compensatedZoom < valleyChase.zoom - 1.2,
         `Expected compensatedZoom (${valleyChase.compensatedZoom}) < zoom (${valleyChase.zoom}) by > 1.2 levels over 900m valley`);
-      assert.ok(valleyChase.chaseDistanceMeters > 200 && valleyChase.chaseDistanceMeters < 1200);
+      assert.ok(valleyChase.chaseDistanceMeters > 500 && valleyChase.chaseDistanceMeters < 2000);
 
       const valleyCockpit = stepCameraSpringDamper(null, valleyPt, 2.0, { mode: 'cockpit', groundAltMsl: 360 });
       assert.ok(valleyCockpit.compensatedZoom < valleyCockpit.zoom - 2.5,

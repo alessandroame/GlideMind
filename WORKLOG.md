@@ -120,12 +120,12 @@ Giornale a finestra mobile (rolling window, max **300 righe** / **ultimi 15 inte
 
 ---
 
-## 2026-10-16 - Fase 7-quinquies: Motore 3D Replay V2 (Camere in Quota, Stabilizzazione Termica, Fisica Pendolare e Traccia Spline)
+## 2026-10-16 - Fase 7-quinquies: Motore 3D Replay V2 (Camere in Quota, Orientamento Calotta, Fisica Pendolare e Clamping DEM)
 - **Tipo**: Evoluzione 3D WebGL / Cinematica Aerodinamica / Geometria Spline (`flightReplayMath.js`, `paragliderModel.js`, `MapLibreThreeEngine.js`)
 - **Dettagli**: [.agents/worklog.d/2026-10-16_3d-replay-engine-v2-cameras-pendulum-spline.md](file:///.agents/worklog.d/2026-10-16_3d-replay-engine-v2-cameras-pendulum-spline.md)
 - **Sintesi**:
-  - Implementato il controller camera V2 (`stepCameraSpringDamper`, `computeCameraGroundTargetForAltitude`) con centratura ottica in quota ($\Delta H \cdot \tan\theta$), stabilizzazione dell'orizzonte in termica ($\tau = 6.5\text{s}$ sul centroide mobile), orbita touch manuale con reset su `Segui` e visuale `Pilota` POV con Look-Into-Turn e occultamento di `PilotPod`/`PilotHead`.
-  - Introdotto lo smoothing Gaussiano 1 Hz (`smoothTrackKinematics`), la fisica pendolare centrifuga con frenata del bordo d'uscita (`computePendulumPose`), la livrea racing bicolore (`paraglider.glb`), il nastro spline Catmull-Rom con normali miter (`buildSmoothTrackGeometryData`), la Ghost Track futura (`16%` opacità), la scia aerodinamica e il fix della tendina DEM sotto quota decollo (`_minTrackY`).
+  - Implementato il controller camera V2 (`stepCameraSpringDamper`, `computeCameraGroundTargetForAltitude`) con centratura ottica 3D completa ($\Delta H \cdot \tan\theta$ + `compensatedZoom` lungo il raggio visivo sincronizzato con `map.transform.elevation`), stabilizzazione dell'orizzonte in termica ($\tau = 6.5\text{s}$) e visuale `Pilota` POV con occultamento di `PilotPod`/`PilotHead`.
+  - Corretto l'orientamento 180° della calotta (`GliderCanopy` e `SuspensionLines` con bordo d'attacco Shark-Nose a `-Z` concorde con il pilota e `sweepBackZ` verso `+Z` in `paragliderModel.js` e `paraglider.glb`), introdotto il raffinamento continuo multi-LOD di `terrainDelta` e il clamping anti-compenetrazione al decollo (`_clampTrackAboveTerrain` $\ge +5.5\text{m}$ sopra il DEM).
 
 ---
 
