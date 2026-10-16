@@ -3287,7 +3287,7 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
       assert.equal(controller.activeLandingId, 'l-alt', 'Must preserve selected landing when switching back to Panoramica');
     });
 
-    it('reactively updates the hourly timeline strip and scrubber spot pill when switching between Panoramica, Decollo, and Atterraggio', () => {
+    it('reactively updates the hourly timeline strip and scrubber spot pill with the synthetic flyability reason when switching between Panoramica, Decollo, and Atterraggio', () => {
       const cornizzolo = DEFAULT_COMPRENSORI[0];
       const takeoff0 = cornizzolo.takeoffs[0];
       const takeoff1 = cornizzolo.takeoffs[1];
@@ -3296,29 +3296,40 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
       const mockStore = createStore({ selectedSpot: cornizzolo });
       const controller = new ForecastViewController({ store: mockStore });
       controller.selectedHour = 14;
+      const weatherData = controller.getWeatherData(cornizzolo, controller.activeDate);
+      const glider = controller.getActiveGlider();
 
       // 1. Overview (Panoramica)
       controller.selectedSubSpot = 'overview';
+      const evalOverview = controller.evaluateTimelineSlot(cornizzolo, weatherData, 14, glider, null);
       const htmlOverview = controller.renderHtml();
       const stripOverview = controller.renderTimelineGrid(
         cornizzolo,
-        controller.getWeatherData(cornizzolo, controller.activeDate),
-        controller.getActiveGlider()
+        weatherData,
+        glider
       );
       assert.ok(htmlOverview.includes('data-timeline-context="overview"'), 'Timeline strip must declare overview context');
-      assert.ok(htmlOverview.includes('· Panoramica ('), 'Scrubber pill must indicate Panoramica context');
+      assert.ok(evalOverview.shortReason && evalOverview.shortReason.length > 0, 'Overview evaluation must expose a synthetic shortReason');
+      assert.ok(
+        htmlOverview.includes(`id="forecast-scrubber-spot-pill"`) && htmlOverview.includes(evalOverview.shortReason),
+        'Scrubber pill must display the synthetic flyability reason instead of locality name in Panoramica'
+      );
+      assert.ok(!htmlOverview.includes('· Panoramica ('), 'Scrubber pill must no longer display the locality/context label');
 
       // 2. Switch to Takeoff 0 (Decollo Risparmio)
       controller.selectedSubSpot = takeoff0.id;
       controller.activeTakeoffId = takeoff0.id;
+      const activeSubTakeoff0 = controller.resolveActiveSubSpot(cornizzolo);
+      const evalTakeoff0 = controller.evaluateTimelineSlot(cornizzolo, weatherData, 14, glider, activeSubTakeoff0);
       const htmlTakeoff0 = controller.renderHtml();
       const stripTakeoff0 = controller.renderTimelineGrid(
         cornizzolo,
-        controller.getWeatherData(cornizzolo, controller.activeDate),
-        controller.getActiveGlider()
+        weatherData,
+        glider
       );
       assert.ok(htmlTakeoff0.includes('data-timeline-context="takeoff"'), 'Timeline strip must declare takeoff context');
-      assert.ok(htmlTakeoff0.includes('· ↗ '), 'Scrubber pill must indicate active takeoff context');
+      assert.ok(evalTakeoff0.shortReason && evalTakeoff0.shortReason.length > 0, 'Takeoff evaluation must expose a synthetic shortReason');
+      assert.ok(htmlTakeoff0.includes(evalTakeoff0.shortReason), 'Scrubber pill must display the active takeoff synthetic flyability reason');
       assert.notEqual(stripOverview, stripTakeoff0, 'Timeline strip HTML must react when switching from Panoramica to Decollo');
 
       // 3. Switch to Takeoff 1 (Decollo Centrale)
@@ -3326,22 +3337,25 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
       controller.activeTakeoffId = takeoff1.id;
       const stripTakeoff1 = controller.renderTimelineGrid(
         cornizzolo,
-        controller.getWeatherData(cornizzolo, controller.activeDate),
-        controller.getActiveGlider()
+        weatherData,
+        glider
       );
       assert.notEqual(stripTakeoff0, stripTakeoff1, 'Timeline strip HTML must react when switching between different takeoffs');
 
       // 4. Switch to Landing 0 (Atterraggio Suello)
       controller.selectedSubSpot = landing0.id;
       controller.activeLandingId = landing0.id;
+      const activeSubLanding0 = controller.resolveActiveSubSpot(cornizzolo);
+      const evalLanding0 = controller.evaluateTimelineSlot(cornizzolo, weatherData, 14, glider, activeSubLanding0);
       const htmlLanding0 = controller.renderHtml();
       const stripLanding0 = controller.renderTimelineGrid(
         cornizzolo,
-        controller.getWeatherData(cornizzolo, controller.activeDate),
-        controller.getActiveGlider()
+        weatherData,
+        glider
       );
       assert.ok(htmlLanding0.includes('data-timeline-context="landing"'), 'Timeline strip must declare landing context');
-      assert.ok(htmlLanding0.includes('· ↘ '), 'Scrubber pill must indicate active landing context');
+      assert.ok(evalLanding0.shortReason && evalLanding0.shortReason.length > 0, 'Landing evaluation must expose a synthetic shortReason');
+      assert.ok(htmlLanding0.includes(evalLanding0.shortReason), 'Scrubber pill must display the active landing synthetic flyability reason');
       assert.notEqual(stripOverview, stripLanding0, 'Timeline strip HTML must react when switching from Panoramica to Atterraggio');
       assert.notEqual(stripTakeoff0, stripLanding0, 'Timeline strip HTML must react when switching from Decollo to Atterraggio');
     });

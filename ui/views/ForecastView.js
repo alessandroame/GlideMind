@@ -4208,6 +4208,15 @@ export class ForecastViewController {
    * @param {object|null} [activeSubSpotObj=null]
    * @returns {object}
    */
+  formatShortFlyabilityReason(rawText) {
+    if (!rawText || typeof rawText !== 'string') return 'Condizioni Ottimali';
+    const cleaned = rawText.replace(/^NO\s*FLY:\s*/i, '').trim();
+    if (/pioggia\/temporale/i.test(cleaned)) return 'Pioggia / Temporale';
+    if (/rischio temporali severi/i.test(cleaned)) return 'Temporali Severi';
+    if (/previsione non disponibile/i.test(cleaned)) return 'Dati N/D';
+    return cleaned || 'Condizioni Ottimali';
+  }
+
   evaluateTimelineSlot(spot, weatherData, hourIndex, glider, activeSubSpotObj = null) {
     if (!spot) {
       return {
@@ -4215,6 +4224,7 @@ export class ForecastViewController {
         status: 'unavailable',
         severity: 2,
         fillPct: 35,
+        shortReason: 'Dati N/D',
         contextLabel: 'Panoramica',
         weatherSnapshot: {}
       };
@@ -4253,21 +4263,27 @@ export class ForecastViewController {
       glider
     );
     let landingSeverity = landingScore.severity;
-    let landingReason = landingScore.reason;
+    let landingReason = landingScore.text || landingScore.reason || 'Brezza Regolare';
+    let landingShortReason = landingSeverity === 0
+      ? ((lw.windSpeed || 0) <= 6 ? 'Brezza Calma' : 'Brezza Regolare')
+      : this.formatShortFlyabilityReason(landingScore.text);
 
     // Valley breeze reinforcement check at landing (aligned with Brezza di Valle parameter card)
     if (landingSeverity === 0 && ((lw.windSpeed || 0) >= 15 || (lw.windGust || 0) >= 21)) {
       landingSeverity = 1;
       landingReason = 'Brezza di valle sostenuta in atterraggio';
+      landingShortReason = 'Brezza Sostenuta';
     }
 
     // CASE 1: Specific Landing selected
     if (activeSubSpotObj && activeSubSpotObj.spotType === 'landing') {
       let severity = landingSeverity;
       let reason = landingReason;
+      let shortReason = landingShortReason;
       if (baseEval.glideMetrics && baseEval.glideMetrics.isSafe === false && severity === 0) {
         severity = 1;
         reason = baseEval.glideMetrics.warningText || 'Cono di planata marginale';
+        shortReason = 'Cono Marginale';
       }
       const status = severity === 0 ? 'flyable' : (severity === 1 ? 'caution' : 'unflyable');
       const badge = severity === 0 ? 'Volabile' : (severity === 1 ? 'Cautela' : 'Non Volabile');
@@ -4286,6 +4302,7 @@ export class ForecastViewController {
         badge,
         severity,
         reason,
+        shortReason,
         fillPct,
         contextLabel: `↘ ${shortName}`,
         weatherSnapshot: lw
@@ -4298,8 +4315,21 @@ export class ForecastViewController {
       const severity = takeoffEval.severity ?? (baseEval.status === 'flyable' ? 0 : (baseEval.status === 'caution' ? 1 : 2));
       const status = severity === 0 ? 'flyable' : (severity === 1 ? 'caution' : 'unflyable');
       const badge = severity === 0 ? 'Volabile' : (severity === 1 ? 'Cautela' : 'Non Volabile');
-      const diffFromFront = takeoffEval.diffFromFront || 0;
+      const diffFromFront = takeoffEval.flyScore?.details?.direction?.diffFromFront ?? takeoffEval.diffFromFront ?? 0;
+      const hasHeading = activeSubSpotObj.heading != null && !isNaN(Number(activeSubSpotObj.heading));
       const tSpeed = tw.windSpeed || 0;
+      let shortReason = 'Condizioni Ottimali';
+      if (severity === 0) {
+        if (tSpeed <= 4) {
+          shortReason = 'Vento Calmo';
+        } else if (hasHeading && diffFromFront <= 35) {
+          shortReason = 'Vento in Asse';
+        } else {
+          shortReason = 'Vento Favorevole';
+        }
+      } else {
+        shortReason = this.formatShortFlyabilityReason(takeoffEval.statusText || takeoffEval.flyScore?.text || baseEval.reason);
+      }
       const fillPct = status === 'flyable'
         ? Math.max(74, Math.min(100, Math.round(100 - diffFromFront * 0.35 - Math.abs(tSpeed - 11) * 1.3)))
         : (status === 'caution'
@@ -4312,7 +4342,8 @@ export class ForecastViewController {
         status,
         badge,
         severity,
-        reason: takeoffEval.reason || baseEval.reason,
+        reason: takeoffEval.statusText || takeoffEval.reason || baseEval.reason,
+        shortReason,
         fillPct,
         contextLabel: `↗ ${shortName}`,
         weatherSnapshot: tw
@@ -4327,12 +4358,41 @@ export class ForecastViewController {
     const reason = combinedSeverity > baseSeverity ? landingReason : baseEval.reason;
     const fillPct = status === 'flyable' ? 100 : (status === 'caution' ? 65 : 35);
 
+    let shortReason = 'Condizioni Ottimali';
+    if (baseEval.status === 'unavailable' || baseEval.isOfflineUnavailable) {
+      shortReason = 'Dati N/D';
+    } else if (combinedSeverity > baseSeverity) {
+      shortReason = landingShortReason;
+    } else if (combinedSeverity === 0) {
+      const takeoffEval = baseEval.bestTakeoffEval || {};
+      const dirDetails = takeoffEval.flyScore?.details?.direction;
+      const tSpeed = tw.windSpeed || 0;
+      if (tSpeed <= 4) {
+        shortReason = 'Vento Calmo';
+      } else if (dirDetails && dirDetails.diffFromFront != null && dirDetails.diffFromFront <= 35) {
+        shortReason = 'Vento in Asse';
+      } else {
+        shortReason = 'Condizioni Ottimali';
+      }
+    } else {
+      const takeoffEval = baseEval.bestTakeoffEval || {};
+      const isLandingUnsafe = Boolean(baseEval.glideMetrics && !baseEval.glideMetrics.isSafe);
+      if (takeoffEval.severity > 0) {
+        shortReason = this.formatShortFlyabilityReason(takeoffEval.statusText || takeoffEval.flyScore?.text || baseEval.reason);
+      } else if (isLandingUnsafe) {
+        shortReason = 'Rientro Critico';
+      } else {
+        shortReason = this.formatShortFlyabilityReason(baseEval.reason);
+      }
+    }
+
     return {
       ...baseEval,
       status,
       badge,
       severity: combinedSeverity,
       reason,
+      shortReason,
       fillPct,
       contextLabel: 'Panoramica'
     };
@@ -4432,7 +4492,7 @@ export class ForecastViewController {
     const activeSub = this.resolveActiveSubSpot(spot);
     const evalCurrent = this.evaluateTimelineSlot(spot, weatherData, this.selectedHour, glider, activeSub);
     const statusColor = (STATUS_COLORS && STATUS_COLORS[evalCurrent?.status]?.fill) || 'var(--gm-text-secondary)';
-    const contextText = evalCurrent?.contextLabel ? ` · ${evalCurrent.contextLabel}` : '';
+    const pillReason = evalCurrent?.shortReason || evalCurrent?.badge || 'N/D';
 
     return `
       <aside 
@@ -4443,8 +4503,8 @@ export class ForecastViewController {
         <div class="gm-map-scrubber-header">
           <div class="gm-map-scrubber-title-group">
             <span class="gm-map-scrubber-title">Timeline Volabilità</span>
-            <span id="forecast-scrubber-spot-pill" class="gm-map-scrubber-spot-pill" style="color: ${statusColor};">
-              ${spot?.name || 'Località'}${contextText} (${evalCurrent?.badge || 'N/D'})
+            <span id="forecast-scrubber-spot-pill" class="gm-map-scrubber-spot-pill" title="${escapeHtml(evalCurrent?.reason || pillReason)}" style="color: ${statusColor};">
+              ${escapeHtml(pillReason)}
             </span>
           </div>
           <div class="gm-map-scrubber-hour-display">
@@ -5042,14 +5102,16 @@ export class ForecastViewController {
 
     // 6. Update scrubber header labels in place if present
     const slotEval = this.evaluateTimelineSlot(spot, weatherData, hour, glider, activeSubSpotObj);
-    const contextText = slotEval?.contextLabel ? ` · ${slotEval.contextLabel}` : '';
+    const pillShortReason = slotEval?.shortReason || slotEval?.badge || 'Ottimale';
+    const pillFullReason = slotEval?.reason || pillShortReason;
     const forecastHourLabel = this.containerEl?.querySelector('#forecast-active-hour-label');
     if (forecastHourLabel) {
       forecastHourLabel.textContent = `Ore ${String(hour).padStart(2, '0')}:00`;
     }
     const forecastSpotPill = this.containerEl?.querySelector('#forecast-scrubber-spot-pill');
     if (forecastSpotPill) {
-      forecastSpotPill.textContent = `${spot?.name || 'Località'}${contextText} (${slotEval.badge})`;
+      forecastSpotPill.textContent = pillShortReason;
+      forecastSpotPill.setAttribute('title', pillFullReason);
       forecastSpotPill.style.color = (STATUS_COLORS && STATUS_COLORS[slotEval.status]?.fill) || 'var(--gm-text-secondary)';
     }
 
@@ -5059,7 +5121,8 @@ export class ForecastViewController {
     }
     const faSpotPill = this.flightAnalysisOverlayEl?.querySelector('#flight-analysis-scrubber-spot-pill');
     if (faSpotPill) {
-      faSpotPill.textContent = `${spot?.name || 'Comprensorio'}${contextText} (${slotEval.badge})`;
+      faSpotPill.textContent = pillShortReason;
+      faSpotPill.setAttribute('title', pillFullReason);
       faSpotPill.style.color = (STATUS_COLORS && STATUS_COLORS[slotEval.status]?.fill) || 'var(--gm-text-secondary)';
     }
 
@@ -5984,9 +6047,14 @@ export class ForecastViewController {
             <div class="gm-map-scrubber-header">
               <div class="gm-map-scrubber-title-group">
                 <span class="gm-map-scrubber-title">Timeline Volabilità</span>
-                <span id="flight-analysis-scrubber-spot-pill" class="gm-map-scrubber-spot-pill" style="color: ${(STATUS_COLORS && STATUS_COLORS[circuitData.isSafetyWarning ? 'caution' : 'flyable']?.fill) || 'var(--gm-text-secondary)'};">
-                  ${spot?.name || 'Comprensorio'} (${circuitData.isSafetyWarning ? 'Attenzione' : 'Volabile'})
-                </span>
+                ${(() => {
+                  const slotEval = this.evaluateTimelineSlot(spot, weatherData, this.selectedHour, glider, activeSub);
+                  const pillStatus = slotEval?.status || (circuitData.isSafetyWarning ? 'caution' : 'flyable');
+                  const pillColor = (STATUS_COLORS && STATUS_COLORS[pillStatus]?.fill) || 'var(--gm-text-secondary)';
+                  const pillShort = slotEval?.shortReason || slotEval?.badge || (circuitData.isSafetyWarning ? 'Attenzione' : 'Volabile');
+                  const pillFull = slotEval?.reason || pillShort;
+                  return `<span id="flight-analysis-scrubber-spot-pill" class="gm-map-scrubber-spot-pill" style="color: ${pillColor};" title="${escapeHtml(pillFull)}">${escapeHtml(pillShort)}</span>`;
+                })()}
               </div>
               <div class="gm-map-scrubber-hour-display">
                 <span id="flight-analysis-active-hour-label" class="gm-flight-alt">Ore ${String(this.selectedHour).padStart(2, '0')}:00</span>
@@ -6287,8 +6355,15 @@ export class ForecastViewController {
       }
       const faSpotPill = this.flightAnalysisOverlayEl.querySelector('#flight-analysis-scrubber-spot-pill');
       if (faSpotPill) {
-        faSpotPill.textContent = `${spot?.name || 'Comprensorio'} (${evaluated?.badge || (circuitData.isSafetyWarning ? 'Attenzione' : 'Volabile')})`;
-        faSpotPill.style.color = (STATUS_COLORS && STATUS_COLORS[circuitData.isSafetyWarning ? 'caution' : (evaluated?.status || 'flyable')]?.fill) || 'var(--gm-text-secondary)';
+        const weatherData = this.getWeatherData(spot, this.activeDate);
+        const activeSub = this.resolveActiveSubSpot(spot);
+        const slotEval = this.evaluateTimelineSlot(spot, weatherData, this.selectedHour, this.getActiveGlider(), activeSub);
+        const pillShort = slotEval?.shortReason || slotEval?.badge || (circuitData.isSafetyWarning ? 'Attenzione' : 'Volabile');
+        const pillFull = slotEval?.reason || pillShort;
+        const pillStatus = slotEval?.status || (circuitData.isSafetyWarning ? 'caution' : (evaluated?.status || 'flyable'));
+        faSpotPill.textContent = pillShort;
+        faSpotPill.setAttribute('title', pillFull);
+        faSpotPill.style.color = (STATUS_COLORS && STATUS_COLORS[pillStatus]?.fill) || 'var(--gm-text-secondary)';
       }
 
       const scrubberSlots = this.flightAnalysisOverlayEl.querySelectorAll('.gm-timeline-col-compact, .gm-flight-analysis-slot');
