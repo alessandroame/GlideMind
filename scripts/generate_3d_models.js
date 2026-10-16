@@ -29,9 +29,10 @@ export function generateParagliderGlb() {
   const canopyThickness = 0.32; // max profile thickness (m)
   const linesLength = 6.2; // lines drop to harness (m)
 
-  // Arrays for Canopy Mesh (Positions, Normals, UVs, Indices)
+  // Arrays for Canopy Mesh (Positions, Normals, Colors, Indices)
   const canopyPositions = [];
   const canopyNormals = [];
+  const canopyColors = [];
   const canopyIndices = [];
 
   // Generate upper and lower surfaces (extrados and intrados)
@@ -41,8 +42,10 @@ export function generateParagliderGlb() {
     const x = -halfSpan + u * span;
     // Normalized span position from center [-1, 1]
     const eta = (x / halfSpan);
+    const absEta = Math.abs(eta);
     // Parabolic arch: y highest at center (x=0), lower at tips
     const archY = archHeight * (1 - Math.pow(eta, 2));
+    const isTipBand = absEta > 0.78;
 
     for (let c = 0; c <= nChordSegments; c++) {
       const v = c / nChordSegments; // 0 (leading edge) to 1 (trailing edge)
@@ -55,17 +58,27 @@ export function generateParagliderGlb() {
       const thicknessFactor = 4 * v * Math.pow(1 - v, 1.2);
       const halfThick = (canopyThickness * thicknessFactor) / 2;
 
-      // Upper surface vertex
+      // Upper surface vertex (Extrados: White leading edge/tips, Amber stripe, Carmine Red main)
       const yUpper = archY + halfThick;
       canopyPositions.push(x, yUpper, z);
-      // Approximate normal for upper surface
       canopyNormals.push(0.3 * -eta, 0.9, (v - 0.5) * 0.4);
+      if (v < 0.20 || isTipBand) {
+        canopyColors.push(0.97, 0.98, 0.99);
+      } else if (v <= 0.28) {
+        canopyColors.push(0.96, 0.62, 0.04);
+      } else {
+        canopyColors.push(0.86, 0.15, 0.15);
+      }
 
-      // Lower surface vertex
+      // Lower surface vertex (Intrados: Light Ice-Silver for instant top/bottom distinction)
       const yLower = archY - halfThick;
       canopyPositions.push(x, yLower, z);
-      // Approximate normal for lower surface
       canopyNormals.push(0.3 * -eta, -0.9, (v - 0.5) * 0.4);
+      if (v >= 0.20 && v <= 0.28) {
+        canopyColors.push(0.96, 0.62, 0.04);
+      } else {
+        canopyColors.push(0.89, 0.91, 0.94);
+      }
     }
   }
 
@@ -118,6 +131,7 @@ export function generateParagliderGlb() {
 
       canopyPositions.push(px, py, pz);
       canopyNormals.push(Math.cos(theta), Math.sin(theta), 0.2);
+      canopyColors.push(0.10, 0.14, 0.20);
     }
   }
 
@@ -137,6 +151,7 @@ export function generateParagliderGlb() {
   // Convert to TypedArrays
   const posArray = new Float32Array(canopyPositions);
   const normArray = new Float32Array(canopyNormals);
+  const colArray = new Float32Array(canopyColors);
   const indArray = new Uint16Array(canopyIndices);
 
   // Compute bounding box
@@ -154,12 +169,14 @@ export function generateParagliderGlb() {
   // - Indices: indArray.byteLength (padded to 4 bytes)
   // - Positions: posArray.byteLength
   // - Normals: normArray.byteLength
+  // - Colors: colArray.byteLength
   const indByteLen = indArray.byteLength;
   const indPad = (4 - (indByteLen % 4)) % 4;
   const posByteLen = posArray.byteLength;
   const normByteLen = normArray.byteLength;
+  const colByteLen = colArray.byteLength;
 
-  const totalBinLen = indByteLen + indPad + posByteLen + normByteLen;
+  const totalBinLen = indByteLen + indPad + posByteLen + normByteLen + colByteLen;
   const binBuffer = Buffer.alloc(totalBinLen);
 
   // Copy indices
@@ -170,6 +187,9 @@ export function generateParagliderGlb() {
   // Copy normals
   const normOffset = posOffset + posByteLen;
   Buffer.from(normArray.buffer).copy(binBuffer, normOffset);
+  // Copy colors
+  const colOffset = normOffset + normByteLen;
+  Buffer.from(colArray.buffer).copy(binBuffer, colOffset);
 
   // glTF JSON Structure
   const gltf = {
@@ -184,9 +204,9 @@ export function generateParagliderGlb() {
       {
         name: 'CanopyMaterial',
         pbrMetallicRoughness: {
-          baseColorFactor: [0.95, 0.45, 0.05, 1.0], // High-visibility glider orange
+          baseColorFactor: [1.0, 1.0, 1.0, 1.0],
           metallicFactor: 0.05,
-          roughnessFactor: 0.5
+          roughnessFactor: 0.45
         },
         doubleSided: true
       }
@@ -198,7 +218,8 @@ export function generateParagliderGlb() {
           {
             attributes: {
               POSITION: 1,
-              NORMAL: 2
+              NORMAL: 2,
+              COLOR_0: 3
             },
             indices: 0,
             material: 0,
@@ -237,6 +258,16 @@ export function generateParagliderGlb() {
         type: 'VEC3',
         max: [1, 1, 1],
         min: [-1, -1, -1]
+      },
+      // 3: COLOR_0
+      {
+        bufferView: 3,
+        byteOffset: 0,
+        componentType: 5126, // FLOAT
+        count: colArray.length / 3,
+        type: 'VEC3',
+        max: [1, 1, 1],
+        min: [0, 0, 0]
       }
     ],
     bufferViews: [
@@ -259,6 +290,13 @@ export function generateParagliderGlb() {
         buffer: 0,
         byteOffset: normOffset,
         byteLength: normByteLen,
+        target: 34962 // ARRAY_BUFFER
+      },
+      // 3: Colors
+      {
+        buffer: 0,
+        byteOffset: colOffset,
+        byteLength: colByteLen,
         target: 34962 // ARRAY_BUFFER
       }
     ],

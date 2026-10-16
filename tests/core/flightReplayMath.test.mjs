@@ -9,6 +9,11 @@ import {
   calculateAvatarMinScale,
   projectTrackToThreeLocal,
   calculateRibbonDimensions,
+  smoothTrackKinematics,
+  computeCameraGroundTargetForAltitude,
+  stepCameraSpringDamper,
+  computePendulumPose,
+  buildSmoothTrackGeometryData,
   STANDARD_GRAVITY
 } from '../../core/flightReplayMath.js';
 
@@ -359,4 +364,128 @@ describe('Flight Replay Math - Headless Core Kinematics & Coordinates', () => {
       assert.equal(extremeFar.widthMeters, 1000.0, 'Must clamp to maxWidthMeters (1000m) at extreme wide zoom');
     });
   });
+
+  describe('smoothTrackKinematics - Gaussian Window Smoothing & Aerodynamic Pitch', () => {
+    it('should smooth 1 Hz GPS quantization jitter and populate brake deflections and thermal centroids', () => {
+      const spiralPoints = [];
+      for (let i = 0; i <= 20; i++) {
+        const angleRad = (i * 15 * Math.PI) / 180;
+        spiralPoints.push({
+          lat: 46.5 + (Math.cos(angleRad) * 60) / 111132,
+          lon: 11.5 + (Math.sin(angleRad) * 60) / 76000,
+          alt: 1800 + i * 2.5,
+          timeSeconds: i
+        });
+      }
+
+      const projected = projectTrackToThreeLocal(spiralPoints, null, { relativeAltitude: true });
+      const midPt = projected.points[10];
+
+      assert.ok(typeof midPt.smoothHeading === 'number');
+      assert.ok(typeof midPt.smoothBankAngle === 'number');
+      assert.ok(Math.abs(midPt.smoothBankAngle) > 5, 'Should detect sustained bank angle in 15 deg/s spiral');
+      assert.ok(midPt.aerodynamicPitchAngle >= -9 && midPt.aerodynamicPitchAngle <= 7, 'Aerodynamic pitch must stay within realistic [-9°, +7°] envelope');
+      assert.ok(midPt.brakeRight > 0 || midPt.brakeLeft > 0, 'Inner trailing-edge brake deflection must be active in turn');
+      assert.ok(typeof midPt.thermalCenterLon === 'number' && typeof midPt.thermalCenterLat === 'number');
+    });
+  });
+
+  describe('computeCameraGroundTargetForAltitude & stepCameraSpringDamper - 3D Camera Controller V2', () => {
+    it('should project high-altitude glider coordinates forward onto ground plane so glider stays centered', () => {
+      // Glider at 2300m MSL over 1500m MSL valley floor (+800m AGL), flying North (bearing 0) at 60° camera pitch
+      const target = computeCameraGroundTargetForAltitude({
+        lon: 11.5000,
+        lat: 46.5000,
+        altMsl: 2300,
+        groundAltMsl: 1500,
+        bearingDeg: 0,
+        pitchDeg: 60,
+        lookAheadMeters: 35
+      });
+
+      // Camera ground focus must be shifted North (lat > 46.5000) to intersect camera ray through glider
+      assert.ok(target.centerLat > 46.502, `Expected projected ground center North of glider (> 46.502), got ${target.centerLat}`);
+      assert.ok(Math.abs(target.centerLon - 11.5000) < 1e-5);
+    });
+
+    it('should apply exponential spring-damper, thermal horizon stabilization, and user touch orbit offsets', () => {
+      const pt = {
+        lon: 11.5000,
+        lat: 46.5000,
+        alt: 2100,
+        heading: 90,
+        smoothHeading: 90,
+        smoothTurnRateDegSec: 16, // Active thermal turn (> 7.5 deg/s)
+        smoothBankAngle: 28,
+        vario: 2.8,
+        smoothVario: 2.8,
+        thermalCenterLon: 11.5008,
+        thermalCenterLat: 46.5004
+      };
+
+      const state0 = stepCameraSpringDamper(null, pt, 0.05, {
+        mode: 'chase',
+        userBearingOffsetDeg: 25,
+        userPitchOffsetDeg: -5,
+        userZoomOffset: 0.4,
+        groundAltMsl: 1500
+      });
+
+      assert.ok(state0.isThermalling, 'Should detect active thermal spiral when |turnRate| >= 7.5 deg/s');
+      // With +25 deg user orbit offset on 90 deg heading, initial bearing should be 115 deg
+      assert.equal(Math.round(state0.bearing), 115);
+
+      // Step forward with a 40 deg heading change in 0.1s: thermal horizon stabilization (tau=6.5s) prevents abrupt spin
+      const ptNext = { ...pt, smoothHeading: 130, heading: 130 };
+      const state1 = stepCameraSpringDamper(state0, ptNext, 0.1, {
+        mode: 'chase',
+        userBearingOffsetDeg: 25,
+        groundAltMsl: 1500
+      });
+      const bearingDelta = Math.abs(state1.bearing - state0.bearing);
+      assert.ok(bearingDelta < 2.0, `Expected gentle horizon rotation (< 2.0 deg in 0.1s) during thermal, got ${bearingDelta}`);
+    });
+
+    it('should apply look-into-turn yaw offset in cockpit POV mode', () => {
+      const pt = {
+        lon: 11.5,
+        lat: 46.5,
+        alt: 1800,
+        smoothHeading: 180,
+        smoothTurnRateDegSec: 15,
+        smoothBankAngle: 25
+      };
+      const cockpitState = stepCameraSpringDamper(null, pt, 1.0, { mode: 'cockpit', groundAltMsl: 1500 });
+      assert.ok(cockpitState.bearing > 188 && cockpitState.bearing <= 200, `Expected look-into-turn bearing > 188°, got ${cockpitState.bearing}`);
+      assert.ok(cockpitState.zoom >= 17.0);
+    });
+  });
+
+  describe('computePendulumPose & buildSmoothTrackGeometryData', () => {
+    it('should displace canopy inward and pilot pod outward during banked turns', () => {
+      const rightTurn = computePendulumPose(30, 5);
+      assert.ok(rightTurn.canopyOffsetX < -1.0, 'Canopy must shift laterally inward (-X) on right bank');
+      assert.ok(rightTurn.pilotOffsetX > 0.5, 'Pilot pod must swing centrifugally outward (+X) on right bank');
+      assert.ok(rightTurn.brakeRight > 0.4 && rightTurn.brakeLeft === 0, 'Right inner trailing edge must deflect on right turn');
+    });
+
+    it('should subdivide curved segments via Catmull-Rom and compute unit miter normals without pinching', () => {
+      const rawPts = [
+        { x: 0, y: 100, z: 0, timeSeconds: 0, vario: 1.0, heading: 0 },
+        { x: 30, y: 115, z: -40, timeSeconds: 5, vario: 2.5, heading: 45 },
+        { x: 80, y: 135, z: -40, timeSeconds: 10, vario: 3.0, heading: 90 },
+        { x: 110, y: 150, z: 0, timeSeconds: 15, vario: 2.0, heading: 135 }
+      ];
+      const { points, normals } = buildSmoothTrackGeometryData(rawPts, { maxSubdivisionsPerSegment: 4 });
+      assert.ok(points.length > rawPts.length, 'Curved track should be subdivided into smoother spline points');
+      assert.equal(normals.length, points.length * 2);
+      for (let i = 0; i < points.length; i++) {
+        const nx = normals[i * 2];
+        const nz = normals[i * 2 + 1];
+        const len = Math.hypot(nx, nz);
+        assert.ok(Math.abs(len - 1.0) < 1e-3, `Normal at ${i} must be unit length, got ${len}`);
+      }
+    });
+  });
 });
+

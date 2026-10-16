@@ -76,9 +76,9 @@ Registro distillato per dominio dei vincoli architetturali e delle insidie di ru
 - **Geometria Pulita dei Marker Cartografici (`mapEngineAdapter.js`)**:
   - *Insidia*: Mostrare la quota testuale dentro il pin di atterraggio (`.gm-mini-pin-landing`) o frecce/gradi ridondanti sul decollo collide con le maniche a vento vettoriali.
   - *Regola*: Renderizzare l'atterraggio come hub circolare `22x22px` contenente solo `⏚` (zero `.gm-mini-pin-alt`), il decollo con settore d'esposizione pulito, doppia manica a vento con rotazione shortest-path e badge dislivello sul punto medio della retta D–A.
-- **Sincronizzazione 3D MapLibre GL + Three.js (`MapLibreReplayEngine.js`)**:
-  - *Insidia*: Disallineamento tra quota terreno DEM e coordinate ENU locales, nastro 3D che ingloba il parapendio o stallo del canvas WebGL durante il play.
-  - *Regola*: Fissare l'origine locale $P_0$ al decollo compensando `map.transform.elevation`, applicare `Dual-Regime Hermite Scaling` (spessore schermo invariante `6.0px`), aggiornare `setDrawRange` col vertice di testa agganciato all'avatar, invocare `this.map.triggerRepaint()` a ogni frame e gestire `webglcontextlost`.
+- **Sincronizzazione 3D MapLibre GL + Three.js e Cinematica V2 (`MapLibreThreeEngine.js`, `flightReplayMath.js`)**:
+  - *Insidia*: Puntare la camera 2D a `[pt.lon, pt.lat]` spinge fuori schermo la vela in quota ($+800\text{ m AGL}$) e fa ruotare vertiginosamente le montagne nei 360°; inoltre usare `groundY = 0` come fallback di `_buildDropCurtain` prima del caricamento DEM collassa a zero i piloni sotto la quota di decollo (`Math.min(pt.y, 0) === pt.y`).
+  - *Regola*: Fissare l'origine locale $P_0$ al decollo compensando `map.transform.elevation`, centrare la camera proiettando la quota lungo il raggio ottico (`computeCameraGroundTargetForAltitude`) con stabilizzazione dell'orizzonte in termica (`stepCameraSpringDamper`, $\tau_{\text{bearing}} = 6.5\text{s}$), applicare smoothing Gaussiano e fisica pendolare (`smoothTrackKinematics`, `computePendulumPose`), nascondere `PilotPod`/`PilotHead` in POV `cockpit` e usare `_minTrackY` + `_refreshDropCurtainElevations()` per la tendina DEM.
 
 ---
 

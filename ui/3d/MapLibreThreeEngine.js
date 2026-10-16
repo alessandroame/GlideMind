@@ -19,7 +19,10 @@ import {
   projectTrackToThreeLocal,
   interpolateTrackSample,
   calculateAvatarMinScale,
-  calculateRibbonDimensions
+  calculateRibbonDimensions,
+  stepCameraSpringDamper,
+  computeCameraGroundTargetForAltitude,
+  buildSmoothTrackGeometryData
 } from '../../core/flightReplayMath.js';
 import { sampleVarioRgb } from '../../core/flightTelemetry.js';
 import { loadScriptOnce } from '../scriptLoader.js';
@@ -88,17 +91,25 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     this.threeRenderer = null;
     this.glCustomLayer = null;
     this.avatarGroup = null;
+    this.avatarGroundLine = null;
+    this.avatarShadowRing = null;
     this.trackRibbonMesh = null;
+    this.ghostRibbonMesh = null;
     this.centerLineMesh = null;
+    this.ghostLineMesh = null;
+    this.wakeTrailMesh = null;
     this.takeoffMarker = null;
     this.landingMarker = null;
     this.curtainMesh = null;
+    this._ribbonPoints = null;
     this._ribbonNormals = null;
     this._currentRibbonZoom = null;
     this._lastModifiedIndex = null;
     this._lastCurrentPoint = null;
     this._totalCurtainVertices = 0;
     this._curtainStep = 10;
+    this._curtainPointIndices = null;
+    this._minTrackY = 0;
 
     // Trajectory & Geodesic Projection State
     this.rawPoints = [];
@@ -106,12 +117,17 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     this.origin = null; // { lat, lon, alt, meterScale }
     this.modelTransform = null;
 
-    // Playback State
+    // Playback & Camera Controller State
     this.isPlaying = false;
     this.progress = 0;
     this.currentTimeSec = 0;
     this.playbackSpeed = 1;
     this.cameraMode = this.options.initialCameraMode || 'chase';
+    this._cameraState = null;
+    this.userBearingOffsetDeg = 0;
+    this.userPitchOffsetDeg = 0;
+    this.userZoomOffset = 0;
+    this._isProgrammaticCameraMove = false;
     this.elevationOffset = 0;
     this.terrainDelta = 0;
     this._hasSnappedTerrain = false;
@@ -344,10 +360,54 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
           const effectiveAlt = this.origin.alt + this.terrainDelta;
           this.modelTransform.translateZ = effectiveAlt * this.modelTransform.meterScale;
         }
+        this._refreshDropCurtainElevations();
         return true;
       }
     }
     return false;
+  }
+
+  /**
+   * Fits MapLibre camera bounds over the full loaded flight trajectory.
+   * @param {number} [duration=1200]
+   */
+  fitTrackBounds(duration = 1200) {
+    if (!this.map || this.isHeadless || !this.rawPoints || this.rawPoints.length === 0) return;
+    const p0 = this.rawPoints[0];
+    let minLon = p0.lon, maxLon = p0.lon, minLat = p0.lat, maxLat = p0.lat;
+    for (const pt of this.rawPoints) {
+      if (pt.lon < minLon) minLon = pt.lon;
+      if (pt.lon > maxLon) maxLon = pt.lon;
+      if (pt.lat < minLat) minLat = pt.lat;
+      if (pt.lat > maxLat) maxLat = pt.lat;
+    }
+    if (typeof this.map.fitBounds === 'function') {
+      this._isProgrammaticCameraMove = true;
+      try {
+        this.map.fitBounds([[minLon, minLat], [maxLon, maxLat]], {
+          padding: { top: 60, bottom: 120, left: 40, right: 40 },
+          pitch: 62,
+          bearing: p0.smoothHeading ?? p0.heading ?? 0,
+          duration
+        });
+      } finally {
+        this._isProgrammaticCameraMove = false;
+      }
+    }
+  }
+
+  /**
+   * Applies user manual orbit offsets around the glider in Chase mode.
+   * Re-selecting 'chase' camera mode resets these offsets to zero.
+   *
+   * @param {number} [deltaBearingDeg=0]
+   * @param {number} [deltaPitchDeg=0]
+   * @param {number} [deltaZoom=0]
+   */
+  applyUserCameraOrbit(deltaBearingDeg = 0, deltaPitchDeg = 0, deltaZoom = 0) {
+    this.userBearingOffsetDeg = (((this.userBearingOffsetDeg + (Number(deltaBearingDeg) || 0)) + 180) % 360 + 360) % 360 - 180;
+    this.userPitchOffsetDeg = Math.max(-35, Math.min(20, this.userPitchOffsetDeg + (Number(deltaPitchDeg) || 0)));
+    this.userZoomOffset = Math.max(-3.0, Math.min(3.0, this.userZoomOffset + (Number(deltaZoom) || 0)));
   }
 
   /**
@@ -368,14 +428,22 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     this.currentTimeSec = this.projectedTrack.points[0].timeSeconds || 0;
     this.progress = 0;
     this.hasPlaybackStarted = false;
+    this._cameraState = null;
+    this.userBearingOffsetDeg = 0;
+    this.userPitchOffsetDeg = 0;
+    this.userZoomOffset = 0;
+
+    let minY = 0;
+    for (const pt of this.projectedTrack.points) {
+      if (typeof pt.y === 'number' && pt.y < minY) minY = pt.y;
+    }
+    this._minTrackY = minY;
 
     if (this.isHeadless || !this.map || !this.THREE || !this.maplibregl) {
+      this._updateCameraForFrame(this.projectedTrack.points[0], 10.0);
       this._emitTimeUpdate(this.projectedTrack.points[0]);
       return;
     }
-
-    // Single-Shot Origin Alignment (P0)
-    const p0 = points[0];
 
     // Check if DEM terrain elevation is available at takeoff origin
     this.terrainDelta = 0;
@@ -383,13 +451,15 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     this._trySnapTerrain();
 
     // Listen for idle event to re-check when DEM raster tiles have finished decoding
-    if (!this._hasSnappedTerrain && this.map && typeof this.map.once === 'function') {
+    if (this.map && typeof this.map.once === 'function') {
       this.map.once('idle', () => {
         if (!this._hasSnappedTerrain) {
-          const snapped = this._trySnapTerrain();
-          if (snapped && this.map) {
-            this.map.triggerRepaint();
-          }
+          this._trySnapTerrain();
+        } else {
+          this._refreshDropCurtainElevations();
+        }
+        if (this.map && typeof this.map.triggerRepaint === 'function') {
+          this.map.triggerRepaint();
         }
       });
     }
@@ -412,22 +482,9 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     this._setupThreeCustomLayer();
 
     // Fit map bounds to flight path
-    let minLon = p0.lon, maxLon = p0.lon, minLat = p0.lat, maxLat = p0.lat;
-    for (const pt of points) {
-      if (pt.lon < minLon) minLon = pt.lon;
-      if (pt.lon > maxLon) maxLon = pt.lon;
-      if (pt.lat < minLat) minLat = pt.lat;
-      if (pt.lat > maxLat) maxLat = pt.lat;
-    }
+    this.fitTrackBounds(1200);
 
-    this.map.fitBounds([[minLon, minLat], [maxLon, maxLat]], {
-      padding: { top: 60, bottom: 120, left: 40, right: 40 },
-      pitch: 62,
-      bearing: p0.heading || 0,
-      duration: 1200
-    });
-
-    this._updateCurrentFrame(this.projectedTrack.points[0]);
+    this._updateCurrentFrame(this.projectedTrack.points[0], 10.0);
     this.map.triggerRepaint();
   }
 
@@ -461,21 +518,22 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
         dirLight.position.set(200, 800, 300);
         self.threeScene.add(dirLight);
 
-        // 2. Trajectory Ribbon
+        // 2. Trajectory Ribbon (Catmull-Rom Spline + Miter Normals + Ghost Track + Wake Trail)
         self._buildTrackRibbon();
 
         // 3. Drop Curtain Lines
         self._buildDropCurtain();
 
-        // 4. Paraglider Avatar Mesh
+        // 4. Paraglider Avatar Mesh + Ground AGL Drop Indicator
         self.avatarGroup = createParagliderMesh(THREE);
         self.avatarGroup.renderOrder = 10;
         self.threeScene.add(self.avatarGroup);
+        self._buildAvatarGroundIndicator();
 
         // Initial avatar position with dynamic scale and traveled track alignment
         if (self.projectedTrack && self.projectedTrack.points.length > 0) {
           const currentPt = self._interpolatePointAtTime(self.currentTimeSec);
-          self._updateCurrentFrame(currentPt);
+          self._updateCurrentFrame(currentPt, 10.0);
         }
 
         // WebGL Renderer
@@ -523,7 +581,6 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
 
         // Mathematical MVP Matrix construction conforming to geodesy_webgl_3d_spec.md & Lesson 116:
         // Maps local Three.js (X: East, Y: Up, Z: South) to MapLibre Mercator (X: East, Y: South, Z: Up)
-        // Swap Y and Z via basis matrix, scale by meterScale, translate to P0 Mercator coords
         if (!self._mProj && typeof THREE.Matrix4 === 'function') self._mProj = new THREE.Matrix4();
         if (!self._coordTransform && typeof THREE.Matrix4 === 'function') self._coordTransform = new THREE.Matrix4();
 
@@ -566,15 +623,38 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     };
 
     if (this.map && typeof this.map.on === 'function' && !this._onMapZoom) {
-      this._onMapZoom = () => {
+      this._onMapZoom = (evt) => {
         if (this.trackRibbonMesh && typeof this.map.getZoom === 'function') {
           const z = this.map.getZoom();
           if (Math.abs(z - (this._currentRibbonZoom ?? 0)) > 0.02) {
             this._updateRibbonDimensions(z);
           }
+          if (!this._isProgrammaticCameraMove && this.cameraMode === 'chase' && this._cameraState && evt?.originalEvent) {
+            const deltaZ = z - this._cameraState.zoom;
+            this.userZoomOffset = Math.max(-3.0, Math.min(3.0, this.userZoomOffset + deltaZ));
+            this._cameraState.zoom = z;
+          }
+        }
+      };
+      this._onMapRotate = (evt) => {
+        if (!this._isProgrammaticCameraMove && this.cameraMode === 'chase' && this._cameraState && evt?.originalEvent && typeof this.map.getBearing === 'function') {
+          const b = this.map.getBearing();
+          const deltaB = (((b - this._cameraState.bearing) + 180) % 360 + 360) % 360 - 180;
+          this.userBearingOffsetDeg = (((this.userBearingOffsetDeg + deltaB) + 180) % 360 + 360) % 360 - 180;
+          this._cameraState.bearing = b;
+        }
+      };
+      this._onMapPitch = (evt) => {
+        if (!this._isProgrammaticCameraMove && this.cameraMode === 'chase' && this._cameraState && evt?.originalEvent && typeof this.map.getPitch === 'function') {
+          const p = this.map.getPitch();
+          const deltaP = p - this._cameraState.pitch;
+          this.userPitchOffsetDeg = Math.max(-35, Math.min(20, this.userPitchOffsetDeg + deltaP));
+          this._cameraState.pitch = p;
         }
       };
       this.map.on('zoom', this._onMapZoom);
+      this.map.on('rotate', this._onMapRotate);
+      this.map.on('pitch', this._onMapPitch);
     }
 
     try {
@@ -585,27 +665,112 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
   }
 
   /**
-   * Builds the 3D trajectory ribbon mesh with vertex colors derived from vario
-   * and dynamic zoom-adaptive width/height dimensions.
+   * Builds vertical ground drop-line and target shadow ring directly under the glider
+   * to provide continuous visual AGL height perception above the 3D terrain.
+   */
+  _buildAvatarGroundIndicator() {
+    if (!this.THREE || !this.threeScene) return;
+    const THREE = this.THREE;
+
+    const lineGeom = new THREE.BufferGeometry();
+    const linePos = new Float32Array([0, 0, 0, 0, 0, 0]);
+    lineGeom.setAttribute('position', new THREE.Float32BufferAttribute(linePos, 3));
+    const lineMat = new THREE.LineBasicMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.55,
+      depthTest: true
+    });
+    this.avatarGroundLine = new THREE.Line(lineGeom, lineMat);
+    this.avatarGroundLine.renderOrder = 8;
+    this.threeScene.add(this.avatarGroundLine);
+
+    if (typeof THREE.RingGeometry === 'function') {
+      const ringGeom = new THREE.RingGeometry(2.0, 5.5, 24);
+      ringGeom.rotateX(-Math.PI / 2);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: 0x38bdf8,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.45,
+        depthTest: true,
+        polygonOffset: true,
+        polygonOffsetFactor: -1.0,
+        polygonOffsetUnits: -1.0
+      });
+      this.avatarShadowRing = new THREE.Mesh(ringGeom, ringMat);
+      this.avatarShadowRing.renderOrder = 8;
+      this.threeScene.add(this.avatarShadowRing);
+    }
+  }
+
+  /**
+   * Updates the glider's vertical AGL drop-line and ground target ring for the current point.
+   * @param {object} pt
+   */
+  _updateAvatarGroundIndicator(pt) {
+    if (!pt) return;
+    const originAlt = this.origin?.alt ?? this.projectedTrack?.origin?.alt ?? 0;
+    let groundY = this._minTrackY ?? 0;
+
+    if (this._hasSnappedTerrain && this.map && typeof this.map.queryTerrainElevation === 'function' && typeof pt.lon === 'number' && typeof pt.lat === 'number') {
+      const queryElev = this.map.queryTerrainElevation([pt.lon, pt.lat]);
+      if (typeof queryElev === 'number' && !isNaN(queryElev) && queryElev > 0) {
+        groundY = (queryElev - this.terrainDelta) - originAlt;
+      }
+    }
+
+    const gliderY = (pt.y || 0) + this.elevationOffset;
+    const targetGroundY = Math.min(gliderY, groundY);
+
+    if (this.avatarGroundLine) {
+      this.avatarGroundLine.visible = this.cameraMode !== 'cockpit';
+      const geom = this.avatarGroundLine.geometry;
+      const posAttr = (geom && typeof geom.getAttribute === 'function')
+        ? geom.getAttribute('position')
+        : geom?.attributes?.position;
+      if (posAttr && posAttr.array) {
+        posAttr.array[0] = pt.x;
+        posAttr.array[1] = gliderY;
+        posAttr.array[2] = pt.z;
+        posAttr.array[3] = pt.x;
+        posAttr.array[4] = targetGroundY;
+        posAttr.array[5] = pt.z;
+        posAttr.needsUpdate = true;
+      }
+    }
+
+    if (this.avatarShadowRing) {
+      this.avatarShadowRing.visible = this.cameraMode !== 'cockpit';
+      this.avatarShadowRing.position.set(pt.x, targetGroundY + 0.4, pt.z);
+    }
+  }
+
+  /**
+   * Builds the 3D trajectory ribbon mesh with miter-bisector horizontal normals,
+   * FAI variometer vertex coloring, Future Ghost Track, and Aerodynamic Wake Trail.
    */
   _buildTrackRibbon() {
     if (!this.THREE || !this.projectedTrack || !this.projectedTrack.points.length) return;
     const THREE = this.THREE;
-    const pts = this.projectedTrack.points;
-    const n = pts.length;
-    if (n < 2) return;
+    const rawPts = this.projectedTrack.points;
+    if (rawPts.length < 2) return;
 
     const currentZoom = (this.map && typeof this.map.getZoom === 'function')
       ? this.map.getZoom()
-      : (this.cameraMode === 'cockpit' ? 16.5 : 14);
+      : (this.cameraMode === 'cockpit' ? 17.1 : 14);
 
     const dims = calculateRibbonDimensions(currentZoom, this.origin?.lat);
     const ribbonHalfWidth = dims.halfWidth;
     const ribbonHalfHeight = dims.halfHeight;
     this._currentRibbonZoom = currentZoom;
 
-    // Cache precomputed heading unit normals for 60 FPS zoom-adaptive updates
-    this._ribbonNormals = new Float32Array(n * 2);
+    // Generate miter-bisector horizontal normals while preserving 1:1 vertex mapping
+    const smoothData = buildSmoothTrackGeometryData(rawPts, { maxSubdivisionsPerSegment: 1 });
+    const pts = rawPts;
+    const n = pts.length;
+    this._ribbonPoints = pts;
+    this._ribbonNormals = smoothData.normals.length === n * 2 ? smoothData.normals : new Float32Array(n * 2);
 
     const positions = [];
     const colors = [];
@@ -613,24 +778,22 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
 
     const linePositions = [];
     const lineColors = [];
+    const wakeColors = [];
 
     for (let i = 0; i < n; i++) {
       const pt = pts[i];
-      const varioCol = sampleVarioRgb(pt.vario);
+      const varioCol = sampleVarioRgb(pt.smoothVario ?? pt.vario);
       const r = varioCol.r;
       const g = varioCol.g;
       const b = varioCol.b;
 
-      // Centerline points colored by FAI variometer
+      // Centerline points colored by smoothed FAI variometer
       linePositions.push(pt.x, pt.y, pt.z);
       lineColors.push(r, g, b);
+      wakeColors.push(0.95, 0.98, 1.0);
 
-      // Compute normal to horizontal segment (heading + 90 deg)
-      const headingRad = ((pt.heading || 0) * Math.PI) / 180;
-      const nx = Math.cos(headingRad);
-      const nz = Math.sin(headingRad);
-      this._ribbonNormals[i * 2] = nx;
-      this._ribbonNormals[i * 2 + 1] = nz;
+      const nx = this._ribbonNormals[i * 2];
+      const nz = this._ribbonNormals[i * 2 + 1];
 
       const dx = nx * ribbonHalfWidth;
       const dz = nz * ribbonHalfWidth;
@@ -681,15 +844,17 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
       indices.push(a0, b0, b3);
     }
 
+    const totalIndices = (n - 1) * 24;
+    const initialIndices = !this.hasPlaybackStarted
+      ? totalIndices
+      : ((this.progress > 0) ? Math.floor(this.progress * (n - 1)) * 24 : 0);
+
     const geom = new THREE.BufferGeometry();
     geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
     geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     geom.setIndex(indices);
 
     if (typeof geom.setDrawRange === 'function') {
-      const initialIndices = !this.hasPlaybackStarted
-        ? (n - 1) * 24
-        : ((this.progress > 0) ? Math.floor(this.progress * (n - 1)) * 24 : 0);
       geom.setDrawRange(0, initialIndices);
     }
 
@@ -705,10 +870,30 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     });
 
     this.trackRibbonMesh = new THREE.Mesh(geom, mat);
-    this.trackRibbonMesh.renderOrder = 1;
+    this.trackRibbonMesh.renderOrder = 2;
     this.threeScene.add(this.trackRibbonMesh);
 
-    // Variometer-colored centerline spine
+    // Future Ghost Track Ribbon (16% opacity for upcoming flight path during playback)
+    const ghostGeom = new THREE.BufferGeometry();
+    ghostGeom.setAttribute('position', new THREE.Float32BufferAttribute([...positions], 3));
+    ghostGeom.setAttribute('color', new THREE.Float32BufferAttribute([...colors], 3));
+    ghostGeom.setIndex([...indices]);
+    if (typeof ghostGeom.setDrawRange === 'function') {
+      ghostGeom.setDrawRange(0, 0);
+    }
+    const ghostMat = new THREE.MeshBasicMaterial({
+      vertexColors: true,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.16,
+      depthTest: true,
+      depthWrite: false
+    });
+    this.ghostRibbonMesh = new THREE.Mesh(ghostGeom, ghostMat);
+    this.ghostRibbonMesh.renderOrder = 1;
+    this.threeScene.add(this.ghostRibbonMesh);
+
+    // Variometer-colored centerline spine (traveled path)
     const lineGeom = new THREE.BufferGeometry();
     lineGeom.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3));
     lineGeom.setAttribute('color', new THREE.Float32BufferAttribute(lineColors, 3));
@@ -730,8 +915,42 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
       polygonOffsetUnits: -1.0
     });
     this.centerLineMesh = new THREE.Line(lineGeom, lineMat);
-    this.centerLineMesh.renderOrder = 2;
+    this.centerLineMesh.renderOrder = 3;
     this.threeScene.add(this.centerLineMesh);
+
+    // Future Ghost Centerline (24% opacity)
+    const ghostLineGeom = new THREE.BufferGeometry();
+    ghostLineGeom.setAttribute('position', new THREE.Float32BufferAttribute([...linePositions], 3));
+    ghostLineGeom.setAttribute('color', new THREE.Float32BufferAttribute([...lineColors], 3));
+    if (typeof ghostLineGeom.setDrawRange === 'function') {
+      ghostLineGeom.setDrawRange(0, 0);
+    }
+    const ghostLineMat = new THREE.LineBasicMaterial({
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.24,
+      depthTest: true
+    });
+    this.ghostLineMesh = new THREE.Line(ghostLineGeom, ghostLineMat);
+    this.ghostLineMesh.renderOrder = 1;
+    this.threeScene.add(this.ghostLineMesh);
+
+    // Aerodynamic Wake Trail (last ~12s behind the glider)
+    const wakeGeom = new THREE.BufferGeometry();
+    wakeGeom.setAttribute('position', new THREE.Float32BufferAttribute([...linePositions], 3));
+    wakeGeom.setAttribute('color', new THREE.Float32BufferAttribute(wakeColors, 3));
+    if (typeof wakeGeom.setDrawRange === 'function') {
+      wakeGeom.setDrawRange(0, 0);
+    }
+    const wakeMat = new THREE.LineBasicMaterial({
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.9,
+      depthTest: true
+    });
+    this.wakeTrailMesh = new THREE.Line(wakeGeom, wakeMat);
+    this.wakeTrailMesh.renderOrder = 4;
+    this.threeScene.add(this.wakeTrailMesh);
 
     // Takeoff 3D Marker (Glowing Neon Green ring)
     if (typeof THREE.RingGeometry === 'function') {
@@ -785,8 +1004,14 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
       : geom?.attributes?.position;
     if (!posAttr || !posAttr.array) return;
 
+    const ghostGeom = this.ghostRibbonMesh?.geometry;
+    const ghostPosAttr = (ghostGeom && typeof ghostGeom.getAttribute === 'function')
+      ? ghostGeom.getAttribute('position')
+      : ghostGeom?.attributes?.position;
+
     const pos = posAttr.array;
-    const pts = this.projectedTrack.points;
+    const ghostPos = ghostPosAttr?.array || null;
+    const pts = this._ribbonPoints || this.projectedTrack.points;
     const n = pts.length;
     const hw = dims.halfWidth;
     const hh = dims.halfHeight;
@@ -818,10 +1043,17 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
       pos[idx + 10] = pt.y;
       pos[idx + 11] = pt.z - nz * hw;
 
+      if (ghostPos) {
+        for (let k = 0; k < 12; k++) {
+          ghostPos[idx + k] = pos[idx + k];
+        }
+      }
+
       idx += 12;
     }
 
     posAttr.needsUpdate = true;
+    if (ghostPosAttr) ghostPosAttr.needsUpdate = true;
 
     if (this._lastCurrentPoint) {
       this._updateTraveledTrack(this._lastCurrentPoint);
@@ -830,7 +1062,8 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
 
   /**
    * Builds vertical drop curtain lines from track to ground for depth perception.
-   * Lines are colored matching the FAI variometer value at each point.
+   * Uses _minTrackY fallback when DEM tiles have not finished loading so pylons
+   * below takeoff altitude never collapse to zero length.
    */
   _buildDropCurtain() {
     if (!this.THREE || !this.projectedTrack) return;
@@ -842,24 +1075,26 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     // Place vertical pylon lines every ~10-15 points
     const step = Math.max(4, Math.floor(n / 40));
     this._curtainStep = step;
+    this._curtainPointIndices = [];
     const linePositions = [];
     const lineColors = [];
 
     const originAlt = this.origin?.alt ?? this.projectedTrack?.origin?.alt ?? 0;
+    const fallbackGroundY = this._minTrackY ?? 0;
 
     for (let i = 0; i < n; i += step) {
       const pt = pts[i];
-      let groundMsl = originAlt;
-      if (this.map && typeof this.map.queryTerrainElevation === 'function') {
+      this._curtainPointIndices.push(i);
+      let groundY = fallbackGroundY;
+      if (this._hasSnappedTerrain && this.map && typeof this.map.queryTerrainElevation === 'function') {
         const queryElev = this.map.queryTerrainElevation([pt.lon, pt.lat]);
-        if (typeof queryElev === 'number' && !isNaN(queryElev)) {
-          groundMsl = queryElev;
+        if (typeof queryElev === 'number' && !isNaN(queryElev) && queryElev > 0) {
+          groundY = (queryElev - this.terrainDelta) - originAlt;
         }
       }
-      const groundY = groundMsl - originAlt;
       const targetY = Math.min(pt.y, groundY);
 
-      const varioCol = sampleVarioRgb(pt.vario);
+      const varioCol = sampleVarioRgb(pt.smoothVario ?? pt.vario);
 
       linePositions.push(pt.x, pt.y, pt.z);
       linePositions.push(pt.x, targetY, pt.z);
@@ -899,13 +1134,49 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
   }
 
   /**
+   * Re-evaluates drop curtain bottom vertices against loaded DEM terrain elevation.
+   */
+  _refreshDropCurtainElevations() {
+    if (!this.curtainMesh || !this.projectedTrack || !this._curtainPointIndices || !this.map || typeof this.map.queryTerrainElevation !== 'function') {
+      return;
+    }
+    const geom = this.curtainMesh.geometry;
+    const posAttr = (geom && typeof geom.getAttribute === 'function')
+      ? geom.getAttribute('position')
+      : geom?.attributes?.position;
+    if (!posAttr || !posAttr.array) return;
+
+    const pts = this.projectedTrack.points;
+    const originAlt = this.origin?.alt ?? this.projectedTrack?.origin?.alt ?? 0;
+    const fallbackGroundY = this._minTrackY ?? 0;
+    let updated = false;
+
+    for (let k = 0; k < this._curtainPointIndices.length; k++) {
+      const ptIdx = this._curtainPointIndices[k];
+      const pt = pts[ptIdx];
+      if (!pt) continue;
+      let groundY = fallbackGroundY;
+      const queryElev = this.map.queryTerrainElevation([pt.lon, pt.lat]);
+      if (typeof queryElev === 'number' && !isNaN(queryElev) && queryElev > 0) {
+        groundY = (queryElev - this.terrainDelta) - originAlt;
+        updated = true;
+      }
+      posAttr.array[k * 6 + 4] = Math.min(pt.y, groundY);
+    }
+
+    if (updated) {
+      posAttr.needsUpdate = true;
+    }
+  }
+
+  /**
    * Restores a ribbon point and centerline vertex to its precomputed coordinates and FAI colors.
    * 
-   * @param {number} i Point index in projectedTrack.points
+   * @param {number} i Point index in _ribbonPoints
    */
   _restoreRibbonPoint(i) {
     if (i == null || !this.trackRibbonMesh || !this.projectedTrack || !this._ribbonNormals) return;
-    const pts = this.projectedTrack.points;
+    const pts = this._ribbonPoints || this.projectedTrack.points;
     if (i < 0 || i >= pts.length) return;
 
     const pt = pts[i];
@@ -927,7 +1198,7 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     const nx = this._ribbonNormals[i * 2];
     const nz = this._ribbonNormals[i * 2 + 1];
 
-    const varioCol = sampleVarioRgb(pt.vario);
+    const varioCol = sampleVarioRgb(pt.smoothVario ?? pt.vario);
     const r = varioCol.r;
     const g = varioCol.g;
     const b = varioCol.b;
@@ -961,42 +1232,46 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
       colAttr.needsUpdate = true;
     }
 
-    if (this.centerLineMesh) {
-      const lineGeom = this.centerLineMesh.geometry;
+    for (const lineMesh of [this.centerLineMesh, this.wakeTrailMesh]) {
+      if (!lineMesh) continue;
+      const lineGeom = lineMesh.geometry;
       const linePos = (lineGeom && typeof lineGeom.getAttribute === 'function')
         ? lineGeom.getAttribute('position')
         : lineGeom?.attributes?.position;
-      const lineCol = (lineGeom && typeof lineGeom.getAttribute === 'function')
-        ? lineGeom.getAttribute('color')
-        : lineGeom?.attributes?.color;
       if (linePos && linePos.array) {
         linePos.array[i * 3]     = pt.x;
         linePos.array[i * 3 + 1] = pt.y;
         linePos.array[i * 3 + 2] = pt.z;
         linePos.needsUpdate = true;
       }
-      if (lineCol && lineCol.array) {
-        lineCol.array[i * 3]     = r;
-        lineCol.array[i * 3 + 1] = g;
-        lineCol.array[i * 3 + 2] = b;
-        lineCol.needsUpdate = true;
+      if (lineMesh === this.centerLineMesh) {
+        const lineCol = (lineGeom && typeof lineGeom.getAttribute === 'function')
+          ? lineGeom.getAttribute('color')
+          : lineGeom?.attributes?.color;
+        if (lineCol && lineCol.array) {
+          lineCol.array[i * 3]     = r;
+          lineCol.array[i * 3 + 1] = g;
+          lineCol.array[i * 3 + 2] = b;
+          lineCol.needsUpdate = true;
+        }
       }
     }
   }
 
   /**
-   * Dynamically renders only the flight track traveled up to the current playback instant.
-   * Updates geometry draw ranges and attaches the active end segment directly to the avatar position.
+   * Dynamically renders traveled flight track (full opacity), future Ghost Track (~18% opacity),
+   * and recent aerodynamic wake trail (~12s behind the wing).
    * 
    * @param {object} currentPoint Interpolated track point at current playback time
    */
   _updateTraveledTrack(currentPoint) {
     if (!this.trackRibbonMesh || !this.projectedTrack || !this.projectedTrack.points.length) return;
-    const pts = this.projectedTrack.points;
+    const pts = this._ribbonPoints || this.projectedTrack.points;
     const n = pts.length;
     if (n < 2) return;
 
     this._lastCurrentPoint = currentPoint;
+    const totalIndices = (n - 1) * 24;
 
     // Case 0: Initial overview before playback starts - show full flight trajectory
     if (!this.hasPlaybackStarted) {
@@ -1004,12 +1279,20 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
         this._restoreRibbonPoint(this._lastModifiedIndex);
         this._lastModifiedIndex = null;
       }
-      const totalIndices = (n - 1) * 24;
       if (typeof this.trackRibbonMesh.geometry.setDrawRange === 'function') {
         this.trackRibbonMesh.geometry.setDrawRange(0, totalIndices);
       }
+      if (this.ghostRibbonMesh && typeof this.ghostRibbonMesh.geometry.setDrawRange === 'function') {
+        this.ghostRibbonMesh.geometry.setDrawRange(0, 0);
+      }
       if (this.centerLineMesh && typeof this.centerLineMesh.geometry.setDrawRange === 'function') {
         this.centerLineMesh.geometry.setDrawRange(0, n);
+      }
+      if (this.ghostLineMesh && typeof this.ghostLineMesh.geometry.setDrawRange === 'function') {
+        this.ghostLineMesh.geometry.setDrawRange(0, 0);
+      }
+      if (this.wakeTrailMesh && typeof this.wakeTrailMesh.geometry.setDrawRange === 'function') {
+        this.wakeTrailMesh.geometry.setDrawRange(0, 0);
       }
       if (this.curtainMesh && typeof this.curtainMesh.geometry.setDrawRange === 'function') {
         this.curtainMesh.geometry.setDrawRange(0, this._totalCurtainVertices || 0);
@@ -1029,8 +1312,17 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
       if (typeof this.trackRibbonMesh.geometry.setDrawRange === 'function') {
         this.trackRibbonMesh.geometry.setDrawRange(0, 0);
       }
+      if (this.ghostRibbonMesh && typeof this.ghostRibbonMesh.geometry.setDrawRange === 'function') {
+        this.ghostRibbonMesh.geometry.setDrawRange(0, totalIndices);
+      }
       if (this.centerLineMesh && typeof this.centerLineMesh.geometry.setDrawRange === 'function') {
         this.centerLineMesh.geometry.setDrawRange(0, 0);
+      }
+      if (this.ghostLineMesh && typeof this.ghostLineMesh.geometry.setDrawRange === 'function') {
+        this.ghostLineMesh.geometry.setDrawRange(0, n);
+      }
+      if (this.wakeTrailMesh && typeof this.wakeTrailMesh.geometry.setDrawRange === 'function') {
+        this.wakeTrailMesh.geometry.setDrawRange(0, 0);
       }
       if (this.curtainMesh && typeof this.curtainMesh.geometry.setDrawRange === 'function') {
         this.curtainMesh.geometry.setDrawRange(0, 0);
@@ -1044,12 +1336,20 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
         this._restoreRibbonPoint(this._lastModifiedIndex);
         this._lastModifiedIndex = null;
       }
-      const totalIndices = (n - 1) * 24;
       if (typeof this.trackRibbonMesh.geometry.setDrawRange === 'function') {
         this.trackRibbonMesh.geometry.setDrawRange(0, totalIndices);
       }
+      if (this.ghostRibbonMesh && typeof this.ghostRibbonMesh.geometry.setDrawRange === 'function') {
+        this.ghostRibbonMesh.geometry.setDrawRange(0, 0);
+      }
       if (this.centerLineMesh && typeof this.centerLineMesh.geometry.setDrawRange === 'function') {
         this.centerLineMesh.geometry.setDrawRange(0, n);
+      }
+      if (this.ghostLineMesh && typeof this.ghostLineMesh.geometry.setDrawRange === 'function') {
+        this.ghostLineMesh.geometry.setDrawRange(0, 0);
+      }
+      if (this.wakeTrailMesh && typeof this.wakeTrailMesh.geometry.setDrawRange === 'function') {
+        this.wakeTrailMesh.geometry.setDrawRange(0, 0);
       }
       if (this.curtainMesh && typeof this.curtainMesh.geometry.setDrawRange === 'function') {
         this.curtainMesh.geometry.setDrawRange(0, this._totalCurtainVertices || 0);
@@ -1057,7 +1357,7 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
       return;
     }
 
-    // Case 3: In-flight intermediate segment (binary search for current segment)
+    // Case 3: In-flight intermediate segment (binary search for current spline segment)
     let low = 0;
     let high = n - 1;
     while (low <= high) {
@@ -1094,11 +1394,12 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     const hh = dims.halfHeight;
 
     const cp = currentPoint || pts[nextIdx];
-    const headingRad = (((cp && cp.heading) || 0) * Math.PI) / 180;
+    const effectiveHeading = (cp && (cp.smoothHeading ?? cp.heading)) || 0;
+    const headingRad = (effectiveHeading * Math.PI) / 180;
     const nx = Math.cos(headingRad);
     const nz = Math.sin(headingRad);
 
-    const varioCol = sampleVarioRgb(cp.vario);
+    const varioCol = sampleVarioRgb(cp.smoothVario ?? cp.vario);
     const r = varioCol.r;
     const g = varioCol.g;
     const b = varioCol.b;
@@ -1107,9 +1408,9 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     const hwHead = Math.min(0.04, hw * 0.15);
     const hhHead = Math.min(0.02, hh * 0.15);
 
-    // Compute scale and backward offset towards harness tail cone
+    // Compute contained scale and backward offset towards harness tail cone
     const cameraDistMeters = Math.max(20, 5000000 / Math.pow(2, currentZoom));
-    const avatarScale = calculateAvatarMinScale(cameraDistMeters, 60, 800, 36, 10.5);
+    const avatarScale = calculateAvatarMinScale(cameraDistMeters, 60, 800, 22, 13.2, 6.5);
     const tailOffset = 0.85 * avatarScale;
     const attachX = cp.x - Math.sin(headingRad) * tailOffset;
     const attachZ = cp.z + Math.cos(headingRad) * tailOffset;
@@ -1144,51 +1445,74 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
       colAttr.needsUpdate = true;
     }
 
-    if (this.centerLineMesh) {
-      const lineGeom = this.centerLineMesh.geometry;
+    for (const lineMesh of [this.centerLineMesh, this.wakeTrailMesh]) {
+      if (!lineMesh) continue;
+      const lineGeom = lineMesh.geometry;
       const linePos = (lineGeom && typeof lineGeom.getAttribute === 'function')
         ? lineGeom.getAttribute('position')
         : lineGeom?.attributes?.position;
-      const lineCol = (lineGeom && typeof lineGeom.getAttribute === 'function')
-        ? lineGeom.getAttribute('color')
-        : lineGeom?.attributes?.color;
       if (linePos && linePos.array) {
         linePos.array[nextIdx * 3]     = attachX;
         linePos.array[nextIdx * 3 + 1] = attachY;
         linePos.array[nextIdx * 3 + 2] = attachZ;
         linePos.needsUpdate = true;
       }
-      if (lineCol && lineCol.array) {
-        lineCol.array[nextIdx * 3]     = r;
-        lineCol.array[nextIdx * 3 + 1] = g;
-        lineCol.array[nextIdx * 3 + 2] = b;
-        lineCol.needsUpdate = true;
+      if (lineMesh === this.centerLineMesh) {
+        const lineCol = (lineGeom && typeof lineGeom.getAttribute === 'function')
+          ? lineGeom.getAttribute('color')
+          : lineGeom?.attributes?.color;
+        if (lineCol && lineCol.array) {
+          lineCol.array[nextIdx * 3]     = r;
+          lineCol.array[nextIdx * 3 + 1] = g;
+          lineCol.array[nextIdx * 3 + 2] = b;
+          lineCol.needsUpdate = true;
+        }
       }
     }
 
-    // Set draw range for ribbon: segments 0 through idx (idx + 1 segments * 24 indices)
+    // Set draw range for traveled ribbon: segments 0 through idx (idx + 1 segments * 24 indices)
     const drawIndices = (idx + 1) * 24;
     if (typeof this.trackRibbonMesh.geometry.setDrawRange === 'function') {
       this.trackRibbonMesh.geometry.setDrawRange(0, drawIndices);
     }
 
-    // Set draw range for centerline: vertices 0 through nextIdx (nextIdx + 1 vertices)
+    // Set draw range for Future Ghost Track Ribbon: from drawIndices to totalIndices
+    if (this.ghostRibbonMesh && typeof this.ghostRibbonMesh.geometry.setDrawRange === 'function') {
+      this.ghostRibbonMesh.geometry.setDrawRange(drawIndices, Math.max(0, totalIndices - drawIndices));
+    }
+
+    // Set draw range for traveled centerline: vertices 0 through nextIdx (nextIdx + 1 vertices)
     if (this.centerLineMesh && typeof this.centerLineMesh.geometry.setDrawRange === 'function') {
       this.centerLineMesh.geometry.setDrawRange(0, nextIdx + 1);
     }
 
-    // Set draw range for drop curtain: pylons up to idx
+    // Set draw range for Future Ghost Centerline: from nextIdx to n
+    if (this.ghostLineMesh && typeof this.ghostLineMesh.geometry.setDrawRange === 'function') {
+      this.ghostLineMesh.geometry.setDrawRange(nextIdx, Math.max(0, n - nextIdx));
+    }
+
+    // Set draw range for Aerodynamic Wake Trail (last 12 seconds behind glider)
+    if (this.wakeTrailMesh && typeof this.wakeTrailMesh.geometry.setDrawRange === 'function') {
+      const wakeTargetSec = this.currentTimeSec - 12;
+      let wakeStartIdx = idx;
+      while (wakeStartIdx > 0 && (pts[wakeStartIdx].timeSeconds ?? 0) > wakeTargetSec) {
+        wakeStartIdx--;
+      }
+      this.wakeTrailMesh.geometry.setDrawRange(wakeStartIdx, Math.max(0, nextIdx - wakeStartIdx + 1));
+    }
+
+    // Set draw range for drop curtain: pylons up to current progress on raw projected points
     if (this.curtainMesh && typeof this.curtainMesh.geometry.setDrawRange === 'function') {
-      const step = this._curtainStep || Math.max(4, Math.floor(n / 40));
-      const pylonCount = Math.floor(idx / step) + 1;
+      const rawCount = this.projectedTrack.points.length;
+      const rawIdx = Math.floor(this.progress * Math.max(1, rawCount - 1));
+      const step = this._curtainStep || Math.max(4, Math.floor(rawCount / 40));
+      const pylonCount = Math.floor(rawIdx / step) + 1;
       const curtainDrawCount = Math.min(this._totalCurtainVertices || 0, pylonCount * 2);
       this.curtainMesh.geometry.setDrawRange(0, curtainDrawCount);
     }
 
     this._lastModifiedIndex = nextIdx;
   }
-
-
 
   /**
    * Starts playback animation loop.
@@ -1256,7 +1580,7 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     if (this.currentTimeSec >= endSec) {
       this.currentTimeSec = endSec;
       this.progress = 1.0;
-      this._updateCurrentFrame(pts[pts.length - 1]);
+      this._updateCurrentFrame(pts[pts.length - 1], dtSeconds);
       if (this.map && typeof this.map.triggerRepaint === 'function') {
         this.map.triggerRepaint();
       }
@@ -1267,7 +1591,7 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
 
     this.progress = Math.max(0, Math.min(1, (this.currentTimeSec - startSec) / totalDuration));
     const currentPoint = this._interpolatePointAtTime(this.currentTimeSec);
-    this._updateCurrentFrame(currentPoint);
+    this._updateCurrentFrame(currentPoint, dtSeconds);
 
     if (this.map && typeof this.map.triggerRepaint === 'function') {
       this.map.triggerRepaint();
@@ -1297,7 +1621,7 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     this.currentTimeSec = startSec + this.progress * totalDuration;
 
     const currentPoint = this._interpolatePointAtTime(this.currentTimeSec);
-    this._updateCurrentFrame(currentPoint);
+    this._updateCurrentFrame(currentPoint, 0.35);
 
     if (this.map && typeof this.map.triggerRepaint === 'function') {
       this.map.triggerRepaint();
@@ -1343,55 +1667,85 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
   }
 
   /**
-   * Updates 3D paraglider avatar pose and MapLibre camera for the current frame.
+   * Updates 3D paraglider avatar pose, AGL ground drop-line, and MapLibre camera for the current frame.
+   * @param {object} pt
+   * @param {number} [dtSeconds=0.05]
    */
-  _updateCurrentFrame(pt) {
+  _updateCurrentFrame(pt, dtSeconds = 0.05) {
     if (!pt) return;
 
     if (this.map) {
       const zoom = (typeof this.map.getZoom === 'function') ? this.map.getZoom() : 14;
       const cameraDistMeters = Math.max(20, 5000000 / Math.pow(2, zoom));
-      const scale = calculateAvatarMinScale(cameraDistMeters, 60, 800, 36, 10.5);
+      const scale = calculateAvatarMinScale(cameraDistMeters, 60, 800, 22, 13.2, 6.5);
 
       if (this.avatarGroup) {
         updateAvatarPose(this.avatarGroup, {
           x: pt.x,
           y: pt.y + this.elevationOffset,
           z: pt.z,
-          headingDeg: pt.heading,
-          pitchDeg: pt.pitchAngle,
-          bankDeg: pt.bankAngle,
+          headingDeg: pt.smoothHeading ?? pt.heading,
+          pitchDeg: pt.aerodynamicPitchAngle ?? pt.pitchAngle,
+          bankDeg: pt.smoothBankAngle ?? pt.bankAngle,
+          brakeLeft: pt.brakeLeft ?? 0,
+          brakeRight: pt.brakeRight ?? 0,
+          cameraMode: this.cameraMode,
           scale
         });
       }
 
-      this._updateCameraForFrame(pt);
+      this._updateAvatarGroundIndicator(pt);
     }
 
+    this._updateCameraForFrame(pt, dtSeconds);
     this._updateTraveledTrack(pt);
-
     this._emitTimeUpdate(pt);
   }
 
   /**
-   * Synchronizes MapLibre camera according to active cameraMode.
+   * Synchronizes MapLibre camera according to active cameraMode using exponential spring-damper,
+   * thermal horizon stabilization, and 3D altitude optical centration.
+   *
+   * @param {object} pt
+   * @param {number} [dtSeconds=0.05]
    */
-  _updateCameraForFrame(pt) {
+  _updateCameraForFrame(pt, dtSeconds = 0.05) {
+    if (!pt) return;
+
+    let groundAltMsl = (this.origin?.alt ?? 0) + (this._minTrackY ?? 0);
+    if (this._hasSnappedTerrain && this.map && typeof this.map.queryTerrainElevation === 'function' && typeof pt.lon === 'number' && typeof pt.lat === 'number') {
+      const queryElev = this.map.queryTerrainElevation([pt.lon, pt.lat]);
+      if (typeof queryElev === 'number' && !isNaN(queryElev) && queryElev > 0) {
+        groundAltMsl = queryElev;
+      }
+    } else if (this._lastValidCenterElevation > 0) {
+      groundAltMsl = this._lastValidCenterElevation;
+    }
+
+    this._cameraState = stepCameraSpringDamper(this._cameraState, pt, dtSeconds, {
+      mode: this.cameraMode,
+      baseZoom: 14.3,
+      basePitch: 60,
+      userBearingOffsetDeg: this.userBearingOffsetDeg,
+      userPitchOffsetDeg: this.userPitchOffsetDeg,
+      userZoomOffset: this.userZoomOffset,
+      groundAltMsl
+    });
+
     if (!this.map || this.isHeadless) return;
 
-    if (this.cameraMode === 'chase' && typeof this.map.jumpTo === 'function') {
-      this.map.jumpTo({
-        center: [pt.lon, pt.lat],
-        bearing: pt.heading,
-        pitch: 62
-      });
-    } else if (this.cameraMode === 'cockpit' && typeof this.map.jumpTo === 'function') {
-      this.map.jumpTo({
-        center: [pt.lon, pt.lat],
-        bearing: pt.heading,
-        pitch: 75,
-        zoom: 16.5
-      });
+    if ((this.cameraMode === 'chase' || this.cameraMode === 'cockpit') && typeof this.map.jumpTo === 'function' && this._cameraState) {
+      this._isProgrammaticCameraMove = true;
+      try {
+        this.map.jumpTo({
+          center: [this._cameraState.centerLon, this._cameraState.centerLat],
+          bearing: this._cameraState.bearing,
+          pitch: this._cameraState.pitch,
+          zoom: this._cameraState.zoom
+        });
+      } finally {
+        this._isProgrammaticCameraMove = false;
+      }
     }
     // 'free' mode: map camera is controlled interactively by user gestures
   }
@@ -1406,16 +1760,30 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
 
   /**
    * Sets active camera perspective mode.
+   * - 'chase': Resets manual touch orbit offsets and locks smooth chase camera behind the wing
+   * - 'cockpit': Switches to 1st-person helmet POV (hiding PilotPod/PilotHead to prevent clipping)
+   * - 'free': Unlocks camera for free exploration; re-tapping 'free' frames the entire track
+   *
    * @param {'chase'|'cockpit'|'free'} mode
    */
   setCameraMode(mode) {
     if (!['chase', 'cockpit', 'free'].includes(mode)) return;
+    const wasSameMode = this.cameraMode === mode;
     this.cameraMode = mode;
+
+    if (mode === 'chase') {
+      this.userBearingOffsetDeg = 0;
+      this.userPitchOffsetDeg = 0;
+      this.userZoomOffset = 0;
+    } else if (mode === 'free' && wasSameMode) {
+      this.fitTrackBounds(900);
+    }
+
     this.emit('camerachange', { mode });
 
     if (this.projectedTrack) {
       const currentPoint = this._interpolatePointAtTime(this.currentTimeSec);
-      this._updateCameraForFrame(currentPoint);
+      this._updateCurrentFrame(currentPoint, 2.5);
       if (this.map && typeof this.map.triggerRepaint === 'function') {
         this.map.triggerRepaint();
       }
@@ -1496,15 +1864,22 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     this._reusableVec3A = null;
     this._reusableVec3B = null;
     this._lastValidCenterElevation = 0;
+    this._ribbonPoints = null;
     this._ribbonNormals = null;
     this._currentRibbonZoom = null;
     this._lastModifiedIndex = null;
     this._lastCurrentPoint = null;
+    this._curtainPointIndices = null;
+    this._cameraState = null;
 
     if (this.map) {
-      if (typeof this.map.off === 'function' && this._onMapZoom) {
-        this.map.off('zoom', this._onMapZoom);
+      if (typeof this.map.off === 'function') {
+        if (this._onMapZoom) this.map.off('zoom', this._onMapZoom);
+        if (this._onMapRotate) this.map.off('rotate', this._onMapRotate);
+        if (this._onMapPitch) this.map.off('pitch', this._onMapPitch);
         this._onMapZoom = null;
+        this._onMapRotate = null;
+        this._onMapPitch = null;
       }
       const mapCanvas = this.map.getCanvas();
       if (mapCanvas) {
@@ -1549,3 +1924,4 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     super.destroy();
   }
 }
+

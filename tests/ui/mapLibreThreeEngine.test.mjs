@@ -193,4 +193,38 @@ describe('MapLibreThreeEngine - 3D MapLibre & Three Engine Contracts', () => {
     engine.setMapLayer('unknown_layer');
     assert.equal(engine.options.mapLayer, 'topo');
   });
+
+  it('should support manual camera orbit offsets in chase mode and reset them when re-selecting chase', async () => {
+    await engine.init(null);
+    await engine.loadTrack(mockTrackPoints);
+
+    assert.ok(engine._cameraState, 'Engine should initialize spring-damper camera state on loadTrack');
+    const initialBearing = engine._cameraState.bearing;
+
+    engine.applyUserCameraOrbit(35, -8, 0.5);
+    assert.equal(engine.userBearingOffsetDeg, 35);
+    assert.equal(engine.userPitchOffsetDeg, -8);
+    assert.equal(engine.userZoomOffset, 0.5);
+
+    engine.seek(0.5);
+    assert.ok(Math.abs(engine._cameraState.bearing - initialBearing) > 10, 'Camera bearing should incorporate user orbit offset');
+
+    // Re-tapping Segui (setCameraMode('chase')) resets manual orbit offsets
+    engine.setCameraMode('chase');
+    assert.equal(engine.userBearingOffsetDeg, 0);
+    assert.equal(engine.userPitchOffsetDeg, 0);
+    assert.equal(engine.userZoomOffset, 0);
+  });
+
+  it('should compute negative _minTrackY when flight descends below takeoff altitude so drop curtain never collapses at y=0', async () => {
+    await engine.init(null);
+    const sledRideTrack = [
+      { lat: 46.5000, lon: 11.5000, alt: 1800, timeSeconds: 0 },
+      { lat: 46.5050, lon: 11.5080, alt: 1400, timeSeconds: 120 },
+      { lat: 46.5100, lon: 11.5160, alt: 950, timeSeconds: 240 }
+    ];
+    await engine.loadTrack(sledRideTrack);
+    assert.equal(engine._minTrackY, -850, 'Landing 850m below takeoff must set _minTrackY = -850');
+  });
 });
+

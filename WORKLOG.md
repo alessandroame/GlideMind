@@ -118,4 +118,11 @@ Giornale a finestra mobile (rolling window, max **300 righe** / **ultimi 15 inte
   - Introdotto il token `--gm-status-unflyable-text` (`#fca5a5` su tema scuro `7.8:1 AAA`, `#b91c1c` su tema chiaro `6.4:1`) e `--gm-status-unflyable-border` per eliminare il basso contrasto (`3.44:1`) di `#ef4444` su fondo rosso semitrasparente.
   - Allineati `.gm-flight-window-hazard-chip`, `.gm-flight-window-badge-unflyable`, `#forecast-scrubber-spot-pill` (`.status-unflyable`), `.gm-param-status-badge.unflyable`, `.gm-trend-sub-badge.status-unflyable` e `.gm-reason-pill.pill-unflyable`.
 
+---
 
+## 2026-10-16 - Fase 7-quinquies: Motore 3D Replay V2 (Camere in Quota, Stabilizzazione Termica, Fisica Pendolare e Traccia Spline)
+- **Tipo**: Evoluzione 3D WebGL / Cinematica Aerodinamica / Geometria Spline (`flightReplayMath.js`, `paragliderModel.js`, `MapLibreThreeEngine.js`)
+- **Dettagli**: [.agents/worklog.d/2026-10-16_3d-replay-engine-v2-cameras-pendulum-spline.md](file:///.agents/worklog.d/2026-10-16_3d-replay-engine-v2-cameras-pendulum-spline.md)
+- **Sintesi**:
+  - Implementato il controller camera V2 (`stepCameraSpringDamper`, `computeCameraGroundTargetForAltitude`) con centratura ottica in quota ($\Delta H \cdot \tan\theta$), stabilizzazione dell'orizzonte in termica ($\tau = 6.5\text{s}$ sul centroide mobile), orbita touch manuale con reset su `Segui` e visuale `Pilota` POV con Look-Into-Turn e occultamento di `PilotPod`/`PilotHead`.
+  - Introdotto lo smoothing Gaussiano 1 Hz (`smoothTrackKinematics`), la fisica pendolare centrifuga con frenata del bordo d'uscita (`computePendulumPose`), la livrea racing bicolore (`paraglider.glb`), il nastro spline Catmull-Rom con normali miter (`buildSmoothTrackGeometryData`), la Ghost Track futura (`16%` opacità), la scia aerodinamica e il fix della tendina DEM sotto quota decollo (`_minTrackY`).

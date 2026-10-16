@@ -57,12 +57,16 @@ export function createParagliderMesh(THREE, options = {}) {
   const archDrop = options.archDrop || 1.95;
   const wingYBase = options.wingYBase || 7.2;
 
-  const mainColor = parseRgbColor(options.canopyColor, 0xdc2626);
-  const cellSeamColor = parseRgbColor(options.accentColor, 0xb91c1c);
-  const intakeColor = { r: 0.12, g: 0.16, b: 0.23 }; // Dark shark-nose cell openings
+  const mainColor = parseRgbColor(options.canopyColor, 0xdc2626);       // Carmine Racing Red (Extrados main)
+  const leadingBandColor = parseRgbColor(options.leadingBandColor, 0xf8fafc); // High-contrast White (Leading edge & wingtips)
+  const accentBandColor = parseRgbColor(options.accentBandColor, 0xf59e0b);   // Warm Amber stripe
+  const intradosColor = parseRgbColor(options.intradosColor, 0xe2e8f0);       // Light Ice-Silver (Intrados lower surface)
+  const cellSeamColor = parseRgbColor(options.accentColor, 0x991b1b);         // Extrados rib seam
+  const intradosSeamColor = { r: 0.58, g: 0.64, b: 0.72 };                    // Intrados subtle seam
+  const intakeColor = { r: 0.10, g: 0.14, b: 0.20 };                          // Dark shark-nose cell openings
   const harnessShellColor = parseRgbColor(options.podColor, 0x182232);
   const harnessTrimColor = parseRgbColor(options.harnessTrimColor, 0xf97316);
-  const linesColor = options.linesColor !== undefined ? options.linesColor : 0x475569;
+  const linesColor = options.linesColor !== undefined ? options.linesColor : 0x64748b;
 
   // 1. High-Performance Reflex Shark-Nose Airfoil with Realistic Thickness Distribution:
   // - t=0 is Leading Edge (Shark-Nose Intakes facing -Z)
@@ -94,6 +98,8 @@ export function createParagliderMesh(THREE, options = {}) {
   const uvs = [];
   const colors = [];
   const indices = [];
+  // Store trailing edge deformation metadata per vertex: [spanU, brakeWeight]
+  const brakeMeta = [];
 
   for (let i = 0; i <= spanSteps; i++) {
     const u = -1.0 + (2.0 * i) / spanSteps; // -1 (Left Tip) to +1 (Right Tip)
@@ -108,8 +114,9 @@ export function createParagliderMesh(THREE, options = {}) {
     const sweepZ = -0.42 * (u * u) - Math.pow(absU, 3.5) * 0.15;
 
     const isCellRib = (i % 2 === 0);
+    const isWingtipBand = absU > 0.78;
 
-    // Upper surface
+    // Upper surface (Extrados - High-Visibility Bi-Color Racing Livery)
     for (let j = 0; j <= chordSteps; j++) {
       const t = j / chordSteps;
       const rawZ = sweepZ + (t - 0.78) * currentChord;
@@ -120,16 +127,25 @@ export function createParagliderMesh(THREE, options = {}) {
       normals.push(-0.25 * u, 0.95, (t - 0.5) * 0.3);
       uvs.push((u + 1) * 0.5, t);
 
+      const brakeWeight = (t > 0.68 && absU > 0.25 && absU < 0.95)
+        ? ((t - 0.68) / 0.32) * Math.sin(((absU - 0.25) / 0.70) * Math.PI) * currentChord
+        : 0;
+      brakeMeta.push(u, brakeWeight);
+
       if (t < 0.05 && !isCellRib) {
         colors.push(intakeColor.r, intakeColor.g, intakeColor.b);
       } else if (isCellRib) {
         colors.push(cellSeamColor.r, cellSeamColor.g, cellSeamColor.b);
+      } else if (t < 0.20 || isWingtipBand) {
+        colors.push(leadingBandColor.r, leadingBandColor.g, leadingBandColor.b);
+      } else if (t >= 0.20 && t <= 0.28) {
+        colors.push(accentBandColor.r, accentBandColor.g, accentBandColor.b);
       } else {
         colors.push(mainColor.r, mainColor.g, mainColor.b);
       }
     }
 
-    // Lower surface (TE -> LE)
+    // Lower surface (Intrados - High-Contrast Light Ice-Silver for top/bottom distinction)
     for (let j = chordSteps - 1; j >= 1; j--) {
       const t = j / chordSteps;
       const rawZ = sweepZ + (t - 0.78) * currentChord;
@@ -140,12 +156,19 @@ export function createParagliderMesh(THREE, options = {}) {
       normals.push(-0.25 * u, -0.95, (t - 0.5) * 0.3);
       uvs.push((u + 1) * 0.5, t);
 
+      const brakeWeight = (t > 0.68 && absU > 0.25 && absU < 0.95)
+        ? ((t - 0.68) / 0.32) * Math.sin(((absU - 0.25) / 0.70) * Math.PI) * currentChord
+        : 0;
+      brakeMeta.push(u, brakeWeight);
+
       if (t < 0.08 && !isCellRib) {
         colors.push(intakeColor.r, intakeColor.g, intakeColor.b);
       } else if (isCellRib) {
-        colors.push(cellSeamColor.r, cellSeamColor.g, cellSeamColor.b);
+        colors.push(intradosSeamColor.r, intradosSeamColor.g, intradosSeamColor.b);
+      } else if (t >= 0.20 && t <= 0.28) {
+        colors.push(accentBandColor.r, accentBandColor.g, accentBandColor.b);
       } else {
-        colors.push(mainColor.r, mainColor.g, mainColor.b);
+        colors.push(intradosColor.r, intradosColor.g, intradosColor.b);
       }
     }
   }
@@ -167,7 +190,8 @@ export function createParagliderMesh(THREE, options = {}) {
   positions.push(positions[0], positions[1], positions[2]);
   normals.push(1.0, 0, 0);
   uvs.push(0, 0.5);
-  colors.push(mainColor.r, mainColor.g, mainColor.b);
+  colors.push(leadingBandColor.r, leadingBandColor.g, leadingBandColor.b);
+  brakeMeta.push(-1.0, 0);
 
   for (let j = 0; j < vertsPerRib; j++) {
     const jNext = (j + 1) % vertsPerRib;
@@ -179,7 +203,8 @@ export function createParagliderMesh(THREE, options = {}) {
   positions.push(positions[rightRibStart * 3], positions[rightRibStart * 3 + 1], positions[rightRibStart * 3 + 2]);
   normals.push(-1.0, 0, 0);
   uvs.push(1.0, 0.5);
-  colors.push(mainColor.r, mainColor.g, mainColor.b);
+  colors.push(leadingBandColor.r, leadingBandColor.g, leadingBandColor.b);
+  brakeMeta.push(1.0, 0);
 
   for (let j = 0; j < vertsPerRib; j++) {
     const jNext = (j + 1) % vertsPerRib;
@@ -187,7 +212,8 @@ export function createParagliderMesh(THREE, options = {}) {
   }
 
   const canopyGeo = new THREE.BufferGeometry();
-  canopyGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  const posFloat32 = new Float32Array(positions);
+  canopyGeo.setAttribute('position', new THREE.Float32BufferAttribute(posFloat32, 3));
   canopyGeo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
   canopyGeo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   canopyGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
@@ -195,12 +221,16 @@ export function createParagliderMesh(THREE, options = {}) {
   if (typeof canopyGeo.computeVertexNormals === 'function') {
     canopyGeo.computeVertexNormals();
   }
+  canopyGeo.userData = {
+    basePositions: new Float32Array(positions),
+    brakeMeta: new Float32Array(brakeMeta)
+  };
 
   const canopyMat = new THREE.MeshStandardMaterial({
     vertexColors: true,
     side: THREE.DoubleSide,
-    roughness: 0.45,
-    metalness: 0.05,
+    roughness: 0.42,
+    metalness: 0.06,
     depthTest: true,
     depthWrite: true,
     polygonOffset: true,
@@ -262,11 +292,15 @@ export function createParagliderMesh(THREE, options = {}) {
   });
 
   const lineGeo = new THREE.BufferGeometry();
-  lineGeo.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3));
+  const lineFloat32 = new Float32Array(linePositions);
+  lineGeo.setAttribute('position', new THREE.Float32BufferAttribute(lineFloat32, 3));
+  lineGeo.userData = {
+    baseLinePositions: new Float32Array(linePositions)
+  };
   const lineMat = new THREE.LineBasicMaterial({
     color: linesColor,
     transparent: true,
-    opacity: 0.55,
+    opacity: 0.62,
     depthTest: true,
     depthWrite: false
   });
@@ -395,6 +429,12 @@ export function createParagliderMesh(THREE, options = {}) {
   pilotHead.rotation.y = Math.PI;
   group.add(pilotHead);
 
+  group.userData = {
+    wingYBase,
+    lastBrakeLeft: 0,
+    lastBrakeRight: 0
+  };
+
   return group;
 }
 
@@ -434,7 +474,8 @@ export async function loadParagliderModel(THREE, modelUrl = 'data/models/paragli
 }
 
 /**
- * Updates the 3D paraglider avatar pose and attitude smoothly.
+ * Updates the 3D paraglider avatar pose, articulated centrifugal pendulum swing,
+ * inner trailing-edge brake deflection, and Pilot POV anti-clipping visibility.
  * 
  * @param {object} avatarGroup THREE.Group
  * @param {object} pose
@@ -442,9 +483,12 @@ export async function loadParagliderModel(THREE, modelUrl = 'data/models/paragli
  * @param {number} [pose.y=0] Altitude in meters
  * @param {number} [pose.z=0] South displacement in meters
  * @param {number} [pose.headingDeg=0] Compass heading in degrees
- * @param {number} [pose.pitchDeg=0] Kinematic pitch in degrees
- * @param {number} [pose.bankDeg=0] Aerodynamic bank in degrees
+ * @param {number} [pose.pitchDeg=0] Aerodynamic pitch in degrees
+ * @param {number} [pose.bankDeg=0] Coordinated bank in degrees
  * @param {number} [pose.scale=1.0] Perspective scale multiplier
+ * @param {number} [pose.brakeLeft=0] Left trailing-edge brake pull [0, 1]
+ * @param {number} [pose.brakeRight=0] Right trailing-edge brake pull [0, 1]
+ * @param {string} [pose.cameraMode='chase'] Active camera mode ('chase' | 'cockpit' | 'free')
  */
 export function updateAvatarPose(avatarGroup, pose = {}) {
   if (!avatarGroup || !avatarGroup.position) return;
@@ -476,4 +520,82 @@ export function updateAvatarPose(avatarGroup, pose = {}) {
   if (typeof avatarGroup.scale?.setScalar === 'function') {
     avatarGroup.scale.setScalar(scale);
   }
+
+  // Articulated Pendulum Mechanics & Cockpit POV Anti-Clipping on Child Meshes
+  if (Array.isArray(avatarGroup.children) && avatarGroup.children.length > 0) {
+    const isCockpitPov = pose.cameraMode === 'cockpit';
+    const bankRad = (bankDeg * Math.PI) / 180;
+
+    // When the group rotates by rotZ around (0,0,0), shifting the canopy inward (-sin(bank)*pivotH)
+    // and swinging the pilot pod outward (+sin(bank)*swingArm) shifts the effective center of
+    // rotation up into the canopy/risers so the pilot swings outward under centrifugal force!
+    const canopyShiftX = -Math.sin(bankRad) * 3.2;
+    const podSwingX = Math.sin(bankRad) * 1.35;
+    const podSwingY = (1 - Math.cos(bankRad)) * 0.65;
+
+    const brakeRight = Math.max(0, Math.min(1, Number(pose.brakeRight) || (bankDeg > 1 ? Math.min(1, bankDeg / 42) : 0)));
+    const brakeLeft = Math.max(0, Math.min(1, Number(pose.brakeLeft) || (bankDeg < -1 ? Math.min(1, -bankDeg / 42) : 0)));
+
+    for (const child of avatarGroup.children) {
+      if (!child) continue;
+      if (child.name === 'PilotPod' || child.name === 'PilotHead') {
+        child.visible = !isCockpitPov;
+        if (child.position && typeof child.position.set === 'function') {
+          child.position.set(podSwingX, podSwingY, 0);
+        }
+      } else if (child.name === 'GliderCanopy') {
+        child.visible = true;
+        if (child.position && typeof child.position.set === 'function') {
+          child.position.set(canopyShiftX, 0, 0);
+        }
+        // Apply inner trailing-edge brake deflection if brake state changed significantly
+        const geo = child.geometry;
+        const ud = geo?.userData;
+        const posAttr = geo?.attributes?.position;
+        if (ud && ud.basePositions && ud.brakeMeta && posAttr && posAttr.array && posAttr.array.length === ud.basePositions.length) {
+          const prevBL = avatarGroup.userData?.lastBrakeLeft ?? -1;
+          const prevBR = avatarGroup.userData?.lastBrakeRight ?? -1;
+          if (Math.abs(brakeLeft - prevBL) > 0.03 || Math.abs(brakeRight - prevBR) > 0.03) {
+            const base = ud.basePositions;
+            const meta = ud.brakeMeta;
+            const arr = posAttr.array;
+            const vCount = base.length / 3;
+            for (let v = 0; v < vCount; v++) {
+              const u = meta[v * 2];
+              const weight = meta[v * 2 + 1];
+              // u > 0 corresponds to right wing (-arcX), u < 0 corresponds to left wing (+arcX)
+              const activeBrake = u > 0 ? brakeRight : brakeLeft;
+              const deflectionY = weight * activeBrake * 0.26;
+              arr[v * 3 + 1] = base[v * 3 + 1] - deflectionY;
+            }
+            posAttr.needsUpdate = true;
+            if (avatarGroup.userData) {
+              avatarGroup.userData.lastBrakeLeft = brakeLeft;
+              avatarGroup.userData.lastBrakeRight = brakeRight;
+            }
+          }
+        }
+      } else if (child.name === 'SuspensionLines') {
+        child.visible = true;
+        const lGeo = child.geometry;
+        const baseLines = lGeo?.userData?.baseLinePositions;
+        const lPosAttr = lGeo?.attributes?.position;
+        if (baseLines && lPosAttr && lPosAttr.array && lPosAttr.array.length === baseLines.length) {
+          const arr = lPosAttr.array;
+          for (let k = 0; k < arr.length; k += 6) {
+            // Even vertex: carabiner attachment on pilot pod
+            arr[k]     = baseLines[k] + podSwingX;
+            arr[k + 1] = baseLines[k + 1] + podSwingY;
+            arr[k + 2] = baseLines[k + 2];
+            // Odd vertex: upper attachment on canopy intrados
+            arr[k + 3] = baseLines[k + 3] + canopyShiftX;
+            arr[k + 4] = baseLines[k + 4];
+            arr[k + 5] = baseLines[k + 5];
+          }
+          lPosAttr.needsUpdate = true;
+        }
+      }
+    }
+  }
 }
+

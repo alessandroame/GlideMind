@@ -9,7 +9,11 @@
  */
 
 import { IReplay3dEngine } from './IReplay3dEngine.js';
-import { projectTrackToThreeLocal, interpolateTrackSample } from '../../core/flightReplayMath.js';
+import {
+  projectTrackToThreeLocal,
+  interpolateTrackSample,
+  stepCameraSpringDamper
+} from '../../core/flightReplayMath.js';
 
 export class HeadlessReplayEngine extends IReplay3dEngine {
   constructor() {
@@ -23,6 +27,10 @@ export class HeadlessReplayEngine extends IReplay3dEngine {
     this.totalDurationSec = 0;
     this.speed = 1;
     this.cameraMode = 'chase';
+    this._cameraState = null;
+    this.userBearingOffsetDeg = 0;
+    this.userPitchOffsetDeg = 0;
+    this.userZoomOffset = 0;
     this.isPlaying = false;
     this.elevationOffset = 0;
     this.currentSample = null;
@@ -51,6 +59,10 @@ export class HeadlessReplayEngine extends IReplay3dEngine {
     this.trackPoints = Array.isArray(points) ? points : [];
     this.options = { ...this.options, ...options };
     this.projected = projectTrackToThreeLocal(this.trackPoints);
+    this._cameraState = null;
+    this.userBearingOffsetDeg = 0;
+    this.userPitchOffsetDeg = 0;
+    this.userZoomOffset = 0;
 
     if (this.trackPoints.length > 0) {
       const firstTime = this.trackPoints[0].timeSeconds ?? 0;
@@ -102,6 +114,15 @@ export class HeadlessReplayEngine extends IReplay3dEngine {
       this.currentSample.effectiveY = this.currentSample.y + this.elevationOffset;
     }
 
+    if (this.currentSample) {
+      this._cameraState = stepCameraSpringDamper(this._cameraState, this.currentSample, 0.35, {
+        mode: this.cameraMode,
+        userBearingOffsetDeg: this.userBearingOffsetDeg,
+        userPitchOffsetDeg: this.userPitchOffsetDeg,
+        userZoomOffset: this.userZoomOffset
+      });
+    }
+
     this.emit('timeupdate', {
       progress: this.progress,
       currentTimeSec: this.currentTimeSec,
@@ -125,6 +146,27 @@ export class HeadlessReplayEngine extends IReplay3dEngine {
   }
 
   /**
+   * Returns array of upcoming Ghost Track points from the current playback instant to landing.
+   * @returns {Array<object>}
+   */
+  getFuturePoints() {
+    if (!this.trackPoints || this.trackPoints.length === 0) return [];
+    if (!this.hasPlaybackStarted || this.progress >= 1.0) return [];
+    const n = this.trackPoints.length;
+    const startIdx = Math.floor(this.progress * (n - 1));
+    return this.trackPoints.slice(startIdx);
+  }
+
+  /**
+   * Applies user manual orbit offsets around the glider in Chase mode.
+   */
+  applyUserCameraOrbit(deltaBearingDeg = 0, deltaPitchDeg = 0, deltaZoom = 0) {
+    this.userBearingOffsetDeg = (((this.userBearingOffsetDeg + (Number(deltaBearingDeg) || 0)) + 180) % 360 + 360) % 360 - 180;
+    this.userPitchOffsetDeg = Math.max(-35, Math.min(20, this.userPitchOffsetDeg + (Number(deltaPitchDeg) || 0)));
+    this.userZoomOffset = Math.max(-3.0, Math.min(3.0, this.userZoomOffset + (Number(deltaZoom) || 0)));
+  }
+
+  /**
    * Sets playback speed multiplier.
    * @param {number} speedMultiplier (1, 2, 5, 10, 20)
    */
@@ -142,6 +184,19 @@ export class HeadlessReplayEngine extends IReplay3dEngine {
   setCameraMode(mode) {
     const validModes = ['chase', 'cockpit', 'free'];
     this.cameraMode = validModes.includes(mode) ? mode : 'chase';
+    if (this.cameraMode === 'chase') {
+      this.userBearingOffsetDeg = 0;
+      this.userPitchOffsetDeg = 0;
+      this.userZoomOffset = 0;
+    }
+    if (this.currentSample) {
+      this._cameraState = stepCameraSpringDamper(this._cameraState, this.currentSample, 2.5, {
+        mode: this.cameraMode,
+        userBearingOffsetDeg: this.userBearingOffsetDeg,
+        userPitchOffsetDeg: this.userPitchOffsetDeg,
+        userZoomOffset: this.userZoomOffset
+      });
+    }
     this.emit('camerachange', { cameraMode: this.cameraMode });
   }
 

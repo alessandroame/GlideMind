@@ -223,4 +223,50 @@ describe('3D Paraglider Model - Procedural Geometry & Pose Kinematics', () => {
       delete globalThis.window;
     }
   });
+
+  it('should include bi-color racing livery vertex colors on GliderCanopy and apply articulated pendulum swing and POV hiding', () => {
+    const THREE = createMockThree();
+    const glider = createParagliderMesh(THREE);
+
+    const canopy = glider.children.find(c => c.name === 'GliderCanopy');
+    const pod = glider.children.find(c => c.name === 'PilotPod');
+    const head = glider.children.find(c => c.name === 'PilotHead');
+
+    assert.ok(canopy.geometry.attributes.color, 'GliderCanopy must include vertex color attribute for bi-color racing livery');
+    assert.equal(canopy.material.vertexColors, true);
+
+    // Apply 30 deg right bank in chase mode: canopy shifts inward (-X), pod shifts outward (+X)
+    updateAvatarPose(glider, {
+      x: 0,
+      y: 500,
+      z: 0,
+      headingDeg: 0,
+      pitchDeg: 0,
+      bankDeg: 30,
+      cameraMode: 'chase',
+      scale: 1.0
+    });
+
+    assert.ok(canopy.position.x < -0.1, `Expected canopy inward shift (< -0.1), got ${canopy.position.x}`);
+    assert.ok(pod.position.x > 0.2, `Expected pilot pod outward centrifugal swing (> 0.2), got ${pod.position.x}`);
+    assert.equal(pod.visible, true);
+    assert.equal(head.visible, true);
+
+    // Switch to cockpit POV mode: PilotPod and PilotHead must be hidden to prevent camera clipping
+    updateAvatarPose(glider, {
+      x: 0,
+      y: 500,
+      z: 0,
+      headingDeg: 0,
+      pitchDeg: 0,
+      bankDeg: 15,
+      cameraMode: 'cockpit',
+      scale: 1.0
+    });
+
+    assert.equal(pod.visible, false, 'PilotPod must be hidden in cockpit POV mode');
+    assert.equal(head.visible, false, 'PilotHead must be hidden in cockpit POV mode');
+    assert.equal(canopy.visible, true, 'GliderCanopy must remain visible above the pilot in cockpit POV mode');
+  });
 });
+

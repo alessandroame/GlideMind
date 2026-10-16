@@ -34,8 +34,8 @@ Matrice di stato delle funzionalità di GlideMind riferita a [MASTER_PLAN.md](fi
 | **Design System & Shell Architetturale** | Fase 2 | 🟢 Completato | `index.html` (108 righe), `css/theme.css` dual-theme, Fitts $\ge 48\text{px}$, `store.js` e `router.js` |
 | **Brand Identity, Icon Bundle & Splash** | Fase 2-bis | 🟢 Completato | Icone PWA (512, 192, maskable, apple-touch), `manifest.webmanifest` e splash zero-FOUC |
 | **Home Dashboard (`HomeDashboardView.js`)** | Fase 3 | 🟢 Completato | Layout Above-the-Fold meteo-centrico, barra simbiotica, card a 2 righe con timeline `3.5px` |
-| **Catalogo Vele & Fattore Prudenza Pilota** | Fase 3-bis | 🟢 Completato | 55+ modelli (`core/gliders.js`), parametri fisici $V_{\text{trim}}$/E senza badge EN come performance (`NOTE-004`) |
-| **Vista Previsioni (`ForecastView.js`)** | Fase 4 | 🟢 Completato | Switcher `Panoramica|Decollo|Atterraggio`, scrubbar a pillole uniformi e badge `Live` nominale nascosto (`NOTE-003`) |
+| **Catalogo Vele & Fattore Prudenza Pilota** | Fase 3-bis | 🟢 Completato | 55+ modelli (`core/gliders.js`), parametri fisici $V_{\text{trim}}$/E senza badge EN (`NOTE-004`) |
+| **Vista Previsioni (`ForecastView.js`)** | Fase 4 | 🟢 Completato | Switcher `Panoramica|Decollo|Atterraggio`, grafici 1:1 LED/fasce/zoom, scrubbar uniforme (`NOTE-003`) |
 | **Smart Date Selector & Calendario 7 Colonne** | Fase 4 | 🟢 Completato | Stepper monoriga `[‹ Data ▾ ›]` + quick chips e sheet calendario 14gg a 7 colonne (`Lun–Dom`) |
 | **Live Ingestion & Multi-Day Cache** | Fase 4-bis | 🟢 Completato | Chiave cache disambiguata `${spot.id}_${takeoff.id}_${landing.id}_${dateStr}` e badge quota 429 |
 | **Finestre di Volo & Previsioni a 2 Livelli** | Fase 4-ter | 🟢 Completato | `core/flightWindows.js`, disaccoppiamento oro-meteo decollo/atterraggio e `evaluateTimelineSlot` |
@@ -47,7 +47,7 @@ Matrice di stato delle funzionalità di GlideMind riferita a [MASTER_PLAN.md](fi
 | **Logbook & Filtri a Pills (`LogbookView.js`)** | Fase 6 | 🟢 Completato | Dual-store `flights_meta`/`flights_raw`, card 4-KPI e 5 pills espandibili per argomento (`NOTE-005`) |
 | **Importatore ParaMeteo & Integrità Traccia** | Fase 6-bis | 🟢 Completato | `core/parameteoImporter.js`, divieto tracce sintetiche, auto-purge DB e focus restoration |
 | **Dettaglio Volo & Debriefing (`FlightDetailSheet.js`)** | Fase 6-ter | 🟢 Completato | Vista `100dvh`, griglia 6 KPI, debriefing aerodinamico `.gm-debrief-callout` ed eliminazione con Undo 5s |
-| **Replay 3D WebGL (`FlightReplayView.js`)** | Fase 7 | 🟢 Completato | MapLibre GL + Three.js CustomLayer, origine ENU $P_0$, compensazione DEM e nastro Hermite |
+| **Replay 3D WebGL & Motore V2 (`FlightReplayView.js`)** | Fase 7/7-quinquies | 🟢 Completato | Camere spring-damper in quota + stabilizzazione termica, fisica pendolare vela, livrea bicolore, spline + Ghost Track |
 | **Trimming Non-Distruttivo & `TrackSetupSheet`** | Fase 7-ter | 🟢 Completato | `core/flightTrimming.js`, calibrazione barometrica bi-punto e modello 3D competition 54 cassoni |
 | **Mini-Mappa Traccia 2D & Fasi Sincronizzate** | Fase 7-quater | 🟢 Completato | Polilinea variometrica FAI 60 FPS, zoom su fase/termica e cursore bidirezionale mappa-grafico |
 | **Audit Ergonomico HMI & Laws of UX** | Audit | 🟢 Completato | Verifica CDP 29 viewport, touch target $\ge 48\text{px}$, contrasto sunlight mode e anti-gergo |
