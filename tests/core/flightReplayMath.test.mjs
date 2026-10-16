@@ -459,6 +459,27 @@ describe('Flight Replay Math - Headless Core Kinematics & Coordinates', () => {
       assert.ok(cockpitState.bearing > 188 && cockpitState.bearing <= 200, `Expected look-into-turn bearing > 188°, got ${cockpitState.bearing}`);
       assert.ok(cockpitState.zoom >= 17.0);
     });
+
+    it('should compute compensatedZoom when glider is high above terrain so camera eye stays behind the glider and centered on takeoff', () => {
+      // 1. At takeoff (alt = groundAltMsl = 1060m) in chase mode: zero forward offset and compensatedZoom === zoom
+      const takeoffPt = { lon: 9.302, lat: 45.833, alt: 1060, smoothHeading: 180 };
+      const takeoffState = stepCameraSpringDamper(null, takeoffPt, 2.0, { mode: 'chase', groundAltMsl: 1060 });
+      assert.ok(Math.abs(takeoffState.centerLon - 9.302) < 1e-6);
+      assert.ok(Math.abs(takeoffState.centerLat - 45.833) < 1e-6);
+      assert.equal(takeoffState.compensatedZoom, takeoffState.zoom);
+
+      // 2. High above valley (alt = 1260m, valley groundAltMsl = 360m -> +900m AGL) in chase and cockpit modes:
+      // compensatedZoom must be smaller than zoom so the longer ray from glider down to valley floor preserves constant camera-to-glider distance
+      const valleyPt = { lon: 9.302, lat: 45.833, alt: 1260, smoothHeading: 180 };
+      const valleyChase = stepCameraSpringDamper(null, valleyPt, 2.0, { mode: 'chase', groundAltMsl: 360 });
+      assert.ok(valleyChase.compensatedZoom < valleyChase.zoom - 1.2,
+        `Expected compensatedZoom (${valleyChase.compensatedZoom}) < zoom (${valleyChase.zoom}) by > 1.2 levels over 900m valley`);
+      assert.ok(valleyChase.chaseDistanceMeters > 200 && valleyChase.chaseDistanceMeters < 1200);
+
+      const valleyCockpit = stepCameraSpringDamper(null, valleyPt, 2.0, { mode: 'cockpit', groundAltMsl: 360 });
+      assert.ok(valleyCockpit.compensatedZoom < valleyCockpit.zoom - 2.5,
+        `Expected cockpit compensatedZoom (${valleyCockpit.compensatedZoom}) < zoom (${valleyCockpit.zoom}) over 900m valley`);
+    });
   });
 
   describe('computePendulumPose & buildSmoothTrackGeometryData', () => {

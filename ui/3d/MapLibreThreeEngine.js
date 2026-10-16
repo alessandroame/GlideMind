@@ -354,17 +354,85 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     const terrainElev = this.map.queryTerrainElevation([this.origin.lon, this.origin.lat]);
     if (typeof terrainElev === 'number' && !isNaN(terrainElev) && terrainElev > 0) {
       if (Math.abs(terrainElev - this.origin.alt) < 600) {
-        this.terrainDelta = terrainElev - this.origin.alt;
+        const nextDelta = terrainElev - this.origin.alt;
+        const deltaChanged = !this._hasSnappedTerrain || Math.abs(nextDelta - this.terrainDelta) > 0.25;
+        this.terrainDelta = nextDelta;
         this._hasSnappedTerrain = true;
         if (this.modelTransform) {
           const effectiveAlt = this.origin.alt + this.terrainDelta;
           this.modelTransform.translateZ = effectiveAlt * this.modelTransform.meterScale;
         }
-        this._refreshDropCurtainElevations();
+        if (deltaChanged) {
+          this._clampTrackAboveTerrain();
+          this._refreshDropCurtainElevations();
+        }
         return true;
       }
     }
     return false;
+  }
+
+  /**
+   * Ensures every projected track point and takeoff/landing 3D marker maintains a positive
+   * clearance (>= +4.5m) above the local 3D DEM terrain mesh so steep slope takeoffs
+   * and ridge segments never clip beneath DEM triangles.
+   */
+  _clampTrackAboveTerrain() {
+    if (!this._hasSnappedTerrain || !this.projectedTrack || !this.origin || !this.map?.transform || typeof this.map.queryTerrainElevation !== 'function') {
+      return;
+    }
+    const pts = this.projectedTrack.points;
+    const n = pts.length;
+    if (n === 0) return;
+
+    const effectiveOriginAlt = (this.origin.alt ?? 0) + this.terrainDelta;
+    const minClearanceMeters = 5.5;
+    let anyClamped = false;
+
+    for (let i = 0; i < n; i++) {
+      const pt = pts[i];
+      if (pt._rawY === undefined) {
+        pt._rawY = pt.y;
+      }
+      if (typeof pt.lon === 'number' && typeof pt.lat === 'number') {
+        const demElev = this.map.queryTerrainElevation([pt.lon, pt.lat]);
+        if (typeof demElev === 'number' && !isNaN(demElev) && demElev > 0) {
+          const localGroundY = demElev - effectiveOriginAlt;
+          const minSafeY = Math.round((localGroundY + minClearanceMeters) * 100) / 100;
+          const nextY = Math.max(pt._rawY, minSafeY);
+          if (Math.abs(nextY - pt.y) > 0.05) {
+            pt.y = nextY;
+            anyClamped = true;
+          }
+        }
+      }
+    }
+
+    if (!anyClamped) return;
+
+    if (this.trackRibbonMesh) {
+      this._updateRibbonDimensions(this._currentRibbonZoom || 14);
+    }
+
+    for (const lineMesh of [this.centerLineMesh, this.ghostLineMesh, this.wakeTrailMesh]) {
+      if (!lineMesh?.geometry) continue;
+      const posAttr = (typeof lineMesh.geometry.getAttribute === 'function')
+        ? lineMesh.geometry.getAttribute('position')
+        : lineMesh.geometry.attributes?.position;
+      if (posAttr?.array) {
+        for (let i = 0; i < n; i++) {
+          posAttr.array[i * 3 + 1] = pts[i].y;
+        }
+        posAttr.needsUpdate = true;
+      }
+    }
+
+    if (this.takeoffMarker && pts[0]) {
+      this.takeoffMarker.position.set(pts[0].x, pts[0].y + 0.5, pts[0].z);
+    }
+    if (this.landingMarker && pts[n - 1]) {
+      this.landingMarker.position.set(pts[n - 1].x, pts[n - 1].y + 0.5, pts[n - 1].z);
+    }
   }
 
   /**
@@ -450,13 +518,15 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     this._hasSnappedTerrain = false;
     this._trySnapTerrain();
 
-    // Listen for idle event to re-check when DEM raster tiles have finished decoding
+    // Listen for idle event to re-check when high-resolution DEM raster tiles have finished decoding
     if (this.map && typeof this.map.once === 'function') {
       this.map.once('idle', () => {
-        if (!this._hasSnappedTerrain) {
-          this._trySnapTerrain();
-        } else {
-          this._refreshDropCurtainElevations();
+        this._trySnapTerrain();
+        this._clampTrackAboveTerrain();
+        this._refreshDropCurtainElevations();
+        if (this.projectedTrack && this.projectedTrack.points.length > 0) {
+          const currentPt = this._interpolatePointAtTime(this.currentTimeSec);
+          this._updateCurrentFrame(currentPt, 10.0);
         }
         if (this.map && typeof this.map.triggerRepaint === 'function') {
           this.map.triggerRepaint();
@@ -481,8 +551,11 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     // Build or Rebuild Three.js Scene and Custom Layer
     this._setupThreeCustomLayer();
 
-    // Fit map bounds to flight path
-    this.fitTrackBounds(1200);
+    // Fit map bounds to flight path only when starting in 'free' mode;
+    // in 'chase' or 'cockpit' mode, frame the paraglider at takeoff immediately
+    if (this.cameraMode === 'free') {
+      this.fitTrackBounds(1200);
+    }
 
     this._updateCurrentFrame(this.projectedTrack.points[0], 10.0);
     this.map.triggerRepaint();
@@ -558,10 +631,10 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
 
         const mt = self.modelTransform;
 
-        // Auto-snap origin altitude to DEM terrain elevation if terrain finished loading
-        if (!self._hasSnappedTerrain) {
-          self._trySnapTerrain();
-        }
+        // Auto-snap and refine origin altitude to DEM terrain elevation as higher-LOD DEM tiles load
+        self._trySnapTerrain();
+
+        const effectiveAlt = (self.origin ? self.origin.alt : 0) + self.terrainDelta + self.elevationOffset;
 
         // Retrieve and compensate screen center terrain elevation (Lesson 116)
         const currentPitch = (self.map && typeof self.map.getPitch === 'function') ? self.map.getPitch() : 0;
@@ -574,9 +647,11 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
         } else if (self._lastValidCenterElevation > 0 && (currentPitch > 75 || centerElevation <= 0)) {
           // If pitched towards the sky or elevation is momentarily invalid, preserve last valid elevation
           centerElevation = self._lastValidCenterElevation;
+        } else if (centerElevation <= 0 && self._lastValidCenterElevation <= 0) {
+          // Before DEM tiles stream in, anchor Three.js origin directly on MapLibre's Z=0 plane
+          centerElevation = effectiveAlt;
         }
 
-        const effectiveAlt = (self.origin ? self.origin.alt : 0) + self.terrainDelta + self.elevationOffset;
         const currentTranslateZ = (effectiveAlt - centerElevation) * mt.meterScale;
 
         // Mathematical MVP Matrix construction conforming to geodesy_webgl_3d_spec.md & Lesson 116:
@@ -606,7 +681,8 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
         }
 
         // Check for zoom changes to dynamically adapt ribbon width and height
-        const currentZoom = (self.map && typeof self.map.getZoom === 'function') ? self.map.getZoom() : null;
+        const rawZoom = (self.map && typeof self.map.getZoom === 'function') ? self.map.getZoom() : null;
+        const currentZoom = (self.cameraMode !== 'free' && self._cameraState?.zoom) ? self._cameraState.zoom : rawZoom;
         if (currentZoom !== null && self.trackRibbonMesh && self._currentRibbonZoom !== null) {
           if (Math.abs(currentZoom - self._currentRibbonZoom) > 0.02) {
             self._updateRibbonDimensions(currentZoom);
@@ -1386,9 +1462,11 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
       ? geom.getAttribute('color')
       : geom?.attributes?.color;
 
-    const currentZoom = (this.map && typeof this.map.getZoom === 'function')
-      ? this.map.getZoom()
-      : (this._currentRibbonZoom || 14);
+    const currentZoom = (this.cameraMode !== 'free' && this._cameraState?.zoom)
+      ? this._cameraState.zoom
+      : ((this.map && typeof this.map.getZoom === 'function')
+        ? this.map.getZoom()
+        : (this._currentRibbonZoom || 14));
     const dims = calculateRibbonDimensions(currentZoom, this.origin?.lat);
     const hw = dims.halfWidth;
     const hh = dims.halfHeight;
@@ -1409,7 +1487,9 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     const hhHead = Math.min(0.02, hh * 0.15);
 
     // Compute contained scale and backward offset towards harness tail cone
-    const cameraDistMeters = Math.max(20, 5000000 / Math.pow(2, currentZoom));
+    const cameraDistMeters = (this.cameraMode !== 'free' && this._cameraState?.chaseDistanceMeters > 0)
+      ? this._cameraState.chaseDistanceMeters
+      : Math.max(20, 5000000 / Math.pow(2, currentZoom));
     const avatarScale = calculateAvatarMinScale(cameraDistMeters, 60, 800, 22, 13.2, 6.5);
     const tailOffset = 0.85 * avatarScale;
     const attachX = cp.x - Math.sin(headingRad) * tailOffset;
@@ -1674,15 +1754,19 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
   _updateCurrentFrame(pt, dtSeconds = 0.05) {
     if (!pt) return;
 
+    this._updateCameraForFrame(pt, dtSeconds);
+
     if (this.map) {
       const zoom = (typeof this.map.getZoom === 'function') ? this.map.getZoom() : 14;
-      const cameraDistMeters = Math.max(20, 5000000 / Math.pow(2, zoom));
+      const cameraDistMeters = (this.cameraMode !== 'free' && this._cameraState?.chaseDistanceMeters > 0)
+        ? this._cameraState.chaseDistanceMeters
+        : Math.max(20, 5000000 / Math.pow(2, zoom));
       const scale = calculateAvatarMinScale(cameraDistMeters, 60, 800, 22, 13.2, 6.5);
 
       if (this.avatarGroup) {
         updateAvatarPose(this.avatarGroup, {
           x: pt.x,
-          y: pt.y + this.elevationOffset,
+          y: pt.y,
           z: pt.z,
           headingDeg: pt.smoothHeading ?? pt.heading,
           pitchDeg: pt.aerodynamicPitchAngle ?? pt.pitchAngle,
@@ -1697,7 +1781,6 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
       this._updateAvatarGroundIndicator(pt);
     }
 
-    this._updateCameraForFrame(pt, dtSeconds);
     this._updateTraveledTrack(pt);
     this._emitTimeUpdate(pt);
   }
@@ -1712,17 +1795,29 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
   _updateCameraForFrame(pt, dtSeconds = 0.05) {
     if (!pt) return;
 
-    let groundAltMsl = (this.origin?.alt ?? 0) + (this._minTrackY ?? 0);
-    if (this._hasSnappedTerrain && this.map && typeof this.map.queryTerrainElevation === 'function' && typeof pt.lon === 'number' && typeof pt.lat === 'number') {
+    const effectiveOriginAlt = (this.origin?.alt ?? pt.alt ?? 0) + this.terrainDelta + this.elevationOffset;
+    const relativeY = typeof pt.y === 'number' ? pt.y : ((pt.alt ?? 0) - (this.origin?.alt ?? pt.alt ?? 0));
+    const gliderAltMsl = effectiveOriginAlt + relativeY;
+
+    let groundAltMsl = effectiveOriginAlt;
+    if (this.map?.transform && typeof this.map.transform.elevation === 'number' && !isNaN(this.map.transform.elevation) && this.map.transform.elevation > 0) {
+      this._lastValidCenterElevation = this.map.transform.elevation;
+      groundAltMsl = this.map.transform.elevation;
+    } else if (this._lastValidCenterElevation > 0) {
+      groundAltMsl = this._lastValidCenterElevation;
+    } else if (this._hasSnappedTerrain && this.map && typeof this.map.queryTerrainElevation === 'function' && typeof pt.lon === 'number' && typeof pt.lat === 'number') {
       const queryElev = this.map.queryTerrainElevation([pt.lon, pt.lat]);
       if (typeof queryElev === 'number' && !isNaN(queryElev) && queryElev > 0) {
         groundAltMsl = queryElev;
       }
-    } else if (this._lastValidCenterElevation > 0) {
-      groundAltMsl = this._lastValidCenterElevation;
     }
 
-    this._cameraState = stepCameraSpringDamper(this._cameraState, pt, dtSeconds, {
+    const cameraTargetPt = {
+      ...pt,
+      alt: gliderAltMsl
+    };
+
+    this._cameraState = stepCameraSpringDamper(this._cameraState, cameraTargetPt, dtSeconds, {
       mode: this.cameraMode,
       baseZoom: 14.3,
       basePitch: 60,
@@ -1741,8 +1836,30 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
           center: [this._cameraState.centerLon, this._cameraState.centerLat],
           bearing: this._cameraState.bearing,
           pitch: this._cameraState.pitch,
-          zoom: this._cameraState.zoom
+          zoom: this._cameraState.compensatedZoom ?? this._cameraState.zoom
         });
+
+        const updatedElev = this.map?.transform?.elevation;
+        if (typeof updatedElev === 'number' && !isNaN(updatedElev) && updatedElev > 0) {
+          this._lastValidCenterElevation = updatedElev;
+          if (dtSeconds >= 1.5 && Math.abs(updatedElev - groundAltMsl) > 5) {
+            this._cameraState = stepCameraSpringDamper(this._cameraState, cameraTargetPt, dtSeconds, {
+              mode: this.cameraMode,
+              baseZoom: 14.3,
+              basePitch: 60,
+              userBearingOffsetDeg: this.userBearingOffsetDeg,
+              userPitchOffsetDeg: this.userPitchOffsetDeg,
+              userZoomOffset: this.userZoomOffset,
+              groundAltMsl: updatedElev
+            });
+            this.map.jumpTo({
+              center: [this._cameraState.centerLon, this._cameraState.centerLat],
+              bearing: this._cameraState.bearing,
+              pitch: this._cameraState.pitch,
+              zoom: this._cameraState.compensatedZoom ?? this._cameraState.zoom
+            });
+          }
+        }
       } finally {
         this._isProgrammaticCameraMove = false;
       }

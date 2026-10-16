@@ -651,6 +651,59 @@ function createMockThree() {
       assert.equal(engine.curtainMesh.material.depthTest, true);
       assert.equal(engine.curtainMesh.material.polygonOffset, true);
     });
+
+    it('should continuously refine terrainDelta as higher-LOD DEM tiles load and clamp takeoff track >= 5.5m above sloped DEM', async () => {
+      engine.THREE = mockThree;
+      let currentDemTakeoffElev = 1015; // Coarse zoom-12 DEM tile initially under-estimates ridge by 45m
+      const mockMap = {
+        transform: { elevation: 1015 },
+        queryTerrainElevation(coords) {
+          if (Math.abs(coords[0] - 9.302) < 0.01 && Math.abs(coords[1] - 45.833) < 0.01) {
+            return currentDemTakeoffElev;
+          }
+          return 260;
+        },
+        getLayer: () => null,
+        removeLayer: () => {},
+        addLayer: () => {},
+        getCanvas: () => ({ clientWidth: 800, clientHeight: 600 }),
+        fitBounds: () => {},
+        triggerRepaint: () => {},
+        jumpTo: () => {},
+        on: () => {}
+      };
+
+      engine.map = mockMap;
+      engine.maplibregl = {
+        MercatorCoordinate: {
+          fromLngLat(lngLat, alt) {
+            return {
+              x: 0.5,
+              y: 0.5,
+              z: alt * 1e-7,
+              meterInMercatorCoordinateUnits: () => 1e-7
+            };
+          }
+        }
+      };
+
+      const pts = [
+        { lat: 45.833, lon: 9.302, alt: 1060, timeSeconds: 0, vario: 1.0, heading: 170 },
+        { lat: 45.817, lon: 9.318, alt: 260, timeSeconds: 1200, vario: -1.0, heading: 170 }
+      ];
+
+      await engine.loadTrack(pts);
+      assert.equal(engine.terrainDelta, 1015 - 1060, 'Initial coarse DEM snap should set terrainDelta = -45m');
+
+      // Higher-LOD zoom-14 DEM tile arrives with true ridge elevation 1052m
+      currentDemTakeoffElev = 1052;
+      mockMap.transform.elevation = 1052;
+      const refined = engine._trySnapTerrain();
+      assert.equal(refined, true, '_trySnapTerrain must refine terrainDelta when higher-LOD DEM tile changes elevation');
+      assert.equal(engine.terrainDelta, 1052 - 1060, 'Refined terrainDelta must update to -8m');
+      assert.ok(engine.projectedTrack.points[0].y >= 5.5, `Takeoff point Y (${engine.projectedTrack.points[0].y}) must maintain >= 5.5m clearance above DEM slope`);
+      assert.equal(engine.projectedTrack.points[0].alt, 1060, 'HUD barometric altitude pt.alt must remain untouched');
+    });
   });
 
   describe('4. Dynamic Traveled Track Rendering (Playback Instant Contracts)', () => {

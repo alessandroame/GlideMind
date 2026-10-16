@@ -268,5 +268,44 @@ describe('3D Paraglider Model - Procedural Geometry & Pose Kinematics', () => {
     assert.equal(head.visible, false, 'PilotHead must be hidden in cockpit POV mode');
     assert.equal(canopy.visible, true, 'GliderCanopy must remain visible above the pilot in cockpit POV mode');
   });
+
+  it('should orient GliderCanopy leading edge forward (-Z) and trailing edge backward (+Z) aligned with PilotPod', () => {
+    const THREE = createMockThree();
+    const glider = createParagliderMesh(THREE, { span: 10.5, chord: 2.4 });
+    const canopy = glider.children.find(c => c.name === 'GliderCanopy');
+    const pos = canopy.geometry.attributes.position.array;
+    const uv = canopy.geometry.attributes.uv.array;
+    const vertCount = pos.length / 3;
+
+    let sumLeadingZ = 0;
+    let countLeading = 0;
+    let sumTrailingZ = 0;
+    let countTrailing = 0;
+    let centerLeadingZ = 0;
+    let tipLeadingZ = 0;
+
+    for (let i = 0; i < vertCount; i++) {
+      const uNorm = uv[i * 2];     // 0 at left tip, 0.5 at center, 1 at right tip
+      const tNorm = uv[i * 2 + 1]; // 0 at leading edge, 1 at trailing edge
+      const z = pos[i * 3 + 2];
+
+      if (tNorm < 0.01) {
+        sumLeadingZ += z;
+        countLeading++;
+        if (Math.abs(uNorm - 0.5) < 0.01) centerLeadingZ = z;
+        if (uNorm > 0.99) tipLeadingZ = z;
+      } else if (tNorm > 0.99) {
+        sumTrailingZ += z;
+        countTrailing++;
+      }
+    }
+
+    const avgLeadingZ = sumLeadingZ / countLeading;
+    const avgTrailingZ = sumTrailingZ / countTrailing;
+
+    assert.ok(avgLeadingZ < -0.5, `Leading edge (t=0) must be forward (-Z < -0.5), got ${avgLeadingZ}`);
+    assert.ok(avgTrailingZ > 0.5, `Trailing edge (t=1) must be backward (+Z > +0.5), got ${avgTrailingZ}`);
+    assert.ok(tipLeadingZ > centerLeadingZ, `Wingtips must sweep backward (+Z) relative to center cell (${tipLeadingZ} > ${centerLeadingZ})`);
+  });
 });
 

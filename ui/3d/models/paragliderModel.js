@@ -111,16 +111,16 @@ export function createParagliderMesh(THREE, options = {}) {
     const tipDownturn = Math.pow(absU, 4.5) * 0.40;
     const arcY = wingYBase - (u * u * archDrop) - tipDownturn;
     const arcX = u * halfSpan * (1.0 - 0.03 * u * u);
-    const sweepZ = -0.42 * (u * u) - Math.pow(absU, 3.5) * 0.15;
+    const sweepBackZ = 0.42 * (u * u) + Math.pow(absU, 3.5) * 0.15;
 
     const isCellRib = (i % 2 === 0);
     const isWingtipBand = absU > 0.78;
 
     // Upper surface (Extrados - High-Visibility Bi-Color Racing Livery)
+    // t = 0 is Leading Edge (-Z, forward flight direction); t = 1 is Trailing Edge (+Z, wake direction)
     for (let j = 0; j <= chordSteps; j++) {
       const t = j / chordSteps;
-      const rawZ = sweepZ + (t - 0.78) * currentChord;
-      const localZ = -rawZ;
+      const localZ = sweepBackZ + (t - 0.65) * currentChord;
       const localY = arcY + getAirfoil(t, true, tipFactor) * currentChord;
 
       positions.push(-arcX, localY, localZ);
@@ -148,8 +148,7 @@ export function createParagliderMesh(THREE, options = {}) {
     // Lower surface (Intrados - High-Contrast Light Ice-Silver for top/bottom distinction)
     for (let j = chordSteps - 1; j >= 1; j--) {
       const t = j / chordSteps;
-      const rawZ = sweepZ + (t - 0.78) * currentChord;
-      const localZ = -rawZ;
+      const localZ = sweepBackZ + (t - 0.65) * currentChord;
       const localY = arcY + getAirfoil(t, false, tipFactor) * currentChord;
 
       positions.push(-arcX, localY, localZ);
@@ -259,11 +258,10 @@ export function createParagliderMesh(THREE, options = {}) {
     const tipDownturn = Math.pow(u, 4.5) * 0.40;
     const arcY = wingYBase - (u * u * archDrop) - tipDownturn;
     const arcX = u * halfSpan * (1.0 - 0.03 * u * u);
-    const sweepZ = -0.42 * (u * u) - Math.pow(u, 3.5) * 0.15;
+    const sweepBackZ = 0.42 * (u * u) + Math.pow(u, 3.5) * 0.15;
 
     rowRatios.forEach(ct => {
-      const rawZ = sweepZ + (ct - 0.78) * currentChord;
-      const z = -rawZ;
+      const z = sweepBackZ + (ct - 0.65) * currentChord;
 
       linePositions.push(harnessRightCarabiner[0], harnessRightCarabiner[1], harnessRightCarabiner[2]);
       linePositions.push(-arcX, arcY - 0.02, z);
@@ -280,9 +278,8 @@ export function createParagliderMesh(THREE, options = {}) {
     const tipDownturn = Math.pow(u, 4.5) * 0.40;
     const arcY = wingYBase - (u * u * archDrop) - tipDownturn;
     const arcX = u * halfSpan * (1.0 - 0.03 * u * u);
-    const sweepZ = -0.42 * (u * u) - Math.pow(u, 3.5) * 0.15;
-    const rawZ = sweepZ + (0.98 - 0.78) * currentChord;
-    const z = -rawZ;
+    const sweepBackZ = 0.42 * (u * u) + Math.pow(u, 3.5) * 0.15;
+    const z = sweepBackZ + (0.98 - 0.65) * currentChord;
 
     linePositions.push(-0.22, 0.48, 0.08);
     linePositions.push(-arcX, arcY - 0.02, z);

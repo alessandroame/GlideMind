@@ -49,9 +49,11 @@ export function generateParagliderGlb() {
 
     for (let c = 0; c <= nChordSegments; c++) {
       const v = c / nChordSegments; // 0 (leading edge) to 1 (trailing edge)
-      // Chord position: -Z is nose/leading edge, +Z is trailing edge
-      // Center of canopy roughly at z = 0
-      const z = -chord * 0.4 + v * chord;
+      // Chord position: -Z is nose/leading edge, +Z is trailing edge with backward wingtip sweep
+      const tipFactor = Math.max(0.22, Math.sqrt(Math.max(0.001, 1.0 - Math.pow(absEta, 2.2))));
+      const currentChord = chord * tipFactor;
+      const sweepBackZ = 0.42 * (eta * eta) + Math.pow(absEta, 3.5) * 0.15;
+      const z = sweepBackZ + (v - 0.65) * currentChord;
 
       // NACA-like camber / thickness distribution
       // Maximum thickness around v = 0.25 - 0.30

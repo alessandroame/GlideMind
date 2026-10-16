@@ -639,44 +639,57 @@ export function computeCameraGroundTargetForAltitude({
   lon,
   altMsl = 0,
   referenceElevationMsl,
-  groundAltMsl = 0,
+  groundAltMsl,
   pitchDeg = 62,
   bearingDeg = 0,
-  zoom = 15,
-  cameraMode = 'chase'
+  zoom = 15.2,
+  cameraMode = 'chase',
+  lookAheadMeters,
+  viewportHeightPx = 600
 } = {}) {
   const baseLat = Number(lat) || 0;
   const baseLon = Number(lon) || 0;
   const clampedPitch = Math.max(0, Math.min(78, Number(pitchDeg) || 0));
   const pitchRad = (clampedPitch * Math.PI) / 180;
 
-  // Height of the 3D glider above MapLibre's current center elevation plane
-  const refElev = referenceElevationMsl !== undefined ? Number(referenceElevationMsl) : Number(groundAltMsl);
-  const rawDeltaH = (Number(altMsl) || 0) - (refElev || 0);
-  const altitudeDeltaMeters = Math.max(-400, Math.min(2800, rawDeltaH));
+  // Height of the 3D glider above MapLibre's current center elevation plane (Z_merc = 0)
+  const hasExplicitRef = referenceElevationMsl !== undefined || groundAltMsl !== undefined;
+  const refElev = referenceElevationMsl !== undefined
+    ? Number(referenceElevationMsl)
+    : (groundAltMsl !== undefined ? Number(groundAltMsl) : Number(altMsl));
+  const rawDeltaH = hasExplicitRef ? ((Number(altMsl) || 0) - (refElev || 0)) : 0;
+  const altitudeDeltaMeters = Math.max(0, Math.min(2800, rawDeltaH));
 
-  // Ray-plane intersection offset: to keep a point at +DeltaH on the optical axis of a camera
-  // pitched by theta and looking along bearing psi, the ground pivot must be shifted forward
-  // along psi by DeltaH * tan(theta). We cap tan(theta) at tan(68 deg) ~= 2.475 for stability.
-  const effectiveTan = Math.min(2.475, Math.tan(pitchRad));
+  // Ray-plane intersection: for a camera looking down at pitchRad along bearingDeg to intersect
+  // the 3D glider at +altitudeDeltaMeters above refElev:
+  // 1. Shift ground pivot forward by altitudeDeltaMeters * tan(pitchRad)
+  // 2. Increase camera-to-ground distance D(zoom) by +altitudeDeltaMeters / cos(pitchRad)
+  //    so the camera eye stays behind and above the 3D glider at distance d_chase.
+  const tanPitch = Math.tan(pitchRad);
+  const cosPitch = Math.max(0.18, Math.cos(pitchRad));
 
-  // Additional look-ahead distance so the glider sits comfortably in the lower-central third in 'chase',
-  // or looks forward along the flight path in 'cockpit' (POV) mode.
-  const z = Math.max(10, Math.min(20, Number(zoom) || 15));
-  const approxViewSpanMeters = 3200000 / Math.pow(2, z);
-  const framingLookAheadMeters = cameraMode === 'cockpit'
-    ? Math.max(45, approxViewSpanMeters * 0.42)
-    : Math.max(12, approxViewSpanMeters * 0.12);
+  const z = Math.max(10, Math.min(20, Number(zoom) || 15.2));
+  const WGS84_A = 6378137.0;
+  const latRad = (baseLat * Math.PI) / 180;
+  const cosLat = Math.max(0.1, Math.cos(latRad));
 
-  const forwardOffsetMeters = altitudeDeltaMeters * effectiveTan + framingLookAheadMeters;
+  const metersPerPixel = (40075016.686 * cosLat) / (512 * Math.pow(2, z));
+  const cameraToCenterPx = 1.5 * Math.max(320, Number(viewportHeightPx) || 600);
+  const chaseDistanceMeters = Math.max(25, cameraToCenterPx * metersPerPixel);
+
+  const totalRayDistance = chaseDistanceMeters + (altitudeDeltaMeters / cosPitch);
+  const zoomDrop = Math.log2(Math.max(1.0, totalRayDistance / chaseDistanceMeters));
+  const compensatedZoom = Math.max(10.5, Math.min(19.5, z - zoomDrop));
+
+  const framingLookAheadMeters = (typeof lookAheadMeters === 'number' && !isNaN(lookAheadMeters))
+    ? lookAheadMeters
+    : (cameraMode === 'cockpit' ? 3.5 : 0);
+
+  const forwardOffsetMeters = altitudeDeltaMeters * tanPitch + framingLookAheadMeters;
 
   const bearingRad = ((Number(bearingDeg) || 0) * Math.PI) / 180;
   const dEastMeters = Math.sin(bearingRad) * forwardOffsetMeters;
   const dNorthMeters = Math.cos(bearingRad) * forwardOffsetMeters;
-
-  const WGS84_A = 6378137.0;
-  const latRad = (baseLat * Math.PI) / 180;
-  const cosLat = Math.max(0.1, Math.cos(latRad));
 
   const targetLat = baseLat + (dNorthMeters / WGS84_A) * (180 / Math.PI);
   const targetLon = baseLon + (dEastMeters / (WGS84_A * cosLat)) * (180 / Math.PI);
@@ -689,7 +702,9 @@ export function computeCameraGroundTargetForAltitude({
     centerLon: roundedLon,
     centerLat: roundedLat,
     forwardOffsetMeters: Math.round(forwardOffsetMeters * 10) / 10,
-    altitudeDeltaMeters: Math.round(altitudeDeltaMeters * 10) / 10
+    altitudeDeltaMeters: Math.round(altitudeDeltaMeters * 10) / 10,
+    compensatedZoom: Math.round(compensatedZoom * 100) / 100,
+    chaseDistanceMeters: Math.round(chaseDistanceMeters * 10) / 10
   };
 }
 
@@ -703,38 +718,46 @@ export function computeCameraGroundTargetForAltitude({
  * @param {object} [options]
  * @param {'chase'|'cockpit'|'free'} [options.cameraMode='chase']
  * @param {'chase'|'cockpit'|'free'} [options.mode]
- * @param {number} [options.referenceElevationMsl=0]
- * @param {number} [options.groundAltMsl=0]
+ * @param {number} [options.referenceElevationMsl]
+ * @param {number} [options.groundAltMsl]
  * @param {number} [options.elevationOffset=0]
  * @param {number} [options.userBearingOffsetDeg=0] User orbit yaw offset in degrees
  * @param {number} [options.userPitchOffsetDeg=0] User orbit pitch offset in degrees
  * @param {number} [options.userZoomOffset=0] User zoom offset
+ * @param {number} [options.viewportHeightPx=600] Viewport height in pixels
  * @returns {object} Updated camera state
  */
 export function stepCameraSpringDamper(prevState, targetPoint, dtSeconds = 0.016, options = {}) {
   if (!targetPoint) return prevState || null;
 
   const mode = options.cameraMode || options.mode || 'chase';
-  const dt = Math.max(0.001, Math.min(0.25, Number(dtSeconds) || 0.016));
+  const rawDt = Number(dtSeconds) || 0.016;
+  const isImmediateSnap = !prevState || rawDt >= 1.5;
+  const dt = Math.max(0.001, Math.min(0.5, rawDt));
   const userYaw = Number(options.userBearingOffsetDeg) || 0;
   const userPitch = Number(options.userPitchOffsetDeg) || 0;
   const userZoom = Number(options.userZoomOffset) || 0;
   const elevOffset = Number(options.elevationOffset) || 0;
-  const refElev = Number(options.referenceElevationMsl ?? options.groundAltMsl) || 0;
 
   const gliderHeading = targetPoint.smoothHeading ?? targetPoint.heading ?? 0;
   const turnRate = targetPoint.smoothTurnRateDegSec ?? targetPoint.turnRateDegSec ?? 0;
   const isThermal = (Boolean(targetPoint.isThermalOrbit) || Math.abs(turnRate) >= 7.5) && mode === 'chase';
 
-  // Target focus position: in Chase mode during sustained thermals, blend 65% toward the
-  // moving thermal centroid so the camera doesn't wobble in tight circles.
-  const rawLat = isThermal && typeof targetPoint.thermalCenterLat === 'number'
-    ? targetPoint.lat * 0.35 + targetPoint.thermalCenterLat * 0.65
+  // Keep focus anchored tightly to the paraglider so the camera always points at the glider;
+  // only apply a subtle 8% damping toward thermal centroid during confirmed sustained orbits
+  const useThermalBlend = Boolean(targetPoint.isThermalOrbit) && mode === 'chase';
+  const rawLat = useThermalBlend && typeof targetPoint.thermalCenterLat === 'number'
+    ? targetPoint.lat * 0.92 + targetPoint.thermalCenterLat * 0.08
     : targetPoint.lat;
-  const rawLon = isThermal && typeof targetPoint.thermalCenterLon === 'number'
-    ? targetPoint.lon * 0.35 + targetPoint.thermalCenterLon * 0.65
+  const rawLon = useThermalBlend && typeof targetPoint.thermalCenterLon === 'number'
+    ? targetPoint.lon * 0.92 + targetPoint.thermalCenterLon * 0.08
     : targetPoint.lon;
   const rawAlt = (targetPoint.alt ?? 0) + elevOffset;
+
+  const hasExplicitRef = options.referenceElevationMsl !== undefined || options.groundAltMsl !== undefined;
+  const refElev = hasExplicitRef
+    ? (Number(options.referenceElevationMsl ?? options.groundAltMsl) || 0)
+    : rawAlt;
 
   // Desired camera orientation before damping:
   // - In 'cockpit' (Pilot POV): look into the turn by up to +/- 20 deg
@@ -752,25 +775,25 @@ export function stepCameraSpringDamper(prevState, targetPoint, dtSeconds = 0.016
 
   // Time constants tau (seconds):
   // In thermal orbit, bearing time constant increases to 6.5s so mountains stay still
-  const tauPos = mode === 'cockpit' ? 0.12 : (isThermal ? 0.85 : 0.32);
-  const tauBearing = mode === 'cockpit' ? 0.22 : (isThermal ? 6.5 : 0.68);
-  const tauPitchZoom = 0.25;
+  const tauPos = mode === 'cockpit' ? 0.08 : 0.18;
+  const tauBearing = mode === 'cockpit' ? 0.18 : (isThermal ? 6.5 : 0.55);
+  const tauPitchZoom = 0.22;
 
-  const alphaPos = !prevState ? 1.0 : (1.0 - Math.exp(-dt / tauPos));
-  const alphaBearing = !prevState ? 1.0 : (1.0 - Math.exp(-dt / tauBearing));
-  const alphaPZ = !prevState ? 1.0 : (1.0 - Math.exp(-dt / tauPitchZoom));
+  const alphaPos = isImmediateSnap ? 1.0 : (1.0 - Math.exp(-dt / tauPos));
+  const alphaBearing = isImmediateSnap ? 1.0 : (1.0 - Math.exp(-dt / tauBearing));
+  const alphaPZ = isImmediateSnap ? 1.0 : (1.0 - Math.exp(-dt / tauPitchZoom));
 
-  const focusLat = !prevState ? rawLat : prevState.focusLat + (rawLat - prevState.focusLat) * alphaPos;
-  const focusLon = !prevState ? rawLon : prevState.focusLon + (rawLon - prevState.focusLon) * alphaPos;
-  const focusAlt = !prevState ? rawAlt : prevState.focusAlt + (rawAlt - prevState.focusAlt) * alphaPos;
+  const focusLat = isImmediateSnap ? rawLat : prevState.focusLat + (rawLat - prevState.focusLat) * alphaPos;
+  const focusLon = isImmediateSnap ? rawLon : prevState.focusLon + (rawLon - prevState.focusLon) * alphaPos;
+  const focusAlt = isImmediateSnap ? rawAlt : prevState.focusAlt + (rawAlt - prevState.focusAlt) * alphaPos;
 
-  const smoothedBearing = !prevState
+  const smoothedBearing = isImmediateSnap
     ? desiredBearing
     : interpolateAngleDegrees(prevState.bearing, desiredBearing, alphaBearing);
-  const smoothedPitch = !prevState
+  const smoothedPitch = isImmediateSnap
     ? desiredPitch
     : prevState.pitch + (desiredPitch - prevState.pitch) * alphaPZ;
-  const smoothedZoom = !prevState
+  const smoothedZoom = isImmediateSnap
     ? desiredZoom
     : prevState.zoom + (desiredZoom - prevState.zoom) * alphaPZ;
 
@@ -783,7 +806,8 @@ export function stepCameraSpringDamper(prevState, targetPoint, dtSeconds = 0.016
     pitchDeg: smoothedPitch,
     bearingDeg: smoothedBearing,
     zoom: smoothedZoom,
-    cameraMode: mode
+    cameraMode: mode,
+    viewportHeightPx: options.viewportHeightPx
   });
 
   return {
@@ -792,10 +816,13 @@ export function stepCameraSpringDamper(prevState, targetPoint, dtSeconds = 0.016
     bearing: Math.round(smoothedBearing * 100) / 100,
     pitch: Math.round(smoothedPitch * 100) / 100,
     zoom: Math.round(smoothedZoom * 100) / 100,
+    compensatedZoom: groundTarget.compensatedZoom,
+    chaseDistanceMeters: groundTarget.chaseDistanceMeters,
     focusLat,
     focusLon,
     focusAlt: Math.round(focusAlt * 10) / 10,
     forwardOffsetMeters: groundTarget.forwardOffsetMeters,
+    altitudeDeltaMeters: groundTarget.altitudeDeltaMeters,
     isThermalStabilized: isThermal,
     isThermalling: isThermal
   };
