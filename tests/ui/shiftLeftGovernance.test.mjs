@@ -289,6 +289,32 @@ describe('Shift-Left Quality Gate & Architectural Governance', () => {
       }
     }
   });
+
+  it('Gate 5 (Cognitive Memory Hygiene): enforces MEMORY.md <= 200 lines and WORKLOG.md <= 300 lines ceilings', () => {
+    const memoryPath = resolve('MEMORY.md');
+    const memorySrc = readFileSync(memoryPath, 'utf-8');
+    const memoryLines = memorySrc.split(/\r?\n/);
+
+    assert.ok(
+      memoryLines.length <= 200,
+      `MEMORY.md exceeds the 200-line ceiling (found ${memoryLines.length} lines). Update domain sections in-place or move static checks to shiftLeftGovernance.test.mjs.`
+    );
+
+    const h2Headers = memoryLines.filter(l => l.startsWith('## '));
+    assert.ok(
+      h2Headers.length <= 8,
+      `MEMORY.md has ${h2Headers.length} top-level sections (max 8 allowed). Do not append numbered task logs to MEMORY.md.`
+    );
+
+    const worklogPath = resolve('WORKLOG.md');
+    const worklogSrc = readFileSync(worklogPath, 'utf-8');
+    const worklogLines = worklogSrc.split(/\r?\n/);
+
+    assert.ok(
+      worklogLines.length <= 300,
+      `WORKLOG.md exceeds the 300-line rolling window ceiling (found ${worklogLines.length} lines). Archive older entries to .agents/archive/.`
+    );
+  });
 });
 
 
