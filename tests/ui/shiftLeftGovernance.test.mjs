@@ -344,6 +344,66 @@ describe('Shift-Left Quality Gate & Architectural Governance', () => {
       'theme.css must define .gm-map-scrubber-spot-pill.status-unflyable for timeline scrubber reason pill'
     );
   });
+
+  it('Gate 5 (Agent Instructions & Skill Governance): enforces valid YAML frontmatter, 80-250 char directive descriptions, and clean rule links', () => {
+    const skillsRoot = resolve('.agents/skills');
+    const skillDirs = readdirSync(skillsRoot, { withFileTypes: true }).filter(d => d.isDirectory());
+
+    for (const dir of skillDirs) {
+      const skillPath = join(skillsRoot, dir.name, 'SKILL.md');
+      const content = readFileSync(skillPath, 'utf-8');
+      const lines = content.split(/\r?\n/);
+
+      assert.ok(
+        lines.length <= 200,
+        `Skill .agents/skills/${dir.name}/SKILL.md exceeds 200-line ceiling (${lines.length} lines)`
+      );
+
+      const fmMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/);
+      assert.ok(fmMatch, `Skill .agents/skills/${dir.name}/SKILL.md is missing valid YAML frontmatter`);
+
+      const fmLines = fmMatch[1].split(/\r?\n/);
+      let descParts = [];
+      let inDesc = false;
+      for (const l of fmLines) {
+        if (l.startsWith('description:')) {
+          const rest = l.slice('description:'.length).trim();
+          if (rest !== '>-' && rest !== '>' && rest !== '|') {
+            const isQuoted = (rest.startsWith('"') && rest.endsWith('"')) || (rest.startsWith("'") && rest.endsWith("'"));
+            assert.ok(
+              isQuoted || !rest.includes(': '),
+              `Skill .agents/skills/${dir.name}/SKILL.md contains unquoted ': ' in inline description`
+            );
+            descParts.push(rest.replace(/^['"]|['"]$/g, ''));
+          }
+          inDesc = true;
+        } else if (inDesc && /^\s+/.test(l)) {
+          descParts.push(l.trim());
+        } else if (/^[a-zA-Z0-9_-]+:/.test(l)) {
+          inDesc = false;
+        }
+      }
+      const desc = descParts.join(' ').trim();
+      assert.ok(
+        desc.length >= 80 && desc.length <= 250,
+        `Skill .agents/skills/${dir.name}/SKILL.md description length (${desc.length}) must be between 80 and 250 chars`
+      );
+      assert.ok(
+        /(Use this skill when|Use this skill to|Utilizza questa skill quando)/i.test(desc),
+        `Skill .agents/skills/${dir.name}/SKILL.md description must include directive trigger ('Use this skill when...' / 'Utilizza questa skill quando...')`
+      );
+    }
+
+    const rulesRoot = resolve('.agents/rules');
+    const ruleFiles = readdirSync(rulesRoot).filter(f => f.endsWith('.md'));
+    for (const rf of ruleFiles) {
+      const ruleSrc = readFileSync(join(rulesRoot, rf), 'utf-8');
+      assert.ok(
+        !ruleSrc.includes('c:/github/antigravity-plugins'),
+        `Rule .agents/rules/${rf} must reference active global plugins in C:/Users/aame/.gemini/config/plugins instead of c:/github/antigravity-plugins`
+      );
+    }
+  });
 });
 
 

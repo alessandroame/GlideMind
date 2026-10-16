@@ -72,6 +72,6 @@ Lo stato applicativo globale deve conformarsi alla seguente nomenclatura e strut
 
 ## 6. Anti-Pattern e Pratiche Vietate
 
-- ❌ **Anti-Pattern "Decollo Orfano"**: mostrare una card o un pin che fa riferimento a un decollo senza che sia visibile a quale atterraggio si fa riferimento.
-- ❌ **Anti-Pattern "Meteo a Quota Piatta"**: calcolare il meteo di un intero comprensorio montano a quota costante; decollo e atterraggio devono campionare i livelli barici o le quote orografiche reali.
-- ❌ **Anti-Pattern "Navigazione Frammentata"**: costringere l'utente a cercare e salvare 3 volte lo stesso monte per avere il decollo Sud, Nord e Ovest.
+- **[VIETATO] Anti-Pattern "Decollo Orfano"**: mostrare una card o un pin che fa riferimento a un decollo senza che sia visibile a quale atterraggio si fa riferimento.
+- **[VIETATO] Anti-Pattern "Meteo a Quota Piatta"**: calcolare il meteo di un intero comprensorio montano a quota costante; decollo e atterraggio devono campionare i livelli barici o le quote orografiche reali.
+- **[VIETATO] Anti-Pattern "Navigazione Frammentata"**: costringere l'utente a cercare e salvare 3 volte lo stesso monte per avere il decollo Sud, Nord e Ovest.

@@ -1,83 +1,54 @@
-# Specifica di Revisione: Prospettiva Pilota Principiante (Novice Pilot Auditor)
+# Specifica di Revisione: Sicurezza Aerodinamica e Prospettiva Pilota Base (Novice Pilot Spec)
 
-Questo documento formalizza i requisiti operativi, i vincoli di sicurezza e la disciplina di invocazione per esaminare GlideMind attraverso gli occhi di un pilota principiante (allievo scuola o neo-brevettato con ala scuola/entry-level EN-A).
-
----
-
-## 1. Principio Fondamentale: Proxy Aerodinamico della Vela (Zero Pilot Level UI)
-
-1. **Divieto di Selettore 'Livello Pilota' nell'Interfaccia**:
-   - L'applicazione non deve includere dropdown o impostazioni arbitrarie per "Livello Pilota" (principiante/intermedio/esperto).
-   - L'autovalutazione del pilota è soggetta a bias (effetto Dunning-Kruger o dimenticanza nel cambio profilo).
-2. **La Vela come Unica Sorgente di Verità Aerodinamica**:
-   - È l'attrezzatura attiva nel profilo/hangar (`activeGlider`), con la sua classe di omologazione (EN-A, EN-B, EN-C, EN-D) e i suoi parametri fisici reali ($v_{\text{trim}}$, $v_{\text{max}}$, allungamento $AR$, efficienza di planata), a determinare deterministicamente l'inviluppo di sicurezza.
-   - Per una vela da scuola/principiante (**EN-A**, con $v_{\text{trim}} \approx 36\text{ km/h}$, $AR \approx 4.8$, efficienza $\approx 7.8$), le formule di calcolo applicano matematicamente la massima protezione conservativa:
-     - Un vento di $20\text{ km/h}$ lascia appena $16\text{ km/h}$ di penetrazione residua: basta una raffica termica o un gradiente per provocare lo stallo o l'arretramento verso il sottovento.
-     - Pertanto, con ala EN-A le condizioni diventano arancioni/rosse a soglie rigorose senza bisogno di configurazioni soggettive.
+Questo documento formalizza i requisiti operativi, i vincoli di sicurezza e la disciplina di invocazione per esaminare GlideMind attraverso la lente di un pilota principiante o in ripresa d'attività (vela entry-level con $V_{\text{trim}} \approx 36\text{ km/h}$, $L/D \approx 7.8$).
 
 ---
 
-## 2. Persona e Modello Mentale del Principiante
+## 1. Principio Fondamentale: Proxy Aerodinamico della Vela & Prudenza Pilota Opt-In
 
-### 2.1 Contesto Operativo e Vulnerabilità Emotiva
+1. **Divieto di Selettore Soggettivo 'Livello Pilota' e Rimozione Badge Burocratici `EN-A..D` in UI**:
+   - L'applicazione non include dropdown soggettivi "principiante/esperto" e **non espone etichette normative `EN-A..D` nella UI o nei debriefing** (`NOTE-004`), poiché oscurano le reali prestazioni fisiche dell'ala.
+   - Tutte le viste e i debriefing espongono direttamente i parametri fisici reali dell'ala attiva (`activeGlider`): velocità di trim $V_{\text{trim}}$, velocità massima $V_{\text{max}}$ ed efficienza di planata $L/D$.
+2. **Invarianza dei Limiti Fisici ($V_{\text{trim}}$) e Fattore Prudenza Pilota (`usePilotCurrencyFactor`)**:
+   - I parametri fisici della vela attiva determinano in modo invariante i limiti aerodinamici di penetrazione (`windRed`, `windNoFly`) e il cono di planata (`safeLimit`). Per un'ala scuola ($V_{\text{trim}} \approx 36\text{ km/h}$), un vento di $20\text{ km/h}$ lascia appena $16\text{ km/h}$ di penetrazione residua.
+   - Il fattore opt-in `calculatePilotSafetyFactor` (`1.0x`, `0.85x`, `0.75x`, calcolato sulla continuità di volo nel Logbook) riduce in modo conservativo solo le soglie di pilotaggio attivo ($\Delta\text{Gust}$, turbolenza EDR, CAPE, vento traverso).
+
+---
+
+## 2. Contesto Operativo del Pilota Base
+
 1. **Sul Decollo**:
-   - Livello di stress e frequenza cardiaca elevati (timore del gonfiaggio asimmetrico, decollo abortito, vento al limite).
-   - Uso con guanti da volo (impossibilità di puntamento fine o pinch-to-zoom).
-   - Luce solare diretta con occhiali da sole (polarizzazione, riverbero, riflesso dello schermo).
-   - Finestra decisionale rapida: la verifica pre-volo richiede risposte binarie in $< 3$ secondi (*Glanceability*).
-2. **In Volo**:
-   - Ansia primaria: perdere l'efficienza necessaria per raggiungere l'atterraggio ufficiale e trovarsi costretto a un fuoricampo tra alberi o linee elettriche.
-   - Paura della turbolenza e dei rotori sottovento non visti.
-3. **A Terra (Pianificazione e Debriefing)**:
-   - Mancanza di background aerologico universitario: acronimi come LCL, CAPE, EDR o Skew-T generano confusione e falsa sicurezza se mal interpretati.
-   - Bisogno di debriefing costruttivo: sapere se ha corso rischi oggettivi (es. quota rispetto al pendio, sottovento) in linguaggio accessibile.
+   - Uso con guanti da volo (touch target rigorosamente $\ge 48 \times 48\text{ px}$) e sotto luce solare diretta (contrasto WCAG AA/AAA, token `--gm-status-unflyable-text`).
+   - Finestra decisionale rapida: il verdetto deve essere leggibile in $< 3\text{ secondi}$ (*Glanceability*).
+2. **In Volo e in Pianificazione**:
+   - Priorità primaria: raggiungere sempre l'atterraggio ufficiale con margine di quota ed evitare rotori sottovento.
+   - Traduzione fenomenologica anti-gergo: vietato esporre acronimi isolati (`CAPE`, `LCL`, `EDR`) senza la traduzione in italiano comprensibile (*Instabilità / Temporali*, *Base Nubi*, *Turbolenza in Termica*, *Gradiente Termico*).
 
 ---
 
-## 3. Matrice delle Soglie di Sicurezza per Vele EN-A / Base
+## 3. Matrice delle Soglie di Sicurezza per Ali Base ($V_{\text{trim}} \approx 36\text{ km/h}$, $L/D \approx 7.8$)
 
-| Parametro Operativo | Soglia Ottimale (🟢 Verde) | Soglia Attenzione (🟡 Giallo) | Soglia Pericolo (🔴 Rosso / NO FLY) |
+| Parametro Operativo | Soglia Ottimale (Verde) | Soglia Attenzione (Giallo) | Soglia Pericolo (Rosso / NO FLY) |
 | :--- | :---: | :---: | :---: |
-| **Vento Base al Decollo** | $5 - 14\text{ km/h}$ | $15 - 18\text{ km/h}$ | $> 18\text{ km/h}$ (oltre il 50% di $v_{\text{trim}}$ EN-A) |
+| **Vento Base al Decollo** | $5 - 14\text{ km/h}$ | $15 - 18\text{ km/h}$ | $> 18\text{ km/h}$ ($> 50\%$ di $V_{\text{trim}}$) |
 | **Raffica Massima (Gust)** | $\le 18\text{ km/h}$ | $19 - 22\text{ km/h}$ | $> 22\text{ km/h}$ |
-| **Delta Raffica ($\Delta$ Gust)** | $\le 5\text{ km/h}$ | $6 - 8\text{ km/h}$ | $> 8\text{ km/h}$ |
+| **Delta Raffica ($\Delta\text{Gust}$)** | $\le 5\text{ km/h}$ | $6 - 8\text{ km/h}$ | $> 8\text{ km/h}$ |
 | **Deviazione Vento / Pendio ($\Delta\theta$)** | $\le \pm 15^\circ$ | $\pm 16^\circ - \pm 25^\circ$ | $> \pm 25^\circ$ (o componente da tergo) |
 | **Gradiente Brezza in Atterraggio** | $< 12\text{ km/h}$ | $13 - 18\text{ km/h}$ | $> 18\text{ km/h}$ |
-| **Cono di Planata verso Landing** | Efficienza richiesta $\le 1:5.0$ | Efficienza $1:5.1 - 1:6.0$ | Efficienza $> 1:6.0$ (o quota residua $< 150\text{m}$ AGL) |
+| **Cono di Planata verso Landing** | Richiesto $\le 1:5.0$ | Richiesto $1:5.1 - 1:6.0$ | Richiesto $> 1:6.0$ (o franco $< 150\text{m}$ AGL) |
 | **Attività Termica (Vario Medio)** | $0.0 - +1.5\text{ m/s}$ | $+1.6 - +2.5\text{ m/s}$ | $> +2.5\text{ m/s}$ o CAPE $> 600\text{ J/kg}$ |
 
 ---
 
-## 4. Matrice di Invocazione della Skill nei "Momenti Opportuni"
+## 4. Checkpoint di Invocazione della Skill `novice-pilot-auditor`
 
-La skill `novice-pilot-auditor` deve essere invocata sistematicamente nei seguenti checkpoint operativi del ciclo di sviluppo:
-
-### Checkpoint 1: Fase Progettuale Preventiva & Rilascio Viste UI (Design Review)
-- **Quando**: In fase progettuale preventiva (PRIMA di scrivere codice, template o mockup) e durante lo sviluppo o modifica di `HomeDashboardView`, `ForecastView`, `SpotMapView`, `LogbookView`.
-- **Cosa verificare**:
-  - **Audit Terminologico & Anti-Gergo Preventivo**: Censimento di tutte le etichette, unità di misura e grandezze meteo. Divieto assoluto di acronimi isolati o grandezze fisiche grezze come etichette primarie (`CAPE`, `LCL`, `EDR`, `J/kg`). Mappatura obbligatoria sull'effetto di sicurezza pratico per il pilota (es. *Rischio Temporali*, *Base Nubi*, *Turbolenza in Termica*).
-  - Regola dei 3 secondi: il verdetto è immediatamente visibile senza scrollare o aprire modal?
-  - Fitts's Law: touch target rigorosamente $\ge 48 \times 48\text{ px}$ per l'uso con guanti da volo.
-  - Zero Icon Clutter e contrasto elevato conforme WCAG AAA.
-
-### Checkpoint 2: Aggiornamento Algoritmi di Volabilità (`flyability.js`, `soundingsMath.js`)
-- **Quando**: Modifiche alle funzioni di scoring, waterfall a cascata, priorità aeronautica o formule di vento.
-- **Cosa verificare**:
-  - La vela attiva EN-A riceve un punteggio restrittivo automatico.
-  - Inseparabilità decollo-atterraggio: nessun semaforo verde se l'atterraggio ha vento forte o brezza a fondo valle incanalata.
-
-### Checkpoint 3: Sintesi e Prompt di Briefing AI (`ai-briefing-gemini`)
-- **Quando**: Modifiche ai prompt per Google Gemini (pre-flight briefing o debriefing IGC).
-- **Cosa verificare**:
-  - Nessun acronimo isolato (LCL $\to$ "Base nubi stimata", CAPE $\to$ "Rischio colpi di vento/temporale", EDR $\to$ "Turbolenza termica").
-  - Raccomandazioni pratiche focalizzate sulla finestra oraria sicura per vele base.
-
-### Checkpoint 4: Analisi Manovre e Debriefing IGC (`flightManeuvers.js`, `LogbookView`)
-- **Quando**: Implementazione di metriche di volo o visualizzazione tracce GPS.
-- **Cosa verificare**:
-  - Evidenziazione didattica di errori tipici (sottovento alla cresta, virate a bassa quota senza margine, ingresso in termiche rotte).
-  - Tono costruttivo ed educativo.
-
-### Checkpoint 5: End-of-Task Sync (Verifica Finale)
-- **Quando**: Prima di marcare come completato (`🟢 Completato`) un task nella matrice [DESIDERATA.md](file:///c:/github/GlideMind/DESIDERATA.md).
-- **Cosa verificare**: L'agente esegue un rapido audit di conformità per garantire zero regressioni ergonomiche o di sicurezza.
+1. **Checkpoint 1 — Design & Viste UI (`HomeDashboardView`, `ForecastView`, `SpotMapView`, `LogbookView`)**:
+   - Verifica anti-gergo preventivo, omissione di badge `EN-A..D` a favore di $V_{\text{trim}}$/$L/D$, regola dei 3 secondi, touch target $\ge 48\text{px}$ e zero icon clutter.
+2. **Checkpoint 2 — Algoritmi di Volabilità (`flyability.js`, `soundingsMath.js`)**:
+   - Verifica scalatura su $V_{\text{trim}}$ dell'ala attiva, applicazione di `pilotSafetyFactor` sulle soglie di pilotaggio attivo e inseparabilità decollo-atterraggio.
+3. **Checkpoint 3 — Prompt di Briefing AI (`ai-briefing-gemini`)**:
+   - Verifica assenza di acronimi isolati e indicazioni focalizzate sulle finestre orarie sicure.
+4. **Checkpoint 4 — Analisi Manovre e Debriefing IGC (`flightManeuvers.js`, `FlightDetailSheet.js`)**:
+   - Verifica feedback aerodinamico costruttivo basato sui parametri fisici dell'ala.
+5. **Checkpoint 5 — End-of-Task Sync (`DESIDERATA.md`)**:
+   - Verifica finale di zero regressioni ergonomiche o di sicurezza prima della chiusura del task.

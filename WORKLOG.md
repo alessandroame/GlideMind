@@ -126,3 +126,12 @@ Giornale a finestra mobile (rolling window, max **300 righe** / **ultimi 15 inte
 - **Sintesi**:
   - Implementato il controller camera V2 (`stepCameraSpringDamper`, `computeCameraGroundTargetForAltitude`) con centratura ottica in quota ($\Delta H \cdot \tan\theta$), stabilizzazione dell'orizzonte in termica ($\tau = 6.5\text{s}$ sul centroide mobile), orbita touch manuale con reset su `Segui` e visuale `Pilota` POV con Look-Into-Turn e occultamento di `PilotPod`/`PilotHead`.
   - Introdotto lo smoothing Gaussiano 1 Hz (`smoothTrackKinematics`), la fisica pendolare centrifuga con frenata del bordo d'uscita (`computePendulumPose`), la livrea racing bicolore (`paraglider.glb`), il nastro spline Catmull-Rom con normali miter (`buildSmoothTrackGeometryData`), la Ghost Track futura (`16%` opacità), la scia aerodinamica e il fix della tendina DEM sotto quota decollo (`_minTrackY`).
+
+---
+
+## 2026-10-16 - Governance & Istruzioni Agente: Compattazione Budget `<user_rules>`, Fix Frontmatter YAML e Allineamento Regole
+- **Tipo**: Governance Agente / Ottimizzazione Token Budget / Shift-Left Gate (`AGENTS.md`, `.agents/rules/*`, `.agents/skills/*`, `shiftLeftGovernance.test.mjs`)
+- **Dettagli**: [.agents/worklog.d/2026-10-16_agent-instructions-governance-audit-and-alignment.md](file:///.agents/worklog.d/2026-10-16_agent-instructions-governance-audit-and-alignment.md)
+- **Sintesi**:
+  - Compattati del 50% i file `rules/AGENTS.md` always-on (`68,9 KB` $\to$ `33,2 KB`) eliminando l'esclusione dal budget inline di `cognitive-persistence` e `laws-of-ux`, e corretti i frontmatter YAML (`>-`, 80–250 char, trigger direttivi) di tutte le skill custom (ripristinando `skill-audit` e `skill-token-optimizer`).
+  - Allineati `AGENTS.md`, `.agents/rules/constraints.md`, `ui_layout_spec.md`, `novice_pilot_spec.md`, `comprensorio_locality_spec.md` e `novice-pilot-auditor/SKILL.md` agli invarianti di `MEMORY.md`, con gate automatico in [`tests/ui/shiftLeftGovernance.test.mjs`](file:///c:/github/GlideMind/tests/ui/shiftLeftGovernance.test.mjs).
