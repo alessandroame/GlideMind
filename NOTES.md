@@ -1,6 +1,8 @@
 # Annotazioni & Pensieri in Corso d'Opera (NOTES)
 
 Buffer di cattura rapida a zero cambio di contesto (`/take-note`). Le osservazioni qui raccolte non sono ancora state analizzate sul codice: utilizza `/review-notes` a lavorazione conclusa per mostrarle, eseguire il task di analisi approfondita e promuoverle in `DESIDERATA.md`.
+> **Governance anti-bloat**: tetto massimo **120 righe**. La sezione *Analizzate & Consolidate* mantiene al massimo le **ultime 10 note chiuse** in formato tabellare a 1 riga (storico in `.agents/archive/NOTES_archive.md`).
+> **Ultimo ID Assegnato**: NOTE-005
 
 ---
 
@@ -32,15 +34,9 @@ Buffer di cattura rapida a zero cambio di contesto (`/take-note`). Le osservazio
 
 ---
 
-## ✅ Analizzate & Consolidate (Resolved)
+## ✅ Analizzate & Consolidate (Ultime 10 Risolte)
 
-### [NOTE-001] Espansione volabilità comprensorio con pills dei fattori determinanti
-- **Stato**: `✅ Consolidata & Implementata`
-- **Data Cattura**: 2026-10-15 19:44
-- **Risoluzione**: Implementato in [`HomeDashboardView.js`](file:///c:/github/GlideMind/ui/views/HomeDashboardView.js) (`buildDeterminantReasonPills`, `data-action="toggle-spot-reasons"`, `.gm-spot-reasons-drawer` e `.gm-reason-pill`): rimossa la micro-causa troncata dall'header e introdotta l'espansione a 1-tap sul badge di stato che rivela i pills espressivi dei fattori determinanti (finestra volabile, pioggia, vento/raffiche, direzione/esposizione, turbolenza/CAPE, cono di rientro, margine pilota).
-
-### [NOTE-002] Selezione rapida decollo/atterraggio e combo per spot multipli in Previsioni
-- **Stato**: `✅ Consolidata & Implementata`
-- **Data Cattura**: 2026-10-15 19:44
-- **Risoluzione**: Implementato in [`ForecastView.js`](file:///c:/github/GlideMind/ui/views/ForecastView.js) (`renderQuickSubSpotSwitcher`, `renderInlineSubSpotControl`, `handleChange` con `change-active-takeoff` / `change-active-landing`) e [`css/theme.css`](file:///c:/github/GlideMind/css/theme.css) (`.gm-quick-subspot-switcher`, `.gm-quick-subspot-pill`, `.gm-inline-subspot-select`): introdotto il selettore rapido a 1-tap (`Panoramica | Decollo | Atterraggio`) nella card di sintesi/dettaglio spot e la combo inline `<select>` condizionale al posto del nome statico quando il comprensorio dispone di più decolli (`takeoffs.length > 1`) o più atterraggi (`landings.length > 1`), preservando il binomio selezionato nel passaggio tra viste.
-
+| ID | Titolo Sintetico | Data | Esito & Destinazione ($\le 120\text{ char}$) |
+| :--- | :--- | :---: | :--- |
+| `NOTE-002` | Switcher rapido decollo/atterraggio e combo sub-spot | 2026-10-15 | Implementata in [`ForecastView.js`](file:///c:/github/GlideMind/ui/views/ForecastView.js) (`renderQuickSubSpotSwitcher`, `<select>` inline) |
+| `NOTE-001` | Pills espandibili dei fattori determinanti volabilità | 2026-10-15 | Implementata in [`HomeDashboardView.js`](file:///c:/github/GlideMind/ui/views/HomeDashboardView.js) (`buildDeterminantReasonPills`, 1-tap drawer) |
