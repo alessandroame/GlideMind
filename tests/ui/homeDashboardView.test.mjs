@@ -695,10 +695,11 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     assert.equal(updatedState.activeGlider.vTrim, 38);
     assert.equal(updatedState.activeGlider.glideRatio, 8.8);
 
-    // Dashboard UI must now display the exact brand and model in the pill
+    // Dashboard UI must now display the exact brand and model in the pill without certification badge (NOTE-004)
     const html = controller.renderHtml();
     assert.ok(html.includes('Ozone Buzz Z7'), 'Must display Ozone Buzz Z7 in glider pill');
-    assert.ok(html.includes('EN-B'), 'Must display EN-B badge in glider pill');
+    assert.ok(html.includes('VTrim: 38 km/h'), 'Must include physical aerodynamic specs in tooltip');
+    assert.ok(!html.includes('gm-glider-pill-badge'), 'Must not display certification class badge in Home glider pill');
   });
 
   it('should support custom glider creation and automated aerodynamic deduction', () => {

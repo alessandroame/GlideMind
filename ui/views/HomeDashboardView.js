@@ -180,6 +180,8 @@ export class HomeDashboardViewController {
 
   /**
    * Renders the discrete network status badge for Home Dashboard.
+   * Per NOTE-003, the green "Live" pill only makes sense on an active spot,
+   * so in Home Dashboard it remains hidden when live and only surfaces loading/offline states.
    * @returns {string}
    */
   renderLiveWeatherBadge() {
@@ -192,12 +194,7 @@ export class HomeDashboardViewController {
       `;
     }
     if (this.networkStatus === 'live') {
-      return `
-        <span id="gm-home-live-badge" class="gm-live-badge live" title="Previsioni reali Open-Meteo attive">
-          <span class="gm-live-badge-dot" aria-hidden="true"></span>
-          <span>Live</span>
-        </span>
-      `;
+      return `<span id="gm-home-live-badge" class="gm-live-badge hidden" aria-hidden="true"></span>`;
     }
     return `
       <span id="gm-home-live-badge" class="gm-live-badge offline" title="Dati meteorologici simulati o offline">
@@ -888,12 +885,9 @@ export class HomeDashboardViewController {
                 id="btn-home-select-glider"
                 class="gm-glider-pill gm-glider-pill-compact" 
                 data-action="open-glider-sheet" 
-                aria-label="Cambia classe vela attiva, attualmente ${escapeHtml(activeGlider.name || activeGlider.category)}${usePilotFactor ? ` (${safetyFactor.shortLabel})` : ''}"
-                title="Vela attiva: ${escapeHtml(activeGlider.name || activeGlider.category)}${usePilotFactor ? ` • Prudenza adattata (${safetyFactor.shortLabel})` : ''}"
+                aria-label="Cambia vela attiva, attualmente ${escapeHtml(activeGlider.name || 'Standard')}${usePilotFactor ? ` (${safetyFactor.shortLabel})` : ''}"
+                title="Vela attiva: ${escapeHtml(activeGlider.name || 'Standard')} (VTrim: ${activeGlider.vTrim || 37} km/h · Efficienza: 1:${activeGlider.glideRatio || 8.2})${usePilotFactor ? ` • Prudenza adattata (${safetyFactor.shortLabel})` : ''}"
               >
-                <span class="gm-glider-pill-badge ${escapeHtml(activeGlider.category ? activeGlider.category.toLowerCase() : 'en-a')}">
-                  ${escapeHtml(activeGlider.category || 'EN-A')}
-                </span>
                 <span class="gm-glider-pill-name">
                   ${escapeHtml(activeGlider.name || 'Standard')}
                 </span>
@@ -1487,11 +1481,8 @@ export class HomeDashboardViewController {
             id="btn-home-select-glider"
             class="gm-glider-pill" 
             data-action="open-glider-sheet" 
-            aria-label="Cambia classe vela attiva, attualmente ${escapeHtml(activeGlider.name || activeGlider.category)}"
+            aria-label="Cambia vela attiva, attualmente ${escapeHtml(activeGlider.name || 'Standard')}"
           >
-            <span class="gm-glider-pill-badge ${escapeHtml(activeGlider.category ? activeGlider.category.toLowerCase() : 'en-a')}">
-              ${escapeHtml(activeGlider.category || 'EN-A')}
-            </span>
             <span class="gm-glider-pill-name">
               ${escapeHtml(activeGlider.name || 'Standard')}
             </span>
@@ -1787,7 +1778,6 @@ export class HomeDashboardViewController {
         >
           <div class="flex items-center justify-between w-full">
             <div class="flex items-center gap-3">
-              <span class="gm-glider-badge ${catClass}">${escapeHtml(glider.category)}</span>
               <div class="flex flex-col text-left">
                 <span class="font-bold text-sm text-[var(--gm-text-primary)]">${escapeHtml(glider.brand)} ${escapeHtml(glider.model)}</span>
                 <span class="text-xs text-[var(--gm-text-muted)]">Trim: ${glider.vTrim} km/h • Max: ${glider.vMax} km/h • Efficienza: 1:${glider.glideRatio} • AR: ${glider.ar}</span>

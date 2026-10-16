@@ -11027,4 +11027,59 @@ input.gm-input:focus {
 .border-\[var\(--gm-status-unflyable\)\] { border-color: var(--gm-status-unflyable); }
 .border-\[rgba\(245\,158\,11\,0\.35\)\] { border-color: rgba(245, 158, 11, 0.35); }
 
+/* ==========================================================================
+   Logbook Expandable Topic Filters (NOTE-005)
+   ========================================================================== */
 
+.gm-filter-group-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.gm-filter-group-pill.expanded {
+  border-color: var(--gm-accent);
+  color: var(--gm-accent);
+}
+
+.gm-filter-pill-caret {
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.gm-filter-group-drawers-wrap {
+  width: 100%;
+}
+
+.gm-filter-group-drawer {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: var(--gm-radius-md, 8px);
+  background-color: var(--gm-bg-elevated);
+  border: 1px solid var(--gm-border);
+}
+
+.gm-filter-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.gm-filter-drawer-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--gm-text-muted);
+}
+
+.gm-filter-drawer-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.gm-filter-option-chip {
+  min-height: 40px;
+}

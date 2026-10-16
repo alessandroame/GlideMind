@@ -477,10 +477,10 @@ export class SettingsViewController {
           <div class="flex items-center justify-between">
             <div>
               <div class="font-bold text-sm text-[var(--gm-text-primary)]">
-                ${escapeHtml(glider?.name || 'Vela Predefinita (EN-A)')}
+                ${escapeHtml(glider?.name || 'Vela Predefinita')}
               </div>
               <div class="text-xs text-[var(--gm-text-secondary)] font-mono">
-                Categoria: ${escapeHtml(glider?.category || 'EN-A')} · VTrim: ${escapeHtml(formatWindSpeed(glider?.vTrim || 38, units.speed))} · Efficienza: ${escapeHtml(glider?.glideRatio || 8.2)}
+                VTrim: ${escapeHtml(formatWindSpeed(glider?.vTrim || 38, units.speed))} · VMax: ${escapeHtml(formatWindSpeed(glider?.vMax || 50, units.speed))} · Efficienza: 1:${escapeHtml(glider?.glideRatio || 8.2)}
               </div>
             </div>
             <button

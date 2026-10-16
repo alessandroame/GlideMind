@@ -772,13 +772,8 @@ export function generateEducationalDebriefing(bundle) {
     }
   }
 
-  // 3. Glider class conservative check
-  const gliderClass = meta.gliderClass || 'Custom';
-  if (gliderClass === 'EN-A') {
-    lines.push('Assetto vela scuola/intermedia (EN-A): ottimo margine passivo di stabilità. Mantieni sempre il cono di planata verso l\'atterraggio con almeno 150m di quota residua.');
-  } else if (gliderClass === 'EN-B') {
-    lines.push('Assetto EN-B: gestione dinamica attiva dell\'ala. Monitora la velocità di discesa nelle transizioni in turbolenza.');
-  }
+  // 3. Aerodynamic glide & safety altitude check (independent of certification class)
+  lines.push('Margine aerodinamico di sicurezza: mantieni sempre il cono di planata verso l\'atterraggio ufficiale con almeno 150m di quota residua sopra l\'ingresso circuito, adattando la velocità alla penetrazione richiesta.');
 
   // 4. Maneuvers & sink control
   if (maneuvers.length > 0) {
@@ -978,11 +973,6 @@ export function renderFlightDetailHtml(bundle, options = {}) {
                   <span class="text-xs font-medium text-[var(--gm-text-secondary)]">${escapeHtml(glider)}</span>
                 </div>
               </div>
-            </div>
-            <div class="flex items-center gap-2 flex-shrink-0">
-              <span class="gm-glider-pill-badge ${classBadgeStyle}">
-                ${escapeHtml(gliderClass)}
-              </span>
             </div>
           </div>
         </div>

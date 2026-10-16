@@ -59,6 +59,7 @@ import {
 } from '../../core/datePresets.js';
 import { calculateFlightWindows } from '../../core/flightWindows.js';
 import { calculatePilotSafetyFactor, DEFAULT_SEED_FLIGHTS } from '../../core/logbook.js';
+import { formatWindSpeed, formatAltitude } from '../../core/units.js';
 
 /**
  * Normalizes an angle to [0, 360) range.
@@ -296,14 +297,16 @@ export function generateFlightBriefing(spot, weatherData, dateStr, glider = DEFA
     hazards.push('Gradiente anemometrico regolare, assenza di rotori sinottici o raffiche pericolose.');
   }
 
-  // 3. Recommended flight envelope based on glider class
+  // 3. Recommended flight envelope based on physical aerodynamic parameters
+  const vTrimVal = Math.round(glider?.vTrim || 37);
+  const glideVal = glider?.glideRatio || 8.5;
   let pilotLevel = '';
   if (flyableSlots.length >= 3 && maxGust <= 18 && maxCape < 500 && !hasRain) {
-    pilotLevel = 'Condizioni ideali per vele ricreative EN-A / EN-B. Finestra termica dolce idonea a voli didattici di ambientamento.';
+    pilotLevel = `Condizioni regolari con ottimo margine di penetrazione (VTrim ${vTrimVal} km/h, efficienza 1:${glideVal}). Finestra termica dolce idonea anche a voli didattici e di ambientamento.`;
   } else if (flyableSlots.length > 0 && maxWind <= 22 && maxGust <= 28) {
-    pilotLevel = 'Condizioni termiche vive per vele intermedie ed avanzate (EN-B / EN-C). Richiesta gestione attiva della turbolenza.';
+    pilotLevel = `Condizioni termiche vive: richiesta gestione attiva del beccheggio e verifica continua dell'avanzamento controvento (VTrim ${vTrimVal} km/h).`;
   } else {
-    pilotLevel = 'Condizioni severe o margine di planata insufficiente per vele EN-A. Decollo sconsigliato per attività ricreativa.';
+    pilotLevel = `Condizioni severe o margine di penetrazione e planata ridotto rispetto all'inviluppo impostato (VTrim ${vTrimVal} km/h). Decollo sconsigliato.`;
   }
 
   const hazardsFormatted = hazards.map(h => `• ${h}`).join('\n');
@@ -523,7 +526,9 @@ export class ForecastViewController {
   }
 
   /**
-   * Renders the discrete network status badge (Live, Loading, Offline/Synthetic).
+   * Renders the discrete network status badge only for non-nominal states (Loading, Rate-Limit, Offline).
+   * When live (nominal online state), returns a hidden placeholder so zero misleading "Live" station
+   * badge is shown in the UI (NOTE-003).
    * @param {string} [suffix=''] Optional ID suffix for duplicate badge instances (e.g. 'sticky')
    * @returns {string}
    */
@@ -546,12 +551,7 @@ export class ForecastViewController {
       `;
     }
     if (this.networkStatus === 'live') {
-      return `
-        <span id="${badgeId}" class="gm-live-badge live" title="Previsioni reali Open-Meteo attive">
-          <span class="gm-live-badge-dot" aria-hidden="true"></span>
-          <span>Live</span>
-        </span>
-      `;
+      return `<span id="${badgeId}" class="gm-live-badge live hidden" aria-hidden="true"></span>`;
     }
     return `
       <span id="${badgeId}" class="gm-live-badge offline" title="Dati meteorologici simulati o offline">
@@ -5343,7 +5343,7 @@ export class ForecastViewController {
           this.activeLandingId = subSpotId;
           if (this.store) this.store.setState({ activeLandingId: subSpotId });
         }
-        if (subSpotId === 'overview') {
+        if (subSpotId === 'overview' || subSpotId === 'live') {
           if (!this.activeTakeoffId || !spot.takeoffs?.some(t => t.id === this.activeTakeoffId)) {
             this.activeTakeoffId = spot.takeoffs?.find(t => t.isPrimary)?.id || spot.takeoffs?.[0]?.id || null;
           }

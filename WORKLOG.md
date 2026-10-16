@@ -100,3 +100,11 @@ Giornale a finestra mobile (rolling window, max **300 righe** / **ultimi 15 inte
   - Risolto in [`ui/views/ForecastView.js`](file:///ui/views/ForecastView.js) il disallineamento per cui la `Timeline Volabilità` restava bloccata sul meteo sintetico iniziale (`compositeKey` non aggiornata al termine di `fetchWeatherDataAsync`) mentre il pallino data e il verdetto leggevano il meteo reale, ed eliminata l'iniezione di `landingWeather` sintetico (`26 km/h` raffiche) dentro payload Open-Meteo reali.
   - Allineato [`ui/views/HomeDashboardView.js`](file:///ui/views/HomeDashboardView.js) (`windspeed_10m ?? wind_speed_10m`, `takeoffId: activeTakeoffId`, popolamento cache multi-day e fallback `getCachedWeatherData`) e [`core/openMeteoApi.js`](file:///core/openMeteoApi.js) (`forecastDays` in ora locale con popolamento multi-data).
 
+---
+
+## 2026-10-16 - Fase 3, 4 & 6: Vista Dati in Tempo Reale sullo Spot, Rimozione Badge Classe EN e Filtri Logbook a Pills Espandibili (`[NOTE-003..005]`)
+- **Tipo**: Refactoring UX / Semantica Dominio / Flight Logbook (`ForecastView.js`, `HomeDashboardView.js`, `LogbookView.js`, `FlightDetailSheet.js`)
+- **Dettagli**: [.agents/worklog.d/2026-10-16_review-notes-live-spot-glider-and-logbook-filters.md](file:///.agents/worklog.d/2026-10-16_review-notes-live-spot-glider-and-logbook-filters.md)
+- **Sintesi**:
+  - Oscurata la pill verde `Live` in Home (`NOTE-003`) e introdotta in [`ui/views/ForecastView.js`](file:///ui/views/ForecastView.js) la vista esplicita `#gm-spot-live-page` (`renderSpotLiveRealtimeCard`) attivabile dalla pill `● Live` sullo spot o dallo switcher `Panoramica | Decollo | Atterraggio | Live`.
+  - Rimossi i badge di omologazione `EN-A..D` usati come indicatori di performance (`NOTE-004`) e sostituiti i filtri statici di [`ui/views/LogbookView.js`](file:///ui/views/LogbookView.js) con 5 pills espandibili a menu (`Vela`, `Anno`, `Caratteristiche`, `Tempo`, `Distanza` — `NOTE-005`).

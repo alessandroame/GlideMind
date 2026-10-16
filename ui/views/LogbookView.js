@@ -79,9 +79,17 @@ export class LogbookViewController {
     this.statsMetric = 'hours'; // 'hours' | 'flights'
     this.pilotPeriod = this.store.getState().pilotPeriod || 'month'; // 'month' | 'year'
 
-    // Search and filter state
+    // Search and expandable topic filter state (NOTE-004 & NOTE-005)
     this.searchQuery = '';
-    this.activeFilter = 'all'; // 'all' | 'EN-A' | 'EN-B' | 'year-current'
+    this.activeFilter = 'all';
+    this.filterGroups = {
+      glider: 'all',
+      year: 'all',
+      feature: 'all',
+      duration: 'all',
+      distance: 'all'
+    };
+    this.expandedFilterGroup = null;
 
     // Storage persistence state
     this.isStoragePersisted = true;
@@ -194,9 +202,9 @@ export class LogbookViewController {
     let card = this.containerEl.querySelector(`[data-flight-id="${flightId}"]`);
 
     // If filtered out, reset search and category filter to reveal card
-    if (!card && (this.searchQuery || this.activeFilter !== 'all')) {
+    if (!card && (this.searchQuery || this.hasActiveGroupFilters())) {
       this.searchQuery = '';
-      this.activeFilter = 'all';
+      this.resetAllFilters();
       this.render();
       card = this.containerEl.querySelector(`[data-flight-id="${flightId}"]`);
     }
@@ -339,6 +347,112 @@ export class LogbookViewController {
   /**
    * Renders the pure flights history feed tab.
    * @param {Array<Object>} flights
+   * Checks whether any topic filter or legacy filter is currently active.
+   * @returns {boolean}
+   */
+  hasActiveGroupFilters() {
+    if (this.activeFilter && this.activeFilter !== 'all') return true;
+    const fg = this.filterGroups || {};
+    return Object.values(fg).some((v) => v && v !== 'all');
+  }
+
+  /**
+   * Resets all topic filters and legacy filter state.
+   */
+  resetAllFilters() {
+    this.activeFilter = 'all';
+    this.filterGroups = {
+      glider: 'all',
+      year: 'all',
+      feature: 'all',
+      duration: 'all',
+      distance: 'all'
+    };
+    this.expandedFilterGroup = null;
+  }
+
+  /**
+   * Extracts dynamic and static options for each expandable filter topic group.
+   * @param {Array<Object>} flights
+   * @returns {Object}
+   */
+  extractFilterGroupOptions(flights = []) {
+    // 1. Gliders flown by the pilot
+    const gliderCounts = new Map();
+    for (const f of flights) {
+      const g = (f.glider || '').trim();
+      if (g) {
+        gliderCounts.set(g, (gliderCounts.get(g) || 0) + 1);
+      }
+    }
+    const gliderOptions = [
+      { value: 'all', label: 'Tutte le vele' },
+      ...Array.from(gliderCounts.entries()).map(([name, count]) => ({
+        value: name,
+        label: `${name} (${count})`,
+        shortLabel: name
+      }))
+    ];
+
+    // 2. Years extracted from flight dates
+    const yearCounts = new Map();
+    for (const f of flights) {
+      const m = String(f.date || '').match(/^(\d{4})/);
+      if (m) {
+        const y = m[1];
+        yearCounts.set(y, (yearCounts.get(y) || 0) + 1);
+      }
+    }
+    const sortedYears = Array.from(yearCounts.entries()).sort((a, b) => b[0].localeCompare(a[0]));
+    const yearOptions = [
+      { value: 'all', label: 'Tutti gli anni' },
+      { value: 'year-current', label: "Quest'anno", shortLabel: "Quest'anno" },
+      ...sortedYears.map(([year, count]) => ({
+        value: year,
+        label: `${year} (${count})`,
+        shortLabel: year
+      }))
+    ];
+
+    // 3. Flight features (track, thermal, maneuvers)
+    const featureOptions = [
+      { value: 'all', label: 'Tutte le caratteristiche' },
+      { value: 'with-track', label: 'Con traccia', shortLabel: 'Con traccia' },
+      { value: 'no-track', label: 'Senza traccia', shortLabel: 'Senza traccia' },
+      { value: 'thermal', label: 'Volo in termica', shortLabel: 'In termica' },
+      { value: 'exercises', label: 'Con manovre / esercizi', shortLabel: 'Con manovre' }
+    ];
+
+    // 4. Duration brackets
+    const durationOptions = [
+      { value: 'all', label: 'Qualsiasi durata' },
+      { value: 'under-30', label: '< 30 min', shortLabel: '< 30 min' },
+      { value: '30-60', label: '30–60 min', shortLabel: '30–60 min' },
+      { value: 'over-60', label: '> 60 min', shortLabel: '> 60 min' },
+      { value: 'over-120', label: '> 2 ore', shortLabel: '> 2 ore' }
+    ];
+
+    // 5. Distance brackets
+    const distanceOptions = [
+      { value: 'all', label: 'Qualsiasi distanza' },
+      { value: 'under-5', label: '< 5 km', shortLabel: '< 5 km' },
+      { value: '5-15', label: '5–15 km', shortLabel: '5–15 km' },
+      { value: 'over-15', label: '> 15 km', shortLabel: '> 15 km' },
+      { value: 'over-30', label: '> 30 km', shortLabel: '> 30 km' }
+    ];
+
+    return {
+      glider: { title: 'Vela', options: gliderOptions },
+      year: { title: 'Anno', options: yearOptions },
+      feature: { title: 'Caratteristiche', options: featureOptions },
+      duration: { title: 'Tempo', options: durationOptions },
+      distance: { title: 'Distanza', options: distanceOptions }
+    };
+  }
+
+  /**
+   * Renders the pure flights history feed tab with expandable topic filter pills (NOTE-005).
+   * @param {Array<Object>} flights
    * @returns {string}
    */
   renderFlightsTab(flights) {
@@ -347,10 +461,79 @@ export class LogbookViewController {
     }
 
     const filteredFlights = this.filterFlights(flights);
+    const groupDefs = this.extractFilterGroupOptions(flights);
+    const isAllActive = !this.hasActiveGroupFilters();
+
+    const topicKeys = ['glider', 'year', 'feature', 'duration', 'distance'];
+    const topicPillsHtml = topicKeys.map((groupKey) => {
+      const def = groupDefs[groupKey];
+      const currentVal = this.getEffectiveGroupValue(groupKey);
+      const isActive = currentVal !== 'all';
+      const isExpanded = this.expandedFilterGroup === groupKey;
+      const selectedOpt = def.options.find((o) => o.value === currentVal);
+      const pillLabel = isActive && selectedOpt
+        ? `${def.title}: ${selectedOpt.shortLabel || selectedOpt.label}`
+        : def.title;
+
+      return `
+        <button
+          type="button"
+          class="gm-filter-chip gm-filter-group-pill ${isActive ? 'active' : ''} ${isExpanded ? 'expanded' : ''}"
+          data-action="toggle-filter-group"
+          data-group="${groupKey}"
+          aria-expanded="${isExpanded ? 'true' : 'false'}"
+          aria-haspopup="menu"
+        >
+          <span>${escapeHtml(pillLabel)}</span>
+          <span class="gm-filter-pill-caret" aria-hidden="true">${isExpanded ? '▴' : '▾'}</span>
+        </button>
+      `;
+    }).join('');
+
+    const drawersHtml = topicKeys.map((groupKey) => {
+      const def = groupDefs[groupKey];
+      const currentVal = this.getEffectiveGroupValue(groupKey);
+      const isExpanded = this.expandedFilterGroup === groupKey;
+
+      const optionsHtml = def.options.map((opt) => {
+        const isSelected = currentVal === opt.value;
+        return `
+          <button
+            type="button"
+            role="menuitemradio"
+            aria-checked="${isSelected ? 'true' : 'false'}"
+            class="gm-filter-chip gm-filter-option-chip ${isSelected ? 'active' : ''}"
+            data-action="select-filter-option"
+            data-group="${groupKey}"
+            data-value="${escapeHtml(opt.value)}"
+            data-filter="${escapeHtml(opt.value)}"
+          >
+            ${escapeHtml(opt.label)}
+          </button>
+        `;
+      }).join('');
+
+      return `
+        <div
+          class="gm-filter-group-drawer ${isExpanded ? '' : 'hidden'}"
+          data-drawer-group="${groupKey}"
+          role="menu"
+          aria-label="Opzioni filtro ${escapeHtml(def.title)}"
+          aria-hidden="${isExpanded ? 'false' : 'true'}"
+        >
+          <div class="gm-filter-drawer-header">
+            <span class="gm-filter-drawer-title">Filtra per ${escapeHtml(def.title)}</span>
+          </div>
+          <div class="gm-filter-drawer-options">
+            ${optionsHtml}
+          </div>
+        </div>
+      `;
+    }).join('');
 
     return `
       <div class="gm-flights-tab-content flex flex-col gap-3">
-        <!-- Search and Quick Filter Chips -->
+        <!-- Search and Expandable Topic Filter Pills -->
         <div class="gm-logbook-search-wrap">
           <div class="gm-search-input-box">
             <svg class="gm-search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -370,56 +553,22 @@ export class LogbookViewController {
             ` : ''}
           </div>
 
-          <!-- Single-row horizontal filter chips (touch-action: pan-x) -->
-          <div class="gm-logbook-filters-carousel" role="toolbar" aria-label="Filtri rapidi">
+          <!-- Single-row horizontal expandable topic filter pills (touch-action: pan-x) -->
+          <div class="gm-logbook-filters-carousel" role="toolbar" aria-label="Filtri per argomento">
             <button
               type="button"
-              class="gm-filter-chip ${this.activeFilter === 'all' ? 'active' : ''}"
-              data-action="filter-flights"
+              class="gm-filter-chip ${isAllActive ? 'active' : ''}"
+              data-action="reset-filters"
               data-filter="all"
             >
               Tutti
             </button>
-            <button
-              type="button"
-              class="gm-filter-chip ${this.activeFilter === 'with-track' ? 'active' : ''}"
-              data-action="filter-flights"
-              data-filter="with-track"
-            >
-              Con traccia
-            </button>
-            <button
-              type="button"
-              class="gm-filter-chip ${this.activeFilter === 'no-track' ? 'active' : ''}"
-              data-action="filter-flights"
-              data-filter="no-track"
-            >
-              Senza traccia
-            </button>
-            <button
-              type="button"
-              class="gm-filter-chip ${this.activeFilter === 'EN-A' ? 'active' : ''}"
-              data-action="filter-flights"
-              data-filter="EN-A"
-            >
-              EN-A
-            </button>
-            <button
-              type="button"
-              class="gm-filter-chip ${this.activeFilter === 'EN-B' ? 'active' : ''}"
-              data-action="filter-flights"
-              data-filter="EN-B"
-            >
-              EN-B
-            </button>
-            <button
-              type="button"
-              class="gm-filter-chip ${this.activeFilter === 'year-current' ? 'active' : ''}"
-              data-action="filter-flights"
-              data-filter="year-current"
-            >
-              Quest'anno
-            </button>
+            ${topicPillsHtml}
+          </div>
+
+          <!-- Expandable Sub-Menu Drawers (outside horizontal scroll container to prevent clipping) -->
+          <div class="gm-filter-group-drawers-wrap">
+            ${drawersHtml}
           </div>
         </div>
 
@@ -432,26 +581,102 @@ export class LogbookViewController {
   }
 
   /**
-   * Filters flights based on search query and active category chip.
+   * Resolves the effective filter value for a given group, honoring legacy this.activeFilter synchronization.
+   * @param {string} groupKey
+   * @returns {string}
+   */
+  getEffectiveGroupValue(groupKey) {
+    const fg = this.filterGroups || {};
+    if (fg[groupKey] && fg[groupKey] !== 'all') {
+      return fg[groupKey];
+    }
+    if (groupKey === 'feature' && (this.activeFilter === 'with-track' || this.activeFilter === 'no-track' || this.activeFilter === 'thermal' || this.activeFilter === 'exercises')) {
+      return this.activeFilter;
+    }
+    if (groupKey === 'year' && (this.activeFilter === 'year-current' || /^\d{4}$/.test(this.activeFilter || ''))) {
+      return this.activeFilter;
+    }
+    return 'all';
+  }
+
+  /**
+   * Filters flights based on search query and active topic filter groups (Vela, Anno, Caratteristiche, Tempo, Distanza).
    * @param {Array<Object>} flights
    * @returns {Array<Object>}
    */
   filterFlights(flights) {
     let result = flights;
 
-    if (this.activeFilter === 'with-track') {
-      result = result.filter((f) => hasAttachedTrack(f));
-    } else if (this.activeFilter === 'no-track') {
-      result = result.filter((f) => !hasAttachedTrack(f));
-    } else if (this.activeFilter === 'EN-A') {
-      result = result.filter((f) => (f.gliderClass || '').toUpperCase() === 'EN-A');
-    } else if (this.activeFilter === 'EN-B') {
-      result = result.filter((f) => (f.gliderClass || '').toUpperCase() === 'EN-B');
-    } else if (this.activeFilter === 'year-current') {
-      const currentYear = new Date().getFullYear().toString();
-      result = result.filter((f) => (f.date || '').startsWith(currentYear));
+    const gliderVal = this.getEffectiveGroupValue('glider');
+    const yearVal = this.getEffectiveGroupValue('year');
+    const featureVal = this.getEffectiveGroupValue('feature');
+    const durationVal = this.getEffectiveGroupValue('duration');
+    const distanceVal = this.getEffectiveGroupValue('distance');
+
+    // 1. Glider filter (by actual wing model flown, NOT certification class)
+    if (gliderVal !== 'all') {
+      const targetGlider = gliderVal.toLowerCase();
+      result = result.filter((f) => (f.glider || '').trim().toLowerCase() === targetGlider);
     }
 
+    // 2. Year filter
+    if (yearVal !== 'all') {
+      const targetYear = yearVal === 'year-current'
+        ? new Date().getFullYear().toString()
+        : yearVal;
+      result = result.filter((f) => String(f.date || '').startsWith(targetYear));
+    }
+
+    // 3. Feature filter (track, thermal, maneuvers)
+    if (featureVal === 'with-track') {
+      result = result.filter((f) => hasAttachedTrack(f));
+    } else if (featureVal === 'no-track') {
+      result = result.filter((f) => !hasAttachedTrack(f));
+    } else if (featureVal === 'thermal') {
+      result = result.filter((f) => Boolean(
+        f.hasThermals ||
+        (Number(f.thermalsCount) > 0) ||
+        (Array.isArray(f.telemetry?.thermals) && f.telemetry.thermals.length > 0) ||
+        (Number(f.maxGainMeters) >= 50) ||
+        (Number(f.maxClimbRate) >= 1.0)
+      ));
+    } else if (featureVal === 'exercises') {
+      result = result.filter((f) => Boolean(
+        f.hasExercises ||
+        (Number(f.maneuversCount) > 0) ||
+        (Array.isArray(f.telemetry?.maneuvers) && f.telemetry.maneuvers.length > 0)
+      ));
+    }
+
+    // 4. Duration filter
+    if (durationVal === 'under-30') {
+      result = result.filter((f) => (Number(f.durationMinutes) || 0) < 30);
+    } else if (durationVal === '30-60') {
+      result = result.filter((f) => {
+        const d = Number(f.durationMinutes) || 0;
+        return d >= 30 && d <= 60;
+      });
+    } else if (durationVal === 'over-60') {
+      result = result.filter((f) => (Number(f.durationMinutes) || 0) > 60);
+    } else if (durationVal === 'over-120') {
+      result = result.filter((f) => (Number(f.durationMinutes) || 0) >= 120);
+    }
+
+    // 5. Distance filter
+    if (distanceVal === 'under-5') {
+      result = result.filter((f) => (Number(f.distanceKm) || 0) < 5);
+    } else if (distanceVal === '5-15') {
+      result = result.filter((f) => {
+        const km = Number(f.distanceKm) || 0;
+        return km >= 5 && km <= 15;
+      });
+    } else if (distanceVal === 'over-15') {
+      result = result.filter((f) => (Number(f.distanceKm) || 0) > 15);
+    } else if (distanceVal === 'over-30') {
+      result = result.filter((f) => (Number(f.distanceKm) || 0) >= 30);
+    }
+
+    // 6. Free-text search query
     if (this.searchQuery && this.searchQuery.trim()) {
       const q = this.searchQuery.trim().toLowerCase();
       result = result.filter((f) => {
@@ -750,18 +975,52 @@ export class LogbookViewController {
         }
         break;
       }
-      case 'filter-flights': {
-        const filter = actionBtn.getAttribute('data-filter');
-        if (filter) {
-          this.activeFilter = filter;
+      case 'toggle-filter-group': {
+        const groupKey = actionBtn.getAttribute('data-group');
+        if (groupKey) {
+          this.expandedFilterGroup = this.expandedFilterGroup === groupKey ? null : groupKey;
           this.render();
         }
         break;
       }
-      case 'clear-search':
+      case 'select-filter-option': {
+        const groupKey = actionBtn.getAttribute('data-group');
+        const val = actionBtn.getAttribute('data-value') || 'all';
+        if (groupKey && this.filterGroups) {
+          this.filterGroups[groupKey] = val;
+          if (groupKey === 'feature' || groupKey === 'year') {
+            this.activeFilter = val;
+          }
+          this.expandedFilterGroup = null;
+          this.render();
+        }
+        break;
+      }
+      case 'filter-flights': {
+        const filter = actionBtn.getAttribute('data-filter');
+        if (filter) {
+          if (filter === 'all') {
+            this.resetAllFilters();
+          } else {
+            this.activeFilter = filter;
+            if (filter === 'with-track' || filter === 'no-track' || filter === 'thermal' || filter === 'exercises') {
+              this.filterGroups.feature = filter;
+            } else if (filter === 'year-current' || /^\d{4}$/.test(filter)) {
+              this.filterGroups.year = filter;
+            }
+          }
+          this.render();
+        }
+        break;
+      }
+      case 'clear-search': {
+        this.searchQuery = '';
+        this.render();
+        break;
+      }
       case 'reset-filters': {
         this.searchQuery = '';
-        this.activeFilter = 'all';
+        this.resetAllFilters();
         this.render();
         break;
       }

@@ -220,7 +220,7 @@ describe('FlightDetailSheet - Telemetry Analysis & Educational Debriefing (UI La
       assert.ok(text.includes('+380 m'), 'Must mention net gain');
       assert.ok(text.includes('14 km/h'), 'Must highlight wind drift speed');
       assert.ok(text.includes('SSW'), 'Must mention cardinal wind direction');
-      assert.ok(text.includes('EN-A'), 'Must calibrate advice for EN-A glider class');
+      assert.ok(!text.includes('EN-A'), 'Must not equate certification class with wing performance (NOTE-004)');
       assert.ok(text.includes('cono di planata verso l\'atterraggio'), 'Must enforce landing cone margin');
     });
 
@@ -245,7 +245,7 @@ describe('FlightDetailSheet - Telemetry Analysis & Educational Debriefing (UI La
       assert.ok(html.includes('Decollo Risparmio -&gt; Atterraggio Suello') || html.includes('Decollo Risparmio'));
       assert.ok(html.includes('Monte Cornizzolo'));
       assert.ok(html.includes('Axis Compact 4'));
-      assert.ok(html.includes('EN-A'));
+      assert.ok(!html.includes('gm-glider-pill-badge'), 'Header must not display certification class badge (NOTE-004)');
       assert.ok(html.includes('35 min'));
 
       // Telemetry metrics

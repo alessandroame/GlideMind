@@ -49,8 +49,13 @@ describe('GlideMind Phase 4-bis: Live Weather Data Ingestion & Cache Sync', () =
 
     controller.networkStatus = 'live';
     const liveHtml = controller.renderLiveWeatherBadge();
-    assert.ok(liveHtml.includes('gm-live-badge live'));
-    assert.ok(liveHtml.includes('Live'));
+    assert.ok(liveHtml.includes('gm-live-badge live hidden'), 'Forecast live badge must remain hidden when online/live to avoid misleading physical-station label (NOTE-003)');
+
+    // Verify HomeDashboardView also hides green Live pill when networkStatus is live (NOTE-003)
+    const homeCtrl = new HomeDashboardViewController();
+    homeCtrl.networkStatus = 'live';
+    const homeLiveBadge = homeCtrl.renderLiveWeatherBadge();
+    assert.ok(homeLiveBadge.includes('hidden'), 'Home live badge must remain hidden when live (NOTE-003)');
 
     controller.networkStatus = 'rate_limit';
     const rateLimitHtml = controller.renderLiveWeatherBadge();

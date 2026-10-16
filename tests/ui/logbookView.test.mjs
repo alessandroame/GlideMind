@@ -158,7 +158,7 @@ describe('LogbookView Controller & Outdoor Ergonomics (UI Layer)', () => {
     assert.ok(html.includes('+ Importa Traccia IGC / Backup'), 'Must render primary upload button in empty state');
   });
 
-  it('should render flight list with lean cards and glider classes without altimetric sparkline', async () => {
+  it('should render flight list with lean cards and expandable topic filter pills without EN certification badges', async () => {
     storeInstance.setState({ flights: [mockFlight1, mockFlight2] });
     await controller.mount(container);
 
@@ -167,13 +167,21 @@ describe('LogbookView Controller & Outdoor Ergonomics (UI Layer)', () => {
     // Segmented tab shows count (2)
     assert.ok(html.includes('Voli (2)'));
 
+    // Expandable topic filter pills (NOTE-005) and absence of EN-A/EN-B filter chips (NOTE-004)
+    assert.ok(html.includes('data-group="glider"'), 'Must render Vela expandable topic pill');
+    assert.ok(html.includes('data-group="year"'), 'Must render Anno expandable topic pill');
+    assert.ok(html.includes('data-group="feature"'), 'Must render Caratteristiche expandable topic pill');
+    assert.ok(html.includes('data-group="duration"'), 'Must render Tempo expandable topic pill');
+    assert.ok(html.includes('data-group="distance"'), 'Must render Distanza expandable topic pill');
+    assert.ok(!html.includes('data-filter="EN-A"'), 'Must not render EN-A certification filter chip (NOTE-004)');
+    assert.ok(!html.includes('data-filter="EN-B"'), 'Must not render EN-B certification filter chip (NOTE-004)');
+
     // Flight 1 Card (Latest = #2)
     assert.ok(html.includes('gm-flight-number-badge'), 'Must render flight number badge');
     assert.ok(html.includes('#2'), 'Must render progressive flight number #2 for newest flight');
     assert.ok(html.includes('#1'), 'Must render progressive flight number #1 for older flight');
     assert.ok(html.includes('Decollo Risparmio → Atterraggio Ufficiale Suello'));
     assert.ok(html.includes('Axis Compact 4'));
-    assert.ok(html.includes('EN-A'));
     assert.ok(html.includes('1480 m'), 'Must show max altitude');
     assert.ok(html.includes('+420 m'), 'Must show altitude gain');
     assert.ok(html.includes('45 min'), 'Must show duration');
@@ -186,7 +194,6 @@ describe('LogbookView Controller & Outdoor Ergonomics (UI Layer)', () => {
     // Flight 2 Card
     assert.ok(html.includes('Bassano del Grappa'));
     assert.ok(html.includes('Ozone Rush 6'));
-    assert.ok(html.includes('EN-B'));
     assert.ok(html.includes('1750 m'));
     assert.ok(html.includes('+850 m'));
     assert.ok(html.includes('70 min'));
@@ -236,26 +243,48 @@ describe('LogbookView Controller & Outdoor Ergonomics (UI Layer)', () => {
     assert.ok(cardHtml.includes('+0 m'), 'Zero altitude gain must render as +0 m instead of --');
   });
 
-  it('should filter flights by category chips and search query', async () => {
+  it('should filter flights by expandable topic groups (glider, year, feature, duration, distance) and search query', async () => {
     storeInstance.setState({ flights: [mockFlight1, mockFlight2] });
     await controller.mount(container);
 
     // Initial: both visible
     assert.equal(controller.filterFlights([mockFlight1, mockFlight2]).length, 2);
 
-    // Filter by EN-A
-    controller.activeFilter = 'EN-A';
-    const enAFlights = controller.filterFlights([mockFlight1, mockFlight2]);
-    assert.equal(enAFlights.length, 1);
-    assert.equal(enAFlights[0].id, mockFlight1.id);
+    // 1. Filter by Glider model (Gruppo Vela - NOTE-005)
+    controller.filterGroups.glider = 'Axis Compact 4';
+    const compactFlights = controller.filterFlights([mockFlight1, mockFlight2]);
+    assert.equal(compactFlights.length, 1);
+    assert.equal(compactFlights[0].id, mockFlight1.id);
 
-    // Filter by EN-B
-    controller.activeFilter = 'EN-B';
-    const enBFlights = controller.filterFlights([mockFlight1, mockFlight2]);
-    assert.equal(enBFlights.length, 1);
-    assert.equal(enBFlights[0].id, mockFlight2.id);
+    controller.filterGroups.glider = 'Ozone Rush 6';
+    const rushFlights = controller.filterFlights([mockFlight1, mockFlight2]);
+    assert.equal(rushFlights.length, 1);
+    assert.equal(rushFlights[0].id, mockFlight2.id);
+    controller.resetAllFilters();
 
-    // Filter by Track Presence (with-track / no-track)
+    // 2. Filter by Duration (Gruppo Tempo - NOTE-005: mockFlight1=45m, mockFlight2=70m)
+    controller.filterGroups.duration = '30-60';
+    assert.equal(controller.filterFlights([mockFlight1, mockFlight2]).length, 1);
+    assert.equal(controller.filterFlights([mockFlight1, mockFlight2])[0].id, mockFlight1.id);
+
+    controller.filterGroups.duration = 'over-60';
+    assert.equal(controller.filterFlights([mockFlight1, mockFlight2]).length, 1);
+    assert.equal(controller.filterFlights([mockFlight1, mockFlight2])[0].id, mockFlight2.id);
+    controller.resetAllFilters();
+
+    // 3. Filter by Distance (Gruppo Distanza - NOTE-005: distFlight1=12.4km, distFlight2=24.8km)
+    const distFlight1 = { ...mockFlight1, distanceKm: 12.4 };
+    const distFlight2 = { ...mockFlight2, distanceKm: 24.8 };
+    controller.filterGroups.distance = '5-15';
+    assert.equal(controller.filterFlights([distFlight1, distFlight2]).length, 1);
+    assert.equal(controller.filterFlights([distFlight1, distFlight2])[0].id, mockFlight1.id);
+
+    controller.filterGroups.distance = 'over-15';
+    assert.equal(controller.filterFlights([distFlight1, distFlight2]).length, 1);
+    assert.equal(controller.filterFlights([distFlight1, distFlight2])[0].id, mockFlight2.id);
+    controller.resetAllFilters();
+
+    // 4. Filter by Track Presence & Thermals (Gruppo Caratteristiche)
     const flightWithTrack = { ...mockFlight1, id: 'fl_track_yes', hasDecimatedTrack: true };
     const flightNoTrack = { ...mockFlight2, id: 'fl_track_no', hasDecimatedTrack: false };
     const flightReconstructed = { ...mockFlight1, id: 'fl_track_recon', hasDecimatedTrack: true, isReconstructed: true };
@@ -271,7 +300,7 @@ describe('LogbookView Controller & Outdoor Ergonomics (UI Layer)', () => {
     assert.deepEqual(noTrackFlights.map((f) => f.id), ['fl_track_no', 'fl_track_recon']);
 
     // Filter by Search Query
-    controller.activeFilter = 'all';
+    controller.resetAllFilters();
     controller.searchQuery = 'Cornizzolo';
     const searchResult = controller.filterFlights([mockFlight1, mockFlight2]);
     assert.equal(searchResult.length, 1);

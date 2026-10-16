@@ -291,7 +291,7 @@ function synthesizeWindow({
     // Flyable
     if (part.id === 'morning') {
       title = 'Volo Calmo & Planate';
-      description = `Brezza debole e aria dolce (${avgTakeoffWind} km/h). Condizioni ideali per planate, ripresa volo e vele ricreative EN-A.`;
+      description = `Brezza debole e aria dolce (${avgTakeoffWind} km/h). Condizioni ideali per planate e ripresa volo in aria laminare.`;
     } else if (part.id === 'midday') {
       title = 'Termodinamica Formata';
       description = `Termiche attive e buona quota. Decollo ${activeTakeoff.name} ben alimentato. Atterraggio ${safeLanding.name} agibile.`;

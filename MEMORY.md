@@ -56,9 +56,12 @@ Registro distillato per dominio dei vincoli architetturali e delle insidie di ru
 - **Date Picker Monoriga (`36px`) e Calendario 7 Colonne (`Lun–Dom`)**:
   - *Insidia*: Aggiungere un 5° chip `.custom` manda in overflow i viewport `360px`; colorare `.gm-date-grid-item.active` di giallo ambra lo confonde con lo stato `Cautela`.
   - *Regola*: Dividere `.gm-date-tabs` in `.gm-date-stepper` (`[‹ Data ▾ ›]`) + `.gm-date-quick-chips` fissi (`!p.isCustom`). Nello sheet calendario usare una griglia a 7 colonne (`Lun–Dom`) con spacer iniziali e anello `.active` ciano neutro (`#38bdf8`) che preserva la barra inferiore a 4 colori.
-- **Selettore Sub-Spot in Previsioni e Serie Grafiche (`ForecastView.js`)**:
-  - *Insidia*: Aprire il bottom sheet per commutare tra Panoramica, Decollo e Atterraggio interrompe il flusso visivo; mostrare una `<select>` quando c'è un solo decollo viola Occam's Razor.
-  - *Regola*: Esporre `.gm-quick-subspot-switcher` (`Panoramica | Decollo | Atterraggio`) a 1-tap e renderizzare `.gm-inline-subspot-select` solo se `spot.takeoffs.length > 1` (o `landings.length > 1`). Nei grafici usare spline monotona Fritsch-Carlson e curva continua `0–100%` per la probabilità di pioggia.
+- **Selettore Sub-Spot in Previsioni, Silenziamento Badge `Live` Nominale e Serie Grafiche (`ForecastView.js`)**:
+  - *Insidia*: Mostrare il badge verde `● Live` quando `networkStatus === 'live'` fa credere al pilota di leggere un anemometro fisico sul prato diverso dalla scrubbar (`ORA`), mentre un 4° tab rompe la griglia a 3 colonne `.gm-quick-subspot-switcher`.
+  - *Regola*: Nascondere sia `#gm-home-live-badge` sia `#gm-forecast-live-badge` (`hidden`) quando `networkStatus === 'live'` (mostrare badge solo per `loading`, `rate_limit`, `offline`). Mantenere `.gm-quick-subspot-switcher` a 3 colonne (`Panoramica | Decollo | Atterraggio`) usando lo slot `ORA` della scrubbar per il dato attuale.
+- ** Rimozione Categorie Normative Vela (`EN-A..D`) e Filtri Logbook a 5 Gruppi (`LogbookView.js`)**:
+  - *Insidia*: Mostrare badge `EN-A`/`EN-B` nella UI o nei debriefing sovrascrive con etichette burocratiche i veri parametri aerodinamici ($V_{\text{trim}}$, $V_{\text{max}}$, efficienza); mescolare chip piatti nel Logbook satura lo spazio mobile.
+  - *Regola*: Omettere `.gm-glider-pill-badge` e riferimenti `EN-A..D` dalla UI/debriefing, esponendo sempre $V_{\text{trim}}$, $V_{\text{max}}$ e $L/D$. Nel Logbook usare una barra a 5 gruppi tematici espandibili (`Vela ▾`, `Anno ▾`, `Caratteristiche ▾`, `Tempo ▾`, `Distanza ▾`) con drawer `.gm-filter-group-drawer` e combinazione in `AND` logico.
 - **Warning Floating Zero-CLS e Cleanup Deterministico degli Overlay**:
   - *Insidia*: Banner di avviso nel flusso statico generano Cumulative Layout Shift (CLS) e restano bloccati a schermo; cambiare rotta con uno sheet aperto lascia listener orfani.
   - *Regola*: Ancorare tutti i warning con `position: fixed` in basso sopra nav/scrubber dotandoli di `.gm-warning-close-btn` (`✕`, `48x48px`). In `ui/router.js`, chiudere sempre `sheetManager.closeSheet()` al cambio rotta e inibire le scorciatoie da tastiera quando un overlay è attivo.
