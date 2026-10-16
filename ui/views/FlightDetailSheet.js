@@ -932,6 +932,7 @@ export function renderFlightDetailHtml(bundle, options = {}) {
             type="button"
             id="btn-delete-from-detail"
             class="gm-btn gm-btn-secondary gm-flight-detail-delete-btn"
+            style="min-height: var(--gm-touch-min, 48px);"
             data-action="delete-flight"
             data-flight-id="${escapeHtml(flightId)}"
             aria-label="Elimina volo ${escapeHtml(siteTitle)}"
@@ -1338,7 +1339,7 @@ export function renderFlightDetailHtml(bundle, options = {}) {
         <!-- Educational Safety Debriefing -->
         <section class="gm-debrief-box" aria-label="Debriefing Didattico di Sicurezza">
           <div class="gm-debrief-header">
-            <h3 class="gm-flight-detail-section-title" style="margin: 0;">Debriefing Didattico di Sicurezza</h3>
+            <h3 class="gm-flight-detail-section-title m-0">Debriefing Didattico di Sicurezza</h3>
             <span class="gm-debrief-instructor-tag">Istruttore</span>
           </div>
           <div class="gm-debrief-text flex flex-col gap-2.5" id="gm-debrief-content">
@@ -1362,8 +1363,7 @@ export function renderFlightDetailHtml(bundle, options = {}) {
             <button
               type="button"
               id="btn-save-flight-notes"
-              class="gm-btn gm-btn-secondary"
-              style="min-height: var(--gm-touch-min, 48px); padding: 0 20px;"
+              class="gm-btn gm-btn-secondary px-5"
             >
               Salva Note
             </button>
@@ -1372,7 +1372,7 @@ export function renderFlightDetailHtml(bundle, options = {}) {
 
         <!-- Secondary Aerological Data: Declassed Wind Drift -->
         ${hasWind ? `
-          <section class="gm-flight-detail-section" aria-label="Dati Eolici Secondari" style="opacity: 0.85;">
+          <section class="gm-flight-detail-section opacity-85" aria-label="Dati Eolici Secondari">
             <div class="p-3 rounded-lg bg-[var(--gm-bg-card)] border border-[var(--gm-border)] flex items-center justify-between gap-3 text-xs">
               <div class="flex items-center gap-2">
                 <span class="font-medium text-[var(--gm-text-secondary)]">Deriva del Vento Stimata:</span>
@@ -1391,7 +1391,6 @@ export function renderFlightDetailHtml(bundle, options = {}) {
             type="button"
             id="btn-replay-from-detail"
             class="gm-btn gm-btn-primary gm-bottom-replay-btn ${!hasValidTrack ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}"
-            style="min-height: var(--gm-touch-min, 48px);"
             ${!hasValidTrack ? 'disabled aria-disabled="true" title="Replay 3D non disponibile: traccia GPS assente"' : 'title="Visualizza Replay 3D"'}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -1404,7 +1403,6 @@ export function renderFlightDetailHtml(bundle, options = {}) {
             type="button"
             id="btn-setup-from-detail"
             class="gm-btn gm-btn-secondary gm-bottom-action-btn ${!hasValidTrack ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}"
-            style="min-height: var(--gm-touch-min, 48px);"
             ${!hasValidTrack ? 'disabled aria-disabled="true" title="Setup traccia non disponibile: traccia GPS assente"' : 'title="Setup Traccia" aria-label="Setup Traccia"'}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -1425,7 +1423,6 @@ export function renderFlightDetailHtml(bundle, options = {}) {
             type="button"
             id="btn-download-from-detail"
             class="gm-btn gm-btn-secondary gm-bottom-action-btn ${!hasIgcDownload ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}"
-            style="min-height: var(--gm-touch-min, 48px);"
             ${!hasIgcDownload ? 'disabled aria-disabled="true" title="Traccia IGC non disponibile"' : 'title="Scarica Traccia IGC (FAI)" aria-label="Scarica Traccia IGC (FAI)"'}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -2362,7 +2359,7 @@ export async function openFlightDetailView(flightId, options = {}) {
   try {
     bundle = await logbookManager.getFlightDetail(flightId);
   } catch (err) {
-    console.warn('[FlightDetailView] Errore DB nel recupero volo:', err);
+    console.warn('[FlightDetailView] Database error retrieving flight:', err);
   }
 
   // Fallback to reactive store state or default seed flights if flight is not persisted in DB
@@ -2403,7 +2400,7 @@ export async function openFlightDetailView(flightId, options = {}) {
   }
 
   if (!bundle || !bundle.meta) {
-    console.warn('[FlightDetailView] Volo non trovato:', flightId);
+    console.warn('[FlightDetailView] Flight not found:', flightId);
     return;
   }
 
@@ -2464,6 +2461,7 @@ export async function openFlightDetailView(flightId, options = {}) {
   document.body.appendChild(overlayEl);
   document.body.style.overflow = 'hidden';
   overlayEl.setAttribute('data-flight-id', String(bundle.meta.id || bundle.meta.flightId || flightId));
+  overlayEl.__cleanupOverlay = closeFlightDetailView;
   activeDetailOverlay = overlayEl;
 
   // 0. Attach interactive telemetry chart controls (zoom, pan, vario, speed, HUD)
@@ -2511,7 +2509,7 @@ export async function openFlightDetailView(flightId, options = {}) {
         }, 2200);
       }
     } catch (err) {
-      console.error('[FlightDetailView] Errore nel salvataggio note:', err);
+      console.error('[FlightDetailView] Error saving notes:', err);
     }
   };
 
@@ -2558,7 +2556,7 @@ export async function openFlightDetailView(flightId, options = {}) {
       try {
         await logbookManager.exportFlightIgc(flightId);
       } catch (err) {
-        console.error('[FlightDetailView] Errore durante export IGC:', err);
+        console.error('[FlightDetailView] Error exporting IGC:', err);
       }
     });
   }
@@ -2594,7 +2592,7 @@ export async function openFlightDetailView(flightId, options = {}) {
             });
           }
         } catch (err) {
-          console.error('[FlightDetailView] Errore durante eliminazione volo:', err);
+          console.error('[FlightDetailView] Error deleting flight:', err);
         }
       }
     });

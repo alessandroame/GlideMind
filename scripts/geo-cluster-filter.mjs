@@ -260,7 +260,7 @@ export async function fetchDemElevations(coordinates, fetchImpl = globalThis.fet
 
     const res = await fetchImpl(url);
     if (!res.ok) {
-      throw new Error(`[DEM Fetcher] Errore HTTP Elevation API: ${res.status}`);
+      throw new Error(`[DEM Fetcher] Elevation API HTTP error: ${res.status}`);
     }
 
     const data = await res.json();

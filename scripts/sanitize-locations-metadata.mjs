@@ -125,7 +125,7 @@ export function sanitizeSpotEntity(item) {
  */
 export function sanitizeCatalogFile(filePath) {
   if (!fs.existsSync(filePath)) {
-    console.warn(`[Sanitizer] File non trovato: ${filePath}`);
+    console.warn(`[Sanitizer] File not found: ${filePath}`);
     return { file: filePath, totalStripped: 0, totalEntities: 0 };
   }
 
@@ -160,7 +160,7 @@ export function sanitizeCatalogFile(filePath) {
   }
 
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + '\n', 'utf-8');
-  console.log(`[Sanitizer] Bonificato ${filePath}: rimossi ${totalStripped} tag testuali da ${totalEntities} comprensori.`);
+  console.log(`[Sanitizer] Sanitized ${filePath}: stripped ${totalStripped} inline metadata tags across ${totalEntities} comprensori.`);
   return { file: filePath, totalStripped, totalEntities };
 }
 
@@ -169,7 +169,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const targetLocations = path.resolve(__dirname, '../data/locations.json');
   const targetStaging = path.resolve(__dirname, '../data/staging-locations.json');
 
-  console.log('[Sanitizer] Avvio bonifica metadati testuali in dati territoriali...');
+  console.log('[Sanitizer] Starting territorial metadata sanitization...');
   sanitizeCatalogFile(targetLocations);
   if (fs.existsSync(targetStaging)) {
     sanitizeCatalogFile(targetStaging);

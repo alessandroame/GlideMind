@@ -6,6 +6,7 @@
  */
 
 import { store } from '../core/store.js';
+import { closeSheet, isSheetOpen } from './sheetManager.js';
 
 export const PRIMARY_NAV_ROUTES = Object.freeze(['home', 'forecast', 'map', 'logbook', 'settings']);
 export const VALID_ROUTES = Object.freeze([...PRIMARY_NAV_ROUTES, 'replay']);
@@ -101,6 +102,7 @@ export function createRouter(options = {}) {
   let currentRoute = null;
   let currentMountedView = null;
   let isNavigating = false;
+  let isInitialized = false;
 
   /**
    * Registers a view controller for a specific route.
@@ -119,7 +121,7 @@ export function createRouter(options = {}) {
    * @param {string} route
    */
   function updateNavUI(route) {
-    if (typeof document === 'undefined') return;
+    if (typeof document === 'undefined' || typeof document.querySelectorAll !== 'function') return;
 
     const navItems = document.querySelectorAll('[data-route], a[href^="#"]');
     navItems.forEach((el) => {
@@ -152,11 +154,20 @@ export function createRouter(options = {}) {
     isNavigating = true;
 
     try {
-      // 1. Unmount previous view and dismiss full-screen overlays
-      if (typeof document !== 'undefined') {
-        const overlays = document.querySelectorAll('.gm-flight-detail-overlay, .gm-track-setup-overlay');
+      // 1. Unmount previous view and cleanly dismiss sheets and full-screen overlays
+      closeSheet();
+      if (typeof document !== 'undefined' && typeof document.querySelectorAll === 'function') {
+        const overlays = document.querySelectorAll('.gm-flight-detail-overlay, .gm-track-setup-overlay, #forecast-flight-analysis-overlay');
         overlays.forEach((el) => {
-          if (el && el.parentNode) el.parentNode.removeChild(el);
+          if (el && typeof el.__cleanupOverlay === 'function') {
+            try {
+              el.__cleanupOverlay();
+            } catch (_) {
+              if (el.parentNode) el.parentNode.removeChild(el);
+            }
+          } else if (el && el.parentNode) {
+            el.parentNode.removeChild(el);
+          }
         });
       }
 
@@ -191,7 +202,7 @@ export function createRouter(options = {}) {
       updateNavUI(validRoute);
 
       // 5. Mount view into container
-      if (!containerEl && typeof document !== 'undefined') {
+      if (!containerEl && typeof document !== 'undefined' && typeof document.getElementById === 'function') {
         containerEl = document.getElementById('main-view');
       }
 
@@ -226,12 +237,12 @@ export function createRouter(options = {}) {
 
     container.innerHTML = `
       <section id="view-${route}" class="gm-view-placeholder" aria-label="${routeTitles[route] || route}">
-        <div class="gm-card" style="margin-top: 16px;">
-          <h2 style="margin: 0 0 8px 0; font-size: 1.3rem;">${routeTitles[route] || route}</h2>
-          <p style="color: var(--gm-text-secondary); margin: 0 0 16px 0;">
+        <div class="gm-card mt-4">
+          <h2 class="text-lg font-bold m-0 mb-2">${routeTitles[route] || route}</h2>
+          <p class="text-[var(--gm-text-secondary)] m-0 mb-4">
             Modulo architetturale configurato nella shell GlideMind. In attesa di montaggio componente dedicato.
           </p>
-          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <div class="flex gap-2 flex-wrap">
             <span class="gm-badge gm-badge-flyable">Shell Attiva</span>
             <span class="gm-badge gm-badge-caution">Fase 2 Pronta</span>
           </div>
@@ -244,9 +255,10 @@ export function createRouter(options = {}) {
    * Initializes router listeners on window and DOM.
    */
   function init() {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || isInitialized) return;
+    isInitialized = true;
 
-    if (!containerEl && typeof document !== 'undefined') {
+    if (!containerEl && typeof document !== 'undefined' && typeof document.getElementById === 'function') {
       containerEl = document.getElementById('main-view');
     }
 
@@ -276,6 +288,18 @@ export function createRouter(options = {}) {
 
       // Ignore if typing inside input / textarea / editable
       if (isInputTarget(e.target)) {
+        return;
+      }
+
+      // Ignore single-key navigation shortcuts when a modal sheet or full-screen overlay is active
+      if (isSheetOpen()) {
+        return;
+      }
+      if (
+        typeof document !== 'undefined' &&
+        typeof document.querySelector === 'function' &&
+        document.querySelector('.gm-flight-detail-overlay, .gm-track-setup-overlay, #forecast-flight-analysis-overlay')
+      ) {
         return;
       }
 

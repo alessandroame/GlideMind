@@ -127,12 +127,12 @@ describe('Logbook IGC Pipeline - Dual-Storage Ingestion & Integrity', () => {
   it('should reject invalid or empty IGC inputs with descriptive error messages', async () => {
     await assert.rejects(
       async () => await logbookManager.importIgcTrack(''),
-      /Impossibile importare traccia/
+      /Cannot import track|Impossibile importare traccia/
     );
 
     await assert.rejects(
       async () => await logbookManager.importIgcTrack('AXCT001\nHFDTE101026\nHFPLT:Mario\n'),
-      /non contiene record di volo B-record/
+      /contains no valid FAI B-record|non contiene record di volo B-record/
     );
   });
 });

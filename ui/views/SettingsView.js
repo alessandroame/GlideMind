@@ -10,6 +10,8 @@ import { APP_VERSION, APP_BUILD } from '../../core/version.js';
 import { applyTheme } from '../app.js';
 import { homeDashboardView } from './HomeDashboardView.js';
 import { calculatePilotSafetyFactor, DEFAULT_SEED_FLIGHTS } from '../../core/logbook.js';
+import { formatWindSpeed } from '../../core/units.js';
+import { formatDateIso } from '../../core/datePresets.js';
 
 /**
  * Cartographic layer options available across the application.
@@ -26,6 +28,18 @@ export const SETTINGS_MAP_LAYERS = Object.freeze([
     name: 'Satellite',
     label: 'Satellite (Ortofoto HD)',
     description: 'Fotografie satellitari Esri World Imagery ad alta risoluzione per studio creste e decolli'
+  },
+  {
+    id: 'dark',
+    name: 'Dark',
+    label: 'Dark (Alto Contrasto)',
+    description: 'Cartografia scura ad alto contrasto ideale per evidenziare tracce 3D e vettori vento'
+  },
+  {
+    id: 'cyclosm',
+    name: 'CyclOSM',
+    label: 'CyclOSM (Sentieri & Accessi)',
+    description: 'Mappa escursionistica dettagliata con sentieri, strade forestali, fontane e impianti di risalita'
   }
 ]);
 
@@ -99,7 +113,8 @@ export class SettingsViewController {
   getActiveMapLayer() {
     const state = this.store ? this.store.getState() : {};
     const layer = (state.ui && state.ui.mapLayer) || 'topo';
-    return (layer === 'satellite') ? 'satellite' : 'topo';
+    const validIds = SETTINGS_MAP_LAYERS.map(l => l.id);
+    return validIds.includes(layer) ? layer : 'topo';
   }
 
   /**
@@ -255,7 +270,7 @@ export class SettingsViewController {
     const usePilotFactor = Boolean(state.usePilotCurrencyFactor);
     const safetyFactor = calculatePilotSafetyFactor({
       flights: state.flights || DEFAULT_SEED_FLIGHTS,
-      referenceDate: state.activeDate || new Date().toISOString().split('T')[0],
+      referenceDate: state.activeDate || formatDateIso(new Date()),
       enabled: usePilotFactor
     });
 
@@ -465,7 +480,7 @@ export class SettingsViewController {
                 ${escapeHtml(glider?.name || 'Vela Predefinita (EN-A)')}
               </div>
               <div class="text-xs text-[var(--gm-text-secondary)] font-mono">
-                Categoria: ${escapeHtml(glider?.category || 'EN-A')} · VTrim: ${escapeHtml(glider?.vTrim || 38)} km/h · Efficienza: ${escapeHtml(glider?.glideRatio || 8.2)}
+                Categoria: ${escapeHtml(glider?.category || 'EN-A')} · VTrim: ${escapeHtml(formatWindSpeed(glider?.vTrim || 38, units.speed))} · Efficienza: ${escapeHtml(glider?.glideRatio || 8.2)}
               </div>
             </div>
             <button

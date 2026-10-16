@@ -270,7 +270,7 @@ export function getSmartDatePresets(refDate = new Date(), activeDateIso = null, 
       isWeekend: true
     });
   } else {
-    // Domenica: Weekend in corso (giorno 2)
+    // Sunday: active weekend (day 2)
     const tomorrowDate = addDays(ref, 1);
     const nextSatDate = addDays(ref, 6);
 

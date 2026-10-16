@@ -264,7 +264,7 @@ export const DEFAULT_COMPRENSORI = Object.freeze([
     "region": "Piemonte",
     "country": "IT",
     "location": "Martiniana Po (Valle Po - CN)",
-    "description": "Sito strategico ai piedi del Monviso nella bassa Valle Po, celebre per le generose correnti ascensionali e la vista spettacolare sul Re di Pietra.",
+    "description": "Sito di riferimento ai piedi del Monviso nella bassa Valle Po, celebre per le generose correnti ascensionali e la vista spettacolare sul Re di Pietra.",
     "webcam": null,
     "club": {
       "name": "Volo Libero Martiniana Po A.S.D.",

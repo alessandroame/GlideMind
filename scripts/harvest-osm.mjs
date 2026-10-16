@@ -167,7 +167,7 @@ export async function runHarvest({
 
   for (const ep of endpointsToTry) {
     try {
-      console.log(`[OSM Harvester] Interrogazione Overpass API (${ep}) per ${country}...`);
+      console.log(`[OSM Harvester] Querying Overpass API (${ep}) for ${country}...`);
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -184,19 +184,19 @@ export async function runHarvest({
       clearTimeout(timer);
 
       if (!response.ok) {
-        throw new Error(`Errore HTTP Overpass: ${response.status} ${response.statusText}`);
+        throw new Error(`Overpass HTTP error: ${response.status} ${response.statusText}`);
       }
 
       json = await response.json();
       break;
     } catch (err) {
-      console.warn(`[OSM Harvester] Fallito endpoint ${ep}: ${err.message}. Tento eventuale fallback...`);
+      console.warn(`[OSM Harvester] Endpoint failed (${ep}): ${err.message}. Trying next fallback...`);
       lastError = err;
     }
   }
 
   if (!json) {
-    throw new Error(`[OSM Harvester] Tutti gli endpoint Overpass sono falliti. Ultimo errore: ${lastError?.message}`);
+    throw new Error(`[OSM Harvester] All Overpass endpoints failed. Last error: ${lastError?.message}`);
   }
 
   const normalizedSpots = parseOverpassResponse(json);
@@ -207,7 +207,7 @@ export async function runHarvest({
   }
 
   fs.writeFileSync(outFile, JSON.stringify(normalizedSpots, null, 2), 'utf-8');
-  console.log(`[OSM Harvester] Censiti con successo ${normalizedSpots.length} spot OSM in ${outFile}`);
+  console.log(`[OSM Harvester] Successfully harvested ${normalizedSpots.length} OSM spots to ${outFile}`);
   return normalizedSpots;
 }
 

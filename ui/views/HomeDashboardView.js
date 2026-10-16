@@ -984,9 +984,9 @@ export class HomeDashboardViewController {
               data-date="${p.isoDate}" 
               role="tab" 
               aria-selected="${p.isActive ? 'true' : 'false'}" 
-              title="${p.label} - ${p.subLabel}"
+              title="${escapeHtml(p.label)} - ${escapeHtml(p.subLabel)}"
             >
-              <span class="gm-date-tab-main">${p.shortLabel || p.label}</span>
+              <span class="gm-date-tab-main">${escapeHtml(p.shortLabel || p.label)}</span>
             </button>
           `).join('')}
         </div>
@@ -1381,7 +1381,7 @@ export class HomeDashboardViewController {
    */
   renderPilotCurrencyBlock(state) {
     const flights = state.flights || DEFAULT_SEED_FLIGHTS;
-    const activeDate = state.activeDate || new Date().toISOString().split('T')[0];
+    const activeDate = state.activeDate || formatDateIso(new Date());
     const metrics = calculatePilotPeriodMetrics({
       flights,
       period: this.pilotPeriod,
@@ -1407,7 +1407,7 @@ export class HomeDashboardViewController {
         <div class="gm-pilot-header">
           <div class="gm-pilot-title-group">
             <span class="gm-pilot-title">Attività Pilota</span>
-            <span class="gm-badge ${badgeClass}" title="${escapeHtml(metrics.currencyDescription || metrics.currencyLabel)}" style="padding: 1px 6px; font-size: 0.68rem;">
+            <span class="gm-badge ${badgeClass} gm-badge-micro" title="${escapeHtml(metrics.currencyDescription || metrics.currencyLabel)}">
               ${escapeHtml(metrics.currencyLabel)}
             </span>
           </div>
@@ -1492,7 +1492,7 @@ export class HomeDashboardViewController {
           </button>
 
           <div>
-            <input type="file" id="home-igc-file-input" accept=".igc" class="hidden" style="display: none;" />
+            <input type="file" id="home-igc-file-input" accept=".igc" class="hidden" />
             <button 
               type="button" 
               id="btn-home-upload-igc"
@@ -1518,7 +1518,7 @@ export class HomeDashboardViewController {
    */
   openAddFlightSheet() {
     const state = this.store ? this.store.getState() : {};
-    const defaultDate = state.activeDate || new Date().toISOString().split('T')[0];
+    const defaultDate = state.activeDate || formatDateIso(new Date());
     
     // Build select options from catalog
     const siteOptions = this.comprensoriCatalog.map(c => 
@@ -1532,8 +1532,8 @@ export class HomeDashboardViewController {
           <input type="date" id="flight-date-input" class="gm-form-control" value="${escapeHtml(defaultDate)}" required />
           <div class="gm-past-presets" role="group" aria-label="Scorciatoie data volo">
             ${getPastDatePresets(new Date()).map(p => `
-              <button type="button" class="gm-past-preset-btn" data-action="set-flight-date" data-date="${p.isoDate}">
-                ${p.label} (${p.subLabel})
+              <button type="button" class="gm-past-preset-btn" data-action="set-flight-date" data-date="${escapeHtml(p.isoDate)}">
+                ${escapeHtml(p.label)} (${escapeHtml(p.subLabel)})
               </button>
             `).join('')}
           </div>
@@ -1562,7 +1562,7 @@ export class HomeDashboardViewController {
         <div class="gm-form-field">
           <label for="flight-igc-input" class="gm-form-label">Traccia GPS .igc (Opzionale)</label>
           <input type="file" id="flight-igc-input" accept=".igc" class="gm-form-control" />
-          <span class="text-xs text-[var(--gm-text-muted)]" style="font-size: 0.72rem; margin-top: 3px; display: block;">
+          <span class="text-xs text-[var(--gm-text-muted)] block mt-1">
             Le attività (termica ed esercizi) e la durata vengono dedotte in automatico dalla traccia.
           </span>
         </div>
@@ -1641,7 +1641,7 @@ export class HomeDashboardViewController {
                     }
                   }
                 } catch (err) {
-                  console.warn('Errore lettura traccia IGC:', err);
+                  console.warn('Error reading IGC track:', err);
                 }
               };
               reader.readAsText(file);
@@ -1692,6 +1692,13 @@ export class HomeDashboardViewController {
             this.store.setState({
               flights: [newEntry, ...currentFlights]
             });
+          }
+
+          if (logbookManager && typeof logbookManager.saveFlight === 'function') {
+            logbookManager.saveFlight(
+              newEntry,
+              parsedTrackPoints ? { id: newEntry.id, decimatedPoints: parsedTrackPoints } : null
+            ).catch(() => {});
           }
 
           closeSheet();
@@ -1969,7 +1976,7 @@ export class HomeDashboardViewController {
                   data-action="pick-calendar-date"
                   data-date="${d.isoDate}"
                   aria-selected="${isSelected ? 'true' : 'false'}"
-                  title="${d.dayName} ${d.formatted} (${d.horizon.label}) - ${d.flyability.label}: ${d.flyability.limitingFactor || ''}"
+                  title="${escapeHtml(d.dayName)} ${escapeHtml(d.formatted)} (${escapeHtml(d.horizon.label)}) - ${escapeHtml(d.flyability.label)}: ${escapeHtml(d.flyability.limitingFactor || '')}"
                 >
                   <span class="grid-day-name">${escapeHtml(d.dayName)}</span>
                   <span class="grid-day-number">${d.dayNumber}</span>
@@ -2370,7 +2377,7 @@ export class HomeDashboardViewController {
         });
         this.render();
       } catch (err) {
-        console.warn('Errore lettura traccia IGC:', err);
+        console.warn('Error reading IGC track:', err);
         this.navigateTo('logbook');
       }
     }

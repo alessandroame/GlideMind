@@ -140,11 +140,11 @@ export async function runBuildCatalog({
     : path.resolve(__dirname, `../docs/spots-audit-report-${cCode.toLowerCase()}.md`));
 
   if (!fs.existsSync(effectiveRawFile)) {
-    throw new Error(`[Catalog Builder] File grezzo non trovato: ${effectiveRawFile}. Eseguire prima 'node scripts/harvest-osm.mjs --country=${cCode}'.`);
+    throw new Error(`[Catalog Builder] Raw file not found: ${effectiveRawFile}. Run 'node scripts/harvest-osm.mjs --country=${cCode}' first.`);
   }
 
   const rawSpots = JSON.parse(fs.readFileSync(effectiveRawFile, 'utf-8'));
-  console.log(`[Catalog Builder] Caricati ${rawSpots.length} spot grezzi [${cCode}] da ${effectiveRawFile}`);
+  console.log(`[Catalog Builder] Loaded ${rawSpots.length} raw spots [${cCode}] from ${effectiveRawFile}`);
 
   const processed = await processGeometricPipeline(rawSpots, { demElevationsMap: demMap });
   const comprensori = buildComprensoriFromClusters(processed.takeoffs, processed.landings, cCode);
@@ -156,7 +156,7 @@ export async function runBuildCatalog({
   }
 
   fs.writeFileSync(effectiveStagingFile, JSON.stringify(comprensori, null, 2), 'utf-8');
-  console.log(`[Catalog Builder] Esportati ${comprensori.length} comprensori in staging: ${effectiveStagingFile}`);
+  console.log(`[Catalog Builder] Exported ${comprensori.length} comprensori to staging: ${effectiveStagingFile}`);
 
   // Generate audit report
   const stats = {
@@ -177,7 +177,7 @@ export async function runBuildCatalog({
     fs.mkdirSync(reportDir, { recursive: true });
   }
   fs.writeFileSync(effectiveReportFile, report, 'utf-8');
-  console.log(`[Catalog Builder] Report generato in ${effectiveReportFile}`);
+  console.log(`[Catalog Builder] Audit report generated at ${effectiveReportFile}`);
 
   return { comprensori, stats };
 }

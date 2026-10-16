@@ -33,7 +33,7 @@ function findBrowser() {
     }
   }
 
-  throw new Error('Nessun browser Chromium trovato per la rasterizzazione delle icone.');
+  throw new Error('No Chromium browser found for icon rasterization.');
 }
 
 const wingSvgContent = fs.readFileSync(path.join(iconsDir, 'glidemind-wing.svg'), 'utf-8');
@@ -156,7 +156,7 @@ const targets = [
 
 export function generateAllIcons() {
   const browserBin = findBrowser();
-  console.log(`[Icon Generator] Browser individuato: ${browserBin}`);
+  console.log(`[Icon Generator] Browser found: ${browserBin}`);
 
   const tmpHtmlPath = path.join(projectRoot, 'tmp_icon_render.html');
 
@@ -181,9 +181,9 @@ export function generateAllIcons() {
 
     if (fs.existsSync(outPath)) {
       const stats = fs.statSync(outPath);
-      console.log(`[Icon Generator] Generata ${target.name} (${target.size}x${target.size}px, ${stats.size} byte)`);
+      console.log(`[Icon Generator] Generated ${target.name} (${target.size}x${target.size}px, ${stats.size} bytes)`);
     } else {
-      throw new Error(`Generazione fallita per ${target.name}`);
+      throw new Error(`Failed to generate ${target.name}`);
     }
   }
 
@@ -191,7 +191,7 @@ export function generateAllIcons() {
     fs.unlinkSync(tmpHtmlPath);
   }
 
-  console.log('[Icon Generator] Bundle iconografico PWA generato con successo.');
+  console.log('[Icon Generator] PWA icon bundle generated successfully.');
 }
 
 if (process.argv[1] && process.argv[1].endsWith('generate-icons.mjs')) {

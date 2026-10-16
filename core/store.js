@@ -172,10 +172,20 @@ export function createStore(initialStateOverrides = {}, customStorageAdapter = n
     for (const key of keysToPersist) {
       if (persistedKeys.has(key)) {
         try {
-          const val = state[key];
+          let val = state[key];
           if (val === undefined) {
             storageAdapter.removeItem(STORAGE_PREFIX + key);
           } else {
+            // Prevent localStorage quota exhaustion by stripping dense GPS track arrays from flights snapshot
+            if (key === 'flights' && Array.isArray(val)) {
+              val = val.map((f) => {
+                if (f && typeof f === 'object' && (f.points || f.originalPoints || f.uncalibratedOriginalPoints)) {
+                  const { points, originalPoints, uncalibratedOriginalPoints, ...lightMeta } = f;
+                  return lightMeta;
+                }
+                return f;
+              });
+            }
             storageAdapter.setItem(STORAGE_PREFIX + key, JSON.stringify(val));
           }
         } catch {
@@ -224,7 +234,8 @@ export function createStore(initialStateOverrides = {}, customStorageAdapter = n
         ...deepClone(DEFAULT_INITIAL_STATE.ui),
         ...loadedSlice.ui
       };
-      if (loadedSlice.ui.mapLayer !== 'satellite' && loadedSlice.ui.mapLayer !== 'topo') {
+      const validLayers = ['topo', 'satellite', 'dark', 'cyclosm'];
+      if (!validLayers.includes(loadedSlice.ui.mapLayer)) {
         loadedSlice.ui.mapLayer = 'topo';
       }
     }
@@ -260,6 +271,7 @@ export function createStore(initialStateOverrides = {}, customStorageAdapter = n
     const nextState = { ...state };
 
     for (const [key, value] of Object.entries(changes)) {
+      if (Object.is(state[key], value)) continue;
       if (JSON.stringify(state[key]) !== JSON.stringify(value)) {
         nextState[key] = deepClone(value);
         changedSliceKeys.push(key);

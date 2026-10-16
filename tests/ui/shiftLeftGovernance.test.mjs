@@ -219,5 +219,76 @@ describe('Shift-Left Quality Gate & Architectural Governance', () => {
       );
     }
   });
+
+  it('Gate 3 (CSS Governance): ensures theme.css has zero duplicate top-level selectors in the same media context', () => {
+    const lines = readFileSync(cssFile, 'utf-8').split(/\r?\n/);
+    let depth = 0;
+    let mediaContext = '';
+    let selectorBuffer = [];
+    const seenSelectors = new Map();
+
+    lines.forEach((line, idx) => {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('@media')) {
+        mediaContext = trimmed;
+      }
+      if (depth === 0 && trimmed && !trimmed.startsWith('@') && !trimmed.startsWith('/*') && !trimmed.startsWith('*')) {
+        selectorBuffer.push(trimmed);
+        if (trimmed.endsWith('{')) {
+          const fullSelector = selectorBuffer.join(' ').slice(0, -1).trim();
+          selectorBuffer = [];
+          const key = `${mediaContext} :: ${fullSelector}`;
+          assert.ok(
+            !seenSelectors.has(key),
+            `Duplicate CSS selector "${fullSelector}" in context "${mediaContext || 'root'}" at line ${idx + 1} (first declared at line ${seenSelectors.get(key)})`
+          );
+          seenSelectors.set(key, idx + 1);
+        }
+      } else if (depth === 0 && (trimmed.startsWith('/*') || trimmed.startsWith('*') || !trimmed)) {
+        if (!trimmed) selectorBuffer = [];
+      }
+      for (const ch of line) {
+        if (ch === '{') depth++;
+        else if (ch === '}') {
+          depth--;
+          if (depth === 0) {
+            mediaContext = '';
+            selectorBuffer = [];
+          }
+        }
+      }
+    });
+  });
+
+  it('Gate 4 (PWA Offline-First): ensures sw.js exists and implements Cache-First shell + Open-Meteo pass-through', () => {
+    const swPath = resolve('sw.js');
+    const swSrc = readFileSync(swPath, 'utf-8');
+    assert.ok(swSrc.includes('CACHE_NAME'), 'sw.js must define a versioned CACHE_NAME');
+    assert.ok(swSrc.includes('open-meteo.com'), 'sw.js must declare pass-through for open-meteo.com');
+    const appSrc = readFileSync(resolve('ui/app.js'), 'utf-8');
+    assert.ok(
+      appSrc.includes("serviceWorker.register('./sw.js')"),
+      'ui/app.js must register ./sw.js on bootstrap'
+    );
+  });
+
+  it('Gate 5 (Engineering Sobriety): ensures core and ui modules contain zero banned military/hype terms', () => {
+    const bannedTerms = [/Sito strategico/i, /scansione tattica/i, /bulletproof/i, /game-changer/i, /silver bullet/i];
+    const filesToScan = [
+      ...readdirSync(coreDir).filter(f => f.endsWith('.js')).map(f => join(coreDir, f)),
+      ...readdirSync(viewsDir).filter(f => f.endsWith('.js')).map(f => join(viewsDir, f))
+    ];
+
+    for (const filePath of filesToScan) {
+      const src = readFileSync(filePath, 'utf-8');
+      for (const regex of bannedTerms) {
+        assert.ok(
+          !regex.test(src),
+          `File ${filePath} contains banned terminology matching ${regex}`
+        );
+      }
+    }
+  });
 });
+
 

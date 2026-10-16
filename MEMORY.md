@@ -2552,3 +2552,20 @@ Questo documento registra vincoli stabili e lezioni tecniche apprese durante lo 
      - Opacità differenziata per risalto immediato delle finestre utili: `status-flyable` (`opacity: 0.85`), `status-caution` (`opacity: 0.68`), `status-unflyable` (`opacity: 0.28`), `status-unavailable` (`opacity: 0.32`).
   3. **Chevron Verticale Standard da Accordion (`.gm-spot-accordion-trigger` + `.gm-spot-chevron`)**:
      - Nella testata destra della card (`.gm-spot-header-right`), evitare la doppia freccia conflittuale (`▾` dentro il badge + `›` orizzontale accanto). Racchiudere badge e freccia in un unico bottone `.gm-spot-accordion-trigger` (`data-action="toggle-spot-reasons"`) con `.gm-spot-chevron` orientato verticalmente verso il basso (`points="6 9 12 15 18 9"`) che ruota di `180deg` (`transform: rotate(180deg)`) quando `.is-reasons-expanded` è attivo.
+
+---
+
+## 176. Sincronizzazione Bootstrap IndexedDB vs LocalStorage, Stripping Tracciati Densi, Conversione Unità Headless e Governance CSS/PWA
+- **Problema**:
+  1. In `ui/app.js`, l'esecuzione di `store.loadPersistedState()` *dopo* il caricamento iniziale da IndexedDB (`logbookManager.getAllFlights()`) permetteva a uno snapshot obsoleto in `localStorage` di sovrascrivere in memoria l'archivio autorevole dei voli, mentre `ImportFlightSheet.js` salvava i voli manuali solo nello store in RAM senza persisterli in IndexedDB.
+  2. La serializzazione integrale di `flights` in `localStorage` (`core/store.js`) includeva gli array densi (`points`, `originalPoints`, `uncalibratedOriginalPoints`), esponendo il browser a `QuotaExceededError` oltre i 5MB.
+  3. La regex di pre-chunking IGC in `core/logbookDb.js` non riconosceva l'header standard `HFDTEDATE:DDMMYY,NN`, ripiegando sulla data odierna e causando collisioni di fingerprint su tracce multi-ora; inoltre `store.loadPersistedState()` scartava i layer mappa `'dark'` e `'cyclosm'`, e le preferenze `ui.units` non erano applicate nel rendering delle viste.
+  4. In `css/theme.css` erano presenti 14 selettori top-level duplicati e oltre 120 attributi `style="..."` statici nei controller UI.
+- **Causa Radice**:
+  Disallineamento nell'ordine di idratazione dello stato tra `localStorage` e `IndexedDB`, assenza di proiezione leggera (`flights_meta`) nel salvataggio sincrono su `localStorage`, validazione parziale dei layer cartografici e stratificazione progressiva di regole CSS/inline durante iterazioni UI.
+- **Pattern Vincolante**:
+  1. **Ordine di Bootstrap e Autorevolezza IndexedDB**: In `bootstrapApp()` (`ui/app.js`), invocare prima `store.loadPersistedState()` per le preferenze utente e subito dopo sincronizzare `flights` da `logbookManager.getAllFlights()`. Tutti i canali di creazione volo (incluso il form manuale in `ImportFlightSheet.js`) devono persistere tramite `logbookManager.saveFlight()`.
+  2. **Proiezione Leggera in `localStorage` (`persistKeys`)**: Quando `core/store.js` serializza `flights` in `localStorage`, rimuovere sempre gli array densi (`points`, `originalPoints`, `uncalibratedOriginalPoints`), conservando in `localStorage` solo i metadati leggeri e delegando i blob densi a IndexedDB (`flights_raw`).
+  3. **Formattazione Unità Centralizzata (`core/units.js`)**: Tutte le viste (`HomeDashboardView`, `ForecastView`, `LogbookView`) devono formattare vento, quota e rateo variometrico tramite il modulo puro headless `core/units.js` (`formatWindSpeed`, `formatAltitude`, `formatVario`) in funzione di `store.getState().ui.units`.
+  4. **Cleanup Deterministico Overlay e Guardie Tastiera**: Ogni cambio rotta nel router deve invocare `sheetManager.closeSheet()` (eseguendo eventuali hook `__cleanupOverlay`), e le scorciatoie globali da tastiera devono essere inibite quando `#sheet-container` o un overlay full-screen ha `aria-hidden="false"`.
+  5. **Gate Automatici Shift-Left (`tests/ui/shiftLeftGovernance.test.mjs`)**: Mantenere a zero i selettori CSS top-level duplicati in `css/theme.css`, verificare la presenza e registrazione del Service Worker `sw.js` e bloccare qualsiasi regressione terminologica nei test automatici.

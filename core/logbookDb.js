@@ -13,6 +13,7 @@ import { analyzeFlightTelemetry, lttbDecimate, CURRENT_TELEMETRY_ENGINE_VERSION 
 import { store } from './store.js';
 import { DEFAULT_COMPRENSORI, parseCoordinates } from './comprensorio.js';
 import { POPULAR_GLIDERS } from './gliders.js';
+import { formatDateIso } from './datePresets.js';
 
 /**
  * Computes a 64-bit FNV-1a synchronous hash of a string.
@@ -586,16 +587,18 @@ export function createIndexedDbAdapter(options = {}) {
 }
 
 /**
- * Checks and requests persistent storage from the browser (Anti-Eviction Guard, Lesson #27 & #87).
- * 
+ * Checks and requests persistent storage from the runtime storage manager (Anti-Eviction Guard, Lesson #27 & #87).
+ *
+ * @param {{ persisted?: () => Promise<boolean>, persist?: () => Promise<boolean> }|null} [customStorageManager=null]
  * @returns {Promise<{persisted: boolean, supported: boolean}>}
  */
-export async function requestStoragePersistence() {
-  if (typeof navigator !== 'undefined' && navigator.storage && typeof navigator.storage.persisted === 'function') {
+export async function requestStoragePersistence(customStorageManager = null) {
+  const storageMgr = customStorageManager || (typeof globalThis !== 'undefined' && globalThis.navigator ? globalThis.navigator.storage : null);
+  if (storageMgr && typeof storageMgr.persisted === 'function') {
     try {
-      let isPersisted = await navigator.storage.persisted();
-      if (!isPersisted && typeof navigator.storage.persist === 'function') {
-        isPersisted = await navigator.storage.persist();
+      let isPersisted = await storageMgr.persisted();
+      if (!isPersisted && typeof storageMgr.persist === 'function') {
+        isPersisted = await storageMgr.persist();
       }
       return { persisted: !!isPersisted, supported: true };
     } catch {
@@ -647,7 +650,7 @@ class LogbookManager {
     await this.init();
 
     if (!rawIgcText || typeof rawIgcText !== 'string' || rawIgcText.trim().length === 0) {
-      throw new Error('[LogbookManager] Impossibile importare traccia: contenuto IGC vuoto o non valido.');
+      throw new Error('[LogbookManager] Cannot import track: empty or invalid IGC content.');
     }
 
     const fileName = options.fileName || 'track.igc';
@@ -665,15 +668,21 @@ class LogbookManager {
     let utcDate = '';
 
     for (let i = 0; i < totalLines; i++) {
-      const line = lines[i];
-      if (line.startsWith('HFDTE')) {
-        const dStr = line.replace('HFDTE', '').trim();
-        if (dStr.length >= 6) {
+      const line = lines[i].trim();
+      if (/^H[FC]DTE/i.test(line)) {
+        const dateMatch = line.match(/^H[FC]DTE(?:DATE:)?\s*([0-9]{6,8})/i);
+        if (dateMatch) {
+          const dStr = dateMatch[1];
           const dd = dStr.substring(0, 2);
           const mm = dStr.substring(2, 4);
-          const yy = dStr.substring(4, 6);
-          const fullYear = parseInt(yy, 10) < 80 ? `20${yy}` : `19${yy}`;
-          utcDate = `${fullYear}-${mm}-${dd}`;
+          if (dStr.length >= 8) {
+            const yyyy = dStr.substring(4, 8);
+            utcDate = `${yyyy}-${mm}-${dd}`;
+          } else {
+            const yy = parseInt(dStr.substring(4, 6), 10);
+            const fullYear = yy < 80 ? `20${dStr.substring(4, 6)}` : `19${dStr.substring(4, 6)}`;
+            utcDate = `${fullYear}-${mm}-${dd}`;
+          }
         }
       } else if (line.startsWith('B') && line.length >= 35) {
         if (!firstBRecord) firstBRecord = line;
@@ -688,7 +697,7 @@ class LogbookManager {
     }
 
     if (totalBRecords === 0) {
-      throw new Error('Il file non contiene record di volo B-record conformi allo standard FAI IGC.');
+      throw new Error('IGC file contains no valid FAI B-record flight coordinates.');
     }
 
     if (onProgress) onProgress(35);
@@ -731,7 +740,7 @@ class LogbookManager {
     /** @type {Object} */
     const metaRecord = {
       id: flightId,
-      date: parsed.date || utcDate || new Date().toISOString().split('T')[0],
+      date: parsed.date || utcDate || formatDateIso(new Date()),
       utcDate: utcDate || parsed.utcDate || parsed.date,
       takeoffTime: parsed.takeoffTime || '12:00',
       landingTime: parsed.landingTime || '12:30',
@@ -1091,7 +1100,7 @@ class LogbookManager {
     await this.init();
     const bundle = await this.adapter.getFlight(flightId);
     if (!bundle || !bundle.meta) {
-      throw new Error(`[LogbookManager] Impossibile trovare il volo ${flightId} per il trimming`);
+      throw new Error(`[LogbookManager] Cannot find flight ${flightId} for trimming`);
     }
 
     const { recalculateFlightAfterTrim } = await import('./flightTrimming.js');
@@ -1116,7 +1125,7 @@ class LogbookManager {
     await this.init();
     const bundle = await this.adapter.getFlight(flightId);
     if (!bundle || !bundle.meta) {
-      throw new Error(`[LogbookManager] Impossibile trovare il volo ${flightId} per il ripristino`);
+      throw new Error(`[LogbookManager] Cannot find flight ${flightId} for trim reset`);
     }
 
     const { restoreUntrimmedFlight } = await import('./flightTrimming.js');
@@ -1145,7 +1154,7 @@ class LogbookManager {
     await this.init();
     const bundle = await this.adapter.getFlight(flightId);
     if (!bundle || !bundle.meta) {
-      throw new Error(`[LogbookManager] Impossibile trovare il volo ${flightId} per la calibrazione quote`);
+      throw new Error(`[LogbookManager] Cannot find flight ${flightId} for elevation calibration`);
     }
 
     const { applyElevationCorrection } = await import('./flightTrimming.js');
@@ -1170,7 +1179,7 @@ class LogbookManager {
     await this.init();
     const bundle = await this.adapter.getFlight(flightId);
     if (!bundle || !bundle.meta) {
-      throw new Error(`[LogbookManager] Impossibile trovare il volo ${flightId} per il ripristino quote`);
+      throw new Error(`[LogbookManager] Cannot find flight ${flightId} for elevation reset`);
     }
 
     const { restoreOriginalElevations } = await import('./flightTrimming.js');

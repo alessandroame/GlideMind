@@ -16,6 +16,7 @@ let closeBtnEl = null;
 let currentSheetConfig = null;
 let previousActiveElement = null;
 let activeStore = store;
+let boundWindowRef = null;
 
 /**
  * Initializes the SheetManager binding to the DOM container.
@@ -46,22 +47,25 @@ export function initSheetManager(container = null, customStore = null) {
   contentEl = containerEl.querySelector('.gm-sheet-content');
   closeBtnEl = containerEl.querySelector('.gm-sheet-close-btn');
 
-  // Backdrop tap dismissal
-  if (backdropEl) {
+  // Backdrop tap dismissal (idempotent binding)
+  if (backdropEl && !backdropEl._gmSheetBound) {
+    backdropEl._gmSheetBound = true;
     backdropEl.addEventListener('click', () => {
       closeSheet();
     });
   }
 
-  // Close button tap dismissal
-  if (closeBtnEl) {
+  // Close button tap dismissal (idempotent binding)
+  if (closeBtnEl && !closeBtnEl._gmSheetBound) {
+    closeBtnEl._gmSheetBound = true;
     closeBtnEl.addEventListener('click', () => {
       closeSheet();
     });
   }
 
-  // Escape key listener
-  if (typeof window !== 'undefined') {
+  // Escape key listener (idempotent per window reference)
+  if (typeof window !== 'undefined' && boundWindowRef !== window) {
+    boundWindowRef = window;
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && isSheetOpen()) {
         e.preventDefault();

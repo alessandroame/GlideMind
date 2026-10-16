@@ -321,8 +321,7 @@ export function renderTrackSetupHtml(bundle) {
               <button
                 type="button"
                 id="btn-setup-apply-elevation"
-                class="gm-btn gm-btn-primary"
-                style="min-height: var(--gm-touch-min, 48px); padding: 0 20px;"
+                class="gm-btn gm-btn-primary px-5"
               >
                 Applica Calibrazione Quote
               </button>
@@ -377,12 +376,12 @@ export async function openTrackSetupView(flightId, options = {}) {
   try {
     bundle = await logbookManager.getFlightDetail(flightId);
   } catch (err) {
-    console.error('[TrackSetupView] Impossibile recuperare i dettagli del volo:', err);
+    console.error('[TrackSetupView] Unable to retrieve flight details:', err);
     return;
   }
 
   if (!bundle || !bundle.meta) {
-    console.warn(`[TrackSetupView] Volo non trovato: ${flightId}`);
+    console.warn(`[TrackSetupView] Flight not found: ${flightId}`);
     return;
   }
 
@@ -395,6 +394,7 @@ export async function openTrackSetupView(flightId, options = {}) {
   const overlayEl = document.createElement('div');
   overlayEl.innerHTML = renderTrackSetupHtml(bundle).trim();
   const setupEl = overlayEl.firstElementChild;
+  setupEl.__cleanupOverlay = closeTrackSetupView;
   document.body.appendChild(setupEl);
   activeSetupOverlay = setupEl;
 
@@ -505,7 +505,7 @@ export async function openTrackSetupView(flightId, options = {}) {
         await logbookManager.trimFlightTrack(flightId, tIdx, lIdx);
         await openTrackSetupView(flightId, options);
       } catch (err) {
-        console.error('[TrackSetupView] Errore applicazione trimming:', err);
+        console.error('[TrackSetupView] Error applying track trimming:', err);
         applyTrimBtn.disabled = false;
       }
     });
@@ -518,7 +518,7 @@ export async function openTrackSetupView(flightId, options = {}) {
         await logbookManager.resetFlightTrim(flightId);
         await openTrackSetupView(flightId, options);
       } catch (err) {
-        console.error('[TrackSetupView] Errore ripristino trimming:', err);
+        console.error('[TrackSetupView] Error resetting track trimming:', err);
         resetTrimBtn.disabled = false;
       }
     });
@@ -549,7 +549,7 @@ export async function openTrackSetupView(flightId, options = {}) {
         );
         await openTrackSetupView(flightId, options);
       } catch (err) {
-        console.error('[TrackSetupView] Errore calibrazione quote:', err);
+        console.error('[TrackSetupView] Error calibrating elevations:', err);
         applyElevBtn.disabled = false;
       }
     });
@@ -562,7 +562,7 @@ export async function openTrackSetupView(flightId, options = {}) {
         await logbookManager.resetFlightElevations(flightId);
         await openTrackSetupView(flightId, options);
       } catch (err) {
-        console.error('[TrackSetupView] Errore ripristino quote:', err);
+        console.error('[TrackSetupView] Error resetting elevations:', err);
         resetElevBtn.disabled = false;
       }
     });

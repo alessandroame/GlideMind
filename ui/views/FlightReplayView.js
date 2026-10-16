@@ -5,7 +5,7 @@
  * Integrates:
  * - 3D Replay Engine (MapLibreThreeEngine / HeadlessReplayEngine)
  * - Decoupled 60 FPS 2D Telemetry & Timeline Scrubber Canvas
- * - Thumb-zone controls: Play/Pause, Speed multipliers (1x-20x), Camera modes (Chase, Cockpit, Free)
+ * - Thumb-zone controls: Play/Pause, Speed multipliers (1x-20x), Camera modes (Chase, Pilot, Free)
  * - Navigation return link (>= 48px) to #logbook
  * 
  * Strictly decoupled and 100% testable in Node.js environments.
@@ -46,6 +46,7 @@ export class FlightReplayView {
     this.flightEvents = [];
     this._boundKeyDown = this._onKeyDown.bind(this);
     this._boundLayerChange = this._onLayerChange.bind(this);
+    this._boundContainerClick = this._onContainerClick.bind(this);
     this._boundReplayToggle = null;
     this._boundStoreListener = null;
   }
@@ -305,6 +306,9 @@ export class FlightReplayView {
 
     this.currentFlightId = this._resolveTargetFlightId(params);
     this.currentBundle = await this._loadFlightData(this.currentFlightId);
+    if (!this.containerEl) {
+      return;
+    }
 
     const points = this.currentBundle?.points;
     const hasTrack = Array.isArray(points) && points.length >= 2;
@@ -312,7 +316,7 @@ export class FlightReplayView {
     if (!hasTrack) {
       const siteName = this.currentBundle?.meta?.siteName || this.currentBundle?.meta?.site || 'selezionato';
       containerEl.innerHTML = `
-        <section id="view-replay" class="gm-flight-replay-fullscreen flex flex-col items-center justify-center p-6 text-center" style="min-height: 100dvh; background: var(--gm-bg-base); color: var(--gm-text-primary);" aria-label="Visualizzatore 3D Traiettoria">
+        <section id="view-replay" class="gm-flight-replay-fullscreen gm-flight-replay-empty flex flex-col items-center justify-center p-6 text-center" aria-label="Visualizzatore 3D Traiettoria">
           <div class="max-w-md w-full p-6 rounded-xl border border-[var(--gm-border-default)] bg-[var(--gm-bg-surface)] flex flex-col items-center gap-4">
             <div class="w-12 h-12 rounded-full flex items-center justify-center bg-[var(--gm-bg-muted)] text-[var(--gm-text-muted)]">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -325,7 +329,7 @@ export class FlightReplayView {
             <p class="text-sm text-[var(--gm-text-secondary)] leading-relaxed">
               Il volo <strong>${escapeHtml(siteName)}</strong> non contiene una registrazione di coordinate GPS secondo per secondo. Il Replay 3D richiede una traccia reale IGC registrata da strumento o variometro.
             </p>
-            <button type="button" class="gm-btn gm-btn-primary mt-2" data-action="exit-replay" style="min-height: 48px;">
+            <button type="button" class="gm-btn gm-btn-primary mt-2" data-action="exit-replay">
               Torna al Flight Log
             </button>
           </div>
@@ -350,7 +354,7 @@ export class FlightReplayView {
       this._boundStoreListener = store.subscribe(() => {
         const s = store.getState();
         if (s.ui?.mapLayer && s.ui.mapLayer !== this.activeLayer) {
-          const validLayer = s.ui.mapLayer === 'satellite' ? 'satellite' : 'topo';
+          const validLayer = ['topo', 'satellite', 'dark', 'cyclosm'].includes(s.ui.mapLayer) ? s.ui.mapLayer : 'topo';
           this.activeLayer = validLayer;
           if (this.engine && typeof this.engine.setMapLayer === 'function') {
             this.engine.setMapLayer(validLayer);
@@ -367,7 +371,9 @@ export class FlightReplayView {
     this.engine = this._createEngine();
     const viewport3dEl = containerEl.querySelector('#gm-replay-viewport-3d');
     await this.engine.init(viewport3dEl, { flightId: this.currentFlightId });
+    if (!this.containerEl || !this.engine) return;
     await this.engine.loadTrack(this.currentBundle.points, { meta: this.currentBundle.meta });
+    if (!this.containerEl || !this.engine) return;
 
     // Mount 2D Telemetry Canvas
     const telemetryContainer = containerEl.querySelector('#gm-replay-telemetry-container');
@@ -407,65 +413,77 @@ export class FlightReplayView {
   }
 
   /**
+   * Delegated click handler on the replay container.
+   * @param {MouseEvent} e
+   */
+  _onContainerClick(e) {
+    const target = /** @type {HTMLElement} */ (e.target);
+    if (!target) return;
+
+    const exitBtn = target.closest('[data-action="exit-replay"]');
+    if (exitBtn) {
+      e.preventDefault();
+      this.handleExitReplay();
+      return;
+    }
+
+    const playBtn = target.closest('[data-action="toggle-play"]');
+    if (playBtn) {
+      e.preventDefault();
+      this.handleTogglePlay();
+      return;
+    }
+
+    const camBtn = target.closest('[data-camera]');
+    if (camBtn) {
+      e.preventDefault();
+      const mode = camBtn.getAttribute('data-camera');
+      this.handleCameraChange(mode);
+      return;
+    }
+
+    const speedBtn = target.closest('[data-speed]');
+    if (speedBtn) {
+      e.preventDefault();
+      const speed = Number(speedBtn.getAttribute('data-speed')) || 1;
+      this.handleSpeedChange(speed);
+      return;
+    }
+
+    const offsetBtn = target.closest('[data-action="toggle-offset"]');
+    if (offsetBtn) {
+      e.preventDefault();
+      this.handleToggleElevationOffset();
+      return;
+    }
+
+    const eventBtn = target.closest('[data-event-progress]');
+    if (eventBtn) {
+      e.preventDefault();
+      const p = parseFloat(eventBtn.getAttribute('data-event-progress'));
+      if (!isNaN(p)) {
+        this.handleSeek(p);
+      }
+      return;
+    }
+  }
+
+  /**
    * Attaches click listeners for replay controls.
    */
   _attachEventListeners() {
     if (!this.containerEl) return;
 
-    this.containerEl.addEventListener('click', (e) => {
-      const target = /** @type {HTMLElement} */ (e.target);
-      if (!target) return;
-
-      const exitBtn = target.closest('[data-action="exit-replay"]');
-      if (exitBtn) {
-        e.preventDefault();
-        this.handleExitReplay();
-        return;
-      }
-
-      const playBtn = target.closest('[data-action="toggle-play"]');
-      if (playBtn) {
-        e.preventDefault();
-        this.handleTogglePlay();
-        return;
-      }
-
-      const camBtn = target.closest('[data-camera]');
-      if (camBtn) {
-        e.preventDefault();
-        const mode = camBtn.getAttribute('data-camera');
-        this.handleCameraChange(mode);
-        return;
-      }
-
-      const speedBtn = target.closest('[data-speed]');
-      if (speedBtn) {
-        e.preventDefault();
-        const speed = Number(speedBtn.getAttribute('data-speed')) || 1;
-        this.handleSpeedChange(speed);
-        return;
-      }
-
-        const offsetBtn = target.closest('[data-action="toggle-offset"]');
-      if (offsetBtn) {
-        e.preventDefault();
-        this.handleToggleElevationOffset();
-        return;
-      }
-
-      const eventBtn = target.closest('[data-event-progress]');
-      if (eventBtn) {
-        e.preventDefault();
-        const p = parseFloat(eventBtn.getAttribute('data-event-progress'));
-        if (!isNaN(p)) {
-          this.handleSeek(p);
-        }
-        return;
-      }
-    });
+    if (typeof this.containerEl.removeEventListener === 'function') {
+      this.containerEl.removeEventListener('click', this._boundContainerClick);
+    }
+    this.containerEl.addEventListener('click', this._boundContainerClick);
 
     const layerToggle = this.containerEl.querySelector('#gm-replay-layer-toggle');
     if (layerToggle) {
+      if (this._boundReplayToggle && typeof layerToggle.removeEventListener === 'function') {
+        layerToggle.removeEventListener('click', this._boundReplayToggle);
+      }
       this._boundReplayToggle = () => {
         const nextLayer = getNextMapLayer(this.activeLayer);
         this.handleLayerChange(nextLayer);
@@ -475,6 +493,9 @@ export class FlightReplayView {
 
     const layerSelect = this.containerEl.querySelector('#gm-replay-layer-select');
     if (layerSelect) {
+      if (typeof layerSelect.removeEventListener === 'function') {
+        layerSelect.removeEventListener('change', this._boundLayerChange);
+      }
       layerSelect.addEventListener('change', this._boundLayerChange);
     }
   }
@@ -708,13 +729,18 @@ export class FlightReplayView {
       this._boundStoreListener = null;
     }
     if (this.containerEl) {
-      const layerToggle = this.containerEl.querySelector('#gm-replay-layer-toggle');
-      if (layerToggle && this._boundReplayToggle) {
-        layerToggle.removeEventListener('click', this._boundReplayToggle);
+      if (typeof this.containerEl.removeEventListener === 'function') {
+        this.containerEl.removeEventListener('click', this._boundContainerClick);
       }
-      const layerSelect = this.containerEl.querySelector('#gm-replay-layer-select');
-      if (layerSelect) {
-        layerSelect.removeEventListener('change', this._boundLayerChange);
+      if (typeof this.containerEl.querySelector === 'function') {
+        const layerToggle = this.containerEl.querySelector('#gm-replay-layer-toggle');
+        if (layerToggle && this._boundReplayToggle) {
+          layerToggle.removeEventListener('click', this._boundReplayToggle);
+        }
+        const layerSelect = this.containerEl.querySelector('#gm-replay-layer-select');
+        if (layerSelect) {
+          layerSelect.removeEventListener('change', this._boundLayerChange);
+        }
       }
       this.containerEl.innerHTML = '';
       this.containerEl = null;

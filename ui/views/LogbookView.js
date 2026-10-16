@@ -297,9 +297,9 @@ export class LogbookViewController {
             <button
               type="button"
               class="gm-btn gm-btn-primary gm-logbook-import-btn"
+              style="min-height: var(--gm-touch-min, 48px);"
               data-action="open-import-sheet"
               aria-label="Importa traccia IGC o backup ParaMeteo"
-              style="min-height: var(--gm-touch-min, 48px); padding: 8px 16px;"
             >
               + Importa
             </button>
@@ -314,7 +314,6 @@ export class LogbookViewController {
               data-tab="flights"
               role="tab"
               aria-selected="${this.activeTab === 'flights'}"
-              style="min-height: var(--gm-touch-min, 48px);"
             >
               Voli (${flights.length})
             </button>
@@ -325,7 +324,6 @@ export class LogbookViewController {
               data-tab="stats"
               role="tab"
               aria-selected="${this.activeTab === 'stats'}"
-              style="min-height: var(--gm-touch-min, 48px);"
             >
               Statistiche
             </button>
@@ -570,10 +568,9 @@ export class LogbookViewController {
         </div>
         <button
           type="button"
-          class="gm-btn gm-btn-primary mt-2"
+          class="gm-btn gm-btn-primary mt-2 gm-import-browse-btn"
           data-action="open-import-sheet"
           aria-label="Importa traccia IGC o backup ParaMeteo"
-          style="min-height: var(--gm-touch-min, 48px); min-width: 220px;"
         >
           + Importa Traccia IGC / Backup
         </button>
@@ -936,7 +933,7 @@ export class LogbookViewController {
     try {
       await this.logbookManager.exportFlightIgc(flightId);
     } catch (err) {
-      console.error('[LogbookView] Errore download IGC:', err);
+      console.error('[LogbookView] Error downloading IGC:', err);
     }
   }
 
@@ -1011,7 +1008,7 @@ export class LogbookViewController {
       try {
         await this.logbookManager.deleteFlight(flightToDelete.id);
       } catch (err) {
-        console.error('[LogbookView] Errore eliminazione definitiva volo:', err);
+        console.error('[LogbookView] Error permanently deleting flight:', err);
       }
     }
     this.render();

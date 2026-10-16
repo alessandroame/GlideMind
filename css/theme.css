@@ -1031,7 +1031,7 @@ button, input, select, textarea {
   box-shadow: 0 0 0 2px var(--gm-accent-glow);
 }
 
-.gm-search-input {
+.gm-search-box .gm-search-input {
   flex: 1;
   background: transparent;
   border: none;
@@ -1040,7 +1040,7 @@ button, input, select, textarea {
   color: var(--gm-text-primary);
 }
 
-.gm-search-input::placeholder {
+.gm-search-box .gm-search-input::placeholder {
   color: var(--gm-text-muted);
 }
 
@@ -1058,7 +1058,7 @@ button, input, select, textarea {
   gap: 8px;
 }
 
-.gm-spot-name {
+.gm-spot-card-header .gm-spot-name {
   font-weight: 700;
   font-size: 1rem;
   color: var(--gm-text-primary);
@@ -1334,12 +1334,6 @@ button, input, select, textarea {
   outline: 2px solid var(--gm-accent);
   outline-offset: 2px;
   border-color: var(--gm-accent);
-}
-
-.gm-spot-chevron {
-  color: var(--gm-text-muted);
-  flex-shrink: 0;
-  transition: transform var(--gm-transition-fast), color var(--gm-transition-fast);
 }
 
 .gm-spot-card:hover .gm-spot-chevron,
@@ -2751,11 +2745,6 @@ input.gm-input:focus {
 /* -------------------------------------------------------------
  * 15. Forecast View - Weather & Flyability Dashboard Styles
  * ------------------------------------------------------------- */
-.gm-forecast-view {
-  width: 100%;
-  padding-top: 4px;
-}
-
 .gm-forecast-header {
   display: flex;
   flex-direction: column;
@@ -3380,6 +3369,7 @@ input.gm-input:focus {
 .gm-compass-svg {
   display: block;
   user-select: none;
+  touch-action: pan-y;
 }
 
 .gm-compass-readout {
@@ -4100,10 +4090,6 @@ input.gm-input:focus {
   touch-action: pan-y;
 }
 
-.gm-compass-svg {
-  touch-action: pan-y;
-}
-
 /* Level 2 Sub-Spot Dropdown & Custom Bounded Popover */
 .gm-subspot-dropdown-wrapper {
   position: relative;
@@ -4199,7 +4185,7 @@ input.gm-input:focus {
   padding: 6px 0;
 }
 
-.gm-subspot-group-header {
+.gm-subspot-popover .gm-subspot-group-header {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -4211,7 +4197,7 @@ input.gm-input:focus {
   color: var(--gm-text-muted);
 }
 
-.gm-subspot-group-header svg {
+.gm-subspot-popover .gm-subspot-group-header svg {
   color: var(--gm-accent);
 }
 
@@ -7763,7 +7749,7 @@ input.gm-input:focus {
   width: 100%;
 }
 
-.gm-search-icon {
+.gm-search-input-box .gm-search-icon {
   position: absolute;
   left: 14px;
   color: var(--gm-text-muted);
@@ -7816,7 +7802,7 @@ input.gm-input:focus {
   display: none;
 }
 
-.gm-filter-chip {
+.gm-logbook-filters-carousel .gm-filter-chip {
   flex-shrink: 0;
   min-height: var(--gm-touch-min, 48px);
   padding: 8px 16px;
@@ -7833,19 +7819,19 @@ input.gm-input:focus {
   justify-content: center;
 }
 
-.gm-filter-chip:hover {
+.gm-logbook-filters-carousel .gm-filter-chip:hover {
   color: var(--gm-text-primary);
   border-color: var(--gm-border-strong);
 }
 
-.gm-filter-chip.active {
+.gm-logbook-filters-carousel .gm-filter-chip.active {
   background: var(--gm-accent-sky, #38bdf8);
   border-color: var(--gm-accent-sky, #38bdf8);
   color: #0f172a;
   font-weight: 700;
 }
 
-[data-theme="light"] .gm-filter-chip.active {
+[data-theme="light"] .gm-logbook-filters-carousel .gm-filter-chip.active {
   background: #0284c7;
   border-color: #0284c7;
   color: #ffffff;
@@ -7911,8 +7897,7 @@ input.gm-input:focus {
 .gm-flight-card-sub,
 .gm-flight-header-right,
 .gm-flight-route-row,
-.gm-flight-site-title,
-.gm-flight-title-group {
+.gm-flight-site-title {
   pointer-events: none;
 }
 
@@ -7932,6 +7917,7 @@ input.gm-input:focus {
   min-width: 0;
   flex: 1 1 auto;
   overflow: hidden;
+  pointer-events: none;
 }
 
 .gm-flight-header-right {
@@ -10942,4 +10928,103 @@ input.gm-input:focus {
 [data-theme="light"] .gm-subspot-info-badge {
   background-color: var(--gm-bg-elevated);
 }
+
+/* -------------------------------------------------------------
+ * 22. Design System Utility & Component Helper Classes
+ * ------------------------------------------------------------- */
+.gm-brand-badge {
+  padding: 2px 6px;
+  font-size: 0.65rem;
+}
+
+.gm-badge-micro {
+  font-size: 0.68rem;
+  padding: 2px 7px;
+}
+
+.gm-flight-replay-empty {
+  padding: 32px;
+  text-align: center;
+  color: var(--gm-text-secondary);
+}
+
+.gm-import-browse-btn {
+  padding: 8px 16px;
+  font-size: 0.8125rem;
+  border-radius: 6px;
+}
+
+.gm-placeholder-card {
+  text-align: center;
+  padding: 40px 20px;
+  margin-top: 20px;
+}
+
+.gm-placeholder-title {
+  margin: 0 0 8px 0;
+  color: var(--gm-accent);
+  font-size: 1.4rem;
+}
+
+.gm-placeholder-desc {
+  color: var(--gm-text-secondary);
+  margin: 0;
+}
+
+/* Atomic Layout & Spacing Utilities used by View Templates */
+.inline-block { display: inline-block; }
+.grid { display: grid; }
+.grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+.flex-none { flex: none; }
+.justify-end { justify-content: flex-end; }
+.overflow-y-auto { overflow-y: auto; }
+.select-none { user-select: none; }
+.pointer-events-none { pointer-events: none; }
+.leading-tight { line-height: 1.25; }
+.opacity-85 { opacity: 0.85; }
+.opacity-90 { opacity: 0.9; }
+
+.w-2\.5 { width: 0.625rem; }
+.h-0\.5 { height: 0.125rem; }
+.px-5 { padding-left: 1.25rem; padding-right: 1.25rem; }
+.pr-1 { padding-right: 0.25rem; }
+.mt-2\.5 { margin-top: 0.625rem; }
+.mb-4 { margin-bottom: 1rem; }
+
+.border { border-width: 1px; border-style: solid; }
+.border-l-2 { border-left-width: 2px; border-left-style: solid; }
+.border-dashed { border-style: dashed; }
+.rounded-lg { border-radius: var(--gm-radius-md); }
+
+.text-\[10px\] { font-size: 10px; }
+.text-\[0\.76rem\] { font-size: 0.76rem; }
+.text-\[0\.82rem\] { font-size: 0.82rem; }
+.min-h-\[44px\] { min-height: 44px; }
+.max-h-\[180px\] { max-height: 180px; }
+.max-w-\[45\%\] { max-width: 45%; }
+.max-w-\[65\%\] { max-width: 65%; }
+
+.text-\[var\(--gm-text-primary\)\] { color: var(--gm-text-primary); }
+.text-\[var\(--gm-text-secondary\)\] { color: var(--gm-text-secondary); }
+.text-\[var\(--gm-text-muted\)\] { color: var(--gm-text-muted); }
+.text-\[var\(--gm-accent\)\] { color: var(--gm-accent); }
+.text-\[var\(--gm-accent\,_\#38bdf8\)\] { color: var(--gm-accent, #38bdf8); }
+.text-\[var\(--gm-status-flyable\)\] { color: var(--gm-status-flyable); }
+.text-\[var\(--gm-status-caution\)\] { color: var(--gm-status-caution); }
+.text-\[var\(--gm-status-alert\)\] { color: var(--gm-status-alert); }
+.text-\[var\(--gm-status-unflyable\)\] { color: var(--gm-status-unflyable); }
+
+.bg-\[var\(--gm-bg-surface\)\] { background-color: var(--gm-bg-surface); }
+.bg-\[var\(--gm-bg-elevated\)\] { background-color: var(--gm-bg-elevated); }
+.bg-\[var\(--gm-status-caution\)\] { background-color: var(--gm-status-caution); }
+.bg-\[rgba\(245\,158\,11\,0\.06\)\] { background-color: rgba(245, 158, 11, 0.06); }
+.bg-\[rgba\(245\,158\,11\,0\.08\)\] { background-color: rgba(245, 158, 11, 0.08); }
+.bg-\[rgba\(239\,68\,68\,0\.08\)\] { background-color: rgba(239, 68, 68, 0.08); }
+
+.border-\[var\(--gm-border\)\] { border-color: var(--gm-border); }
+.border-\[var\(--gm-accent\)\] { border-color: var(--gm-accent); }
+.border-\[var\(--gm-status-caution\)\] { border-color: var(--gm-status-caution); }
+.border-\[var\(--gm-status-unflyable\)\] { border-color: var(--gm-status-unflyable); }
+.border-\[rgba\(245\,158\,11\,0\.35\)\] { border-color: rgba(245, 158, 11, 0.35); }
+
 

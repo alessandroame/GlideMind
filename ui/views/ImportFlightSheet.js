@@ -66,7 +66,7 @@ export function renderImportSheetHtml(options = {}) {
           id="gm-import-sheet-file-input"
           accept=".igc,.json,application/json"
           multiple
-          style="display: none;"
+          class="hidden"
           aria-hidden="true"
         />
 
@@ -83,10 +83,10 @@ export function renderImportSheetHtml(options = {}) {
 
         <button
           type="button"
-          class="gm-btn gm-btn-primary"
+          class="gm-btn gm-btn-primary gm-import-browse-btn"
           id="gm-import-browse-btn"
+          style="min-height: var(--gm-touch-min, 48px);"
           aria-label="Seleziona file dal dispositivo"
-          style="min-height: var(--gm-touch-min, 48px); min-width: 220px;"
         >
           Sfoglia File (.IGC / .JSON)
         </button>
@@ -104,7 +104,7 @@ export function renderImportSheetHtml(options = {}) {
       <!-- Manual Flight Entry Collapsible Section -->
       <details class="gm-glider-custom-details" id="gm-manual-flight-details">
         <summary class="gm-glider-custom-summary">Registra Volo Manualmente (Senza Traccia)</summary>
-        <form id="gm-manual-flight-form" class="gm-sheet-form" style="margin-top: 10px;">
+        <form id="gm-manual-flight-form" class="gm-sheet-form mt-2.5">
           <div class="gm-form-group">
             <label for="gm-manual-flight-date" class="gm-form-label">Data del Volo</label>
             <div class="gm-past-presets" role="group" aria-label="Scelta rapida data">
@@ -152,7 +152,6 @@ export function renderImportSheetHtml(options = {}) {
             type="submit"
             class="gm-btn gm-btn-primary gm-btn-full"
             id="gm-manual-flight-save-btn"
-            style="min-height: var(--gm-touch-min, 48px);"
           >
             Salva Volo nel Libretto
           </button>
@@ -160,7 +159,7 @@ export function renderImportSheetHtml(options = {}) {
       </details>
 
       <!-- Progress Section (Dynamic) -->
-      <div id="gm-import-progress-wrap" class="gm-import-progress-section" style="display: none;" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+      <div id="gm-import-progress-wrap" class="gm-import-progress-section hidden" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
         <div class="gm-import-progress-header">
           <span id="gm-import-progress-status" class="gm-import-progress-status">Importazione in corso...</span>
           <span id="gm-import-progress-pct" class="gm-import-progress-pct">0%</span>
@@ -171,7 +170,7 @@ export function renderImportSheetHtml(options = {}) {
       </div>
 
       <!-- Summary Outcome Section (Dynamic) -->
-      <div id="gm-import-summary-wrap" class="gm-import-summary-wrap" style="display: none;" role="status" aria-live="polite">
+      <div id="gm-import-summary-wrap" class="gm-import-summary-wrap hidden" role="status" aria-live="polite">
         <div class="gm-import-summary-badge">
           <span id="gm-import-summary-icon" class="gm-import-summary-icon">&#10003;</span>
           <div class="gm-import-summary-text">
@@ -184,7 +183,6 @@ export function renderImportSheetHtml(options = {}) {
           class="gm-btn gm-btn-primary w-full"
           id="gm-import-done-btn"
           aria-label="Chiudi e torna al flight log"
-          style="min-height: var(--gm-touch-min, 48px);"
         >
           Vai al Flight Log
         </button>
@@ -215,7 +213,10 @@ export async function processImportFiles(files, options = {}) {
   const summaryWrap = typeof document !== 'undefined' ? document.getElementById('gm-import-summary-wrap') : null;
   const summaryMsg = typeof document !== 'undefined' ? document.getElementById('gm-import-summary-msg') : null;
 
-  if (progressWrap) progressWrap.style.display = 'block';
+  if (progressWrap) {
+    progressWrap.classList.remove('hidden');
+    progressWrap.style.display = 'block';
+  }
   if (dropzone) dropzone.style.display = 'none';
 
   const totalFiles = files.length;
@@ -257,7 +258,7 @@ export async function processImportFiles(files, options = {}) {
         totalImportedFlights += 1;
       }
     } catch (err) {
-      console.error(`[ImportFlightSheet] Errore elaborazione file ${file.name}:`, err);
+      console.error(`[ImportFlightSheet] Error processing file ${file.name}:`, err);
     }
 
     completedFiles++;
@@ -273,12 +274,16 @@ export async function processImportFiles(files, options = {}) {
       targetStore.setState({ flights: updatedFlights });
     }
   } catch (err) {
-    console.warn('[ImportFlightSheet] Errore sincronizzazione store:', err);
+    console.warn('[ImportFlightSheet] Error synchronizing store:', err);
   }
 
   // Show summary
-  if (progressWrap) progressWrap.style.display = 'none';
+  if (progressWrap) {
+    progressWrap.classList.add('hidden');
+    progressWrap.style.display = 'none';
+  }
   if (summaryWrap) {
+    summaryWrap.classList.remove('hidden');
     summaryWrap.style.display = 'flex';
     const tracksText = totalImportedTracks > 0 ? ` (${totalImportedTracks} con traccia GPS)` : '';
     if (summaryMsg) {
@@ -416,6 +421,12 @@ export function openImportFlightSheet(options = {}) {
           const currentFlights = Array.isArray(state.flights) ? state.flights : [];
           if (targetStore && typeof targetStore.setState === 'function') {
             targetStore.setState({ flights: [newFlight, ...currentFlights] });
+          }
+
+          if (manager && typeof manager.saveFlight === 'function') {
+            try {
+              await manager.saveFlight(newFlight);
+            } catch (_) {}
           }
 
           if (typeof options.onSuccess === 'function') {

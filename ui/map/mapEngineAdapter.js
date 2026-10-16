@@ -621,8 +621,9 @@ export function generateTakeoffSectorSvg(heading = null, windDirection = null, a
   // Sector arc path (70° opening, clockwise)
   const sectorPath = `M ${center} ${center} L ${xStart} ${yStart} A ${radius} ${radius} 0 0 1 ${xEnd} ${yEnd} Z`;
 
+  const altSuffix = altitude != null && !isNaN(Number(altitude)) ? `, quota ${Math.round(Number(altitude))}m` : '';
   return `
-    <svg class="gm-takeoff-sector-svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="overflow: visible; pointer-events: none;" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Esposizione decollo ${H} gradi (${statusLabel})">
+    <svg class="gm-takeoff-sector-svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="overflow: visible; pointer-events: none;" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Esposizione decollo ${H} gradi (${statusLabel}${altSuffix})">
       <!-- Launch Window Sector (+/-35 deg) -->
       <path id="${prefix}wedge" d="${sectorPath}" fill="${fillColor}" stroke="${statusColor}" stroke-width="1.5" stroke-dasharray="3 2" />
       ${showArrow ? `
@@ -1441,7 +1442,7 @@ export class LeafletMapEngine {
 
     // 1. Takeoff Slope Exposure Sector (Cono e Azimut di Decollo)
     if (tCoord) {
-      const sectorSvg = generateTakeoffSectorSvg(tHeading, tDir, tAlt, { prefix: 'miniws-to-' });
+      const sectorSvg = generateTakeoffSectorSvg(tHeading, tDir, null, { prefix: 'miniws-to-' });
       const sectorIcon = window.L.divIcon({
         className: 'gm-takeoff-sector-marker-container',
         html: sectorSvg,
@@ -2402,6 +2403,13 @@ export class LeafletMapEngine {
       }
     }
 
+    const escAttr = (val) => String(val ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
     // Takeoff marker "D"
     const tLat = trackData?.takeoff?.lat != null ? trackData.takeoff.lat : (validPoints[0]?.lat ?? null);
     const tLon = trackData?.takeoff?.lon != null ? trackData.takeoff.lon : (validPoints[0]?.lon ?? null);
@@ -2409,7 +2417,7 @@ export class LeafletMapEngine {
       const tCoord = [tLat, tLon];
       const tIcon = window.L.divIcon({
         className: 'gm-map-div-icon',
-        html: `<div class="gm-flight-map-pin gm-flight-map-takeoff-pin" title="${trackData?.takeoff?.name || 'Decollo'}">D</div>`,
+        html: `<div class="gm-flight-map-pin gm-flight-map-takeoff-pin" title="${escAttr(trackData?.takeoff?.name || 'Decollo')}">D</div>`,
         iconSize: [22, 22],
         iconAnchor: [11, 11]
       });
@@ -2424,7 +2432,7 @@ export class LeafletMapEngine {
       const lCoord = [lLat, lLon];
       const lIcon = window.L.divIcon({
         className: 'gm-map-div-icon',
-        html: `<div class="gm-flight-map-pin gm-flight-map-landing-pin" title="${trackData?.landing?.name || 'Atterraggio'}">A</div>`,
+        html: `<div class="gm-flight-map-pin gm-flight-map-landing-pin" title="${escAttr(trackData?.landing?.name || 'Atterraggio')}">A</div>`,
         iconSize: [22, 22],
         iconAnchor: [11, 11]
       });

@@ -31,7 +31,7 @@ if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined' && typeof 
       store.setState({ flights });
     }
   }).catch((err) => {
-    console.warn('[GlideMind] Impossibile caricare voli da IndexedDB:', err);
+    console.warn('[GlideMind] Unable to load flights from IndexedDB:', err);
   });
 }
 
@@ -62,7 +62,7 @@ export async function loadLocationsCatalog() {
         }
       }
     } catch (err) {
-      console.warn('[GlideMind] Impossibile caricare /data/locations.json, fallback a DEFAULT_COMPRENSORI:', err);
+      console.warn('[GlideMind] Unable to load /data/locations.json, falling back to DEFAULT_COMPRENSORI:', err);
     }
   }
   return DEFAULT_COMPRENSORI;
@@ -102,6 +102,24 @@ export function bootstrapApp() {
 
   // Load persisted user preferences, cached spots, and active mapLayer
   store.loadPersistedState();
+
+  // Re-synchronize flights from authoritative IndexedDB after loadPersistedState to prevent race conditions
+  if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined' && typeof logbookManager.getAllFlights === 'function') {
+    logbookManager.getAllFlights().then((flights) => {
+      if (Array.isArray(flights) && flights.length > 0) {
+        store.setState({ flights });
+      }
+    }).catch((err) => {
+      console.warn('[GlideMind] Unable to synchronize flights from IndexedDB on bootstrap:', err);
+    });
+  }
+
+  // Register offline-first Service Worker when supported in browser environment
+  if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator && typeof navigator.serviceWorker?.register === 'function') {
+    navigator.serviceWorker.register('./sw.js').catch((err) => {
+      console.warn('[GlideMind] Service Worker registration skipped or failed:', err);
+    });
+  }
 
   // Synchronize visual theme
   const currentTheme = (store.getState().ui && store.getState().ui.theme) || 'dark';

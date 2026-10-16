@@ -1277,14 +1277,14 @@ export class ForecastViewController {
                 : this.renderParameterCards(evaluated, weatherData, spot, glider, activeSubSpotObj)}
             </div>
           ` : `
-            <div id="forecast-params-container" style="display:none;" aria-hidden="true"></div>
+            <div id="forecast-params-container" class="hidden" aria-hidden="true"></div>
           `}
 
           <!-- Hidden containers for wind and sounding panel tests compatibility -->
-          <div id="forecast-wind-panel-container" style="display:none;" aria-hidden="true">
+          <div id="forecast-wind-panel-container" class="hidden" aria-hidden="true">
             ${this.renderWindPanel(evaluated, weatherData, spot, activeSubSpotObj)}
           </div>
-          <div id="forecast-sounding-panel-container" style="display:none;" aria-hidden="true">
+          <div id="forecast-sounding-panel-container" class="hidden" aria-hidden="true">
             ${this.renderSoundingPanel(evaluated, weatherData, spot, activeSubSpotObj)}
           </div>
 
@@ -1576,10 +1576,10 @@ export class ForecastViewController {
                 data-date="${p.isoDate}"
                 role="tab"
                 aria-selected="${p.isActive ? 'true' : 'false'}"
-                title="${p.label} - ${p.subLabel}${p.flyability && p.flyability.status !== 'unknown' ? ` (${p.flyability.label})` : ''}"
+                title="${escapeHtml(p.label)} - ${escapeHtml(p.subLabel)}${p.flyability && p.flyability.status !== 'unknown' ? ` (${escapeHtml(p.flyability.label)})` : ''}"
               >
                 <span class="gm-date-tab-main">
-                  ${p.shortLabel || p.label}
+                  ${escapeHtml(p.shortLabel || p.label)}
                   ${p.flyability && p.flyability.status !== 'unknown' ? `<span class="gm-tab-fly-dot fly-${p.flyability.status}" title="${escapeHtml(p.flyability.label)}"></span>` : ''}
                 </span>
               </button>
@@ -1847,7 +1847,7 @@ export class ForecastViewController {
    */
   updateFlightAnalysisToggleUi(newLayer) {
     const root = this.flightAnalysisOverlayEl || this.container || (typeof document !== 'undefined' ? document : null);
-    if (!root) return;
+    if (!root || typeof root.querySelector !== 'function') return;
     const toggleBtn = root.querySelector('#forecast-flight-analysis-layer-toggle');
     if (!toggleBtn) return;
     const isSat = newLayer === 'satellite';
@@ -2278,7 +2278,7 @@ export class ForecastViewController {
     const maxWindLimit = glider.maxWind || 18;
     const maxGustLimit = glider.maxGust || 25;
 
-    // 1. Vento in Decollo
+    // 1. Takeoff Wind
     let windStatus = 'flyable';
     let windStatusLabel = 'Favorevole';
 
@@ -2391,7 +2391,7 @@ export class ForecastViewController {
             : 'Vento oltre i limiti di sicurezza dell\'ala o con componente posteriore marcata. Decollo sconsigliato.')
     };
 
-    // 2. Raffiche & Delta Vento
+    // 2. Gusts & Wind Delta
     let gustStatus = 'flyable';
     let gustStatusLabel = 'Flusso Regolare';
     if (activePoint.deltaWind <= 7 && activePoint.gust <= maxWindLimit) {
@@ -2456,7 +2456,7 @@ export class ForecastViewController {
       }
     };
 
-    // 3. Base Cumulo (LCL)
+    // 3. Cloud Base (LCL)
     const lclMargin = activePoint.lclMsl - takeoff.altitude;
     let lclStatus = 'flyable';
     let lclStatusLabel = 'Favorevole';
@@ -2497,7 +2497,7 @@ export class ForecastViewController {
         : 'Quota nubi molto bassa. Visibilità ridotta e rischio concreto di banco nuvoloso a ridosso del pendio.'
     };
 
-    // 4. Instabilità / Temporali (CAPE)
+    // 4. Instability / Thunderstorms (CAPE)
     let capeStatus = 'flyable';
     let capeStatusLabel = 'Stabile / Sicuro';
     if (activePoint.cape < 300) {
@@ -2556,7 +2556,7 @@ export class ForecastViewController {
       }
     };
 
-    // 5. Turbolenza in Termica (EDR)
+    // 5. Thermal Turbulence (EDR)
     let edrStatus = 'flyable';
     let edrStatusLabel = 'Termiche Dolci';
     if (activePoint.edr <= 1.8) {
@@ -2614,7 +2614,7 @@ export class ForecastViewController {
       }
     };
 
-    // 6. Copertura Nuvolosa & Insolazione
+    // 6. Cloud Cover & Insolation
     let cloudStatus = 'flyable';
     let cloudStatusLabel = 'Soleggiato';
     if (activePoint.precip > 0.5) {
@@ -2697,7 +2697,7 @@ export class ForecastViewController {
       }
     };
 
-    // 7. Condizioni in Atterraggio
+    // 7. Landing Conditions
     const isLandingSafe = evaluated.glideMetrics ? evaluated.glideMetrics.isSafe : true;
     const reqGlide = evaluated.glideMetrics ? evaluated.glideMetrics.requiredGlideRatio : 6.0;
     const limitGlide = evaluated.glideMetrics ? evaluated.glideMetrics.safeLimit : 7.0;
@@ -4832,7 +4832,7 @@ export class ForecastViewController {
                   data-action="pick-calendar-date"
                   data-date="${d.isoDate}"
                   aria-selected="${isSelected ? 'true' : 'false'}"
-                  title="${d.dayName} ${d.formatted} (${d.horizon.label}) - ${d.flyability.label}: ${d.flyability.limitingFactor || ''}"
+                  title="${escapeHtml(d.dayName)} ${escapeHtml(d.formatted)} (${escapeHtml(d.horizon.label)}) - ${escapeHtml(d.flyability.label)}: ${escapeHtml(d.flyability.limitingFactor || '')}"
                 >
                   <span class="grid-day-name">${escapeHtml(d.dayName)}</span>
                   <span class="grid-day-number">${d.dayNumber}</span>
@@ -5965,6 +5965,7 @@ export class ForecastViewController {
 
       document.body.appendChild(overlayEl);
       this.flightAnalysisOverlayEl = overlayEl;
+      overlayEl.__cleanupOverlay = () => this.closeFlightAnalysisOverlay();
       overlayEl.addEventListener('click', this.boundClickHandler);
       overlayEl.addEventListener('change', this.boundChangeHandler);
       overlayEl.addEventListener('pointerdown', this.boundPointerDown);
