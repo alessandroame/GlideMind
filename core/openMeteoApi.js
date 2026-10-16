@@ -114,6 +114,7 @@ export const DEFAULT_HOURLY_SURFACE_VARS = Object.freeze([
     'dewpoint_2m',
     'pressure_msl',
     'surface_pressure',
+    'cloudcover',
     'cloudcover_low',
     'cloudcover_mid',
     'cloudcover_high',
@@ -706,6 +707,10 @@ export function generateSyntheticWeather(coords, options = {}) {
     const blhArr = [];
     const pressMslArr = [];
     const surfPressArr = [];
+    const cloudArr = [];
+    const cloudLowArr = [];
+    const cloudMidArr = [];
+    const cloudHighArr = [];
 
     const baseDate = new Date(`${targetDate}T00:00:00Z`);
 
@@ -726,6 +731,9 @@ export function generateSyntheticWeather(coords, options = {}) {
         let temp = 20;
         let dir = 180;
         let dew = 12.0;
+        let cloudLow = 10;
+        let cloudMid = 8;
+        let cloudHigh = 12;
 
         if (hourOfDay >= 0 && hourOfDay <= 5) {
             // Night: calm, stable catabatic flow
@@ -735,6 +743,9 @@ export function generateSyntheticWeather(coords, options = {}) {
             temp = 14;
             dir = 360;
             dew = 11.5;
+            cloudLow = 5;
+            cloudMid = 5;
+            cloudHigh = 10;
         } else if (hourOfDay >= 6 && hourOfDay <= 8) {
             // Early Morning: calm, optimal student window (Green)
             wind = 8;
@@ -743,38 +754,53 @@ export function generateSyntheticWeather(coords, options = {}) {
             temp = 17;
             dir = 180;
             dew = 11.8;
+            cloudLow = 8 + (hourOfDay - 6) * 3;
+            cloudMid = 6;
+            cloudHigh = 12;
         } else if (hourOfDay >= 9 && hourOfDay <= 11) {
-            // Late Morning: active thermals developing (Yellow)
+            // Late Morning: active thermals & cumulus developing (Yellow)
             wind = 14;
             gust = 20;
             cape = 450;
             temp = 22;
             dir = 185;
             dew = 12.2;
+            cloudLow = 20 + (hourOfDay - 9) * 5;
+            cloudMid = 12;
+            cloudHigh = 15;
         } else if (hourOfDay >= 12 && hourOfDay <= 14) {
-            // Midday: strong thermals, gusty (Peak flying)
+            // Midday: strong thermals, gusty, active cumulus (Peak flying)
             wind = 18;
             gust = 26;
             cape = 950;
             temp = 26;
             dir = 190;
             dew = 13.0;
+            cloudLow = 36 + (hourOfDay - 12) * 4;
+            cloudMid = 18;
+            cloudHigh = 18;
         } else if (hourOfDay >= 15 && hourOfDay <= 17) {
-            // Late Afternoon: intense convective activity
+            // Late Afternoon: intense convective activity & cloud spread
             wind = 22;
             gust = 32;
             cape = 1100;
             temp = 24;
             dir = 200;
             dew = 13.5;
+            cloudLow = 44 - (hourOfDay - 15) * 4;
+            cloudMid = 26;
+            cloudHigh = 22;
         } else if (hourOfDay >= 18 && hourOfDay <= 20) {
-            // Evening: smooth evening restitution (Green)
+            // Evening: smooth evening restitution & cumulus dissipation (Green)
             wind = 9;
             gust = 12;
             cape = 120;
             temp = 21;
             dir = 180;
             dew = 12.5;
+            cloudLow = 16 - (hourOfDay - 18) * 3;
+            cloudMid = 12;
+            cloudHigh = 16;
         } else {
             // Night
             wind = 6;
@@ -783,6 +809,9 @@ export function generateSyntheticWeather(coords, options = {}) {
             temp = 16;
             dir = 350;
             dew = 11.8;
+            cloudLow = 6;
+            cloudMid = 6;
+            cloudHigh = 10;
         }
 
         if (isLanding) {
@@ -791,6 +820,7 @@ export function generateSyntheticWeather(coords, options = {}) {
             gust = Math.max(5, Math.round(gust * 0.8));
             dir = (dir + 25) % 360;
             temp = Math.round((temp + Math.max(0, (900 - effectiveElev) * 0.0065)) * 10) / 10;
+            cloudLow = Math.max(4, Math.round(cloudLow * 0.85));
         }
 
         // Apply realistic deterministic multi-day synoptic progression for dayIndex > 0
@@ -802,6 +832,8 @@ export function generateSyntheticWeather(coords, options = {}) {
                     wind = Math.round(wind * 1.15);
                     gust = Math.round(gust * 1.25);
                     cape = Math.min(1400, Math.round(cape * 1.3));
+                    cloudLow = Math.min(100, cloudLow + 12);
+                    cloudMid = Math.min(100, cloudMid + 10);
                 }
             } else if (dayCycle === 2) {
                 // Unflyable day (Red) - rain & crosswind
@@ -810,6 +842,9 @@ export function generateSyntheticWeather(coords, options = {}) {
                     wind = Math.round(wind * 1.4);
                     gust = Math.round(gust * 1.5);
                     dir = (dir + 90) % 360;
+                    cloudLow = 75;
+                    cloudMid = 80;
+                    cloudHigh = 60;
                 }
             } else if (dayCycle === 3) {
                 // Severe hazard day (Black) - severe storm & violent gusts
@@ -818,6 +853,9 @@ export function generateSyntheticWeather(coords, options = {}) {
                     wind = 34;
                     gust = 48;
                     rain = 5.2;
+                    cloudLow = 85;
+                    cloudMid = 90;
+                    cloudHigh = 85;
                 }
             } else if (dayCycle === 4) {
                 // Optimal calm soaring day (Green)
@@ -825,14 +863,22 @@ export function generateSyntheticWeather(coords, options = {}) {
                 gust = Math.max(9, Math.round(gust * 0.75));
                 cape = Math.min(400, cape);
                 rain = 0;
+                cloudLow = Math.max(4, Math.round(cloudLow * 0.6));
+                cloudMid = Math.max(4, Math.round(cloudMid * 0.6));
             } else if (dayCycle === 5) {
                 // Caution day (Yellow) - moderate wind
                 if (hourOfDay >= 11 && hourOfDay <= 17) {
                     wind = Math.round(wind * 1.2);
                     gust = Math.round(gust * 1.25);
+                    cloudLow = Math.min(100, cloudLow + 8);
                 }
             }
         }
+
+        const cloudTotal = Math.min(
+            100,
+            Math.round(100 * (1 - (1 - cloudLow / 100) * (1 - cloudMid / 100) * (1 - cloudHigh / 100)))
+        );
 
         // Diurnal solar radiation and boundary layer height
         let rad = 0;
@@ -854,6 +900,10 @@ export function generateSyntheticWeather(coords, options = {}) {
         blhArr.push(blh);
         pressMslArr.push(1015.0);
         surfPressArr.push(Math.round(1015.0 * Math.exp(-effectiveElev / 8434)));
+        cloudArr.push(cloudTotal);
+        cloudLowArr.push(cloudLow);
+        cloudMidArr.push(cloudMid);
+        cloudHighArr.push(cloudHigh);
     }
 
     const hourly = {
@@ -862,9 +912,10 @@ export function generateSyntheticWeather(coords, options = {}) {
         dewpoint_2m: dewArr,
         pressure_msl: pressMslArr,
         surface_pressure: surfPressArr,
-        cloudcover_low: new Array(totalHours).fill(15),
-        cloudcover_mid: new Array(totalHours).fill(10),
-        cloudcover_high: new Array(totalHours).fill(20),
+        cloudcover: cloudArr,
+        cloudcover_low: cloudLowArr,
+        cloudcover_mid: cloudMidArr,
+        cloudcover_high: cloudHighArr,
         windspeed_10m: windArr,
         winddirection_10m: dirArr,
         windgusts_10m: gustArr,
@@ -1050,6 +1101,27 @@ export function enrichWeatherData(rawPayload, targetDate, fetchTimestamp = Date.
 
         return calculateThermalLift(rad, blh, wind, rain, elev);
     });
+
+    // Ensure total cloudcover array is populated from cloud_cover alias or low/mid/high layers if absent
+    if (!Array.isArray(payload.hourly.cloudcover)) {
+        if (Array.isArray(payload.hourly.cloud_cover)) {
+            payload.hourly.cloudcover = payload.hourly.cloud_cover.slice();
+        } else if (
+            Array.isArray(payload.hourly.cloudcover_low) ||
+            Array.isArray(payload.hourly.cloudcover_mid) ||
+            Array.isArray(payload.hourly.cloudcover_high)
+        ) {
+            const lowArr = payload.hourly.cloudcover_low || [];
+            const midArr = payload.hourly.cloudcover_mid || [];
+            const highArr = payload.hourly.cloudcover_high || [];
+            payload.hourly.cloudcover = times.map((_, i) => {
+                const l = Math.min(100, Math.max(0, Number(lowArr[i] ?? 0)));
+                const m = Math.min(100, Math.max(0, Number(midArr[i] ?? 0)));
+                const h = Math.min(100, Math.max(0, Number(highArr[i] ?? 0)));
+                return Math.min(100, Math.round(100 * (1 - (1 - l / 100) * (1 - m / 100) * (1 - h / 100))));
+            });
+        }
+    }
 
     // Calculate Dew Point for isobaric pressure levels if present
     STANDARD_PRESSURE_LEVELS_HPA.forEach(hpa => {

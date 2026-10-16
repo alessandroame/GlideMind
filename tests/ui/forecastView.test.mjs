@@ -15,6 +15,7 @@ import {
 } from '../../ui/views/ForecastView.js';
 import { DEFAULT_COMPRENSORI, parseCoordinates } from '../../core/comprensorio.js';
 import { GLIDER_CLASSES } from '../../core/flyability.js';
+import { generateSyntheticWeather } from '../../core/openMeteoApi.js';
 
 describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
   it('should initialize with default state and contracts', () => {
@@ -3780,8 +3781,77 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
       assert.ok(expWindSlice.includes('aria-expanded="true"'), 'Expanded trend chart card must set aria-expanded="true"');
       assert.ok(expWindSlice.includes('18 km/h') && expWindSlice.includes('26 km/h'), 'Expanded wind chart must display threshold labels');
     });
+
+    it('should render a dynamic hourly cloudCover curve instead of a flat 25% line for both direct and layered payloads', () => {
+      const targetDate = '2026-10-15';
+      const spot = DEFAULT_COMPRENSORI[0];
+      const takeoff = spot.takeoffs[0];
+      const landing = spot.landings[0];
+      const mockStore = createStore({ selectedSpot: spot });
+
+      // 1. Synthetic weather payload (direct cloudcover + layers)
+      const parsedCoords = parseCoordinates(takeoff.coordinates) || { lat: 45.35, lon: 7.35 };
+      const synthWeather = generateSyntheticWeather(
+        { lat: parsedCoords.lat, lon: parsedCoords.lon, elev: takeoff.altitude },
+        { targetDate, days: 1 }
+      );
+      const controller = new ForecastViewController({ store: mockStore, comprensori: DEFAULT_COMPRENSORI });
+      controller.activeDate = targetDate;
+      const synthMetrics = controller.computeParamMetrics(takeoff, synthWeather, spot, GLIDER_CLASSES.EN_A, false);
+      const synthCloudSeries = synthMetrics.hourlyPoints.map(pt => pt.cloudCover);
+      const uniqueSynthClouds = new Set(synthCloudSeries);
+      assert.ok(uniqueSynthClouds.size >= 4, 'Synthetic weather cloudCover series must vary across daylight hours instead of flat 25%');
+      assert.ok(!synthCloudSeries.every(v => v === 25), 'cloudCover series must not be hardcoded at 25%');
+
+      // 2. Partial cached payload with only cloudcover_low/mid/high (no total cloudcover property)
+      const times = [];
+      const cloudLow = [];
+      const cloudMid = [];
+      const cloudHigh = [];
+      for (let h = 0; h < 24; h++) {
+        times.push(`${targetDate}T${String(h).padStart(2, '0')}:00`);
+        cloudLow.push(h >= 11 && h <= 16 ? 60 : 10);
+        cloudMid.push(h >= 13 && h <= 17 ? 40 : 5);
+        cloudHigh.push(15);
+      }
+      const layeredOnlyWeather = {
+        targetDate,
+        hourly: {
+          time: times,
+          temperature_2m: new Array(24).fill(20),
+          dewpoint_2m: new Array(24).fill(11),
+          windspeed_10m: new Array(24).fill(12),
+          windgusts_10m: new Array(24).fill(16),
+          winddirection_10m: new Array(24).fill(180),
+          cloudcover_low: cloudLow,
+          cloudcover_mid: cloudMid,
+          cloudcover_high: cloudHigh,
+          cape: new Array(24).fill(300),
+          precipitation: new Array(24).fill(0)
+        }
+      };
+
+      controller.selectedHour = 14;
+      const layeredMetrics = controller.computeParamMetrics(takeoff, layeredOnlyWeather, spot, GLIDER_CLASSES.EN_A, false);
+      const morningPt = layeredMetrics.hourlyPoints.find(pt => pt.hour === 9);
+      const middayPt = layeredMetrics.hourlyPoints.find(pt => pt.hour === 14);
+      assert.ok(morningPt && middayPt, 'Must compute morning and midday points');
+      assert.equal(morningPt.cloudCover, 27, 'Morning cloudCover must be derived from random overlap of (10%, 5%, 15%) = 27%');
+      assert.equal(middayPt.cloudCover, 80, 'Midday cloudCover must be derived from random overlap of (60%, 40%, 15%) = 80%');
+      const cloudParam = layeredMetrics.params.find(p => p.id === 'copertura');
+      assert.ok(cloudParam.value.includes('80%'), 'Cloud cover parameter card must display 80% at 14:00');
+
+      const trendHtml = controller.renderMultiTrendCharts(
+        { takeoff, landing, status: 'flyable' },
+        layeredOnlyWeather,
+        spot,
+        GLIDER_CLASSES.EN_A,
+        takeoff
+      );
+      const cloudStart = trendHtml.indexOf('id="multi-chart-cloudcover"');
+      assert.ok(cloudStart !== -1, 'Must render multi-chart-cloudcover card');
+      const cloudSlice = trendHtml.slice(cloudStart, cloudStart + 3500);
+      assert.ok(cloudSlice.includes('80') && cloudSlice.includes('Nuvoloso'), 'multi-chart-cloudcover card must reflect 80% Nuvoloso at selected hour 14');
+    });
   });
 });
-
-
-

@@ -135,3 +135,11 @@ Giornale a finestra mobile (rolling window, max **300 righe** / **ultimi 15 inte
 - **Sintesi**:
   - Compattati del 50% i file `rules/AGENTS.md` always-on (`68,9 KB` $\to$ `33,2 KB`) eliminando l'esclusione dal budget inline di `cognitive-persistence` e `laws-of-ux`, e corretti i frontmatter YAML (`>-`, 80–250 char, trigger direttivi) di tutte le skill custom (ripristinando `skill-audit` e `skill-token-optimizer`).
   - Allineati `AGENTS.md`, `.agents/rules/constraints.md`, `ui_layout_spec.md`, `novice_pilot_spec.md`, `comprensorio_locality_spec.md` e `novice-pilot-auditor/SKILL.md` agli invarianti di `MEMORY.md`, con gate automatico in [`tests/ui/shiftLeftGovernance.test.mjs`](file:///c:/github/GlideMind/tests/ui/shiftLeftGovernance.test.mjs).
+
+---
+
+## 2026-10-16 - Fase 1 & 4: Fix Copertura Nuvolosa Piatta al 25% nei Grafici Previsioni e Variabili Open-Meteo
+- **Tipo**: Bugfix Meteo & Grafici (`core/openMeteoApi.js`, `ui/views/ForecastView.js`)
+- **Dettagli**: [.agents/worklog.d/2026-10-16_fix-flat-cloudcover-chart-and-api-vars.md](file:///c:/github/GlideMind/.agents/worklog.d/2026-10-16_fix-flat-cloudcover-chart-and-api-vars.md)
+- **Sintesi**:
+  - Aggiunto `'cloudcover'` a `DEFAULT_HOURLY_SURFACE_VARS` in [`core/openMeteoApi.js`](file:///c:/github/GlideMind/core/openMeteoApi.js), introdotto il ciclo diurno dei cumuli in `generateSyntheticWeather` e la sintesi random-overlap da `cloudcover_low`/`mid`/`high` in `enrichWeatherData` e `ForecastViewController.computeParamMetrics`.

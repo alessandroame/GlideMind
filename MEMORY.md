@@ -36,9 +36,9 @@ Registro distillato per dominio dei vincoli architetturali e delle insidie di ru
 - **Disaccoppiamento Oro-Meteorologico Decollo/Atterraggio e Sub-Spot**:
   - *Insidia*: Usare solo `baseKey` (`${spot.id}_${dateStr}`) serve l'aerologia del decollo primario; d'altra parte, salvare il fallback sintetico a `0ms` sulla `compositeKey` (`${spot.id}_${takeoff.id}_${landing.id}_${dateStr}`) senza invalidarlo al ritorno di `fetchWeatherDataAsync` lascia la `Timeline Volabilità` bloccata sui dati sintetici, mentre iniettare `landingWeather` sintetico (`26 km/h` gust) in un `mainWeather` reale degrada falsamente il pomeriggio.
   - *Regola*: In `ForecastView.js` invalidare tutte le chiavi `${spot.id}_*_${dateStr}` quando arriva il payload live, dare sempre priorità alle entry `!isSynthetic` in `getWeatherData`, non allegare mai `landingWeather` sintetico a un `mainWeather` reale e usare `windspeed_10m ?? wind_speed_10m` in `HomeDashboardView.js`.
-- **Resilienza Client Open-Meteo & Protezione Quota HTTP 429**:
-  - *Insidia*: Modelli regionali (`arome_france`, `icon_d2`) fuori dominio o oltre 2 giorni restituiscono HTTP 400; richieste concorrenti duplicate saturano il rate limit (HTTP 429).
-  - *Regola*: Applicare in `core/openMeteoApi.js` fallback automatico a `best_match` su HTTP 400, in-flight promise pooling, circuit breaker cooldown su HTTP 429 e fallback su cache stale offline (`isStaleOfflineFallback: true`).
+- **Resilienza Client Open-Meteo, Copertura Nuvolosa Totale & Protezione Quota HTTP 429**:
+  - *Insidia*: Modelli regionali (`arome_france`, `icon_d2`) fuori dominio o oltre 2 giorni restituiscono HTTP 400; richieste concorrenti duplicate saturano il rate limit (HTTP 429); omettere `'cloudcover'` da `DEFAULT_HOURLY_SURFACE_VARS` lasciando solo `cloudcover_low`/`mid`/`high` fa cadere `ForecastView.computeParamMetrics` sul default fisso `25%`.
+  - *Regola*: Includere sempre `'cloudcover'` in `DEFAULT_HOURLY_SURFACE_VARS` e sintetizzare la copertura totale con random-overlap (`1 - (1-low)*(1-mid)*(1-high)`) in `enrichWeatherData` e `computeParamMetrics` se assente. Applicare fallback a `best_match` su HTTP 400, in-flight promise pooling e circuit breaker su HTTP 429.
 - **Traduzione Fenomenologica Anti-Gergo (`novice-pilot-auditor`)**:
   - *Insidia*: Esporre acronimi grezzi (`CAPE`, `LCL`, `EDR`) rallenta il triage pre-volo oltre i 3 secondi.
   - *Regola*: Affiancare sempre l'etichetta fenomenologica in italiano (*Instabilità / Temporali*, *Base Nubi*, *Turbolenza in Termica*, *Gradiente Termico*) come dato primario.

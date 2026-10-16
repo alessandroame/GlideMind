@@ -816,4 +816,40 @@ describe('Open-Meteo Client - Geocoding & Reverse Geocoding', () => {
 
         assert.equal(spotName, 'Suello (Lecco)');
     });
+
+    it('should request total cloudcover in surface variables and generate non-flat diurnal cloudcover curves', () => {
+        const fullVars = buildHourlyVariablesList({ includeSounding: true });
+        assert.ok(fullVars.includes('cloudcover'), 'buildHourlyVariablesList must include total cloudcover');
+
+        const synth = generateSyntheticWeather({ lat: 45.83, lon: 9.30, elev: 1100 }, { targetDate: '2026-10-16', days: 3 });
+        assert.ok(Array.isArray(synth.hourly.cloudcover), 'Synthetic weather must include hourly.cloudcover array');
+        assert.equal(synth.hourly.cloudcover.length, 72);
+
+        const day1DaylightClouds = synth.hourly.cloudcover.slice(7, 20);
+        const uniqueCloudValues = new Set(day1DaylightClouds);
+        assert.ok(uniqueCloudValues.size >= 4, 'Daylight synthetic cloudcover must follow a diurnal curve rather than a flat line');
+        assert.ok(synth.hourly.cloudcover[14] > synth.hourly.cloudcover[7], 'Midday convective cloudcover must exceed early morning cloudcover');
+
+        // Verify enrichWeatherData synthesizes total cloudcover when only layered cloudcover_low/mid/high are present
+        const partialPayload = {
+            latitude: 45.83,
+            longitude: 9.30,
+            elevation: 1100,
+            hourly: {
+                time: ['2026-10-16T08:00', '2026-10-16T12:00', '2026-10-16T16:00'],
+                temperature_2m: [16, 22, 20],
+                dewpoint_2m: [10, 11, 11],
+                windspeed_10m: [8, 15, 12],
+                winddirection_10m: [180, 185, 190],
+                windgusts_10m: [11, 22, 18],
+                cloudcover_low: [10, 50, 30],
+                cloudcover_mid: [0, 20, 10],
+                cloudcover_high: [10, 10, 20],
+                cape: [50, 600, 400],
+                precipitation: [0, 0, 0]
+            }
+        };
+        const enriched = enrichWeatherData(partialPayload, '2026-10-16');
+        assert.deepEqual(enriched.hourly.cloudcover, [19, 64, 50]);
+    });
 });

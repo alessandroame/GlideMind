@@ -2262,6 +2262,9 @@ export class ForecastViewController {
         const rawHum = hourlyData.relativehumidity_2m ?? hourlyData.relative_humidity_2m;
         const rawCape = hourlyData.cape;
         const rawCloud = hourlyData.cloudcover ?? hourlyData.cloud_cover;
+        const rawCloudLow = hourlyData.cloudcover_low ?? hourlyData.cloud_cover_low;
+        const rawCloudMid = hourlyData.cloudcover_mid ?? hourlyData.cloud_cover_mid;
+        const rawCloudHigh = hourlyData.cloudcover_high ?? hourlyData.cloud_cover_high;
         const rawPrecip = hourlyData.precipitation ?? hourlyData.rain;
         const rawPrecipProb = hourlyData.precipitation_probability;
 
@@ -2275,7 +2278,18 @@ export class ForecastViewController {
         if (!isLanding && rawLandingCapeSeries && rawLandingCapeSeries[idx] != null) {
           cape = Math.max(cape, Number(rawLandingCapeSeries[idx]));
         }
-        if (rawCloud && rawCloud[idx] != null) cloudCover = Number(rawCloud[idx]);
+        if (rawCloud && rawCloud[idx] != null) {
+          cloudCover = Number(rawCloud[idx]);
+        } else if (
+          (rawCloudLow && rawCloudLow[idx] != null) ||
+          (rawCloudMid && rawCloudMid[idx] != null) ||
+          (rawCloudHigh && rawCloudHigh[idx] != null)
+        ) {
+          const cLow = Math.min(100, Math.max(0, Number(rawCloudLow?.[idx] ?? 0)));
+          const cMid = Math.min(100, Math.max(0, Number(rawCloudMid?.[idx] ?? 0)));
+          const cHigh = Math.min(100, Math.max(0, Number(rawCloudHigh?.[idx] ?? 0)));
+          cloudCover = Math.min(100, Math.round(100 * (1 - (1 - cLow / 100) * (1 - cMid / 100) * (1 - cHigh / 100))));
+        }
         if (rawPrecip && rawPrecip[idx] != null) precip = Number(rawPrecip[idx]);
         if (rawPrecipProb && rawPrecipProb[idx] != null) precipProb = Number(rawPrecipProb[idx]);
         else if (precip > 0) precipProb = 80;
