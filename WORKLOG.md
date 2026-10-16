@@ -102,9 +102,10 @@ Giornale a finestra mobile (rolling window, max **300 righe** / **ultimi 15 inte
 
 ---
 
-## 2026-10-16 - Fase 3, 4 & 6: Vista Dati in Tempo Reale sullo Spot, Rimozione Badge Classe EN e Filtri Logbook a Pills Espandibili (`[NOTE-003..005]`)
-- **Tipo**: Refactoring UX / Semantica Dominio / Flight Logbook (`ForecastView.js`, `HomeDashboardView.js`, `LogbookView.js`, `FlightDetailSheet.js`)
+## 2026-10-16 - Fase 3, 4, 5 & 6: Silenziamento Badge `Live` Nominale, Rimozione Sigle EN, Filtri Logbook a Pills e Scrubbar Uniforme (`[NOTE-003..006]`)
+- **Tipo**: Refactoring UX / Semantica Dominio / Data-Ink Ratio (`ForecastView.js`, `SpotMapView.js`, `HomeDashboardView.js`, `LogbookView.js`, `FlightDetailSheet.js`, `theme.css`)
 - **Dettagli**: [.agents/worklog.d/2026-10-16_review-notes-live-spot-glider-and-logbook-filters.md](file:///.agents/worklog.d/2026-10-16_review-notes-live-spot-glider-and-logbook-filters.md)
 - **Sintesi**:
-  - Oscurata la pill verde `Live` in Home (`NOTE-003`) e introdotta in [`ui/views/ForecastView.js`](file:///ui/views/ForecastView.js) la vista esplicita `#gm-spot-live-page` (`renderSpotLiveRealtimeCard`) attivabile dalla pill `● Live` sullo spot o dallo switcher `Panoramica | Decollo | Atterraggio | Live`.
+  - Nascosto il badge verde `Live` in stato nominale sia in Home sia in Previsioni (`NOTE-003`, lasciando lo slot `ORA` della scrubbar e promuovendo le centraline fisiche in `Fase 4-quater` / `NOTE-006`) e convertite le barre `.compact-bar` della scrubbar in pillole orizzontali ad altezza uniforme (`16x8px`) prive di `fillPct` euristico in [`ForecastView.js`](file:///ui/views/ForecastView.js) e [`SpotMapView.js`](file:///ui/views/SpotMapView.js).
   - Rimossi i badge di omologazione `EN-A..D` usati come indicatori di performance (`NOTE-004`) e sostituiti i filtri statici di [`ui/views/LogbookView.js`](file:///ui/views/LogbookView.js) con 5 pills espandibili a menu (`Vela`, `Anno`, `Caratteristiche`, `Tempo`, `Distanza` — `NOTE-005`).
+

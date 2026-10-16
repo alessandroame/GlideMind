@@ -110,7 +110,7 @@ describe('Flight Detail Full-Screen View & Schema Integrity', () => {
     assert.ok(debrief.includes('165 m'), 'Calculates total thermal gain (19 + 146 = 165 m)');
     assert.ok(debrief.includes('Termica #2 con +146 m'), 'Identifies best thermal with its gain');
     assert.ok(debrief.includes('215°') || debrief.includes('SW'), 'Includes wind origin degrees or cardinal');
-    assert.ok(debrief.includes('EN-A'), 'Includes EN-A safety reminder');
+    assert.ok(debrief.includes('Margine aerodinamico di sicurezza'), 'Includes safety margin reminder without EN class label');
   });
 
   test('renderFlightDetailHtml renders dedicated full-screen structure instead of flyer', () => {

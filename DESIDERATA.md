@@ -35,12 +35,12 @@ Matrice di stato delle funzionalità di GlideMind riferita a [MASTER_PLAN.md](fi
 | **Brand Identity, Icon Bundle & Splash** | Fase 2-bis | 🟢 Completato | Icone PWA (512, 192, maskable, apple-touch), `manifest.webmanifest` e splash zero-FOUC |
 | **Home Dashboard (`HomeDashboardView.js`)** | Fase 3 | 🟢 Completato | Layout Above-the-Fold meteo-centrico, barra simbiotica, card a 2 righe con timeline `3.5px` |
 | **Catalogo Vele & Fattore Prudenza Pilota** | Fase 3-bis | 🟢 Completato | 55+ modelli (`core/gliders.js`), parametri fisici $V_{\text{trim}}$/E senza badge EN come performance (`NOTE-004`) |
-| **Vista Previsioni & Spot Live (`ForecastView.js`)** | Fase 4 | 🟢 Completato | Switcher `Panoramica|Decollo|Atterraggio|Live`, vista `Dati in Tempo Reale` (`NOTE-003`), 7 parametri e SVG |
+| **Vista Previsioni (`ForecastView.js`)** | Fase 4 | 🟢 Completato | Switcher `Panoramica|Decollo|Atterraggio`, scrubbar a pillole uniformi e badge `Live` nominale nascosto (`NOTE-003`) |
 | **Smart Date Selector & Calendario 7 Colonne** | Fase 4 | 🟢 Completato | Stepper monoriga `[‹ Data ▾ ›]` + quick chips e sheet calendario 14gg a 7 colonne (`Lun–Dom`) |
 | **Live Ingestion & Multi-Day Cache** | Fase 4-bis | 🟢 Completato | Chiave cache disambiguata `${spot.id}_${takeoff.id}_${landing.id}_${dateStr}` e badge quota 429 |
 | **Finestre di Volo & Previsioni a 2 Livelli** | Fase 4-ter | 🟢 Completato | `core/flightWindows.js`, disaccoppiamento oro-meteo decollo/atterraggio e `evaluateTimelineSlot` |
 | **Pipeline Harvesting & Audit Spot** | Tooling | 🟢 Completato | Harvesting OSM Overpass + PG Earth, filtro geometrico Haversine/DEM e `spot-data-auditor` |
-| **Mappa Comprensori (`SpotMapView.js`)** | Fase 5 | 🟢 Completato | Adapter Leaflet `IMapEngine`, barra esterna, mirino GPS/spot e scrubber diurno VFR |
+| **Mappa Comprensori (`SpotMapView.js`)** | Fase 5 | 🟢 Completato | Adapter Leaflet `IMapEngine`, barra esterna, mirino GPS/spot e scrubber diurno a pillole uniformi |
 | **Mini-Mappa & Maniche a Vento (`windsock.js`)** | Fase 5-bis | 🟢 Completato | Doppia manica a vento shortest-path, pin atterraggio circolare `22px` e callout planata a 2 righe |
 | **Analisi Volo Comprensorio & Procedure** | Fase 5-ter | 🟢 Completato | Overlay `100dvh`, settore decollo $70^\circ$, linea di planata e circuiti atterraggio (`flightProcedures.js`) |
 | **Catalogo Europeo Sharded & Clustering** | Fase 5-quater | 🟢 Completato | Sharding `data/locations/<country>.json` (IT, CH, FR, AT, DE), viewport culling e cluster 60 FPS |

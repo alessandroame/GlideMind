@@ -3876,9 +3876,10 @@ input.gm-input:focus {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  padding: 6px 2px 5px;
-  min-height: 52px;
+  justify-content: center;
+  gap: 6px;
+  padding: 5px 2px;
+  min-height: 44px;
   background-color: var(--gm-bg-card);
   border: 1px solid var(--gm-border-strong);
   border-radius: 4px;
@@ -3959,11 +3960,11 @@ input.gm-input:focus {
 }
 
 .gm-timeline-col-compact .compact-bar {
-  width: 14px;
-  height: 30px;
+  width: 16px;
+  height: 8px;
   background: var(--gm-bg-surface);
   border: 1px solid var(--gm-border-strong);
-  border-radius: var(--gm-radius-xs);
+  border-radius: var(--gm-radius-full);
   position: relative;
   overflow: hidden;
   box-sizing: border-box;
@@ -3971,10 +3972,13 @@ input.gm-input:focus {
 
 .gm-timeline-col-compact .compact-bar-fill {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  border-radius: 2px;
+  inset: 0;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.gm-timeline-col-compact .compact-bar-unflyable .compact-bar-fill {
+  opacity: 0.35;
 }
 
 /* High-Contrast Light Theme Overrides for Timeline Scrubber (WCAG 2.1 AA Non-Text Contrast >= 3:1) */

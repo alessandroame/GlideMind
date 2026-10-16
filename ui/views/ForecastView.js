@@ -4223,7 +4223,7 @@ export class ForecastViewController {
         badge: 'N/D',
         status: 'unavailable',
         severity: 2,
-        fillPct: 35,
+        fillPct: 100,
         shortReason: 'Dati N/D',
         contextLabel: 'Panoramica',
         weatherSnapshot: {}
@@ -4287,13 +4287,6 @@ export class ForecastViewController {
       }
       const status = severity === 0 ? 'flyable' : (severity === 1 ? 'caution' : 'unflyable');
       const badge = severity === 0 ? 'Volabile' : (severity === 1 ? 'Cautela' : 'Non Volabile');
-      const lSpeed = lw.windSpeed || 0;
-      const lGust = lw.windGust || 0;
-      const fillPct = status === 'flyable'
-        ? Math.max(70, Math.min(100, Math.round(100 - Math.max(0, lSpeed - 5) * 2.2)))
-        : (status === 'caution'
-          ? Math.max(48, Math.min(68, Math.round(66 - Math.max(0, lGust - 18))))
-          : 32);
       const shortName = (activeSubSpotObj.name || 'Atterraggio').replace(/^Atterraggio\s*/i, '');
 
       return {
@@ -4303,7 +4296,7 @@ export class ForecastViewController {
         severity,
         reason,
         shortReason,
-        fillPct,
+        fillPct: 100,
         contextLabel: `↘ ${shortName}`,
         weatherSnapshot: lw
       };
@@ -4330,11 +4323,6 @@ export class ForecastViewController {
       } else {
         shortReason = this.formatShortFlyabilityReason(takeoffEval.statusText || takeoffEval.flyScore?.text || baseEval.reason);
       }
-      const fillPct = status === 'flyable'
-        ? Math.max(74, Math.min(100, Math.round(100 - diffFromFront * 0.35 - Math.abs(tSpeed - 11) * 1.3)))
-        : (status === 'caution'
-          ? Math.max(50, Math.min(68, Math.round(65 - diffFromFront * 0.15)))
-          : 35);
       const shortName = (activeSubSpotObj.name || 'Decollo').replace(/^Decollo\s*/i, '');
 
       return {
@@ -4344,7 +4332,7 @@ export class ForecastViewController {
         severity,
         reason: takeoffEval.statusText || takeoffEval.reason || baseEval.reason,
         shortReason,
-        fillPct,
+        fillPct: 100,
         contextLabel: `↗ ${shortName}`,
         weatherSnapshot: tw
       };
@@ -4356,7 +4344,6 @@ export class ForecastViewController {
     const status = combinedSeverity === 0 ? 'flyable' : (combinedSeverity === 1 ? 'caution' : 'unflyable');
     const badge = combinedSeverity === 0 ? 'Volabile' : (combinedSeverity === 1 ? 'Cautela' : 'Non Volabile');
     const reason = combinedSeverity > baseSeverity ? landingReason : baseEval.reason;
-    const fillPct = status === 'flyable' ? 100 : (status === 'caution' ? 65 : 35);
 
     let shortReason = 'Condizioni Ottimali';
     if (baseEval.status === 'unavailable' || baseEval.isOfflineUnavailable) {
@@ -4393,7 +4380,7 @@ export class ForecastViewController {
       severity: combinedSeverity,
       reason,
       shortReason,
-      fillPct,
+      fillPct: 100,
       contextLabel: 'Panoramica'
     };
   }
@@ -4438,16 +4425,14 @@ export class ForecastViewController {
           const evalH = slot.eval;
           const weather = evalH.weatherSnapshot || {};
           const speed = Math.round(weather.windSpeed || 0);
+          const statusKey = evalH.status === 'flyable' ? 'flyable' : (evalH.status === 'caution' ? 'caution' : 'unflyable');
 
-          let fillPct = evalH.fillPct ?? 35;
           let fillColor = 'var(--gm-status-unflyable)';
           let slotBgColor = 'var(--gm-status-unflyable-bg)';
-          if (evalH.status === 'flyable') {
-            fillPct = evalH.fillPct ?? 100;
+          if (statusKey === 'flyable') {
             fillColor = 'var(--gm-status-flyable)';
             slotBgColor = 'var(--gm-status-flyable-bg)';
-          } else if (evalH.status === 'caution') {
-            fillPct = evalH.fillPct ?? 65;
+          } else if (statusKey === 'caution') {
             fillColor = 'var(--gm-status-caution)';
             slotBgColor = 'var(--gm-status-caution-bg)';
           }
@@ -4471,8 +4456,8 @@ export class ForecastViewController {
             >
               ${slot.isCurrentHour ? '<span class="compact-now-badge" aria-label="Ora attuale">ORA</span>' : ''}
               <span class="compact-time">${String(h).padStart(2, '0')}</span>
-              <div class="compact-bar" style="background-color: ${slotBgColor};">
-                <div class="compact-bar-fill" style="height: ${fillPct}%; background-color: ${fillColor};"></div>
+              <div class="compact-bar compact-bar-${statusKey}" style="background-color: ${slotBgColor};">
+                <div class="compact-bar-fill" style="background-color: ${fillColor};"></div>
               </div>
             </div>
           `;

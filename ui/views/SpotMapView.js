@@ -270,15 +270,14 @@ export class SpotMapView {
           const weather = evalH.weatherSnapshot || {};
           const speed = Math.round(weather.windSpeed || 0);
 
-          let fillPct = 35;
+          const statusKey = evalH.status === 'flyable' ? 'flyable' : (evalH.status === 'caution' ? 'caution' : 'unflyable');
+
           let fillColor = 'var(--gm-status-unflyable)';
           let slotBgColor = 'var(--gm-status-unflyable-bg)';
-          if (evalH.status === 'flyable') {
-            fillPct = 100;
+          if (statusKey === 'flyable') {
             fillColor = 'var(--gm-status-flyable)';
             slotBgColor = 'var(--gm-status-flyable-bg)';
-          } else if (evalH.status === 'caution') {
-            fillPct = 65;
+          } else if (statusKey === 'caution') {
             fillColor = 'var(--gm-status-caution)';
             slotBgColor = 'var(--gm-status-caution-bg)';
           }
@@ -302,8 +301,8 @@ export class SpotMapView {
             >
               ${slot.isCurrentHour ? '<span class="compact-now-badge" aria-label="Ora attuale">ORA</span>' : ''}
               <span class="compact-time">${String(h).padStart(2, '0')}</span>
-              <div class="compact-bar" style="background-color: ${slotBgColor};">
-                <div class="compact-bar-fill" data-slot-hour="${h}" style="height: ${fillPct}%; background-color: ${fillColor};"></div>
+              <div class="compact-bar compact-bar-${statusKey}" style="background-color: ${slotBgColor};">
+                <div class="compact-bar-fill" data-slot-hour="${h}" style="background-color: ${fillColor};"></div>
               </div>
             </div>
           `;
@@ -1262,24 +1261,24 @@ export class SpotMapView {
             allowSynthetic: true,
             targetDate: this.activeDate
           });
-          let fillPct = 35;
+          const statusKey = evalAtH.status === 'flyable' ? 'flyable' : (evalAtH.status === 'caution' ? 'caution' : 'unflyable');
           let fillColor = 'var(--gm-status-unflyable)';
           let slotBgColor = 'var(--gm-status-unflyable-bg)';
-          if (evalAtH.status === 'flyable') {
-            fillPct = 100;
+          if (statusKey === 'flyable') {
             fillColor = 'var(--gm-status-flyable)';
             slotBgColor = 'var(--gm-status-flyable-bg)';
-          } else if (evalAtH.status === 'caution') {
-            fillPct = 65;
+          } else if (statusKey === 'caution') {
             fillColor = 'var(--gm-status-caution)';
             slotBgColor = 'var(--gm-status-caution-bg)';
           }
 
           const bar = col.querySelector('.compact-bar');
           const fill = col.querySelector('.compact-bar-fill');
-          if (bar) bar.style.backgroundColor = slotBgColor;
+          if (bar) {
+            bar.className = `compact-bar compact-bar-${statusKey}`;
+            bar.style.backgroundColor = slotBgColor;
+          }
           if (fill) {
-            fill.style.height = `${fillPct}%`;
             fill.style.backgroundColor = fillColor;
           }
 

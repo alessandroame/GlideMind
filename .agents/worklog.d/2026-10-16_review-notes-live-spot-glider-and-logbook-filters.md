@@ -1,38 +1,46 @@
-# 2026-10-16 — Consolidamento e Implementazione Note Utente (`NOTE-003`, `NOTE-004`, `NOTE-005`)
+# 2026-10-16 — Consolidamento Note Utente (`NOTE-003..005`) e Scrubbar Orizzontale ad Altezza Uniforme
 
 - **Data**: 2026-10-16
-- **Tipo**: Refactoring UX / Semantica Dominio / Filtri Log di Volo
+- **Tipo**: Refactoring UX / Semantica Dominio / Filtri Log di Volo / Data-Ink Ratio
 - **Moduli Coinvolti**:
   - `ui/views/HomeDashboardView.js`
   - `ui/views/ForecastView.js`
+  - `ui/views/SpotMapView.js`
   - `ui/views/LogbookView.js`
   - `ui/views/FlightDetailSheet.js`
   - `ui/views/SettingsView.js`
+  - `core/flightWindows.js`
   - `css/theme.css`
   - `tests/ui/liveWeatherDataIngestion.test.mjs`
   - `tests/ui/homeDashboardView.test.mjs`
   - `tests/ui/logbookView.test.mjs`
   - `tests/ui/flightDetailSheet.test.mjs`
+  - `tests/flightDetailView.test.js`
 
 ---
 
 ## 1. Contesto e Motivazione
-Durante la sessione di revisione delle note salvate (`/review-notes`), sono state analizzate, promosse in `DESIDERATA.md` e implementate tre osservazioni strutturali di prodotto:
-1. **`[NOTE-003]` — Semantica della pill verde `Live` e Pagina Esplicita Dati in Tempo Reale dello Spot**:
-   - L'indicatore verde `Live` sulla lista generale della Home Dashboard creava dissonanza cognitiva perché lo stato "in tempo reale" ha senso operativo solo se riferito a uno spot specifico, corredato da una vista dedicata con la telemetria del momento attuale.
-2. **`[NOTE-004]` — Rimozione della classe di omologazione (`EN-A` / `EN-B` / `EN-C`) usata come indicatore di performance**:
-   - La classe di certificazione EN misura il comportamento passivo dell'ala ai test di chiusura e non le sue prestazioni aerodinamiche. Esporla come badge prestazionale sulla pillola Home, nei filtri del Flight Log, nell'header del Dettaglio Volo o nel debriefing istruzionale generava un falso parallelismo.
-3. **`[NOTE-005]` — Filtri del Log di Volo a Pills Espandibili per Argomento e Metriche**:
+Durante la sessione `/review-notes` e il successivo audit `/how-its-made` della scrubbar oraria, sono stati risolti quattro punti architetturali e di ergonomia cognitiva:
+1. **`[NOTE-003]` — Soppressione della pill verde `Live` nominale e distinzione tra Modello NWP e Centraline Fisiche (`[NOTE-006]`)**:
+   - L'indicatore verde `● Live` induceva l'utente a credere di leggere dati in diretta da una centralina anemometrica fisica sul prato anziché il modello numerico orario Open-Meteo (già ispezionabile sullo slot `ORA` della scrubbar). I sensori fisici in diretta sono stati promossi a feature dedicata in `DESIDERATA.md` (`Fase 4-quater`, `NOTE-006`).
+2. **`[NOTE-004]` — Rimozione della classe di omologazione (`EN-A..D`) usata come indicatore di performance**:
+   - La certificazione EN misura la sicurezza passiva ai test di chiusura e non le prestazioni aerodinamiche. Esporla nella pillola vela, nei filtri, nel dettaglio volo o nei debriefing generava un falso parallelismo.
+3. **`[NOTE-005]` — Filtri del Log di Volo a Pills Espandibili per Argomento**:
    - I chip statici del Log di Volo sono stati sostituiti con 5 pills per argomento espandibili a menu (`Vela ▾`, `Anno ▾`, `Caratteristiche ▾`, `Tempo ▾`, `Distanza ▾`).
+4. **Scrubbar Oraria ad Altezza Uniforme (Tufte Data-Ink Ratio & Rasoio di Occam)**:
+   - L'altezza variabile (`fillPct`) delle barre verticali nella scrubbar di `ForecastView.js` e `SpotMapView.js` era priva di asse Y, duplicava informazioni già esplicite e invertiva il modello mentale meteorologico (`100%` = vento calmo, `35%` = vento forte).
 
 ---
 
 ## 2. Decisioni Architetturali e Implementative
-1. **Oscuramento Pill `Live` in Home e Vista `Dati in Tempo Reale` sullo Spot (`[NOTE-003]`)**:
-   - In `HomeDashboardView.js`, `renderLiveWeatherBadge()` mantiene nascosto il badge quando `networkStatus === 'live'` (esponendo solo stati transitori o `Offline / Stima`).
-   - In `ForecastView.js`, la pillola verde `● Live` sull'header dello spot (`data-action="open-spot-live-view"`) e il tab dedicato `● Live` in `.gm-quick-subspot-switcher` aprono la vista esplicita `#gm-spot-live-page` (`renderSpotLiveRealtimeCard`), che mostra la rilevazione dell'ora attuale per Decollo Attivo e Atterraggio Attivo (vento, raffiche, direzione, scarto angolare $\Delta^\circ$ rispetto all'orientamento del decollo, base cumuli LCL, pressione QNH/CAPE) e l'evoluzione a breve termine (`-1h → Adesso → +1h`).
+1. **Silenziamento Badge `Live` Nominale e Ripristino Switcher a 3 Colonne (`[NOTE-003]`)**:
+   - Sia in `HomeDashboardView.js` (`#gm-home-live-badge`) sia in `ForecastView.js` (`#gm-forecast-live-badge`), `renderLiveWeatherBadge()` mantiene nascosto (`hidden`) il badge quando `networkStatus === 'live'`, esponendolo solo per stati diagnostici (`loading`, `rate_limit`, `offline`).
+   - Mantenuto `.gm-quick-subspot-switcher` come griglia pulita a 3 colonne (`Panoramica | Decollo | Atterraggio`).
 2. **Neutralizzazione Badge Classe EN e Focus su Parametri Fisici (`[NOTE-004]`)**:
-   - Rimossi i badge `.gm-glider-pill-badge` dalla pillola vela di `HomeDashboardView.js`, dalle card del selettore modelli e dall'header di `FlightDetailSheet.js`.
-   - Aggiornati `SettingsView.js`, `ForecastView.js` (`generateFlightBriefing`) e `FlightDetailSheet.js` (`generateEducationalDebriefing`) per riferirsi esclusivamente ai parametri fisici dell'inviluppo ($V_{\text{trim}}$, $V_{\text{max}}$, efficienza e margine del cono di planata).
+   - Rimossi i badge `.gm-glider-pill-badge` e i riferimenti `EN-A..D` da `HomeDashboardView.js`, `ForecastView.js`, `LogbookView.js`, `FlightDetailSheet.js`, `SettingsView.js` e `core/flightWindows.js`, esponendo sempre $V_{\text{trim}}$, $V_{\text{max}}$ ed efficienza $L/D$.
 3. **Sistema di Filtri Multi-Criterio a Pills Espandibili (`[NOTE-005]`)**:
-   - Implementati in `LogbookView.js` i 5 gruppi tematici (`glider`, `year`, `feature`, `duration`, `distance`) con estrazione dinamica delle vele volate e degli anni presenti nello storico (`extractFilterGroupOptions`) e drawer `.gm-filter-group-drawer` posizionati all'esterno del carosello orizzontale per prevenire il clipping CSS (`overflow-x: auto`).
+   - Implementati in `LogbookView.js` i 5 gruppi tematici (`glider`, `year`, `feature`, `duration`, `distance`) con drawer `.gm-filter-group-drawer` esterni al carosello `overflow-x: auto`.
+4. **Tacche Orizzontali ad Altezza Uniforme nella Scrubbar (`ForecastView.js`, `SpotMapView.js`, `css/theme.css`)**:
+   - Rimossi i calcoli euristici di `fillPct` parziale in `evaluateTimelineSlot`, `renderTimelineGrid` e `updateScrubberBars`.
+   - Convertito `.compact-bar` in `css/theme.css` da istogramma verticale (`14x30px`) a pillola orizzontale uniforme (`16x8px`, `border-radius: var(--gm-radius-full)`) con opacità attenuata (`0.35`) per `.compact-bar-unflyable`.
+
