@@ -2844,6 +2844,34 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
       assert.ok(!html.includes('gm-flight-windows-section'), 'Must NOT render flight windows when not in overview');
       assert.ok(!html.includes('Evoluzione Giornaliera'), 'Must NOT render Evoluzione Giornaliera title');
     });
+
+    it('should render concise spot names without redundant prefixes or landing arrows and right-align spot tags', async () => {
+      const fs = await import('node:fs');
+      const path = await import('node:path');
+      const spot = DEFAULT_COMPRENSORI[0]; // Monte Cornizzolo (takeoffs: Decollo Risparmio, Decollo Centrale)
+      const mockStore = createStore({ selectedSpot: spot });
+      const controller = new ForecastViewController({ store: mockStore });
+
+      // 1. Overview mode: flight window cards show only clean takeoff name without "Decollo " prefix or " → Landing"
+      const htmlOverview = controller.renderHtml();
+      assert.ok(htmlOverview.includes('gm-flight-window-card-takeoff-tag'), 'Must render takeoff tag on flight window cards');
+      assert.ok(!htmlOverview.includes(' → '), 'Flight window takeoff tag must not append landing arrow and name');
+      assert.ok(htmlOverview.includes('<span>Risparmio</span>') || htmlOverview.includes('<span>Centrale</span>'), 'Flight window tag must display concise takeoff name');
+
+      // 2. Specific Takeoff mode: header and specific spot card show clean name aligned to the right
+      controller.selectedSubSpot = spot.takeoffs[0].id;
+      const htmlTakeoff = controller.renderHtml();
+      assert.ok(htmlTakeoff.includes('gm-specific-spot-name-tag'), 'Specific spot card must render right-aligned spot name tag container');
+      assert.ok(htmlTakeoff.includes('<span class="gm-unified-subspot-badge truncate" title="Decollo Risparmio'), 'Unified subspot badge must preserve full detail in title attribute');
+      assert.ok(htmlTakeoff.includes('Risparmio\n                </span>'), 'Unified subspot badge visible text must be just the clean spot name');
+
+      // 3. CSS right-alignment contract in theme.css
+      const cssContent = fs.readFileSync(path.resolve('css/theme.css'), 'utf-8');
+      const tagBlockMatch = cssContent.match(/\.gm-flight-window-card-takeoff-tag\s*\{[\s\S]*?\}/);
+      assert.ok(tagBlockMatch, 'theme.css must declare .gm-flight-window-card-takeoff-tag');
+      assert.ok(tagBlockMatch[0].includes('justify-content: flex-end'), '.gm-flight-window-card-takeoff-tag must be right-aligned via flex-end');
+      assert.ok(tagBlockMatch[0].includes('text-align: right'), '.gm-flight-window-card-takeoff-tag must enforce right text alignment');
+    });
   });
 
   describe('Mini-Map Dual Windsock Decoupled Directions', () => {

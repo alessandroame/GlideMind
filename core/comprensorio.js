@@ -1243,3 +1243,54 @@ export function isSpotPinned(spot, pinnedIds) {
 
   return false;
 }
+
+/**
+ * Toggles a comprensorio spot in the user's pinnedSpotIds list,
+ * cleaning up any legacy alias IDs when unpinning.
+ * @param {object|string} spotOrId
+ * @param {Set<string>|Array<string>} pinnedIds
+ * @param {Array<object>} [catalog=[]]
+ * @returns {Array<string>} Updated array of pinned spot IDs
+ */
+export function toggleSpotPin(spotOrId, pinnedIds, catalog = []) {
+  const spotId = typeof spotOrId === 'string' ? spotOrId : spotOrId?.id;
+  const currentSet = pinnedIds instanceof Set ? new Set(pinnedIds) : new Set(pinnedIds || []);
+  if (!spotId) return Array.from(currentSet);
+
+  const spot = (typeof spotOrId === 'object' && spotOrId)
+    ? spotOrId
+    : (Array.isArray(catalog) ? catalog.find(c => c.id === spotId) : null) || { id: spotId };
+
+  const currentlyPinned = isSpotPinned(spot, currentSet);
+
+  if (currentlyPinned) {
+    currentSet.delete(spotId);
+    const idLower = (spot.id || spotId).toLowerCase();
+    for (const [legacyId, catalogId] of Object.entries(LEGACY_PINNED_MAP)) {
+      if (spotId === legacyId || spotId === catalogId) {
+        currentSet.delete(legacyId);
+        currentSet.delete(catalogId);
+      }
+    }
+    for (const pid of Array.from(currentSet)) {
+      const p = pid.toLowerCase();
+      if (
+        p === idLower ||
+        (idLower.includes('chialamberto') && p.includes('chialamberto')) ||
+        (idLower.includes('martiniana') && p.includes('martiniana')) ||
+        (idLower.includes('cavallaria') && p.includes('cavallaria')) ||
+        (idLower.includes('cornizzolo') && p.includes('cornizzolo')) ||
+        (idLower.includes('grappa') && p.includes('grappa')) ||
+        (idLower.includes('meduno') && p.includes('meduno')) ||
+        (idLower.includes('calascio') && p.includes('calascio'))
+      ) {
+        currentSet.delete(pid);
+      }
+    }
+  } else {
+    currentSet.add(spotId);
+  }
+
+  return Array.from(currentSet);
+}
+

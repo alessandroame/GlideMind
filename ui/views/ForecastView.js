@@ -1333,6 +1333,19 @@ export class ForecastViewController {
   }
 
   /**
+   * Returns the concise spot/sub-spot name stripped of redundant role prefixes ("Decollo", "Atterraggio").
+   * @param {string} rawName
+   * @param {'takeoff'|'landing'|null} [role=null]
+   * @returns {string}
+   */
+  formatCleanSpotName(rawName, role = null) {
+    const fallback = role === 'takeoff' ? 'Decollo' : (role === 'landing' ? 'Atterraggio' : 'Spot');
+    if (!rawName || typeof rawName !== 'string') return fallback;
+    const cleaned = rawName.replace(/^(?:Decollo|Atterraggio)\s+/i, '').trim();
+    return cleaned || rawName.trim() || fallback;
+  }
+
+  /**
    * Renders the collapsing sticky header anchored at the top of ForecastView.
    * Visible only when the user scrolls down past the main header (>60px).
    * Displays spot name, active takeoff/landing description, live badge, and scroll-to-top button.
@@ -1345,24 +1358,26 @@ export class ForecastViewController {
     if (!spot) return '';
 
     let subSpotLabel = 'Panoramica';
+    let ariaSubSpotDetail = 'Panoramica';
     const activeTakeoff = this.resolveActiveTakeoff(spot);
     const activeLanding = this.resolveActiveLanding(spot);
     if (activeSubSpot) {
+      subSpotLabel = this.formatCleanSpotName(activeSubSpot.name, activeSubSpot.spotType);
       if (activeSubSpot.spotType === 'takeoff') {
         const headingPart = activeSubSpot.heading != null && !isNaN(Number(activeSubSpot.heading))
           ? ` · ${getCardinalDirection(activeSubSpot.heading)}`
           : '';
-        subSpotLabel = `${activeSubSpot.name} (${activeSubSpot.altitude}m${headingPart})`;
+        ariaSubSpotDetail = `${activeSubSpot.name} (${activeSubSpot.altitude}m${headingPart})`;
       } else if (activeSubSpot.spotType === 'landing') {
-        subSpotLabel = `${activeSubSpot.name} (${activeSubSpot.altitude}m)`;
+        ariaSubSpotDetail = `${activeSubSpot.name} (${activeSubSpot.altitude}m)`;
       }
     } else if (activeTakeoff && activeLanding) {
-      subSpotLabel = `${activeTakeoff.name} (${activeTakeoff.altitude}m) • ${activeLanding.name} (${activeLanding.altitude}m)`;
+      ariaSubSpotDetail = `${activeTakeoff.name} (${activeTakeoff.altitude}m) • ${activeLanding.name} (${activeLanding.altitude}m)`;
     } else if (activeTakeoff) {
-      subSpotLabel = `${activeTakeoff.name} (${activeTakeoff.altitude}m)`;
+      ariaSubSpotDetail = `${activeTakeoff.name} (${activeTakeoff.altitude}m)`;
     }
 
-    const fullAriaLabel = `Località attiva: ${escapeHtml(spot.name)}, ${escapeHtml(subSpotLabel)}. Tocca per cambiare comprensorio.`;
+    const fullAriaLabel = `Località attiva: ${escapeHtml(spot.name)}, ${escapeHtml(ariaSubSpotDetail)}. Tocca per cambiare comprensorio.`;
 
     return `
       <div 
@@ -1449,7 +1464,8 @@ export class ForecastViewController {
     const activeLanding = this.resolveActiveLanding(currentSpot);
 
     // Resolve active sub-spot label and monochrome vector SVG icon
-    let activeSubSpotLabel = (activeTakeoff && activeLanding)
+    let activeSubSpotLabel = 'Panoramica';
+    let activeSubSpotAria = (activeTakeoff && activeLanding)
       ? `Panoramica (${activeTakeoff.name} • ${activeLanding.name})`
       : 'Panoramica (Decollo Primario + Atterraggio)';
     let activeSubSpotIcon = `
@@ -1462,18 +1478,19 @@ export class ForecastViewController {
 
     const activeSub = this.resolveActiveSubSpot(currentSpot);
     if (activeSub) {
+      activeSubSpotLabel = this.formatCleanSpotName(activeSub.name, activeSub.spotType);
       if (activeSub.spotType === 'takeoff') {
         const headingPart = activeSub.heading != null && !isNaN(Number(activeSub.heading))
           ? ` · ${activeSub.heading}° ${getCardinalDirection(activeSub.heading)}`
           : '';
-        activeSubSpotLabel = `${activeSub.name} (${activeSub.altitude}m${headingPart})`;
+        activeSubSpotAria = `${activeSub.name} (${activeSub.altitude}m${headingPart})`;
         activeSubSpotIcon = `
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="m8 3 4 8 5-5 5 15H2L8 3z"></path>
           </svg>
         `;
       } else if (activeSub.spotType === 'landing') {
-        activeSubSpotLabel = `${activeSub.name} (${activeSub.altitude}m${activeSub.isOfficial ? ' · Ufficiale' : ''})`;
+        activeSubSpotAria = `${activeSub.name} (${activeSub.altitude}m${activeSub.isOfficial ? ' · Ufficiale' : ''})`;
         activeSubSpotIcon = `
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <circle cx="12" cy="12" r="10"></circle>
@@ -1492,7 +1509,7 @@ export class ForecastViewController {
           data-action="open-picker-sheet" 
           role="button" 
           tabindex="0" 
-          aria-label="Località attiva: ${escapeHtml(currentSpot.name)}, ${escapeHtml(activeSubSpotLabel)}. Tocca per cambiare comprensorio o punto di volo."
+          aria-label="Località attiva: ${escapeHtml(currentSpot.name)}, ${escapeHtml(activeSubSpotAria)}. Tocca per cambiare comprensorio o punto di volo."
           title="Tocca per cambiare comprensorio o punto di volo"
         >
           <div class="gm-comprensorio-bar-info">
@@ -1502,12 +1519,12 @@ export class ForecastViewController {
             <div class="gm-comprensorio-text min-w-0">
               <div class="gm-comprensorio-title-row flex items-center justify-between gap-2">
                 <span class="gm-comprensorio-name truncate">
-                  ${escapeHtml(currentSpot.name)} (${escapeHtml(currentSpot.province)})
+                  ${escapeHtml(currentSpot.name)}
                 </span>
                 ${this.renderLiveWeatherBadge()}
               </div>
               <div class="gm-comprensorio-subspot-row flex items-center gap-1.5 mt-0.5 min-w-0">
-                <span class="gm-unified-subspot-badge truncate" title="${escapeHtml(activeSubSpotLabel)}">
+                <span class="gm-unified-subspot-badge truncate" title="${escapeHtml(activeSubSpotAria)}">
                   ${escapeHtml(activeSubSpotLabel)}
                 </span>
                 <span class="gm-comprensorio-action-hint text-xs text-[var(--gm-text-muted)] flex-shrink-0">
@@ -1804,12 +1821,11 @@ export class ForecastViewController {
       <div class="gm-flight-data-grid">
         <div
           class="gm-flight-stat-row gm-flight-stat-row-interactive"
-          ${takeoff.id ? `data-action="select-subspot" data-subspot-id="${escapeHtml(takeoff.id)}" role="button" tabindex="0" title="Mostra previsioni decollo"` : ''}
+          ${takeoff.id ? `data-action="select-subspot" data-subspot-id="${escapeHtml(takeoff.id)}" role="button" tabindex="0" title="Mostra previsioni decollo (${escapeHtml(takeoffAlt)})"` : ''}
         >
           <div class="gm-flight-label">
             <span class="gm-flight-icon">↗</span>
             ${this.renderInlineSubSpotControl('takeoff', takeoff, takeoffs, true)}
-            <span class="gm-flight-alt">(${takeoffAlt})</span>
           </div>
           <div class="gm-flight-data">
             <span class="gm-flight-wind">${windSpeedStr}</span>
@@ -1819,12 +1835,11 @@ export class ForecastViewController {
 
         <div
           class="gm-flight-stat-row gm-flight-stat-row-interactive"
-          ${landing.id ? `data-action="select-subspot" data-subspot-id="${escapeHtml(landing.id)}" role="button" tabindex="0" title="Mostra previsioni atterraggio"` : ''}
+          ${landing.id ? `data-action="select-subspot" data-subspot-id="${escapeHtml(landing.id)}" role="button" tabindex="0" title="Mostra previsioni atterraggio (${escapeHtml(landingAlt)})"` : ''}
         >
           <div class="gm-flight-label">
             <span class="gm-flight-icon">↘</span>
             ${this.renderInlineSubSpotControl('landing', landing, landings, true)}
-            <span class="gm-flight-alt">(${landingAlt})</span>
           </div>
           <div class="gm-flight-data">
             <span class="gm-glide-label">Efficienza</span>
@@ -2003,15 +2018,14 @@ export class ForecastViewController {
 
     return `
       ${this.renderQuickSubSpotSwitcher(spot, isTakeoff ? subSpot : evalData.takeoff, !isTakeoff ? subSpot : evalData.landing)}
-      <div class="flex items-center justify-between border-b border-[var(--gm-border)] pb-2 mb-2">
-        <div class="flex items-center gap-2 min-w-0">
-          <span class="text-sm font-bold text-[var(--gm-accent)]">${icon}</span>
-          ${this.renderInlineSubSpotControl(isTakeoff ? 'takeoff' : 'landing', subSpot, roleItems, false)}
-          <span class="text-xs text-[var(--gm-text-muted)] font-mono">(${subSpot.altitude}m)</span>
-        </div>
-        <span class="text-xs font-mono font-bold text-[var(--gm-text-secondary)]">
+      <div class="flex items-center justify-between gap-2 border-b border-[var(--gm-border)] pb-2 mb-2">
+        <span class="text-xs font-mono font-bold text-[var(--gm-text-secondary)] flex-shrink-0">
           Ore ${String(this.selectedHour).padStart(2, '0')}:00
         </span>
+        <div class="gm-specific-spot-name-tag flex items-center justify-end gap-1.5 min-w-0 ml-auto text-right">
+          <span class="text-sm font-bold text-[var(--gm-accent)] flex-shrink-0">${icon}</span>
+          ${this.renderInlineSubSpotControl(isTakeoff ? 'takeoff' : 'landing', subSpot, roleItems, true)}
+        </div>
       </div>
 
       <details class="gm-subspot-info-collapsible"${isInfoOpen ? ' open' : ''}>
@@ -2116,6 +2130,7 @@ export class ForecastViewController {
     const isForced = Boolean(forcedTakeoffId);
     const forcedTakeoffObj = spot?.takeoffs?.find(t => t.id === forcedTakeoffId) || activeSubSpotObj;
     const forcedTakeoffName = isForced ? (forcedTakeoffObj?.name || 'Decollo Selezionato') : null;
+    const forcedTakeoffClean = isForced ? this.formatCleanSpotName(forcedTakeoffName, 'takeoff') : null;
 
     return `
       <section aria-labelledby="heading-flight-windows" class="gm-flight-windows-section">
@@ -2123,8 +2138,8 @@ export class ForecastViewController {
           <div class="flex items-center gap-2">
             <h2 id="heading-flight-windows" class="gm-flight-windows-title">Evoluzione Giornaliera</h2>
             ${isForced ? `
-              <span class="gm-flight-windows-badge-forced" title="Decollo imposto manualmente">
-                Imposto: ${escapeHtml(forcedTakeoffName)}
+              <span class="gm-flight-windows-badge-forced" title="Decollo imposto manualmente: ${escapeHtml(forcedTakeoffName)}">
+                Imposto: ${escapeHtml(forcedTakeoffClean)}
               </span>
             ` : ''}
           </div>
@@ -2139,6 +2154,7 @@ export class ForecastViewController {
             const badgeLabel = win.status === 'flyable'
               ? 'Volabile'
               : (win.status === 'caution' ? 'Cautela' : 'Non Volabile');
+            const cleanTakeoffName = win.takeoff ? this.formatCleanSpotName(win.takeoff.name, 'takeoff') : '';
 
             return `
               <div 
@@ -2162,11 +2178,11 @@ export class ForecastViewController {
                 <div class="gm-flight-window-card-title">${escapeHtml(win.title)}</div>
                 <div class="gm-flight-window-card-desc">${escapeHtml(win.description)}</div>
                 ${win.takeoff ? `
-                  <div class="gm-flight-window-card-takeoff-tag">
+                  <div class="gm-flight-window-card-takeoff-tag" title="${escapeHtml(win.takeoff.name)}">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                       <path d="m8 3 4 8 5-5 5 15H2L8 3z"></path>
                     </svg>
-                    <span>${escapeHtml(win.takeoff.name)}${win.landing ? ` → ${escapeHtml(win.landing.name)}` : ''}</span>
+                    <span>${escapeHtml(cleanTakeoffName)}</span>
                   </div>
                 ` : ''}
                 ${(win.hazards && win.hazards.length > 0) ? `
@@ -4668,10 +4684,10 @@ export class ForecastViewController {
         <div class="gm-picker-section gm-picker-current-spot-section">
           <div class="flex items-center justify-between gap-2 mb-2">
             <span class="gm-picker-section-title font-bold text-xs uppercase tracking-wider text-[var(--gm-text-muted)]">
-              Punto di Volo Attivo (${escapeHtml(currentSpot.name)})
+              Punto di Volo Attivo
             </span>
-            <span class="gm-badge gm-badge-sm ${this.selectedSubSpot === 'overview' ? 'gm-badge-flyable' : ''}">
-              ${escapeHtml(this.selectedSubSpot === 'overview' ? 'Panoramica' : (this.resolveActiveSubSpot(currentSpot)?.name || 'Specifico'))}
+            <span class="gm-badge gm-badge-sm ml-auto text-right ${this.selectedSubSpot === 'overview' ? 'gm-badge-flyable' : ''}">
+              ${escapeHtml(this.selectedSubSpot === 'overview' ? 'Panoramica' : this.formatCleanSpotName(this.resolveActiveSubSpot(currentSpot)?.name, this.resolveActiveSubSpot(currentSpot)?.spotType))}
             </span>
           </div>
           <div class="gm-current-subspots-list flex flex-col gap-1.5 p-1.5 bg-[var(--gm-bg-surface)] rounded-[var(--gm-radius-md)] border border-[var(--gm-border)]">
@@ -4702,7 +4718,7 @@ export class ForecastViewController {
                     </svg>
                   </span>
                   <span class="gm-subspot-item-name font-semibold">
-                    ${activeTakeoff && activeLanding ? `Panoramica (${escapeHtml(activeTakeoff.name)} • ${escapeHtml(activeLanding.name)})` : 'Panoramica (Decollo Primario + Atterraggio)'}
+                    ${activeTakeoff && activeLanding ? `Panoramica (${escapeHtml(this.formatCleanSpotName(activeTakeoff.name, 'takeoff'))} • ${escapeHtml(this.formatCleanSpotName(activeLanding.name, 'landing'))})` : 'Panoramica'}
                   </span>
                 </div>
                 ${this.selectedSubSpot === 'overview' ? '<span class="gm-subspot-item-check" aria-hidden="true">✓</span>' : ''}
@@ -5881,7 +5897,7 @@ export class ForecastViewController {
           <div class="gm-flight-analysis-title-group">
             <h1 class="gm-flight-analysis-title">${escapeHtml(spot?.name || 'Analisi Comprensorio')}</h1>
             <p class="gm-flight-analysis-subtitle">
-              ▲ ${escapeHtml(takeoff.name || 'Decollo')} (${takeoff.altitude || 1000}m) • ⏚ ${escapeHtml(landing.name || 'Atterraggio')} (${landing.altitude || 300}m)
+              ▲ ${escapeHtml(this.formatCleanSpotName(takeoff.name, 'takeoff'))} • ⏚ ${escapeHtml(this.formatCleanSpotName(landing.name, 'landing'))}
             </p>
           </div>
           <div class="gm-flight-analysis-actions">

@@ -16,7 +16,8 @@ import {
   evaluateComprensorio,
   sortEvaluatedComprensori,
   parseCoordinates,
-  isSpotPinned
+  isSpotPinned,
+  toggleSpotPin
 } from '../../core/comprensorio.js';
 import {
   DEFAULT_GLIDER,
@@ -280,6 +281,46 @@ export class HomeDashboardViewController {
   }
 
   /**
+   * Formats the spots count badge label distinguishing Home spots from active search filter results.
+   * @param {Array<object>} evaluatedList
+   * @returns {string}
+   */
+  formatSpotsCountLabel(evaluatedList) {
+    const count = Array.isArray(evaluatedList) ? evaluatedList.length : 0;
+    const hasSearch = Boolean(this.searchQuery && this.searchQuery.trim().length > 0);
+    return hasSearch ? `Filtro: ${count} siti` : `${count} siti`;
+  }
+
+  /**
+   * Updates only the spots list and count badge inside the DOM without replacing the search input.
+   * Falls back to full render() if the section container is not mounted.
+   * @returns {boolean} True if updated in-place
+   */
+  updateSpotsListSectionInDom() {
+    if (!this.containerEl || typeof this.containerEl.querySelector !== 'function') {
+      this.render();
+      return false;
+    }
+    const listContainer = this.containerEl.querySelector('section[aria-labelledby="heading-comprensori"]');
+    if (!listContainer) {
+      this.render();
+      return false;
+    }
+    const evaluatedList = this.getEvaluatedComprensori();
+    const countBadge = listContainer.querySelector('#home-spots-count') || listContainer.querySelector('.flex.items-center.justify-between.text-xs span:last-child');
+    if (countBadge) {
+      countBadge.textContent = this.formatSpotsCountLabel(evaluatedList);
+    }
+    const existingList = listContainer.querySelector('#home-spots-list') || listContainer.querySelector('.flex.flex-col.gap-2');
+    if (existingList) {
+      existingList.outerHTML = this.renderComprensoriList(evaluatedList);
+      return true;
+    }
+    this.render();
+    return false;
+  }
+
+  /**
    * Updates the active comprensori catalog (e.g. when master catalog is loaded).
    * @param {Array<object>} catalog
    */
@@ -292,15 +333,7 @@ export class HomeDashboardViewController {
     const isSearchFocused = Boolean(searchInput && typeof document !== 'undefined' && document.activeElement === searchInput);
 
     if (isSearchFocused) {
-      const listContainer = this.containerEl.querySelector('section[aria-labelledby="heading-comprensori"]');
-      if (listContainer) {
-        const evaluatedList = this.getEvaluatedComprensori();
-        const countBadge = listContainer.querySelector('#home-spots-count') || listContainer.querySelector('.flex.items-center.justify-between.text-xs span:last-child');
-        if (countBadge) countBadge.textContent = `${evaluatedList.length} siti`;
-        const existingList = listContainer.querySelector('#home-spots-list') || listContainer.querySelector('.flex.flex-col.gap-2');
-        if (existingList) {
-          existingList.outerHTML = this.renderComprensoriList(evaluatedList);
-        }
+      if (this.updateSpotsListSectionInDom()) {
         return;
       }
     }
@@ -332,12 +365,28 @@ export class HomeDashboardViewController {
           state.flights !== prev.flights ||
           themeChanged
         ) {
+          const onlyPinnedChanged = Boolean(
+            prev &&
+            state.pinnedSpotIds !== prev.pinnedSpotIds &&
+            state.weatherData === prev.weatherData &&
+            state.activeDate === prev.activeDate &&
+            state.locationsCatalog === prev.locationsCatalog &&
+            state.activeGlider === prev.activeGlider &&
+            state.glider === prev.glider &&
+            state.usePilotCurrencyFactor === prev.usePilotCurrencyFactor &&
+            state.flights === prev.flights &&
+            !themeChanged
+          );
+          const hasActiveSearch = Boolean(this.searchQuery && this.searchQuery.trim().length > 0);
+
           if (state.locationsCatalog && state.locationsCatalog !== this.comprensoriCatalog) {
             this.setComprensoriCatalog(state.locationsCatalog);
+          } else if (onlyPinnedChanged && hasActiveSearch) {
+            this.updateSpotsListSectionInDom();
           } else {
             this.render();
           }
-          if (!themeChanged && (state.activeDate !== prev?.activeDate || state.locationsCatalog !== prev?.locationsCatalog)) {
+          if (!themeChanged && (state.activeDate !== prev?.activeDate || state.locationsCatalog !== prev?.locationsCatalog || state.pinnedSpotIds !== prev?.pinnedSpotIds)) {
             this.fetchBatchWeatherAsync();
           }
         }

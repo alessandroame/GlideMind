@@ -10669,13 +10669,27 @@ input.gm-input:focus {
 }
 
 .gm-flight-window-card-takeoff-tag {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 4px;
+  width: 100%;
+  margin-left: auto;
+  text-align: right;
   font-size: 0.72rem;
   font-weight: 600;
   color: var(--gm-accent);
   margin-top: 4px;
+}
+
+.gm-specific-spot-name-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-left: auto;
+  text-align: right;
+  min-width: 0;
 }
 
 .gm-flight-window-hazards-row {
