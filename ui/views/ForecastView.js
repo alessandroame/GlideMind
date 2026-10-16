@@ -1494,15 +1494,14 @@ export class ForecastViewController {
           <div class="flex items-center gap-1.5 flex-shrink-0">
             <button
               type="button"
-              class="gm-forecast-pin-btn ${isPinned ? 'active' : ''}"
+              class="gm-forecast-pin-btn ${isPinned ? 'active pinned' : ''}"
               data-action="toggle-pin-spot"
               data-spot-id="${escapeHtml(currentSpot.id)}"
               aria-pressed="${isPinned ? 'true' : 'false'}"
-              aria-label="${isPinned ? `Rimuovi ${escapeHtml(currentSpot.name)} dalla Home` : `Aggiungi ${escapeHtml(currentSpot.name)} alla Home`}"
-              title="${isPinned ? 'Presente nella Home. Tocca per rimuovere dalla Home' : 'Aggiungi comprensorio alla Home'}"
+              aria-label="${isPinned ? `Rimuovi ${escapeHtml(currentSpot.name)} dai preferiti` : `Aggiungi ${escapeHtml(currentSpot.name)} ai preferiti`}"
+              title="${isPinned ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'}"
             >
               <span aria-hidden="true">${isPinned ? '★' : '☆'}</span>
-              <span class="gm-forecast-pin-label">${isPinned ? 'In Home' : '+ Home'}</span>
             </button>
             <span class="gm-comprensorio-action-hint text-xs text-[var(--gm-text-muted)]">
               Cambia
@@ -4558,11 +4557,7 @@ export class ForecastViewController {
             <div class="gm-picker-item-main" data-action="pick-spot" data-spot-id="${escapeHtml(s.id)}" data-takeoff-id="${escapeHtml(activeTId || '')}" data-landing-id="${escapeHtml(activeLId || '')}">
               <div class="flex items-center justify-between gap-2">
                 <div class="text-sm font-bold text-[var(--gm-text-primary)] truncate">${escapeHtml(s.name)} (${escapeHtml(s.province)})</div>
-                ${isActive ? '<span class="gm-subspot-item-check flex-shrink-0" aria-hidden="true">✓</span>' : ((hasMultiTakeoffs || hasMultiLandings) ? `
-                  <span class="gm-picker-badge-count flex-shrink-0">
-                    ${countSummary}
-                  </span>
-                ` : '')}
+                ${isActive ? '<span class="gm-subspot-item-check flex-shrink-0" aria-hidden="true">✓</span>' : ''}
               </div>
               <div class="text-xs text-[var(--gm-text-muted)]">${escapeHtml(s.region)} · ${countSummary}</div>
             </div>

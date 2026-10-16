@@ -1542,7 +1542,7 @@ export class SpotMapView {
           </div>
         ` : ''}
 
-        <!-- Actions Row: Pin to Home + Primary CTA to Forecast View -->
+        <!-- Actions Row: Pin to Favorites + Primary CTA to Forecast View -->
         <div class="gm-spot-detail-actions">
           <button
             type="button"
@@ -1550,9 +1550,10 @@ export class SpotMapView {
             class="gm-btn gm-btn-secondary gm-map-pin-spot-btn ${isPinned ? 'active' : ''}"
             data-spot-id="${escapeHtml(spot.id || '')}"
             aria-pressed="${isPinned ? 'true' : 'false'}"
+            aria-label="${isPinned ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'}"
           >
             <span aria-hidden="true">${isPinned ? '★' : '☆'}</span>
-            <span id="gm-map-cta-pin-label">${isPinned ? 'In Home' : 'Aggiungi a Home'}</span>
+            <span id="gm-map-cta-pin-label">${isPinned ? 'Preferito' : 'Aggiungi ai preferiti'}</span>
           </button>
           <button type="button" id="gm-map-cta-forecast" class="gm-btn gm-btn-primary gm-spot-detail-cta">
             Apri Previsioni Dettagliate
@@ -1583,9 +1584,10 @@ export class SpotMapView {
             const nowPinned = isSpotPinned(spot, nextPinned);
             pinBtn.classList.toggle('active', nowPinned);
             pinBtn.setAttribute('aria-pressed', nowPinned ? 'true' : 'false');
+            pinBtn.setAttribute('aria-label', nowPinned ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti');
             pinBtn.innerHTML = `
               <span aria-hidden="true">${nowPinned ? '★' : '☆'}</span>
-              <span id="gm-map-cta-pin-label">${nowPinned ? 'In Home' : 'Aggiungi a Home'}</span>
+              <span id="gm-map-cta-pin-label">${nowPinned ? 'Preferito' : 'Aggiungi ai preferiti'}</span>
             `;
           }
         });

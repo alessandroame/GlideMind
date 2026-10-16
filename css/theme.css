@@ -11228,20 +11228,22 @@ input.gm-input:focus {
   color: var(--gm-text-muted);
 }
 
-/* 1-Tap Pin/Unpin buttons on Home search cards & drawer */
+/* 1-Tap Star Favorite buttons on Home search cards & drawer */
 .gm-home-pin-btn {
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  padding: 3px 8px;
-  min-height: 28px;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
   border-radius: var(--gm-radius-full, 9999px);
-  font-size: 0.70rem;
-  font-weight: 700;
+  font-size: 1.05rem;
+  line-height: 1;
   cursor: pointer;
   flex-shrink: 0;
-  transition: background-color var(--gm-transition-fast), border-color var(--gm-transition-fast), color var(--gm-transition-fast);
+  transition: background-color var(--gm-transition-fast), border-color var(--gm-transition-fast), color var(--gm-transition-fast), transform var(--gm-transition-fast);
 }
 
 .gm-home-pin-btn::before {
@@ -11257,28 +11259,29 @@ input.gm-input:focus {
 }
 
 .gm-home-pin-btn.is-unpinned {
-  background-color: rgba(56, 189, 248, 0.14);
-  border: 1px solid var(--gm-accent);
-  color: var(--gm-accent);
+  background-color: var(--gm-bg-elevated);
+  border: 1px solid var(--gm-border-strong);
+  color: var(--gm-text-muted);
 }
 
 .gm-home-pin-btn.is-pinned {
-  background-color: var(--gm-bg-elevated);
-  border: 1px solid var(--gm-border-strong);
-  color: var(--gm-text-secondary);
+  background-color: rgba(245, 158, 11, 0.14);
+  border: 1px solid rgba(245, 158, 11, 0.55);
+  color: var(--gm-status-caution);
 }
 
 .gm-home-pin-btn:hover,
 .gm-home-pin-btn:focus-visible {
   border-color: var(--gm-accent);
-  color: var(--gm-text-primary);
+  color: var(--gm-accent);
+  transform: scale(1.08);
   outline: none;
 }
 
 .gm-home-drawer-pin-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   margin-left: auto;
   padding: 3px 9px;
   min-height: 28px;
@@ -11291,9 +11294,15 @@ input.gm-input:focus {
   cursor: pointer;
 }
 
+.gm-home-drawer-pin-btn.is-pinned {
+  background-color: rgba(245, 158, 11, 0.14);
+  border-color: rgba(245, 158, 11, 0.55);
+  color: var(--gm-status-caution);
+}
+
 .gm-home-drawer-pin-btn.is-unpinned {
-  border-color: var(--gm-accent);
-  color: var(--gm-accent);
+  border-color: var(--gm-border-strong);
+  color: var(--gm-text-secondary);
 }
 
 .gm-home-drawer-pin-btn:hover,
@@ -11303,23 +11312,25 @@ input.gm-input:focus {
   outline: none;
 }
 
-/* 1-Tap Pin button in ForecastView header & picker sheet */
+/* 1-Tap Star Favorite button in ForecastView header */
 .gm-forecast-pin-btn {
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 9px;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
   min-height: 30px;
+  padding: 0;
   border-radius: var(--gm-radius-full, 9999px);
   background-color: var(--gm-bg-elevated);
   border: 1px solid var(--gm-border-strong);
-  color: var(--gm-text-secondary);
-  font-size: 0.72rem;
-  font-weight: 700;
+  color: var(--gm-text-muted);
+  font-size: 1.05rem;
+  line-height: 1;
   cursor: pointer;
   flex-shrink: 0;
-  transition: background-color var(--gm-transition-fast), border-color var(--gm-transition-fast), color var(--gm-transition-fast);
+  transition: background-color var(--gm-transition-fast), border-color var(--gm-transition-fast), color var(--gm-transition-fast), transform var(--gm-transition-fast);
 }
 
 .gm-forecast-pin-btn::before {
@@ -11343,7 +11354,8 @@ input.gm-input:focus {
 .gm-forecast-pin-btn:hover,
 .gm-forecast-pin-btn:focus-visible {
   border-color: var(--gm-accent);
-  color: var(--gm-text-primary);
+  color: var(--gm-accent);
+  transform: scale(1.08);
   outline: none;
 }
 
@@ -11391,12 +11403,8 @@ input.gm-input:focus {
   color: var(--gm-accent);
 }
 
-[data-theme="light"] .gm-home-pin-btn.is-unpinned {
-  background-color: rgba(2, 132, 199, 0.10);
-  border-color: var(--gm-accent);
-  color: var(--gm-accent);
-}
-
+[data-theme="light"] .gm-home-pin-btn.is-pinned,
+[data-theme="light"] .gm-home-drawer-pin-btn.is-pinned,
 [data-theme="light"] .gm-forecast-pin-btn.active {
   background-color: rgba(217, 119, 6, 0.12);
   border-color: rgba(217, 119, 6, 0.55);

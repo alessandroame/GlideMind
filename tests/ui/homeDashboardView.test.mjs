@@ -28,9 +28,9 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     assert.ok(html.includes('gm-home-timeline'), 'Must show diurnal flyability timeline row (Option A)');
     assert.ok(html.includes('gm-spot-explain'), 'Must include compact micro-reason in header');
 
-    // Strict check: No PIN or favorites elements
-    assert.equal(html.includes('data-action="unpin"'), false, 'Must NOT contain unpin action');
-    assert.equal(html.includes('★'), false, 'Must NOT contain star favorite icon');
+    // Strict check: Default Home card header does not render search pin button when not searching
+    assert.equal(html.includes('data-action="unpin"'), false, 'Must NOT contain legacy unpin action');
+    assert.equal(html.includes('gm-star-pin-btn'), false, 'Must NOT render search star pin button in card header when not searching');
     assert.equal(html.includes('Comprensori Preferiti'), false, 'Must NOT refer to Preferiti in heading');
     assert.equal(html.includes('home-toast-anchor'), false, 'Must NOT contain unpin toast anchor');
 
@@ -1297,7 +1297,7 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     assert.equal(item.status, 'flyable', 'Card verdict must align to flyable when daylight timeline has >= 2 flyable hours despite 14:00 spike');
   });
 
-  it('should render clear search filter indicator banner and distinguish pinned Home spots from catalog search results', () => {
+  it('should render clear search filter indicator banner and distinguish pinned favorite spots from catalog search results using the star icon', () => {
     const mockStore = createStore({
       pinnedSpotIds: ['monte-cornizzolo-lc']
     });
@@ -1316,14 +1316,16 @@ describe('GlideMind Phase 3 - HomeDashboardView Architecture & Contracts (No PIN
     assert.ok(html.includes('id="home-search-filter-banner"'), 'Must render #home-search-filter-banner when search query is active');
     assert.ok(html.includes('is-search-filtered'), 'Spots list container must have is-search-filtered class when searching');
     assert.ok(html.includes('Filtro ricerca') && html.includes('Catalogo per'), 'Banner must explicitly state that list is filtered from full catalog');
-    assert.ok(html.includes('Torna a Home'), 'Banner must provide 1-tap exit button back to Home');
+    assert.ok(html.includes('★ nei preferiti'), 'Banner must summarize favorites count with star icon');
+    assert.ok(html.includes('Chiudi filtro'), 'Banner must provide 1-tap exit button');
     assert.ok(html.includes('Filtro: '), 'Counter badge must display "Filtro: X siti" during active search');
 
-    // 3. Individual cards must distinguish pinned Home items from unpinned catalog items
+    // 3. Individual cards must distinguish pinned items from unpinned catalog items via unified star button (★ / ☆) without redundant "In Home" pills
     assert.ok(html.includes('is-pinned-home is-search-result'), 'Pinned spot in search results must have is-pinned-home is-search-result classes');
     assert.ok(html.includes('is-unpinned-search is-search-result'), 'Unpinned spot in search results must have is-unpinned-search is-search-result classes');
-    assert.ok(html.includes('gm-spot-origin-badge is-in-home'), 'Pinned spot must display "✓ In Home" origin badge during search');
-    assert.ok(html.includes('gm-spot-origin-badge is-catalog-only'), 'Unpinned spot must display "Catalogo" origin badge during search');
+    assert.ok(!html.includes('gm-spot-origin-badge'), 'Must NOT render redundant "✓ In Home" origin badge alongside star button');
+    assert.ok(html.includes('gm-star-pin-btn is-pinned'), 'Pinned spot must display active star button (★) during search');
+    assert.ok(html.includes('gm-star-pin-btn is-unpinned'), 'Unpinned spot must display outline star button (☆) during search');
     assert.ok(html.includes('data-action="toggle-pin-spot"'), 'Cards must expose 1-tap toggle-pin-spot button');
   });
 

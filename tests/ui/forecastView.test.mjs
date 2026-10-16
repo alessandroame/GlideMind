@@ -3526,7 +3526,7 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
       assert.equal(slot12.status, 'unflyable', 'Timeline slot 12:00 must be unflyable due to 1.4 mm rain (not synthetic yellow)');
     });
 
-    it('renders 1-tap toggle-pin-spot button in comprensorio header bar and toggles pinnedSpotIds without opening picker sheet', () => {
+    it('renders 1-tap star favorite button in comprensorio header bar and toggles pinnedSpotIds without opening picker sheet', () => {
       const targetSpot = DEFAULT_COMPRENSORI[0];
       const mockStore = createStore({
         selectedSpot: targetSpot,
@@ -3534,12 +3534,13 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
       });
       const controller = new ForecastViewController({ store: mockStore });
 
-      // 1. Unpinned state: button shows "+ Home" and aria-pressed="false"
+      // 1. Unpinned state: button shows outline star "☆" and aria-pressed="false" without redundant "+ Home" text
       let html = controller.renderHtml();
       assert.ok(html.includes('gm-forecast-pin-btn'), 'Header must render 1-tap .gm-forecast-pin-btn');
       assert.ok(html.includes('data-action="toggle-pin-spot"'), 'Header pin button must bind toggle-pin-spot');
       assert.ok(html.includes('aria-pressed="false"'), 'Unpinned spot must have aria-pressed="false"');
-      assert.ok(html.includes('+ Home'), 'Unpinned spot must show "+ Home" CTA');
+      assert.ok(html.includes('<span aria-hidden="true">☆</span>'), 'Unpinned spot must display outline star icon ☆');
+      assert.ok(!html.includes('+ Home') && !html.includes('In Home'), 'Header pin button must use only the star icon without redundant Home text');
 
       // 2. Click toggle-pin-spot in header -> adds to pinnedSpotIds without opening picker sheet
       let pickerOpened = false;
@@ -3568,7 +3569,7 @@ describe('GlideMind Phase 4 - ForecastView Architecture & Contracts', () => {
 
       html = controller.renderHtml();
       assert.ok(html.includes('aria-pressed="true"'), 'Pinned spot must have aria-pressed="true"');
-      assert.ok(html.includes('In Home'), 'Pinned spot must display "In Home" status');
+      assert.ok(html.includes('<span aria-hidden="true">★</span>'), 'Pinned spot must display filled star icon ★');
     });
   });
 });

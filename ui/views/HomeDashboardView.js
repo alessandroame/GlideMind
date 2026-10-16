@@ -1121,17 +1121,17 @@ export class HomeDashboardViewController {
         <div class="gm-search-filter-banner-info">
           <span class="gm-search-filter-badge">Filtro ricerca</span>
           <span class="gm-search-filter-summary">
-            Catalogo per «<strong>${escapeHtml(trimmedQuery)}</strong>» · ${evaluatedList.length} ${evaluatedList.length === 1 ? 'risultato' : 'risultati'} (${pinnedInResults} in Home)
+            Catalogo per «<strong>${escapeHtml(trimmedQuery)}</strong>» · ${evaluatedList.length} ${evaluatedList.length === 1 ? 'risultato' : 'risultati'} (${pinnedInResults} ★ nei preferiti)
           </span>
         </div>
         <button
           type="button"
           class="gm-search-filter-reset-btn"
           data-action="clear-search"
-          aria-label="Chiudi filtro ricerca e torna ai comprensori della Home"
-          title="Torna ai comprensori della Home"
+          aria-label="Chiudi filtro ricerca e torna ai preferiti"
+          title="Torna ai preferiti"
         >
-          <span>Torna a Home</span>
+          <span>Chiudi filtro</span>
           <span aria-hidden="true">✕</span>
         </button>
       </div>
@@ -1167,7 +1167,7 @@ export class HomeDashboardViewController {
                 Nessuna località trovata per "${escapeHtml(this.searchQuery)}"
               </div>
               <p class="text-xs text-[var(--gm-text-muted)] max-w-xs">
-                Verifica i termini digitati o ripristina la visualizzazione dei comprensori nella Home.
+                Verifica i termini digitati o ripristina la visualizzazione dei comprensori preferiti.
               </p>
               <button 
                 type="button" 
@@ -1206,7 +1206,7 @@ export class HomeDashboardViewController {
             Nessuna località tra i preferiti
           </div>
           <p class="text-xs text-[var(--gm-text-muted)] max-w-xs">
-            Cerca un comprensorio nella barra qui sopra e tocca «+ Home», oppure aggiungilo da Previsioni.
+            Cerca un comprensorio nella barra qui sopra e tocca la stellina (☆), oppure aggiungilo da Previsioni.
           </p>
           <div class="flex items-center gap-2 mt-1">
             <button 
@@ -1327,9 +1327,9 @@ export class HomeDashboardViewController {
 
   /**
    * Renders an individual compact glanceable Comprensorio Card (Option A: 2-Row Expressive Timeline).
-   * Row 1: Spot Name + Province (+ contextual search match if searching sub-spot) | Flyability Badge (tap to expand reason pills) + Chevron
+   * Row 1: Spot Name + Province (+ contextual search match if searching sub-spot) | Star Favorite Toggle (in search) + Flyability Badge + Chevron
    * Row 2: Diurnal Flyability Timeline (Sunrise -> Sunset) with 1-tap hour deep-linking.
-   * Row 3 (Expandable on badge tap): Determinant Factor Pills ([NOTE-001]) + Home Pin management.
+   * Row 3 (Expandable on badge tap): Determinant Factor Pills ([NOTE-001]) + Favorite Star Toggle.
    * @param {object} item - Evaluated comprensorio
    * @returns {string}
    */
@@ -1387,16 +1387,11 @@ export class HomeDashboardViewController {
         tabindex="0"
         aria-label="${escapeHtml(item.name)}, stato ${escapeHtml(badgeTitle)}, decollo ${escapeHtml(takeoffName)}, atterraggio ${escapeHtml(landingName)}"
       >
-        <!-- Line 1: Spot Name + Province (+ Sub-spot Search Match) + Flyability Badge Toggle + Chevron -->
+        <!-- Line 1: Spot Name + Province (+ Sub-spot Search Match) + Star Favorite Toggle + Flyability Badge Toggle + Chevron -->
         <div class="gm-spot-header">
           <div class="gm-spot-title-group">
             <span class="gm-spot-name">${escapeHtml(item.name)}</span>
             ${item.province ? `<span class="gm-spot-prov">${escapeHtml(item.province)}</span>` : ''}
-            ${hasSearch ? `
-              <span class="gm-spot-origin-badge ${isPinned ? 'is-in-home' : 'is-catalog-only'}" title="${isPinned ? 'Comprensorio presente nella tua Home' : 'Risultato del filtro ricerca non presente nella Home'}">
-                ${isPinned ? '✓ In Home' : 'Catalogo'}
-              </span>
-            ` : ''}
             ${item.searchMatch ? `
               <span class="gm-spot-search-match" data-match-type="${escapeHtml(item.searchMatch.type)}" title="Trovato per: ${escapeHtml(item.searchMatch.label)}">
                 ${escapeHtml(item.searchMatch.label)}
@@ -1407,15 +1402,14 @@ export class HomeDashboardViewController {
             ${hasSearch ? `
               <button
                 type="button"
-                class="gm-home-pin-btn ${isPinned ? 'is-pinned' : 'is-unpinned'}"
+                class="gm-home-pin-btn gm-star-pin-btn ${isPinned ? 'is-pinned pinned' : 'is-unpinned'}"
                 data-action="toggle-pin-spot"
                 data-spot-id="${escapeHtml(item.comprensorioId)}"
                 aria-pressed="${isPinned ? 'true' : 'false'}"
-                title="${isPinned ? 'Presente nella Home. Tocca per rimuovere dalla Home' : 'Non nella Home. Tocca per aggiungere alla Home'}"
-                aria-label="${isPinned ? `Rimuovi ${escapeHtml(item.name)} dalla Home` : `Aggiungi ${escapeHtml(item.name)} alla Home`}"
+                title="${isPinned ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'}"
+                aria-label="${isPinned ? `Rimuovi ${escapeHtml(item.name)} dai preferiti` : `Aggiungi ${escapeHtml(item.name)} ai preferiti`}"
               >
-                <span aria-hidden="true">${isPinned ? '✓' : '+'}</span>
-                <span>${isPinned ? 'Home' : 'Home'}</span>
+                <span aria-hidden="true">${isPinned ? '★' : '☆'}</span>
               </button>
             ` : ''}
             <button
@@ -1459,7 +1453,7 @@ export class HomeDashboardViewController {
           `).join('')}
         </div>
 
-        <!-- Line 3 (Expandable on Badge Tap): Determinant Factor Pills ([NOTE-001]) + Home Pin Toggle -->
+        <!-- Line 3 (Expandable on Badge Tap): Determinant Factor Pills ([NOTE-001]) + Favorite Star Toggle -->
         <div 
           class="gm-spot-reasons-drawer gm-spot-explain gm-spot-micro-reason ${isReasonsExpanded ? 'is-expanded' : 'hidden'}"
           role="region"
@@ -1474,10 +1468,11 @@ export class HomeDashboardViewController {
             data-action="toggle-pin-spot"
             data-spot-id="${escapeHtml(item.comprensorioId)}"
             aria-pressed="${isPinned ? 'true' : 'false'}"
-            title="${isPinned ? 'Rimuovi questo comprensorio dalla Home' : 'Aggiungi questo comprensorio alla Home'}"
-            aria-label="${isPinned ? `Rimuovi ${escapeHtml(item.name)} dalla Home` : `Aggiungi ${escapeHtml(item.name)} alla Home`}"
+            title="${isPinned ? 'Rimuovi questo comprensorio dai preferiti' : 'Aggiungi questo comprensorio ai preferiti'}"
+            aria-label="${isPinned ? `Rimuovi ${escapeHtml(item.name)} dai preferiti` : `Aggiungi ${escapeHtml(item.name)} ai preferiti`}"
           >
-            ${isPinned ? '✕ Rimuovi da Home' : '+ Aggiungi a Home'}
+            <span aria-hidden="true">${isPinned ? '★' : '☆'}</span>
+            <span>${isPinned ? 'Preferito' : 'Aggiungi ai preferiti'}</span>
           </button>
         </div>
       </article>
