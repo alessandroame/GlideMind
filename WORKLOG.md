@@ -143,3 +143,13 @@ Giornale a finestra mobile (rolling window, max **300 righe** / **ultimi 15 inte
 - **Dettagli**: [.agents/worklog.d/2026-10-16_fix-flat-cloudcover-chart-and-api-vars.md](file:///c:/github/GlideMind/.agents/worklog.d/2026-10-16_fix-flat-cloudcover-chart-and-api-vars.md)
 - **Sintesi**:
   - Aggiunto `'cloudcover'` a `DEFAULT_HOURLY_SURFACE_VARS` in [`core/openMeteoApi.js`](file:///c:/github/GlideMind/core/openMeteoApi.js), introdotto il ciclo diurno dei cumuli in `generateSyntheticWeather` e la sintesi random-overlap da `cloudcover_low`/`mid`/`high` in `enrichWeatherData` e `ForecastViewController.computeParamMetrics`.
+
+---
+
+## 2026-10-16 - Fase 7-quinquies: Camera `Segui` a Puntamento Fisso, Soppressione Termica, Solver Anti-Vibrazione e Sguardo in Pausa
+- **Tipo**: Cinematica 3D & Controllo Camera (`core/flightReplayMath.js`, `ui/3d/MapLibreThreeEngine.js`)
+- **Dettagli**: [.agents/worklog.d/2026-10-16_chase-camera-fixed-lookat-thermal-and-valley-bias.md](file:///c:/github/GlideMind/.agents/worklog.d/2026-10-16_chase-camera-fixed-lookat-thermal-and-valley-bias.md)
+- **Sintesi**:
+  - Disaccoppiato il Look-At fisso (`focusLat/Lon/Alt` e `anchorAlt = focusAlt` con spline verticale monotona Fritsch-Carlson) dall'ancora orizzontale (`anchorLat/Lon` + `rigBearing`), sopprimendo $> 95\%$ delle traslazioni in termica ($\tau = 8.5\text{ s}$, deadband $18\text{ m}$, blocco azimut) e garantendo l'inseguimento fino a $65+\text{ km/h}$ (*elastic leash* $12\text{ m}$) con bias lato valle (`valleyBearingDeg`).
+  - Eliminata la vibrazione verticale su pendii ripidi ($|\text{slope}\cdot\tan\theta| > 1$) tramite il solver bracketed Illinois Regula Falsi (`_solveAndApplyCameraGroundTarget`) e bloccato lo sguardo sulla vela a replay fermo (`lockAnchorToFocus`, `preserveAutoRigBearing`, `_syncCameraGazeWhenPaused`).
+

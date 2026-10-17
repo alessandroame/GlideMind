@@ -47,7 +47,7 @@ Matrice di stato delle funzionalità di GlideMind riferita a [MASTER_PLAN.md](fi
 | **Logbook & Filtri a Pills (`LogbookView.js`)** | Fase 6 | 🟢 Completato | Dual-store `flights_meta`/`flights_raw`, card 4-KPI e 5 pills espandibili per argomento (`NOTE-005`) |
 | **Importatore ParaMeteo & Integrità Traccia** | Fase 6-bis | 🟢 Completato | `core/parameteoImporter.js`, divieto tracce sintetiche, auto-purge DB e focus restoration |
 | **Dettaglio Volo & Debriefing (`FlightDetailSheet.js`)** | Fase 6-ter | 🟢 Completato | Vista `100dvh`, griglia 6 KPI, debriefing aerodinamico `.gm-debrief-callout` ed eliminazione con Undo 5s |
-| **Replay 3D WebGL & Motore V2 (`FlightReplayView.js`)** | Fase 7/7-quinquies | 🟢 Completato | Camere spring-damper in quota + stabilizzazione termica, fisica pendolare vela, livrea bicolore, spline + Ghost Track |
+| **Replay 3D WebGL & Motore V2 (`FlightReplayView.js`)** | Fase 7/7-quinquies | 🟢 Completato | Camera `Segui` a Look-At fisso, blocco traslazioni termica, leash 65 km/h, bias lato valle e fisica pendolare |
 | **Trimming Non-Distruttivo & `TrackSetupSheet`** | Fase 7-ter | 🟢 Completato | `core/flightTrimming.js`, calibrazione barometrica bi-punto e modello 3D competition 54 cassoni |
 | **Mini-Mappa Traccia 2D & Fasi Sincronizzate** | Fase 7-quater | 🟢 Completato | Polilinea variometrica FAI 60 FPS, zoom su fase/termica e cursore bidirezionale mappa-grafico |
 | **Audit Ergonomico HMI & Laws of UX** | Audit | 🟢 Completato | Verifica CDP 29 viewport, touch target $\ge 48\text{px}$, contrasto sunlight mode e anti-gergo |

@@ -355,16 +355,23 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     if (typeof terrainElev === 'number' && !isNaN(terrainElev) && terrainElev > 0) {
       if (Math.abs(terrainElev - this.origin.alt) < 600) {
         const nextDelta = terrainElev - this.origin.alt;
-        const deltaChanged = !this._hasSnappedTerrain || Math.abs(nextDelta - this.terrainDelta) > 0.25;
-        this.terrainDelta = nextDelta;
-        this._hasSnappedTerrain = true;
-        if (this.modelTransform) {
-          const effectiveAlt = this.origin.alt + this.terrainDelta;
-          this.modelTransform.translateZ = effectiveAlt * this.modelTransform.meterScale;
-        }
-        if (deltaChanged) {
-          this._clampTrackAboveTerrain();
-          this._refreshDropCurtainElevations();
+        // Once snapped, only refine terrainDelta when higher-LOD DEM tiles bring the origin
+        // closer to the GPS takeoff altitude, preventing mid-flight origin tile LOD downgrades
+        // from shaking the entire 3D scene vertically.
+        const shouldUpdate = !this._hasSnappedTerrain || Math.abs(nextDelta) < Math.abs(this.terrainDelta) - 0.25;
+        if (shouldUpdate) {
+          const deltaChanged = !this._hasSnappedTerrain || Math.abs(nextDelta - this.terrainDelta) > 0.25;
+          this.terrainDelta = nextDelta;
+          this._hasSnappedTerrain = true;
+          if (this.modelTransform) {
+            const effectiveAlt = this.origin.alt + this.terrainDelta;
+            this.modelTransform.translateZ = effectiveAlt * this.modelTransform.meterScale;
+          }
+          if (deltaChanged) {
+            this._needsPausedFrameSync = true;
+            this._clampTrackAboveTerrain();
+            this._refreshDropCurtainElevations();
+          }
         }
         return true;
       }
@@ -375,7 +382,8 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
   /**
    * Ensures every projected track point and takeoff/landing 3D marker maintains a positive
    * clearance (>= +4.5m) above the local 3D DEM terrain mesh so steep slope takeoffs
-   * and ridge segments never clip beneath DEM triangles.
+   * and ridge segments never clip beneath DEM triangles, while smoothing local cliff
+   * clearance lifts temporally to prevent vertical sawtooth oscillation.
    */
   _clampTrackAboveTerrain() {
     if (!this._hasSnappedTerrain || !this.projectedTrack || !this.origin || !this.map?.transform || typeof this.map.queryTerrainElevation !== 'function') {
@@ -387,6 +395,8 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
 
     const effectiveOriginAlt = (this.origin.alt ?? 0) + this.terrainDelta;
     const minClearanceMeters = 5.5;
+    const rawLifts = new Float64Array(n);
+    const envelopeLifts = new Float64Array(n);
     let anyClamped = false;
 
     for (let i = 0; i < n; i++) {
@@ -398,17 +408,52 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
         const demElev = this.map.queryTerrainElevation([pt.lon, pt.lat]);
         if (typeof demElev === 'number' && !isNaN(demElev) && demElev > 0) {
           const localGroundY = demElev - effectiveOriginAlt;
-          const minSafeY = Math.round((localGroundY + minClearanceMeters) * 100) / 100;
-          const nextY = Math.max(pt._rawY, minSafeY);
-          if (Math.abs(nextY - pt.y) > 0.05) {
-            pt.y = nextY;
-            anyClamped = true;
-          }
+          const minSafeY = localGroundY + minClearanceMeters;
+          rawLifts[i] = Math.max(0, minSafeY - pt._rawY);
         }
       }
     }
 
+    // Stage 1: Tapered local upper envelope so narrow DEM triangle ridges remain safely cleared
+    for (let i = 0; i < n; i++) {
+      const tCenter = pts[i].timeSeconds ?? i;
+      let maxEnv = rawLifts[i];
+      for (let j = Math.max(0, i - 5); j <= Math.min(n - 1, i + 5); j++) {
+        const dt = Math.abs((pts[j].timeSeconds ?? j) - tCenter);
+        const envWeight = Math.exp(-0.5 * (dt / 4.0) * (dt / 4.0));
+        const candidate = rawLifts[j] * envWeight;
+        if (candidate > maxEnv) maxEnv = candidate;
+      }
+      envelopeLifts[i] = maxEnv;
+    }
+
+    // Stage 2: Pure C-infinity Gaussian smoothing of the upper envelope (eliminates 1 Hz DEM sawtooth)
+    for (let i = 0; i < n; i++) {
+      const pt = pts[i];
+      let lift = envelopeLifts[i];
+      if (n >= 5 && i > 0 && i < n - 1) {
+        let wSum = 0;
+        let valSum = 0;
+        const tCenter = pt.timeSeconds ?? i;
+        for (let j = Math.max(0, i - 8); j <= Math.min(n - 1, i + 8); j++) {
+          const dt = Math.abs((pts[j].timeSeconds ?? j) - tCenter);
+          const w = Math.exp(-0.5 * (dt / 5.0) * (dt / 5.0));
+          wSum += w;
+          valSum += envelopeLifts[j] * w;
+        }
+        if (wSum > 0) {
+          lift = valSum / wSum;
+        }
+      }
+      const nextY = Math.round((pt._rawY + lift) * 1000) / 1000;
+      if (Math.abs(nextY - pt.y) > 0.01) {
+        pt.y = nextY;
+        anyClamped = true;
+      }
+    }
+
     if (!anyClamped) return;
+    this._needsPausedFrameSync = true;
 
     if (this.trackRibbonMesh) {
       this._updateRibbonDimensions(this._currentRibbonZoom || 14);
@@ -476,6 +521,44 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     this.userBearingOffsetDeg = (((this.userBearingOffsetDeg + (Number(deltaBearingDeg) || 0)) + 180) % 360 + 360) % 360 - 180;
     this.userPitchOffsetDeg = Math.max(-35, Math.min(20, this.userPitchOffsetDeg + (Number(deltaPitchDeg) || 0)));
     this.userZoomOffset = Math.max(-3.0, Math.min(3.0, this.userZoomOffset + (Number(deltaZoom) || 0)));
+    this._syncCameraGazeWhenPaused();
+  }
+
+  /**
+   * Synchronizes MapLibre dragPan interaction handler with the active cameraMode:
+   * disables ground panning in 'chase' and 'cockpit' modes so user touch/mouse drags
+   * never pan the camera center away from the paraglider, and enables it in 'free' mode.
+   */
+  _syncMapInteractionMode() {
+    if (!this.map || this.isHeadless) return;
+    const panHandler = this.map.dragPan;
+    if (panHandler) {
+      try {
+        if (this.cameraMode === 'free') {
+          if (typeof panHandler.enable === 'function') panHandler.enable();
+        } else {
+          if (typeof panHandler.disable === 'function') panHandler.disable();
+        }
+      } catch {}
+    }
+  }
+
+  /**
+   * Re-centers and re-orients the camera onto the 3D paraglider immediately when playback is not running.
+   */
+  _syncCameraGazeWhenPaused() {
+    if (this.isDestroyed || this.isPlaying || !this.projectedTrack || this.projectedTrack.points.length === 0) {
+      return;
+    }
+    if (this.cameraMode !== 'chase' && this.cameraMode !== 'cockpit') {
+      return;
+    }
+    this._needsPausedFrameSync = false;
+    const currentPt = this._interpolatePointAtTime(this.currentTimeSec);
+    this._updateCurrentFrame(currentPt, 2.5, { preserveAutoRigBearing: true });
+    if (this.map && typeof this.map.triggerRepaint === 'function') {
+      this.map.triggerRepaint();
+    }
   }
 
   /**
@@ -497,6 +580,7 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     this.progress = 0;
     this.hasPlaybackStarted = false;
     this._cameraState = null;
+    this._lastPausedSyncElevation = -1;
     this.userBearingOffsetDeg = 0;
     this.userPitchOffsetDeg = 0;
     this.userZoomOffset = 0;
@@ -550,6 +634,7 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
 
     // Build or Rebuild Three.js Scene and Custom Layer
     this._setupThreeCustomLayer();
+    this._syncMapInteractionMode();
 
     // Fit map bounds to flight path only when starting in 'free' mode;
     // in 'chase' or 'cockpit' mode, frame the paraglider at takeoff immediately
@@ -693,44 +778,130 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
         self.threeRenderer.render(self.threeScene, self.threeCamera);
 
         if (self.isPlaying) {
-          map.triggerRepaint();
+          if (self.map && typeof self.map.triggerRepaint === 'function') {
+            self.map.triggerRepaint();
+          }
+        } else if ((self.cameraMode === 'chase' || self.cameraMode === 'cockpit') && self._cameraState && self.projectedTrack?.points?.length > 0) {
+          // If playback is paused and newly streamed DEM tiles changed terrainDelta or centerElevation relative to
+          // the camera's referenceElevationMsl, re-project the camera ground target for the next frame so gaze stays on the glider
+          const refElev = self._cameraState.referenceElevationMsl ?? centerElevation;
+          const elevChanged = centerElevation > 0 &&
+            Math.abs(centerElevation - refElev) > 0.5 &&
+            Math.abs(centerElevation - (self._lastPausedSyncElevation ?? -1)) > 0.25;
+          if (self._needsPausedFrameSync || elevChanged) {
+            self._needsPausedFrameSync = false;
+            if (centerElevation > 0) {
+              self._lastPausedSyncElevation = centerElevation;
+            }
+            const currentPt = self._interpolatePointAtTime(self.currentTimeSec);
+            self._updateCurrentFrame(currentPt, 2.5, { preserveAutoRigBearing: true });
+            const refreshedElev = self.map?.transform?.elevation;
+            if (typeof refreshedElev === 'number' && !isNaN(refreshedElev) && refreshedElev > 0) {
+              self._lastValidCenterElevation = refreshedElev;
+              self._lastPausedSyncElevation = refreshedElev;
+            }
+            if (self.map && typeof self.map.triggerRepaint === 'function') {
+              self.map.triggerRepaint();
+            }
+          }
         }
       }
     };
 
     if (this.map && typeof this.map.on === 'function' && !this._onMapZoom) {
-      this._onMapZoom = (evt) => {
-        if (this.trackRibbonMesh && typeof this.map.getZoom === 'function') {
-          const z = this.map.getZoom();
-          if (Math.abs(z - (this._currentRibbonZoom ?? 0)) > 0.02) {
-            this._updateRibbonDimensions(z);
-          }
-          if (!this._isProgrammaticCameraMove && this.cameraMode === 'chase' && this._cameraState && evt?.originalEvent) {
-            const deltaZ = z - this._cameraState.zoom;
-            this.userZoomOffset = Math.max(-3.0, Math.min(3.0, this.userZoomOffset + deltaZ));
-            this._cameraState.zoom = z;
-          }
+      const handleUserCameraGesture = (evt) => {
+        if (this._isProgrammaticCameraMove || (this.cameraMode !== 'chase' && this.cameraMode !== 'cockpit') || !this._cameraState) {
+          return;
         }
-      };
-      this._onMapRotate = (evt) => {
-        if (!this._isProgrammaticCameraMove && this.cameraMode === 'chase' && this._cameraState && evt?.originalEvent && typeof this.map.getBearing === 'function') {
+        // During active playback, only respond to direct user input events; when paused, also respond
+        // to inertia/wheel-zoom easing frames (where originalEvent is omitted) so the gaze never drifts.
+        if (this.isPlaying && !evt?.originalEvent) {
+          return;
+        }
+
+        if (typeof this.map.getBearing === 'function') {
           const b = this.map.getBearing();
           const deltaB = (((b - this._cameraState.bearing) + 180) % 360 + 360) % 360 - 180;
-          this.userBearingOffsetDeg = (((this.userBearingOffsetDeg + deltaB) + 180) % 360 + 360) % 360 - 180;
-          this._cameraState.bearing = b;
+          if (Math.abs(deltaB) > 1e-4) {
+            this.userBearingOffsetDeg = (((this.userBearingOffsetDeg + deltaB) + 180) % 360 + 360) % 360 - 180;
+            this._cameraState.bearing = b;
+            if (typeof this._cameraState.rigBearing === 'number') {
+              this._cameraState.rigBearing = (((this._cameraState.rigBearing + deltaB) % 360) + 360) % 360;
+            }
+          }
         }
-      };
-      this._onMapPitch = (evt) => {
-        if (!this._isProgrammaticCameraMove && this.cameraMode === 'chase' && this._cameraState && evt?.originalEvent && typeof this.map.getPitch === 'function') {
+
+        if (typeof this.map.getPitch === 'function') {
           const p = this.map.getPitch();
           const deltaP = p - this._cameraState.pitch;
-          this.userPitchOffsetDeg = Math.max(-35, Math.min(20, this.userPitchOffsetDeg + deltaP));
-          this._cameraState.pitch = p;
+          if (Math.abs(deltaP) > 1e-4) {
+            this.userPitchOffsetDeg = Math.max(-35, Math.min(20, this.userPitchOffsetDeg + deltaP));
+            this._cameraState.pitch = p;
+            if (typeof this._cameraState.rigPitch === 'number') {
+              this._cameraState.rigPitch = Math.max(15, Math.min(78, this._cameraState.rigPitch + deltaP));
+            }
+          }
+        }
+
+        if (typeof this.map.getZoom === 'function') {
+          const z = this.map.getZoom();
+          const refZoom = this._cameraState.compensatedZoom ?? this._cameraState.zoom;
+          const deltaZ = z - refZoom;
+          if (Math.abs(deltaZ) > 1e-4) {
+            this.userZoomOffset = Math.max(-3.0, Math.min(3.0, this.userZoomOffset + deltaZ));
+            this._cameraState.zoom += deltaZ;
+            this._cameraState.compensatedZoom = z;
+          }
+        }
+
+        if (!this.isPlaying) {
+          this._syncCameraGazeWhenPaused();
+        }
+      };
+
+      this._onMapZoom = (evt) => {
+        if (typeof this.map.getZoom === 'function') {
+          const z = this.map.getZoom();
+          if (this.trackRibbonMesh && Math.abs(z - (this._currentRibbonZoom ?? 0)) > 0.02) {
+            this._updateRibbonDimensions(z);
+          }
+        }
+        handleUserCameraGesture(evt);
+      };
+      this._onMapRotate = (evt) => {
+        handleUserCameraGesture(evt);
+      };
+      this._onMapPitch = (evt) => {
+        handleUserCameraGesture(evt);
+      };
+      this._onMapMove = (evt) => {
+        if (!this.isPlaying) {
+          handleUserCameraGesture(evt);
+        }
+      };
+      this._onMapIdle = () => {
+        if (this.isDestroyed || !this.projectedTrack || this.projectedTrack.points.length === 0) return;
+        const prevDelta = this.terrainDelta;
+        const prevSnapped = this._hasSnappedTerrain;
+        this._trySnapTerrain();
+        const deltaChanged = Boolean(this._needsPausedFrameSync) || (this._hasSnappedTerrain !== prevSnapped) || Math.abs(this.terrainDelta - prevDelta) > 0.25;
+        const liveElev = this.map?.transform?.elevation;
+        const refElev = this._cameraState?.referenceElevationMsl ?? liveElev;
+        const elevMismatch = typeof liveElev === 'number' && !isNaN(liveElev) && liveElev > 0 && Math.abs(liveElev - refElev) > 0.5;
+        if (!this.isPlaying && (deltaChanged || elevMismatch)) {
+          this._needsPausedFrameSync = false;
+          const currentPt = this._interpolatePointAtTime(this.currentTimeSec);
+          this._updateCurrentFrame(currentPt, 2.5, { preserveAutoRigBearing: true });
+          if (this.map && typeof this.map.triggerRepaint === 'function') {
+            this.map.triggerRepaint();
+          }
         }
       };
       this.map.on('zoom', this._onMapZoom);
       this.map.on('rotate', this._onMapRotate);
       this.map.on('pitch', this._onMapPitch);
+      this.map.on('move', this._onMapMove);
+      this.map.on('idle', this._onMapIdle);
     }
 
     try {
@@ -1627,6 +1798,13 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
       }
       this._animationFrameId = null;
     }
+    if (!this.isDestroyed && this.projectedTrack && this.projectedTrack.points.length > 0) {
+      if (this._cameraState && typeof this._cameraState.bearing === 'number') {
+        this._cameraState.autoRigBearing = (((this._cameraState.bearing - this.userBearingOffsetDeg) % 360) + 360) % 360;
+      }
+      const currentPt = this._interpolatePointAtTime(this.currentTimeSec);
+      this._updateCurrentFrame(currentPt, 2.5, { preserveAutoRigBearing: true });
+    }
     if (this.map && typeof this.map.triggerRepaint === 'function') {
       this.map.triggerRepaint();
     }
@@ -1699,7 +1877,8 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     this.currentTimeSec = startSec + this.progress * totalDuration;
 
     const currentPoint = this._interpolatePointAtTime(this.currentTimeSec);
-    this._updateCurrentFrame(currentPoint, 0.35);
+    const seekDt = this.isPlaying ? 0.35 : 2.5;
+    this._updateCurrentFrame(currentPoint, seekDt);
 
     if (this.map && typeof this.map.triggerRepaint === 'function') {
       this.map.triggerRepaint();
@@ -1748,11 +1927,12 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
    * Updates 3D paraglider avatar pose, AGL ground drop-line, and MapLibre camera for the current frame.
    * @param {object} pt
    * @param {number} [dtSeconds=0.05]
+   * @param {object} [options]
    */
-  _updateCurrentFrame(pt, dtSeconds = 0.05) {
+  _updateCurrentFrame(pt, dtSeconds = 0.05, options = {}) {
     if (!pt) return;
 
-    this._updateCameraForFrame(pt, dtSeconds);
+    this._updateCameraForFrame(pt, dtSeconds, options);
 
     if (this.map) {
       const rawMapZoom = (typeof this.map.getZoom === 'function') ? this.map.getZoom() : 14;
@@ -1786,22 +1966,36 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
 
   /**
    * Synchronizes MapLibre camera according to active cameraMode using exponential spring-damper,
-   * thermal horizon stabilization, and 3D altitude optical centration.
+   * thermal horizon stabilization, and safeguarded Secant-Bisection 3D ray-terrain intersection.
    *
    * @param {object} pt
    * @param {number} [dtSeconds=0.05]
+   * @param {object} [options]
    */
-  _updateCameraForFrame(pt, dtSeconds = 0.05) {
+  _updateCameraForFrame(pt, dtSeconds = 0.05, options = {}) {
     if (!pt) return;
 
     const effectiveOriginAlt = (this.origin?.alt ?? pt.alt ?? 0) + this.terrainDelta + this.elevationOffset;
     const relativeY = typeof pt.y === 'number' ? pt.y : ((pt.alt ?? 0) - (this.origin?.alt ?? pt.alt ?? 0));
     const gliderAltMsl = effectiveOriginAlt + relativeY;
 
+    const canvasHeightPx = this.map?.getCanvas?.()?.clientHeight || this.container?.clientHeight || 600;
+    const viewportHeightPx = (this.map?.transform?.cameraToCenterDistance > 50)
+      ? (this.map.transform.cameraToCenterDistance / 1.5)
+      : canvasHeightPx;
+
+    const liveTransformElev = (this.map?.transform && typeof this.map.transform.elevation === 'number' && !isNaN(this.map.transform.elevation) && this.map.transform.elevation > 0)
+      ? this.map.transform.elevation
+      : 0;
+    if (liveTransformElev > 0) {
+      this._lastValidCenterElevation = liveTransformElev;
+    }
+
     let groundAltMsl = effectiveOriginAlt;
-    if (this.map?.transform && typeof this.map.transform.elevation === 'number' && !isNaN(this.map.transform.elevation) && this.map.transform.elevation > 0) {
-      this._lastValidCenterElevation = this.map.transform.elevation;
-      groundAltMsl = this.map.transform.elevation;
+    if (typeof this._cameraState?.referenceElevationMsl === 'number' && this._cameraState.referenceElevationMsl > 0 && typeof this.map?.queryTerrainElevation === 'function') {
+      groundAltMsl = this._cameraState.referenceElevationMsl;
+    } else if (liveTransformElev > 0) {
+      groundAltMsl = liveTransformElev;
     } else if (this._lastValidCenterElevation > 0) {
       groundAltMsl = this._lastValidCenterElevation;
     } else if (this._hasSnappedTerrain && this.map && typeof this.map.queryTerrainElevation === 'function' && typeof pt.lon === 'number' && typeof pt.lat === 'number') {
@@ -1811,18 +2005,42 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
       }
     }
 
+    let valleyBearingDeg = typeof pt.valleyBearingDeg === 'number' ? pt.valleyBearingDeg : undefined;
+    if (this._hasSnappedTerrain && this.map && typeof this.map.queryTerrainElevation === 'function' && typeof pt.lon === 'number' && typeof pt.lat === 'number') {
+      const sampleLon = this._cameraState?.anchorLon ?? pt.lon;
+      const sampleLat = this._cameraState?.anchorLat ?? pt.lat;
+      const eN = this.map.queryTerrainElevation([sampleLon, sampleLat + 0.0025]);
+      const eS = this.map.queryTerrainElevation([sampleLon, sampleLat - 0.0025]);
+      const eE = this.map.queryTerrainElevation([sampleLon + 0.0032, sampleLat]);
+      const eW = this.map.queryTerrainElevation([sampleLon - 0.0032, sampleLat]);
+      if (eN > 0 && eS > 0 && eE > 0 && eW > 0) {
+        const downEast = eW - eE;
+        const downNorth = eS - eN;
+        if (Math.hypot(downEast, downNorth) > 15) {
+          valleyBearingDeg = ((Math.atan2(downEast, downNorth) * 180) / Math.PI + 360) % 360;
+        }
+      }
+    }
+
     const cameraTargetPt = {
       ...pt,
       alt: gliderAltMsl
     };
 
-    this._cameraState = stepCameraSpringDamper(this._cameraState, cameraTargetPt, dtSeconds, {
+    const effectiveDt = this.isPlaying ? dtSeconds : Math.max(Number(dtSeconds) || 0.05, 2.0);
+
+    this._cameraState = stepCameraSpringDamper(this._cameraState, cameraTargetPt, effectiveDt, {
       mode: this.cameraMode,
       baseZoom: 14.3,
       basePitch: 60,
+      playbackSpeed: this.playbackSpeed,
+      valleyBearingDeg,
       userBearingOffsetDeg: this.userBearingOffsetDeg,
       userPitchOffsetDeg: this.userPitchOffsetDeg,
       userZoomOffset: this.userZoomOffset,
+      viewportHeightPx,
+      lockAnchorToFocus: !this.isPlaying,
+      preserveAutoRigBearing: Boolean(options?.preserveAutoRigBearing),
       groundAltMsl
     });
 
@@ -1831,6 +2049,206 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     if ((this.cameraMode === 'chase' || this.cameraMode === 'cockpit') && typeof this.map.jumpTo === 'function' && this._cameraState) {
       this._isProgrammaticCameraMove = true;
       try {
+        this._solveAndApplyCameraGroundTarget(groundAltMsl, viewportHeightPx);
+      } finally {
+        this._isProgrammaticCameraMove = false;
+      }
+    }
+    // 'free' mode: map camera is controlled interactively by user gestures
+  }
+
+  /**
+   * Solves the ray-terrain intersection fixed point T(E*) = E* along the camera's 3D optical ray
+   * using a safeguarded Secant-Bisection (Illinois Regula Falsi) solver so that `referenceElevationMsl`
+   * matches the actual terrain elevation at `[centerLon, centerLat]`, preventing cobweb divergence on steep slopes.
+   *
+   * @param {number} initialElev
+   * @param {number} viewportHeightPx
+   */
+  _solveAndApplyCameraGroundTarget(initialElev, viewportHeightPx) {
+    const evalCandidate = (eRef) => computeCameraGroundTargetForAltitude({
+      lat: this._cameraState.focusLat,
+      lon: this._cameraState.focusLon,
+      altMsl: this._cameraState.focusAlt,
+      referenceElevationMsl: eRef,
+      pitchDeg: this._cameraState.pitch,
+      bearingDeg: this._cameraState.bearing,
+      zoom: this._cameraState.zoom,
+      cameraMode: this.cameraMode,
+      viewportHeightPx,
+      rayDistanceMeters: this._cameraState.rayDistanceMeters
+    });
+
+    const applyCandidateToState = (cand, refElev) => {
+      this._cameraState.centerLon = cand.lon;
+      this._cameraState.centerLat = cand.lat;
+      this._cameraState.forwardOffsetMeters = cand.forwardOffsetMeters;
+      this._cameraState.altitudeDeltaMeters = cand.altitudeDeltaMeters;
+      this._cameraState.compensatedZoom = cand.compensatedZoom;
+      this._cameraState.referenceElevationMsl = Math.round(refElev * 100) / 100;
+    };
+
+    const hasQueryFn = typeof this.map?.queryTerrainElevation === 'function';
+    if (hasQueryFn) {
+      const e0 = initialElev;
+      const cand0 = evalCandidate(e0);
+      const t0 = this.map.queryTerrainElevation([cand0.lon, cand0.lat]);
+
+      if (typeof t0 === 'number' && !isNaN(t0) && t0 > 0) {
+        const f0 = t0 - e0;
+        let bestE = e0;
+        let bestCand = cand0;
+        let bestResidual = Math.abs(f0);
+
+        if (bestResidual > 0.02) {
+          const probe = (eVal) => {
+            const c = evalCandidate(eVal);
+            const t = this.map.queryTerrainElevation([c.lon, c.lat]);
+            if (typeof t !== 'number' || isNaN(t) || t <= 0) return null;
+            const f = t - eVal;
+            if (Math.abs(f) < bestResidual) {
+              bestE = eVal;
+              bestCand = c;
+              bestResidual = Math.abs(f);
+            }
+            return { e: eVal, f, cand: c, t };
+          };
+
+          const p1 = probe(Math.max(0, Math.min(this._cameraState.focusAlt + 400, e0 + 0.5 * f0)));
+          if (p1 && bestResidual > 0.02) {
+            let aE = e0;
+            let aF = f0;
+            let bE = p1.e;
+            let bF = p1.f;
+            let hasBracket = (aF > 0 && bF < 0) || (aF < 0 && bF > 0);
+
+            if (!hasBracket) {
+              const pFull = probe(Math.max(0, Math.min(this._cameraState.focusAlt + 400, t0)));
+              if (pFull) {
+                if ((aF > 0 && pFull.f < 0) || (aF < 0 && pFull.f > 0)) {
+                  bE = pFull.e;
+                  bF = pFull.f;
+                  hasBracket = true;
+                } else if ((bF > 0 && pFull.f < 0) || (bF < 0 && pFull.f > 0)) {
+                  aE = bE;
+                  aF = bF;
+                  bE = pFull.e;
+                  bF = pFull.f;
+                  hasBracket = true;
+                } else {
+                  aE = bE;
+                  aF = bF;
+                  bE = pFull.e;
+                  bF = pFull.f;
+                }
+              }
+            }
+
+            if (!hasBracket && bestResidual > 0.02) {
+              const boundaryProbes = [this._cameraState.focusAlt, 0];
+              for (const bProbeElev of boundaryProbes) {
+                const pBound = probe(bProbeElev);
+                if (pBound && ((bF > 0 && pBound.f < 0) || (bF < 0 && pBound.f > 0))) {
+                  aE = bE;
+                  aF = bF;
+                  bE = pBound.e;
+                  bF = pBound.f;
+                  hasBracket = true;
+                  break;
+                }
+              }
+            }
+
+            let sameSideCount = 0;
+            for (let iter = 0; iter < 12 && bestResidual > 0.02; iter++) {
+              const denom = bF - aF;
+              let eNext = Math.abs(denom) > 1e-4
+                ? (bE - bF * ((bE - aE) / denom))
+                : (0.5 * (aE + bE));
+
+              if (hasBracket) {
+                const minB = Math.min(aE, bE);
+                const maxB = Math.max(aE, bE);
+                const span = maxB - minB;
+                if (sameSideCount >= 2 || eNext <= minB + 0.1 * span || eNext >= maxB - 0.1 * span) {
+                  eNext = 0.5 * (aE + bE);
+                  sameSideCount = 0;
+                }
+              } else {
+                const step = Math.max(-350, Math.min(350, eNext - bE));
+                eNext = Math.max(0, Math.min(this._cameraState.focusAlt + 400, bE + step));
+              }
+
+              const pNext = probe(eNext);
+              if (!pNext) break;
+
+              if (hasBracket) {
+                if ((pNext.f > 0 && bF < 0) || (pNext.f < 0 && bF > 0)) {
+                  aE = bE;
+                  aF = bF;
+                  bE = pNext.e;
+                  bF = pNext.f;
+                  sameSideCount = 0;
+                } else {
+                  bE = pNext.e;
+                  bF = pNext.f;
+                  aF *= 0.5;
+                  sameSideCount++;
+                }
+              } else if ((pNext.f > 0 && bF < 0) || (pNext.f < 0 && bF > 0)) {
+                hasBracket = true;
+                aE = bE;
+                aF = bF;
+                bE = pNext.e;
+                bF = pNext.f;
+                sameSideCount = 0;
+              } else {
+                aE = bE;
+                aF = bF;
+                bE = pNext.e;
+                bF = pNext.f;
+              }
+            }
+          }
+        }
+
+        // Preserve the converged (bestCand, bestE) pair without taking an unbracketed cobweb step
+        applyCandidateToState(bestCand, bestE);
+        this._lastValidCenterElevation = bestE;
+
+        this.map.jumpTo({
+          center: [this._cameraState.centerLon, this._cameraState.centerLat],
+          bearing: this._cameraState.bearing,
+          pitch: this._cameraState.pitch,
+          zoom: this._cameraState.compensatedZoom ?? this._cameraState.zoom
+        });
+        return;
+      }
+    }
+
+    // Fallback when queryTerrainElevation is unavailable or returns 0: use map.transform.elevation with Secant-Bisection damping
+    let bestE = initialElev;
+    let bestCand = evalCandidate(bestE);
+    applyCandidateToState(bestCand, bestE);
+    this.map.jumpTo({
+      center: [this._cameraState.centerLon, this._cameraState.centerLat],
+      bearing: this._cameraState.bearing,
+      pitch: this._cameraState.pitch,
+      zoom: this._cameraState.compensatedZoom ?? this._cameraState.zoom
+    });
+
+    const t0 = this.map?.transform?.elevation;
+    if (typeof t0 === 'number' && !isNaN(t0) && t0 > 0) {
+      this._lastValidCenterElevation = t0;
+      const e0 = initialElev;
+      const f0 = t0 - e0;
+      let bestResidual = Math.abs(f0);
+      if (bestResidual > 0.2) {
+        let aE = e0;
+        let aF = f0;
+        let bE = Math.max(0, Math.min(this._cameraState.focusAlt + 400, e0 + 0.5 * f0));
+        const cand1 = evalCandidate(bE);
+        applyCandidateToState(cand1, bE);
         this.map.jumpTo({
           center: [this._cameraState.centerLon, this._cameraState.centerLat],
           bearing: this._cameraState.bearing,
@@ -1838,32 +2256,88 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
           zoom: this._cameraState.compensatedZoom ?? this._cameraState.zoom
         });
 
-        const updatedElev = this.map?.transform?.elevation;
-        if (typeof updatedElev === 'number' && !isNaN(updatedElev) && updatedElev > 0) {
-          this._lastValidCenterElevation = updatedElev;
-          if (dtSeconds >= 1.5 && Math.abs(updatedElev - groundAltMsl) > 5) {
-            this._cameraState = stepCameraSpringDamper(this._cameraState, cameraTargetPt, dtSeconds, {
-              mode: this.cameraMode,
-              baseZoom: 14.3,
-              basePitch: 60,
-              userBearingOffsetDeg: this.userBearingOffsetDeg,
-              userPitchOffsetDeg: this.userPitchOffsetDeg,
-              userZoomOffset: this.userZoomOffset,
-              groundAltMsl: updatedElev
-            });
+        const t1 = this.map?.transform?.elevation;
+        if (typeof t1 === 'number' && !isNaN(t1) && t1 > 0) {
+          this._lastValidCenterElevation = t1;
+          let bF = t1 - bE;
+          if (Math.abs(bF) < bestResidual) {
+            bestE = bE;
+            bestCand = cand1;
+            bestResidual = Math.abs(bF);
+          }
+
+          let hasBracket = (aF > 0 && bF < 0) || (aF < 0 && bF > 0);
+          for (let iter = 0; iter < 3 && bestResidual > 0.2; iter++) {
+            const denom = bF - aF;
+            let eNext = Math.abs(denom) > 1e-4
+              ? (bE - bF * ((bE - aE) / denom))
+              : (bE + 0.5 * bF);
+            if (hasBracket) {
+              const minB = Math.min(aE, bE);
+              const maxB = Math.max(aE, bE);
+              const span = maxB - minB;
+              if (eNext <= minB + 0.1 * span || eNext >= maxB - 0.1 * span) {
+                eNext = 0.5 * (aE + bE);
+              }
+            } else {
+              const step = Math.max(-350, Math.min(350, eNext - bE));
+              eNext = Math.max(0, Math.min(this._cameraState.focusAlt + 400, bE + step));
+            }
+
+            const candNext = evalCandidate(eNext);
+            applyCandidateToState(candNext, eNext);
             this.map.jumpTo({
               center: [this._cameraState.centerLon, this._cameraState.centerLat],
               bearing: this._cameraState.bearing,
               pitch: this._cameraState.pitch,
               zoom: this._cameraState.compensatedZoom ?? this._cameraState.zoom
             });
+
+            const tNext = this.map?.transform?.elevation;
+            if (typeof tNext !== 'number' || isNaN(tNext) || tNext <= 0) break;
+            this._lastValidCenterElevation = tNext;
+            const fNext = tNext - eNext;
+            if (Math.abs(fNext) < bestResidual) {
+              bestE = eNext;
+              bestCand = candNext;
+              bestResidual = Math.abs(fNext);
+            }
+
+            if (hasBracket) {
+              if ((fNext > 0 && bF < 0) || (fNext < 0 && bF > 0)) {
+                aE = bE;
+                aF = bF;
+                bE = eNext;
+                bF = fNext;
+              } else {
+                bE = eNext;
+                bF = fNext;
+                aF *= 0.5;
+              }
+            } else if ((fNext > 0 && bF < 0) || (fNext < 0 && bF > 0)) {
+              hasBracket = true;
+              aE = bE;
+              aF = bF;
+              bE = eNext;
+              bF = fNext;
+            } else {
+              aE = bE;
+              aF = bF;
+              bE = eNext;
+              bF = fNext;
+            }
           }
+
+          applyCandidateToState(bestCand, bestE);
+          this.map.jumpTo({
+            center: [this._cameraState.centerLon, this._cameraState.centerLat],
+            bearing: this._cameraState.bearing,
+            pitch: this._cameraState.pitch,
+            zoom: this._cameraState.compensatedZoom ?? this._cameraState.zoom
+          });
         }
-      } finally {
-        this._isProgrammaticCameraMove = false;
       }
     }
-    // 'free' mode: map camera is controlled interactively by user gestures
   }
 
   /**
@@ -1886,6 +2360,8 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     if (!['chase', 'cockpit', 'free'].includes(mode)) return;
     const wasSameMode = this.cameraMode === mode;
     this.cameraMode = mode;
+
+    this._syncMapInteractionMode();
 
     if (mode === 'chase') {
       this.userBearingOffsetDeg = 0;
@@ -1914,7 +2390,8 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     this.elevationOffset = Number(deltaMeters) || 0;
     if (this.projectedTrack) {
       const currentPoint = this._interpolatePointAtTime(this.currentTimeSec);
-      this._updateCurrentFrame(currentPoint);
+      const offsetDt = this.isPlaying ? 0.05 : 2.5;
+      this._updateCurrentFrame(currentPoint, offsetDt);
       if (this.map && typeof this.map.triggerRepaint === 'function') {
         this.map.triggerRepaint();
       }
@@ -1980,6 +2457,7 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
     this._reusableVec3A = null;
     this._reusableVec3B = null;
     this._lastValidCenterElevation = 0;
+    this._lastPausedSyncElevation = -1;
     this._ribbonPoints = null;
     this._ribbonNormals = null;
     this._currentRibbonZoom = null;
@@ -1993,9 +2471,13 @@ export class MapLibreThreeEngine extends IReplay3dEngine {
         if (this._onMapZoom) this.map.off('zoom', this._onMapZoom);
         if (this._onMapRotate) this.map.off('rotate', this._onMapRotate);
         if (this._onMapPitch) this.map.off('pitch', this._onMapPitch);
+        if (this._onMapMove) this.map.off('move', this._onMapMove);
+        if (this._onMapIdle) this.map.off('idle', this._onMapIdle);
         this._onMapZoom = null;
         this._onMapRotate = null;
         this._onMapPitch = null;
+        this._onMapMove = null;
+        this._onMapIdle = null;
       }
       const mapCanvas = this.map.getCanvas();
       if (mapCanvas) {

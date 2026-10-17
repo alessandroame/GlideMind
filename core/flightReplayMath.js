@@ -151,17 +151,37 @@ export function interpolateTrackSample(pPrev, pNext, factor, pPrevPrev = null, p
   const hasCubic = pPrevPrev && pNextNext &&
     typeof pPrev.lat === 'number' && typeof pNext.lat === 'number';
 
+  const dt12 = Math.max(0.1, (pNext.timeSeconds ?? 1) - (pPrev.timeSeconds ?? 0));
+  const dt01 = hasCubic
+    ? Math.max(0.1, (pPrev.timeSeconds ?? 0) - (pPrevPrev.timeSeconds ?? ((pPrev.timeSeconds ?? 0) - dt12)))
+    : dt12;
+  const dt23 = hasCubic
+    ? Math.max(0.1, (pNextNext.timeSeconds ?? ((pNext.timeSeconds ?? 1) + dt12)) - (pNext.timeSeconds ?? 1))
+    : dt12;
+  const r01 = Math.max(0.25, Math.min(4.0, dt12 / dt01));
+  const r23 = Math.max(0.25, Math.min(4.0, dt12 / dt23));
+  const evalNormCubic = (v0, v1, v2, v3) => interpolateCatmullRom(
+    v1 - (v1 - v0) * r01,
+    v1,
+    v2,
+    v2 + (v3 - v2) * r23,
+    t
+  );
+
   const lat = hasCubic
-    ? interpolateCatmullRom(pPrevPrev.lat, pPrev.lat, pNext.lat, pNextNext.lat, t)
+    ? evalNormCubic(pPrevPrev.lat, pPrev.lat, pNext.lat, pNextNext.lat)
     : pPrev.lat + (pNext.lat - pPrev.lat) * t;
 
   const lon = hasCubic
-    ? interpolateCatmullRom(pPrevPrev.lon, pPrev.lon, pNext.lon, pNextNext.lon, t)
+    ? evalNormCubic(pPrevPrev.lon, pPrev.lon, pNext.lon, pNextNext.lon)
     : pPrev.lon + (pNext.lon - pPrev.lon) * t;
 
-  const alt = hasCubic && typeof pPrev.alt === 'number'
-    ? interpolateCatmullRom(pPrevPrev.alt || pPrev.alt, pPrev.alt, pNext.alt, pNextNext.alt || pNext.alt, t)
+  const rawAlt = hasCubic && typeof pPrev.alt === 'number'
+    ? evalNormCubic(pPrevPrev.alt ?? pPrev.alt, pPrev.alt, pNext.alt, pNextNext.alt ?? pNext.alt)
     : (pPrev.alt || 0) + ((pNext.alt || 0) - (pPrev.alt || 0)) * t;
+  const minSegAlt = Math.min(pPrev.alt ?? rawAlt, pNext.alt ?? rawAlt);
+  const maxSegAlt = Math.max(pPrev.alt ?? rawAlt, pNext.alt ?? rawAlt);
+  const alt = Math.max(minSegAlt, Math.min(maxSegAlt, rawAlt));
 
   const timeSeconds = (pPrev.timeSeconds ?? 0) + ((pNext.timeSeconds ?? 0) - (pPrev.timeSeconds ?? 0)) * t;
   const speedKmh = (pPrev.speedKmh ?? 38) + ((pNext.speedKmh ?? 38) - (pPrev.speedKmh ?? 38)) * t;
@@ -171,7 +191,7 @@ export function interpolateTrackSample(pPrev, pNext, factor, pPrevPrev = null, p
   const heading = interpolateAngleDegrees(pPrev.heading ?? 0, pNext.heading ?? 0, t);
 
   // Turn rate estimation in deg/s
-  const dt = Math.max(0.1, (pNext.timeSeconds ?? 1) - (pPrev.timeSeconds ?? 0));
+  const dt = dt12;
   const turnRateDegSec = calculateAngularDelta(pPrev.heading ?? 0, pNext.heading ?? 0) / dt;
 
   // Coordinated bank & kinematic pitch
@@ -207,11 +227,21 @@ export function interpolateTrackSample(pPrev, pNext, factor, pPrevPrev = null, p
   const thermalCenterLon = (typeof pPrev.thermalCenterLon === 'number' && typeof pNext.thermalCenterLon === 'number')
     ? Math.round((pPrev.thermalCenterLon + (pNext.thermalCenterLon - pPrev.thermalCenterLon) * t) * 1e7) / 1e7
     : Math.round(lon * 1e7) / 1e7;
+  const directionalPersistence = (typeof pPrev.directionalPersistence === 'number' && typeof pNext.directionalPersistence === 'number')
+    ? Math.round((pPrev.directionalPersistence + (pNext.directionalPersistence - pPrev.directionalPersistence) * t) * 1000) / 1000
+    : 1;
+  const guideHeading = (typeof pPrev.guideHeading === 'number' && typeof pNext.guideHeading === 'number')
+    ? interpolateAngleDegrees(pPrev.guideHeading, pNext.guideHeading, t)
+    : smoothHeading;
+  const hasValleyBearing = typeof pPrev.valleyBearingDeg === 'number' || typeof pNext.valleyBearingDeg === 'number';
+  const valleyBearingDeg = (typeof pPrev.valleyBearingDeg === 'number' && typeof pNext.valleyBearingDeg === 'number')
+    ? interpolateAngleDegrees(pPrev.valleyBearingDeg, pNext.valleyBearingDeg, t)
+    : (typeof pPrev.valleyBearingDeg === 'number' ? pPrev.valleyBearingDeg : pNext.valleyBearingDeg);
 
   const result = {
     lat: Math.round(lat * 1e7) / 1e7,
     lon: Math.round(lon * 1e7) / 1e7,
-    alt: Math.round(alt * 10) / 10,
+    alt: Math.round(alt * 1000) / 1000,
     timeSeconds: Math.round(timeSeconds * 10) / 10,
     speedKmh: Math.round(speedKmh * 10) / 10,
     vario: Math.round(vario * 10) / 10,
@@ -228,26 +258,36 @@ export function interpolateTrackSample(pPrev, pNext, factor, pPrevPrev = null, p
     brakeRight,
     isThermalOrbit,
     thermalCenterLat,
-    thermalCenterLon
+    thermalCenterLon,
+    directionalPersistence,
+    guideHeading
   };
+
+  if (hasValleyBearing && typeof valleyBearingDeg === 'number' && !isNaN(valleyBearingDeg)) {
+    result.valleyBearingDeg = valleyBearingDeg;
+  }
 
   // Interpolate local Cartesian coordinates if present
   if (typeof pPrev.x === 'number' && typeof pNext.x === 'number') {
     const rx = hasCubic && typeof pPrevPrev?.x === 'number' && typeof pNextNext?.x === 'number'
-      ? Math.round(interpolateCatmullRom(pPrevPrev.x, pPrev.x, pNext.x, pNextNext.x, t) * 100) / 100
-      : Math.round((pPrev.x + (pNext.x - pPrev.x) * t) * 100) / 100;
+      ? Math.round(evalNormCubic(pPrevPrev.x, pPrev.x, pNext.x, pNextNext.x) * 1000) / 1000
+      : Math.round((pPrev.x + (pNext.x - pPrev.x) * t) * 1000) / 1000;
     result.x = rx === 0 ? 0 : rx;
   }
   if (typeof pPrev.y === 'number' && typeof pNext.y === 'number') {
-    const ry = hasCubic && typeof pPrevPrev?.y === 'number' && typeof pNextNext?.y === 'number'
-      ? Math.round(interpolateCatmullRom(pPrevPrev.y, pPrev.y, pNext.y, pNextNext.y, t) * 100) / 100
-      : Math.round((pPrev.y + (pNext.y - pPrev.y) * t) * 100) / 100;
+    const rawY = hasCubic && typeof pPrevPrev?.y === 'number' && typeof pNextNext?.y === 'number'
+      ? evalNormCubic(pPrevPrev.y, pPrev.y, pNext.y, pNextNext.y)
+      : (pPrev.y + (pNext.y - pPrev.y) * t);
+    const minSegY = Math.min(pPrev.y, pNext.y);
+    const maxSegY = Math.max(pPrev.y, pNext.y);
+    const clampedY = Math.max(minSegY, Math.min(maxSegY, rawY));
+    const ry = Math.round(clampedY * 1000) / 1000;
     result.y = ry === 0 ? 0 : ry;
   }
   if (typeof pPrev.z === 'number' && typeof pNext.z === 'number') {
     const rz = hasCubic && typeof pPrevPrev?.z === 'number' && typeof pNextNext?.z === 'number'
-      ? Math.round(interpolateCatmullRom(pPrevPrev.z, pPrev.z, pNext.z, pNextNext.z, t) * 100) / 100
-      : Math.round((pPrev.z + (pNext.z - pPrev.z) * t) * 100) / 100;
+      ? Math.round(evalNormCubic(pPrevPrev.z, pPrev.z, pNext.z, pNextNext.z) * 1000) / 1000
+      : Math.round((pPrev.z + (pNext.z - pPrev.z) * t) * 1000) / 1000;
     result.z = rz === 0 ? 0 : rz;
   }
 
@@ -436,7 +476,8 @@ export function projectTrackToThreeLocal(points, origin = null, { relativeAltitu
  *
  * Mutates points in-place by adding `smoothHeading`, `smoothTurnRateDegSec`, `smoothBankAngle`,
  * `aerodynamicPitchAngle`, `smoothVario`, `brakeLeft`, `brakeRight`, `isThermalOrbit`,
- * `thermalCenterLat`, `thermalCenterLon`, `thermalCenterX`, `thermalCenterZ`, and returns the array.
+ * `thermalCenterLat`, `thermalCenterLon`, `thermalCenterX`, `thermalCenterZ`,
+ * `directionalPersistence`, `guideHeading`, and returns the array.
  *
  * @param {Array<object>} points Projected track points
  * @param {object} [options]
@@ -486,6 +527,7 @@ export function smoothTrackKinematics(points, options = {}) {
     let sumVx = 0;
     let sumVy = 0;
     let sumVz = 0;
+    let sumScalarSpeed = 0;
     let sumSinH = 0;
     let sumCosH = 0;
 
@@ -498,6 +540,7 @@ export function smoothTrackKinematics(points, options = {}) {
       sumVx += instVx[j] * w;
       sumVy += instVy[j] * w;
       sumVz += instVz[j] * w;
+      sumScalarSpeed += Math.hypot(instVx[j], instVz[j]) * w;
       sumSinH += Math.sin(hRad) * w;
       sumCosH += Math.cos(hRad) * w;
     }
@@ -510,6 +553,7 @@ export function smoothTrackKinematics(points, options = {}) {
       sumVx += instVx[j] * w;
       sumVy += instVy[j] * w;
       sumVz += instVz[j] * w;
+      sumScalarSpeed += Math.hypot(instVx[j], instVz[j]) * w;
       sumSinH += Math.sin(hRad) * w;
       sumCosH += Math.cos(hRad) * w;
     }
@@ -519,6 +563,7 @@ export function smoothTrackKinematics(points, options = {}) {
     const vy = sumVy * invW;
     const vz = sumVz * invW;
     const horizSpeed = Math.hypot(vx, vz);
+    const scalarSpeed = sumScalarSpeed * invW;
 
     let headingDeg;
     if (horizSpeed > 0.8) {
@@ -529,11 +574,11 @@ export function smoothTrackKinematics(points, options = {}) {
     }
 
     smoothHeadingArr[i] = headingDeg;
-    smoothSpeedMsArr[i] = Math.max(2.0, horizSpeed || ((points[i].speedKmh || 36) / 3.6));
+    smoothSpeedMsArr[i] = Math.max(2.0, scalarSpeed || horizSpeed || ((points[i].speedKmh || 36) / 3.6));
     smoothVarioArr[i] = vy;
   }
 
-  // Step 3: Smoothed Turn Rate, Coordinated Bank, Aerodynamic Pitch, Brakes & Thermal Centroid
+  // Step 3: Smoothed Turn Rate & Instantaneous Osculating Circle Center Pre-pass
   const rawTurnRates = new Float64Array(n);
   for (let i = 0; i < n; i++) {
     const i0 = Math.max(0, i - 1);
@@ -542,11 +587,17 @@ export function smoothTrackKinematics(points, options = {}) {
     rawTurnRates[i] = i0 === i1 ? 0 : calculateAngularDelta(smoothHeadingArr[i0], smoothHeadingArr[i1]) / dt;
   }
 
+  const smoothOmegaArr = new Float64Array(n);
+  const oscLatArr = new Float64Array(n);
+  const oscLonArr = new Float64Array(n);
+  const oscXArr = new Float64Array(n);
+  const oscZArr = new Float64Array(n);
+  const WGS84_A = 6378137.0;
+  const metersPerDegLat = (Math.PI / 180) * WGS84_A;
+
   for (let i = 0; i < n; i++) {
     const pt = points[i];
     const ti = pt.timeSeconds ?? i;
-
-    // Smooth turn rate and vertical acceleration over +/- 2.5s window
     let wSum = 0;
     let omegaSum = 0;
     for (let j = Math.max(0, i - 4); j <= Math.min(n - 1, i + 4); j++) {
@@ -556,6 +607,74 @@ export function smoothTrackKinematics(points, options = {}) {
       omegaSum += rawTurnRates[j] * w;
     }
     const smoothOmega = wSum > 0 ? omegaSum / wSum : rawTurnRates[i];
+    smoothOmegaArr[i] = smoothOmega;
+
+    const absOmega = Math.abs(smoothOmega);
+    const wOsc = Math.max(0, Math.min(1, (absOmega - 5.5) / 5.5));
+    if (wOsc > 0 && absOmega > 1e-3) {
+      const omegaRad = (smoothOmega * Math.PI) / 180;
+      const i0 = Math.max(0, i - 1);
+      const i1 = Math.min(n - 1, i + 1);
+      const dtHalf = i0 === i1 ? 0.5 : Math.max(0.1, ((points[i1].timeSeconds ?? i1) - (points[i0].timeSeconds ?? i0)) * 0.5);
+      const halfAngleRad = Math.min(0.9, Math.abs(omegaRad) * dtHalf);
+      const chordToArcRatio = halfAngleRad > 1e-3 ? (halfAngleRad / Math.sin(halfAngleRad)) : 1.0;
+      const trueArcSpeedMs = smoothSpeedMsArr[i] * chordToArcRatio;
+      const radiusM = Math.max(-130, Math.min(130, trueArcSpeedMs / omegaRad));
+      const hRad = (smoothHeadingArr[i] * Math.PI) / 180;
+      const dEastM = wOsc * radiusM * Math.cos(hRad);
+      const dNorthM = -wOsc * radiusM * Math.sin(hRad);
+      const cosLat = Math.max(0.1, Math.cos(((pt.lat || 46.0) * Math.PI) / 180));
+      const metersPerDegLon = metersPerDegLat * cosLat;
+      oscLatArr[i] = pt.lat + dNorthM / metersPerDegLat;
+      oscLonArr[i] = pt.lon + dEastM / metersPerDegLon;
+      oscXArr[i] = (pt.x ?? 0) + dEastM;
+      oscZArr[i] = (pt.z ?? 0) - dNorthM;
+    } else {
+      oscLatArr[i] = pt.lat;
+      oscLonArr[i] = pt.lon;
+      oscXArr[i] = pt.x ?? 0;
+      oscZArr[i] = pt.z ?? 0;
+    }
+  }
+
+  // Optional downhill valley bearing inference when track exhibits a mountain-to-valley descent
+  let inferredValleyBearing = typeof options.valleyBearingDeg === 'number' && !isNaN(options.valleyBearingDeg)
+    ? (((options.valleyBearingDeg % 360) + 360) % 360)
+    : null;
+  if (inferredValleyBearing === null && n >= 2) {
+    let minAltIdx = 0;
+    for (let i = 1; i < n; i++) {
+      if ((points[i].alt ?? 0) < (points[minAltIdx].alt ?? 0)) {
+        minAltIdx = i;
+      }
+    }
+    const p0 = points[0];
+    const pMin = points[minAltIdx];
+    const altDropM = (p0.alt ?? 0) - (pMin.alt ?? 0);
+    if (altDropM >= 40) {
+      const cosLat0 = Math.max(0.1, Math.cos(((p0.lat || 46.0) * Math.PI) / 180));
+      const dEastM = (pMin.x !== undefined && p0.x !== undefined)
+        ? (pMin.x - p0.x)
+        : ((pMin.lon - p0.lon) * metersPerDegLat * cosLat0);
+      const dNorthM = (pMin.z !== undefined && p0.z !== undefined)
+        ? -(pMin.z - p0.z)
+        : ((pMin.lat - p0.lat) * metersPerDegLat);
+      if (Math.hypot(dEastM, dNorthM) >= 120) {
+        const rawValley = ((Math.atan2(dEastM, dNorthM) * 180) / Math.PI + 360) % 360;
+        inferredValleyBearing = Math.round(rawValley * 10) / 10;
+      }
+    }
+  }
+
+  // Step 4: Symmetric Gaussian Thermal Window (sigma = 8.5s, half-window W = 22.0s)
+  const sigmaThermal = 8.5;
+  const halfWinThermal = 22.0;
+  const twoSigmaThermalSq = 2 * sigmaThermal * sigmaThermal;
+
+  for (let i = 0; i < n; i++) {
+    const pt = points[i];
+    const ti = pt.timeSeconds ?? i;
+    const smoothOmega = smoothOmegaArr[i];
     const smoothBank = calculateCoordinatedBankAngle(smoothOmega, smoothSpeedMsArr[i], { maxBankDeg: 55 });
 
     // Vertical acceleration az = d(smoothVario)/dt for transient aerodynamic pitch surge
@@ -565,7 +684,6 @@ export function smoothTrackKinematics(points, options = {}) {
     const az = iPrev === iNext ? 0 : (smoothVarioArr[iNext] - smoothVarioArr[iPrev]) / dtAcc;
 
     // Realistic paraglider aerodynamic pitch attitude in [-9 deg, +7 deg]
-    // Trim pitch is ~ -2.0 deg in glide; pitches back slightly on thermal entry (+az / +vario)
     const rawAeroPitch = -2.0 + 0.75 * smoothVarioArr[i] + 1.8 * az - 0.04 * Math.abs(smoothBank);
     const aeroPitch = Math.max(-9.0, Math.min(7.0, Math.round(rawAeroPitch * 10) / 10));
 
@@ -574,29 +692,58 @@ export function smoothTrackKinematics(points, options = {}) {
     const brakeRight = smoothBank > 0.5 ? Math.round(normBank * 100) / 100 : 0;
     const brakeLeft = smoothBank < -0.5 ? Math.round(normBank * 100) / 100 : 0;
 
-    // Thermal orbit detection & moving centroid over +/- 8s window
-    let cLat = 0, cLon = 0, cX = 0, cZ = 0, cCount = 0, absOmegaSum = 0;
+    // Symmetric Gaussian thermal centroid & directional persistence over +/- 22.0s window
+    let cLat = 0, cLon = 0, cX = 0, cZ = 0, cWeight = 0, absOmegaSum = 0, signedOmegaSum = 0;
+    let guideSin = 0, guideCos = 0;
+
     for (let j = i; j >= 0; j--) {
-      if (Math.abs(ti - (points[j].timeSeconds ?? j)) > 8.0 && j < i - 2) break;
-      cLat += points[j].lat;
-      cLon += points[j].lon;
-      cX += points[j].x ?? 0;
-      cZ += points[j].z ?? 0;
-      absOmegaSum += Math.abs(rawTurnRates[j]);
-      cCount++;
+      const dt = Math.abs(ti - (points[j].timeSeconds ?? j));
+      if (dt > halfWinThermal && j < i - 2) break;
+      const w = Math.exp(-(dt * dt) / twoSigmaThermalSq);
+      const hRad = (smoothHeadingArr[j] * Math.PI) / 180;
+      cLat += oscLatArr[j] * w;
+      cLon += oscLonArr[j] * w;
+      cX += oscXArr[j] * w;
+      cZ += oscZArr[j] * w;
+      absOmegaSum += Math.abs(rawTurnRates[j]) * w;
+      signedOmegaSum += rawTurnRates[j] * w;
+      guideSin += Math.sin(hRad) * w;
+      guideCos += Math.cos(hRad) * w;
+      cWeight += w;
     }
     for (let j = i + 1; j < n; j++) {
-      if (Math.abs((points[j].timeSeconds ?? j) - ti) > 8.0 && j > i + 2) break;
-      cLat += points[j].lat;
-      cLon += points[j].lon;
-      cX += points[j].x ?? 0;
-      cZ += points[j].z ?? 0;
-      absOmegaSum += Math.abs(rawTurnRates[j]);
-      cCount++;
+      const dt = Math.abs((points[j].timeSeconds ?? j) - ti);
+      if (dt > halfWinThermal && j > i + 2) break;
+      const w = Math.exp(-(dt * dt) / twoSigmaThermalSq);
+      const hRad = (smoothHeadingArr[j] * Math.PI) / 180;
+      cLat += oscLatArr[j] * w;
+      cLon += oscLonArr[j] * w;
+      cX += oscXArr[j] * w;
+      cZ += oscZArr[j] * w;
+      absOmegaSum += Math.abs(rawTurnRates[j]) * w;
+      signedOmegaSum += rawTurnRates[j] * w;
+      guideSin += Math.sin(hRad) * w;
+      guideCos += Math.cos(hRad) * w;
+      cWeight += w;
     }
 
-    const avgAbsOmega = cCount > 0 ? absOmegaSum / cCount : Math.abs(smoothOmega);
-    const isThermalOrbit = Math.abs(smoothOmega) >= 7.5 && avgAbsOmega >= 6.5;
+    const invCW = cWeight > 0 ? 1 / cWeight : 1;
+    const avgAbsOmega = cWeight > 0 ? absOmegaSum * invCW : Math.abs(smoothOmega);
+    const avgSignedOmega = cWeight > 0 ? Math.abs(signedOmegaSum * invCW) : Math.abs(smoothOmega);
+    const normSin = guideSin * invCW;
+    const normCos = guideCos * invCW;
+    const rawPersistence = Math.min(1, Math.hypot(normSin, normCos));
+    const directionalPersistence = Math.round(rawPersistence * 1000) / 1000;
+    const rawGuideHeading = rawPersistence > 0.05
+      ? ((Math.atan2(normSin, normCos) * 180) / Math.PI + 360) % 360
+      : smoothHeadingArr[i];
+    const guideHeading = Math.round(rawGuideHeading * 10) / 10;
+
+    const isSustainedOrbit = avgSignedOmega >= 4.5 || directionalPersistence < 0.55;
+    const isThermalOrbit = isSustainedOrbit && (
+      (Math.abs(smoothOmega) >= 7.5 && avgAbsOmega >= 6.5) ||
+      (avgAbsOmega >= 8.0 && directionalPersistence < 0.55)
+    );
 
     pt.smoothHeading = Math.round(smoothHeadingArr[i] * 10) / 10;
     pt.smoothTurnRateDegSec = Math.round(smoothOmega * 10) / 10;
@@ -606,10 +753,15 @@ export function smoothTrackKinematics(points, options = {}) {
     pt.brakeLeft = brakeLeft;
     pt.brakeRight = brakeRight;
     pt.isThermalOrbit = isThermalOrbit;
-    pt.thermalCenterLat = cCount > 0 ? Math.round((cLat / cCount) * 1e7) / 1e7 : pt.lat;
-    pt.thermalCenterLon = cCount > 0 ? Math.round((cLon / cCount) * 1e7) / 1e7 : pt.lon;
-    pt.thermalCenterX = cCount > 0 ? Math.round((cX / cCount) * 100) / 100 : (pt.x ?? 0);
-    pt.thermalCenterZ = cCount > 0 ? Math.round((cZ / cCount) * 100) / 100 : (pt.z ?? 0);
+    pt.thermalCenterLat = cWeight > 0 ? Math.round((cLat * invCW) * 1e7) / 1e7 : pt.lat;
+    pt.thermalCenterLon = cWeight > 0 ? Math.round((cLon * invCW) * 1e7) / 1e7 : pt.lon;
+    pt.thermalCenterX = cWeight > 0 ? Math.round((cX * invCW) * 100) / 100 : (pt.x ?? 0);
+    pt.thermalCenterZ = cWeight > 0 ? Math.round((cZ * invCW) * 100) / 100 : (pt.z ?? 0);
+    pt.directionalPersistence = directionalPersistence;
+    pt.guideHeading = guideHeading === 0 ? 0 : guideHeading;
+    if (typeof pt.valleyBearingDeg !== 'number' && inferredValleyBearing !== null) {
+      pt.valleyBearingDeg = inferredValleyBearing;
+    }
   }
 
   return points;
@@ -645,7 +797,8 @@ export function computeCameraGroundTargetForAltitude({
   zoom = 15.2,
   cameraMode = 'chase',
   lookAheadMeters,
-  viewportHeightPx = 600
+  viewportHeightPx = 600,
+  rayDistanceMeters
 } = {}) {
   const baseLat = Number(lat) || 0;
   const baseLon = Number(lon) || 0;
@@ -658,13 +811,13 @@ export function computeCameraGroundTargetForAltitude({
     ? Number(referenceElevationMsl)
     : (groundAltMsl !== undefined ? Number(groundAltMsl) : Number(altMsl));
   const rawDeltaH = hasExplicitRef ? ((Number(altMsl) || 0) - (refElev || 0)) : 0;
-  const altitudeDeltaMeters = Math.max(0, Math.min(2800, rawDeltaH));
+  const altitudeDeltaMeters = Math.max(-400, Math.min(2800, rawDeltaH));
 
   // Ray-plane intersection: for a camera looking down at pitchRad along bearingDeg to intersect
   // the 3D glider at +altitudeDeltaMeters above refElev:
   // 1. Shift ground pivot forward by altitudeDeltaMeters * tan(pitchRad)
   // 2. Increase camera-to-ground distance D(zoom) by +altitudeDeltaMeters / cos(pitchRad)
-  //    so the camera eye stays behind and above the 3D glider at distance d_chase.
+  //    so the camera eye stays at activeRayDistance behind and above the 3D glider.
   const tanPitch = Math.tan(pitchRad);
   const cosPitch = Math.max(0.18, Math.cos(pitchRad));
 
@@ -674,12 +827,16 @@ export function computeCameraGroundTargetForAltitude({
   const cosLat = Math.max(0.1, Math.cos(latRad));
 
   const metersPerPixel = (40075016.686 * cosLat) / (512 * Math.pow(2, z));
-  const cameraToCenterPx = 1.5 * Math.max(320, Number(viewportHeightPx) || 600);
+  const cameraToCenterPx = 1.5 * Math.max(100, Number(viewportHeightPx) || 600);
   const chaseDistanceMeters = Math.max(25, cameraToCenterPx * metersPerPixel);
 
-  const totalRayDistance = chaseDistanceMeters + (altitudeDeltaMeters / cosPitch);
-  const zoomDrop = Math.log2(Math.max(1.0, totalRayDistance / chaseDistanceMeters));
-  const compensatedZoom = Math.max(10.5, Math.min(19.5, z - zoomDrop));
+  const activeRayDistance = (typeof rayDistanceMeters === 'number' && !isNaN(rayDistanceMeters) && rayDistanceMeters > 1)
+    ? rayDistanceMeters
+    : chaseDistanceMeters;
+
+  const totalRayDistance = Math.max(5.0, activeRayDistance + (altitudeDeltaMeters / cosPitch));
+  const zoomDrop = Math.log2(Math.max(0.05, totalRayDistance / chaseDistanceMeters));
+  const compensatedZoom = Math.max(6.0, Math.min(19.5, z - zoomDrop));
 
   const framingLookAheadMeters = (typeof lookAheadMeters === 'number' && !isNaN(lookAheadMeters))
     ? lookAheadMeters
@@ -701,16 +858,24 @@ export function computeCameraGroundTargetForAltitude({
     lat: roundedLat,
     centerLon: roundedLon,
     centerLat: roundedLat,
-    forwardOffsetMeters: Math.round(forwardOffsetMeters * 10) / 10,
-    altitudeDeltaMeters: Math.round(altitudeDeltaMeters * 10) / 10,
-    compensatedZoom: Math.round(compensatedZoom * 100) / 100,
-    chaseDistanceMeters: Math.round(chaseDistanceMeters * 10) / 10
+    forwardOffsetMeters: Math.round(forwardOffsetMeters * 1000) / 1000,
+    altitudeDeltaMeters: Math.round(altitudeDeltaMeters * 1000) / 1000,
+    referenceElevationMsl: Math.round((refElev || 0) * 100) / 100,
+    compensatedZoom: Math.round(compensatedZoom * 10000) / 10000,
+    chaseDistanceMeters: Math.round(chaseDistanceMeters * 1000) / 1000,
+    rayDistanceMeters: Math.round(activeRayDistance * 1000) / 1000
   };
 }
 
 /**
- * Advances the 3D camera state using a frame-rate independent exponential spring-damper,
- * incorporating Thermal Horizon Stabilization and user touch orbit offsets.
+ * Advances the 3D camera state using a decoupled target-anchor spring-damper architecture:
+ * - Look-at target (`focusLat`, `focusLon`, `focusAlt`) is locked 100% to the instantaneous 3D paraglider position.
+ * - Spatial rig anchor (`anchorLat`, `anchorLon`, `anchorAlt`) and arm bearing (`rigBearing`) are filtered
+ *   with a long time constant (tau=8.5s), radial soft deadband (18m), and rotational lock during thermals
+ *   to suppress orbital camera translation, while using a fast time constant (tau=0.14s) and 12m elastic leash
+ *   during glides to track the paraglider at maximum speed without lag.
+ * - When `valleyBearingDeg` (downhill direction toward the valley) is present in `chase` mode, the camera
+ *   tends to stay positioned on the valley side looking toward the paraglider and mountain slope.
  *
  * @param {object|null} prevState Previous camera controller state
  * @param {object} targetPoint Current interpolated track sample
@@ -721,6 +886,9 @@ export function computeCameraGroundTargetForAltitude({
  * @param {number} [options.referenceElevationMsl]
  * @param {number} [options.groundAltMsl]
  * @param {number} [options.elevationOffset=0]
+ * @param {number} [options.playbackSpeed=1] Playback speed multiplier
+ * @param {number} [options.valleyBearingDeg] Downhill azimuth toward the valley in degrees [0, 360)
+ * @param {number} [options.valleyBias=0.75] Tendency [0, 1] to keep the camera on the valley side in chase mode
  * @param {number} [options.userBearingOffsetDeg=0] User orbit yaw offset in degrees
  * @param {number} [options.userPitchOffsetDeg=0] User orbit pitch offset in degrees
  * @param {number} [options.userZoomOffset=0] User zoom offset
@@ -732,99 +900,323 @@ export function stepCameraSpringDamper(prevState, targetPoint, dtSeconds = 0.016
 
   const mode = options.cameraMode || options.mode || 'chase';
   const rawDt = Number(dtSeconds) || 0.016;
-  const isImmediateSnap = !prevState || rawDt >= 1.5;
+  const isImmediateSnap = !prevState || rawDt >= 1.5 || Boolean(prevState.mode && prevState.mode !== mode);
   const dt = Math.max(0.001, Math.min(0.5, rawDt));
+  const playbackSpeed = Math.max(0.25, Math.min(30, Number(options.playbackSpeed) || 1));
   const userYaw = Number(options.userBearingOffsetDeg) || 0;
   const userPitch = Number(options.userPitchOffsetDeg) || 0;
   const userZoom = Number(options.userZoomOffset) || 0;
   const elevOffset = Number(options.elevationOffset) || 0;
 
-  const gliderHeading = targetPoint.smoothHeading ?? targetPoint.heading ?? 0;
-  const turnRate = targetPoint.smoothTurnRateDegSec ?? targetPoint.turnRateDegSec ?? 0;
-  const isThermal = (Boolean(targetPoint.isThermalOrbit) || Math.abs(turnRate) >= 7.5) && mode === 'chase';
-
-  // Keep focus anchored tightly to the paraglider so the camera always points at the glider;
-  // only apply a subtle 8% damping toward thermal centroid during confirmed sustained orbits
-  const useThermalBlend = Boolean(targetPoint.isThermalOrbit) && mode === 'chase';
-  const rawLat = useThermalBlend && typeof targetPoint.thermalCenterLat === 'number'
-    ? targetPoint.lat * 0.92 + targetPoint.thermalCenterLat * 0.08
-    : targetPoint.lat;
-  const rawLon = useThermalBlend && typeof targetPoint.thermalCenterLon === 'number'
-    ? targetPoint.lon * 0.92 + targetPoint.thermalCenterLon * 0.08
-    : targetPoint.lon;
-  const rawAlt = (targetPoint.alt ?? 0) + elevOffset;
+  // 1. Fixed Look-At Point P_G(t): 100% locked to the instantaneous 3D paraglider coordinates
+  const focusLat = Number(targetPoint.lat) || 0;
+  const focusLon = Number(targetPoint.lon) || 0;
+  const focusAlt = (Number(targetPoint.alt) || 0) + elevOffset;
 
   const hasExplicitRef = options.referenceElevationMsl !== undefined || options.groundAltMsl !== undefined;
   const refElev = hasExplicitRef
     ? (Number(options.referenceElevationMsl ?? options.groundAltMsl) || 0)
-    : rawAlt;
+    : focusAlt;
 
-  // Desired camera orientation before damping:
-  // - In 'cockpit' (Pilot POV): look into the turn by up to +/- 20 deg
-  // - In 'chase': glider smoothed heading + user touch orbit offset
-  const lookIntoTurnDeg = mode === 'cockpit'
-    ? Math.max(-20, Math.min(20, turnRate * 0.65))
+  // 2. Thermal Regime Detection with Hysteresis & Directional Persistence
+  const gliderHeading = targetPoint.smoothHeading ?? targetPoint.heading ?? 0;
+  const turnRate = targetPoint.smoothTurnRateDegSec ?? targetPoint.turnRateDegSec ?? 0;
+  const absTurnRate = Math.abs(turnRate);
+  const persistence = typeof targetPoint.directionalPersistence === 'number'
+    ? Math.max(0, Math.min(1, targetPoint.directionalPersistence))
+    : (Boolean(targetPoint.isThermalOrbit) ? 0.15 : (absTurnRate >= 7.5 ? 0.2 : 1.0));
+
+  const wasThermalling = Boolean(prevState?.isThermalling);
+  const hasPrecomputedOrbitFlag = typeof targetPoint.isThermalOrbit === 'boolean';
+  const isThermal = mode === 'chase' && (
+    Boolean(targetPoint.isThermalOrbit) ||
+    (!hasPrecomputedOrbitFlag && absTurnRate >= 7.5) ||
+    (absTurnRate >= 7.5 && persistence < 0.65) ||
+    (wasThermalling && (absTurnRate >= 4.5 && persistence < 0.72))
+  );
+
+  const rawThermalTarget = mode === 'chase'
+    ? (isThermal
+        ? 1.0
+        : (persistence < 0.75 ? Math.max(0, Math.min(0.5, (absTurnRate - 4.5) / 5.5)) : 0))
     : 0;
-  const desiredBearing = (gliderHeading + lookIntoTurnDeg + userYaw + 360) % 360;
+  const prevThermalWeight = typeof prevState?.thermalWeight === 'number'
+    ? prevState.thermalWeight
+    : (wasThermalling ? 1.0 : 0);
+  const tauThermalWeight = rawThermalTarget >= prevThermalWeight
+    ? (0.3 / Math.sqrt(playbackSpeed))
+    : (0.65 / Math.sqrt(playbackSpeed));
+  const alphaThermalWeight = isImmediateSnap ? 1.0 : (1.0 - Math.exp(-dt / tauThermalWeight));
+  const thermalWeight = isImmediateSnap
+    ? rawThermalTarget
+    : Math.max(0, Math.min(1, prevThermalWeight + (rawThermalTarget - prevThermalWeight) * alphaThermalWeight));
 
+  // 3. Pitch and Zoom (continuous baseZoom in chase mode without forced thermal zoom jumps)
   const basePitch = mode === 'cockpit' ? 75 : (options.basePitch ?? 62);
   const desiredPitch = Math.max(15, Math.min(78, basePitch + userPitch));
 
-  const baseZoom = mode === 'cockpit' ? 17.1 : (isThermal ? 15.6 : (options.baseZoom ?? 15.2));
+  const baseZoom = mode === 'cockpit' ? 17.1 : (options.baseZoom ?? 15.2);
   const desiredZoom = Math.max(10.5, Math.min(19.5, baseZoom + userZoom));
 
-  // Time constants tau (seconds):
-  // In thermal orbit, bearing time constant increases to 6.5s so mountains stay still
-  const tauPos = mode === 'cockpit' ? 0.08 : 0.18;
-  const tauBearing = mode === 'cockpit' ? 0.18 : (isThermal ? 6.5 : 0.55);
   const tauPitchZoom = 0.22;
-
-  const alphaPos = isImmediateSnap ? 1.0 : (1.0 - Math.exp(-dt / tauPos));
-  const alphaBearing = isImmediateSnap ? 1.0 : (1.0 - Math.exp(-dt / tauBearing));
   const alphaPZ = isImmediateSnap ? 1.0 : (1.0 - Math.exp(-dt / tauPitchZoom));
-
-  const focusLat = isImmediateSnap ? rawLat : prevState.focusLat + (rawLat - prevState.focusLat) * alphaPos;
-  const focusLon = isImmediateSnap ? rawLon : prevState.focusLon + (rawLon - prevState.focusLon) * alphaPos;
-  const focusAlt = isImmediateSnap ? rawAlt : prevState.focusAlt + (rawAlt - prevState.focusAlt) * alphaPos;
-
-  const smoothedBearing = isImmediateSnap
-    ? desiredBearing
-    : interpolateAngleDegrees(prevState.bearing, desiredBearing, alphaBearing);
+  const prevRigPitch = prevState?.rigPitch ?? prevState?.pitch ?? desiredPitch;
   const smoothedPitch = isImmediateSnap
     ? desiredPitch
-    : prevState.pitch + (desiredPitch - prevState.pitch) * alphaPZ;
+    : prevRigPitch + (desiredPitch - prevRigPitch) * alphaPZ;
   const smoothedZoom = isImmediateSnap
     ? desiredZoom
     : prevState.zoom + (desiredZoom - prevState.zoom) * alphaPZ;
 
-  // Project 3D focus point at focusAlt down along the optical ray to MapLibre ground center
+  // 4. Thermal Center Estimation (Gaussian Centroid + Analytical Osculating Circle Center)
+  const WGS84_A = 6378137.0;
+  const cosLat = Math.max(0.1, Math.cos((focusLat * Math.PI) / 180));
+  const metersPerDegLat = (Math.PI / 180) * WGS84_A;
+  const metersPerDegLon = metersPerDegLat * cosLat;
+
+  let oscLat = focusLat;
+  let oscLon = focusLon;
+  if (absTurnRate >= 4.0) {
+    const speedMs = Math.max(2.0, (Number(targetPoint.speedKmh) || 36) / 3.6);
+    const omegaRad = (turnRate * Math.PI) / 180;
+    const oscRadiusM = Math.max(-130, Math.min(130, speedMs / omegaRad));
+    const hRad = (gliderHeading * Math.PI) / 180;
+    const oscEastM = oscRadiusM * Math.cos(hRad);
+    const oscNorthM = -oscRadiusM * Math.sin(hRad);
+    oscLat = focusLat + oscNorthM / metersPerDegLat;
+    oscLon = focusLon + oscEastM / metersPerDegLon;
+  }
+
+  const hasDistinctPrecomputedCenter = typeof targetPoint.thermalCenterLat === 'number' &&
+    typeof targetPoint.thermalCenterLon === 'number' &&
+    (Math.abs(targetPoint.thermalCenterLat - focusLat) > 1e-7 ||
+     Math.abs(targetPoint.thermalCenterLon - focusLon) > 1e-7);
+
+  let thermCenterLat = oscLat;
+  let thermCenterLon = oscLon;
+  if (hasDistinctPrecomputedCenter) {
+    const oscBlend = (typeof targetPoint.directionalPersistence === 'number' && persistence > 0.65)
+      ? Math.min(0.25, (persistence - 0.65) * 0.7)
+      : 0.0;
+    thermCenterLat = targetPoint.thermalCenterLat * (1 - oscBlend) + oscLat * oscBlend;
+    thermCenterLon = targetPoint.thermalCenterLon * (1 - oscBlend) + oscLon * oscBlend;
+  }
+
+  // 5. Filtered Spatial Anchor A(t): Soft Deadband (18m) in Thermal + Elastic Leash (12m) in Glide
+  const lockAnchor = Boolean(options.lockAnchorToFocus);
+  const desiredAnchorLat = lockAnchor ? focusLat : (focusLat * (1 - thermalWeight) + thermCenterLat * thermalWeight);
+  const desiredAnchorLon = lockAnchor ? focusLon : (focusLon * (1 - thermalWeight) + thermCenterLon * thermalWeight);
+
+  let anchorLat;
+  let anchorLon;
+  // Lock anchorAlt strictly to focusAlt so eyeAlt = focusAlt + vertArmHeightM maintains a constant
+  // vertical drop rayVertDropM = vertArmHeightM, preventing vertical climbs/descents from rocking rayPitchDeg.
+  const anchorAlt = focusAlt;
+
+  if (isImmediateSnap || lockAnchor) {
+    anchorLat = desiredAnchorLat;
+    anchorLon = desiredAnchorLon;
+  } else {
+    const prevAnchorLat = prevState.anchorLat ?? prevState.focusLat ?? focusLat;
+    const prevAnchorLon = prevState.anchorLon ?? prevState.focusLon ?? focusLon;
+
+    const errNorthM = (desiredAnchorLat - prevAnchorLat) * metersPerDegLat;
+    const errEastM = (desiredAnchorLon - prevAnchorLon) * metersPerDegLon;
+    const errDistM = Math.hypot(errEastM, errNorthM);
+
+    const tauGlide = (mode === 'cockpit' ? 0.06 : 0.14) / playbackSpeed;
+    const tauThermal = 8.5;
+    const deadbandRadiusM = 18.0 * thermalWeight;
+    const excessOutsideDeadbandM = Math.max(0, errDistM - deadbandRadiusM);
+    const centeringBlend = Math.min(1.0, excessOutsideDeadbandM / 18.0);
+    const effectiveTauThermal = tauThermal * (1 - centeringBlend) + (0.65 / playbackSpeed) * centeringBlend;
+    const tauPos = tauGlide * (1 - thermalWeight) + effectiveTauThermal * thermalWeight;
+    const alphaPos = 1.0 - Math.exp(-dt / Math.max(0.005, tauPos));
+
+    let deadbandGain = 1.0;
+    if (deadbandRadiusM > 0.5 && errDistM < deadbandRadiusM) {
+      const ratio = errDistM / deadbandRadiusM;
+      deadbandGain = (1 - thermalWeight) + thermalWeight * 0.05 * ratio * ratio;
+    }
+
+    const stepFactor = Math.min(1.0, alphaPos * deadbandGain);
+    anchorLat = prevAnchorLat + (desiredAnchorLat - prevAnchorLat) * stepFactor;
+    anchorLon = prevAnchorLon + (desiredAnchorLon - prevAnchorLon) * stepFactor;
+
+    if (mode === 'chase' || mode === 'cockpit') {
+      const maxLeashM = mode === 'cockpit'
+        ? 6.0
+        : (12.0 * (1 - thermalWeight) + 25.0 * thermalWeight);
+      const remNorthM = (desiredAnchorLat - anchorLat) * metersPerDegLat;
+      const remEastM = (desiredAnchorLon - anchorLon) * metersPerDegLon;
+      const remDistM = Math.hypot(remEastM, remNorthM);
+      if (remDistM > maxLeashM && remDistM > 1e-4) {
+        const pullFraction = (remDistM - maxLeashM) / remDistM;
+        anchorLat += (desiredAnchorLat - anchorLat) * pullFraction;
+        anchorLon += (desiredAnchorLon - anchorLon) * pullFraction;
+      }
+    }
+  }
+
+  // 6. Camera Arm Orientation (rigBearing) with Valley-Side Tendency, Rotational Lock in Thermal & Immediate User Offset
+  const zClamped = Math.max(10, Math.min(20, Number(smoothedZoom) || 15.2));
+  const metersPerPixel = (40075016.686 * cosLat) / (512 * Math.pow(2, zClamped));
+  const cameraToCenterPx = 1.5 * Math.max(100, Number(options.viewportHeightPx) || 600);
+  const chaseDistanceMeters = Math.max(25, cameraToCenterPx * metersPerPixel);
+
+  const pitchRadRig = (smoothedPitch * Math.PI) / 180;
+  const horizArmDistM = Math.max(5.0, chaseDistanceMeters * Math.sin(pitchRadRig));
+  const vertArmHeightM = Math.max(5.0, chaseDistanceMeters * Math.cos(pitchRadRig));
+
+  const rawValleyInput = options.valleyBearingDeg ?? targetPoint.valleyBearingDeg;
+  const prevValleyBearing = prevState?.valleyBearingDeg;
+  const hasRawValley = typeof rawValleyInput === 'number' && !isNaN(rawValleyInput);
+  const hasPrevValley = typeof prevValleyBearing === 'number' && !isNaN(prevValleyBearing);
+  const hasValleyBearing = hasRawValley || hasPrevValley;
+
+  let valleyBearingDeg = null;
+  if (hasRawValley) {
+    const normRawValley = (((Number(rawValleyInput) % 360) + 360) % 360);
+    if (isImmediateSnap || !hasPrevValley) {
+      valleyBearingDeg = normRawValley;
+    } else {
+      const tauValley = 2.8 / playbackSpeed;
+      const alphaValley = (1.0 - Math.exp(-dt / Math.max(0.05, tauValley))) * Math.max(0, 1 - 0.9 * thermalWeight);
+      const dVal = calculateAngularDelta(prevValleyBearing, normRawValley);
+      valleyBearingDeg = (prevValleyBearing + dVal * alphaValley + 360) % 360;
+    }
+  } else if (hasPrevValley) {
+    valleyBearingDeg = (((Number(prevValleyBearing) % 360) + 360) % 360);
+  }
+  // Viewing bearing from a valley-positioned camera eye looking toward the paraglider and mountain slope
+  const lookFromValleyBearing = hasValleyBearing ? ((valleyBearingDeg + 180) % 360) : null;
+
+  const lookIntoTurnDeg = mode === 'cockpit'
+    ? Math.max(-20, Math.min(20, turnRate * 0.65))
+    : 0;
+  const flightGuideHeading = targetPoint.guideHeading ?? gliderHeading;
+  const valleyBias = Math.max(0, Math.min(1, Number(options.valleyBias ?? 0.75)));
+
+  let targetAutoHeading;
+  if (mode === 'cockpit') {
+    targetAutoHeading = (gliderHeading + lookIntoTurnDeg + 360) % 360;
+  } else if (hasValleyBearing) {
+    const angleFromValleyView = Math.abs(calculateAngularDelta(lookFromValleyBearing, flightGuideHeading));
+    const intoSlopePenalty = angleFromValleyView > 90 ? ((angleFromValleyView - 90) / 90) * 0.15 : 0;
+    const wValley = Math.max(
+      0,
+      Math.min(1, valleyBias + intoSlopePenalty + (1 - valleyBias) * (1 - persistence * (1 - thermalWeight)))
+    );
+    const wFlight = 1 - wValley;
+    const vRad = (lookFromValleyBearing * Math.PI) / 180;
+    const fRad = (flightGuideHeading * Math.PI) / 180;
+    const sumSin = wValley * Math.sin(vRad) + wFlight * Math.sin(fRad);
+    const sumCos = wValley * Math.cos(vRad) + wFlight * Math.cos(fRad);
+    targetAutoHeading = Math.hypot(sumSin, sumCos) > 1e-3
+      ? (((Math.atan2(sumSin, sumCos) * 180) / Math.PI) + 360) % 360
+      : lookFromValleyBearing;
+  } else {
+    targetAutoHeading = flightGuideHeading;
+  }
+
+  let autoRigBearing;
+  if (Boolean(options.preserveAutoRigBearing) && typeof prevState?.autoRigBearing === 'number' && (!prevState.mode || prevState.mode === mode)) {
+    autoRigBearing = (((prevState.autoRigBearing % 360) + 360) % 360);
+  } else if (isImmediateSnap) {
+    const baseInitHeading = (mode === 'chase' && hasValleyBearing)
+      ? targetAutoHeading
+      : ((gliderHeading + lookIntoTurnDeg + 360) % 360);
+    const desiredInitialBearing = (baseInitHeading + userYaw + 360) % 360;
+    const desRad = (desiredInitialBearing * Math.PI) / 180;
+    const dEastInitM = (focusLon - anchorLon) * metersPerDegLon;
+    const dNorthInitM = (focusLat - anchorLat) * metersPerDegLat;
+    const perpOffsetM = dEastInitM * Math.cos(desRad) - dNorthInitM * Math.sin(desRad);
+    const sinDelta = Math.max(-0.45, Math.min(0.45, perpOffsetM / horizArmDistM));
+    const deltaDeg = -(Math.asin(sinDelta) * 180) / Math.PI;
+    autoRigBearing = (baseInitHeading + deltaDeg + 360) % 360;
+  } else {
+    const prevAutoRig = prevState.autoRigBearing ?? (((prevState.rigBearing ?? prevState.bearing ?? gliderHeading) - userYaw + 360) % 360);
+    if (mode === 'cockpit') {
+      const alphaCockpit = 1.0 - Math.exp(-dt / Math.max(0.01, 0.18 / playbackSpeed));
+      autoRigBearing = interpolateAngleDegrees(prevAutoRig, targetAutoHeading, alphaCockpit);
+    } else {
+      const baseAlphaBearing = 1.0 - Math.exp(-dt / Math.max(0.02, 0.45 / playbackSpeed));
+      const nonThermalFactor = Math.max(0, 1 - thermalWeight);
+      const effectivePersistence = hasValleyBearing
+        ? Math.max(persistence, valleyBias * 0.75)
+        : persistence;
+      const rotationGate = nonThermalFactor * nonThermalFactor * effectivePersistence;
+      const alphaAutoBearing = Math.min(1.0, baseAlphaBearing * rotationGate);
+      const deltaAngle = calculateAngularDelta(prevAutoRig, targetAutoHeading);
+      autoRigBearing = (prevAutoRig + deltaAngle * alphaAutoBearing + 360) % 360;
+    }
+  }
+
+  const rigBearing = (autoRigBearing + userYaw + 360) % 360;
+
+  // 7. 3D Camera Eye Position E_cam(t) and Exact Optical Ray E_cam(t) -> P_G(t)
+  const rigBearingRad = (rigBearing * Math.PI) / 180;
+  const eyeEastFromAnchorM = -horizArmDistM * Math.sin(rigBearingRad);
+  const eyeNorthFromAnchorM = -horizArmDistM * Math.cos(rigBearingRad);
+
+  const eyeLat = anchorLat + eyeNorthFromAnchorM / metersPerDegLat;
+  const eyeLon = anchorLon + eyeEastFromAnchorM / metersPerDegLon;
+  const eyeAlt = anchorAlt + vertArmHeightM;
+
+  const rayEastM = (focusLon - eyeLon) * metersPerDegLon;
+  const rayNorthM = (focusLat - eyeLat) * metersPerDegLat;
+  const rayVertDropM = Math.max(5.0, eyeAlt - focusAlt);
+  const rayHorizDistM = Math.hypot(rayEastM, rayNorthM);
+  const rayDistanceMeters = Math.hypot(rayHorizDistM, rayVertDropM);
+
+  const rayBearingDeg = rayHorizDistM > 1e-3
+    ? (((Math.atan2(rayEastM, rayNorthM) * 180) / Math.PI) + 360) % 360
+    : rigBearing;
+  const rayPitchDeg = Math.max(15, Math.min(78, (Math.atan2(rayHorizDistM, rayVertDropM) * 180) / Math.PI));
+
+  // 8. Project 3D focus point P_G(t) along exact optical ray down to MapLibre ground center
   const groundTarget = computeCameraGroundTargetForAltitude({
     lat: focusLat,
     lon: focusLon,
     altMsl: focusAlt,
     referenceElevationMsl: refElev,
-    pitchDeg: smoothedPitch,
-    bearingDeg: smoothedBearing,
+    pitchDeg: rayPitchDeg,
+    bearingDeg: rayBearingDeg,
     zoom: smoothedZoom,
     cameraMode: mode,
-    viewportHeightPx: options.viewportHeightPx
+    viewportHeightPx: options.viewportHeightPx,
+    rayDistanceMeters
   });
 
   return {
     centerLon: groundTarget.lon,
     centerLat: groundTarget.lat,
-    bearing: Math.round(smoothedBearing * 100) / 100,
-    pitch: Math.round(smoothedPitch * 100) / 100,
-    zoom: Math.round(smoothedZoom * 100) / 100,
+    bearing: Math.round(rayBearingDeg * 10000) / 10000,
+    pitch: Math.round(rayPitchDeg * 10000) / 10000,
+    zoom: Math.round(smoothedZoom * 10000) / 10000,
     compensatedZoom: groundTarget.compensatedZoom,
     chaseDistanceMeters: groundTarget.chaseDistanceMeters,
+    rayDistanceMeters: groundTarget.rayDistanceMeters,
     focusLat,
     focusLon,
-    focusAlt: Math.round(focusAlt * 10) / 10,
+    focusAlt: Math.round(focusAlt * 1000) / 1000,
+    anchorLat: Math.round(anchorLat * 1e7) / 1e7,
+    anchorLon: Math.round(anchorLon * 1e7) / 1e7,
+    anchorAlt: Math.round(anchorAlt * 1000) / 1000,
+    eyeLat: Math.round(eyeLat * 1e7) / 1e7,
+    eyeLon: Math.round(eyeLon * 1e7) / 1e7,
+    eyeAlt: Math.round(eyeAlt * 1000) / 1000,
+    rigBearing: Math.round(rigBearing * 10000) / 10000,
+    rigPitch: Math.round(smoothedPitch * 10000) / 10000,
+    autoRigBearing: Math.round(autoRigBearing * 10000) / 10000,
+    valleyBearingDeg: valleyBearingDeg !== null ? Math.round(valleyBearingDeg * 10) / 10 : null,
+    thermalWeight: Math.round(thermalWeight * 1000) / 1000,
     forwardOffsetMeters: groundTarget.forwardOffsetMeters,
     altitudeDeltaMeters: groundTarget.altitudeDeltaMeters,
+    referenceElevationMsl: groundTarget.referenceElevationMsl,
     isThermalStabilized: isThermal,
-    isThermalling: isThermal
+    isThermalling: isThermal,
+    mode
   };
 }
 
